@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ERP · System Requirement Specification — Phase 3–6</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <aside class="side hidden lg:flex flex-col w-[280px] shrink-0 sticky top-0 h-screen">
+    <div class="px-7 pt-8 pb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg blueprint-bg border border-white/10 flex items-center justify-center">
+          <span class="mono text-white text-sm font-semibold">S</span>
+        </div>
+        <div>
+          <div class="text-white font-semibold text-[15px] leading-none">ERP · SRS</div>
+          <div class="mono text-[10px] tracking-wider text-[#5E7391] mt-1">PHASE 3–6 SPEC</div>
+        </div>
+      </div>
+    </div>
+    <nav class="px-5 flex-1 overflow-y-auto space-y-1" id="nav">
+      <a href="#p3" class="navlink"><span class="n" style="color:var(--signal)">P3</span> Inventory Core</a>
+      <a href="#p4" class="navlink"><span class="n" style="color:var(--blueprint)">P4</span> Procurement &amp; Sales</a>
+      <a href="#p5" class="navlink"><span class="n" style="color:var(--accent)">P5</span> Finance</a>
+      <a href="#p6" class="navlink"><span class="n" style="color:var(--accent)">P6</span> Reporting (CQRS)</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <div class="navsub">แต่ละเฟสประกอบด้วย</div>
+      <div class="navsub">1 · Business &amp; Roles</div>
+      <div class="navsub">2 · Use Cases &amp; Data</div>
+      <div class="navsub">3 · Data Flow &amp; Events</div>
+      <div class="navsub">4 · ER Diagram</div>
+      <div class="navsub">5 · Dev Guide</div>
+    </nav>
+    <div class="px-7 py-5 border-t border-white/8">
+      <div class="mono text-[10px] leading-relaxed text-[#5E7391]">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[1000px] mx-auto px-6 sm:px-10 py-14">
+        <div class="eyebrow mb-4" style="color:#0AA2A0">System Requirement Specification</div>
+        <h1 class="display text-3xl sm:text-[44px] leading-[1.1] max-w-3xl">
+          ข้อกำหนดความต้องการระบบ ERP<br>
+          <span style="color:#0AA2A0">Phase 3–6</span> · Inventory · Sales · Finance · Reporting
+        </h1>
+        <p class="mt-5 text-[16px] max-w-2xl" style="color:#C6D4EA">
+          เอกสารระบุรายละเอียดเชิงธุรกิจและเชิงเทคนิคของ 4 เฟสหลัก ครอบคลุมบทบาทผู้ใช้,
+          กระบวนการบันทึกข้อมูล, การไหลของข้อมูลข้าม Bounded Context ผ่าน RabbitMQ,
+          ER Diagram และคู่มือสำหรับนักพัฒนา (SA → Dev)
+        </p>
+        <div class="mt-7 flex flex-wrap gap-2">
+          <span class="chip" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff"><span class="dot" style="background:#F0803C"></span>inventory-bc</span>
+          <span class="chip" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff"><span class="dot" style="background:#5B8DEF"></span>supplier-bc · sales-bc</span>
+          <span class="chip" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff"><span class="dot" style="background:#2DD4BF"></span>finance-bc</span>
+          <span class="chip" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff"><span class="dot" style="background:#38BDF8"></span>report-bc</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[1000px] mx-auto px-6 sm:px-10 py-14 space-y-20">
+
+      <!-- ============================================================= -->
+      <!-- PHASE 3 : INVENTORY CORE                                      -->
+      <!-- ============================================================= -->
+      <section id="p3" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(220,90,22,.12),rgba(220,90,22,.04))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(220,90,22,.16);color:var(--signal);border:1px solid rgba(220,90,22,.3)">PHASE 3</span>
+              <span class="eyebrow" style="color:var(--signal)">inventory-bc · Critical Path</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Inventory Core — Lot · FIFO/FEFO · Bundle · Goods Movement</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">แกนกลางของทั้งระบบ ควบคุมความถูกต้องของสต็อก ต้นทุนต่อล็อต และการหมดอายุ</p>
+          </div>
+        </div>
+
+        <!-- 3.1 Business & Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครทำอะไร</h3></div>
+          <div class="grid sm:grid-cols-3 gap-4">
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">WAREHOUSE MANAGER</div>
+              <div class="font-semibold mb-1.5">ผู้จัดการคลังสินค้า</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">อนุมัติการปรับสต็อก, ตัดจำหน่ายสินค้าหมดอายุ, กำหนดจุดสั่งซื้อ (reorder), เฝ้าระวังล็อตใกล้หมดอายุ</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">WAREHOUSE STAFF</div>
+              <div class="font-semibold mb-1.5">เจ้าหน้าที่คลัง</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">บันทึกรับสินค้าจริง (Goods Receipt), ระบุล็อต/ต้นทุน/วันหมดอายุ, หยิบสินค้า (picking) ตามใบจ่าย</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">QC OFFICER</div>
+              <div class="font-semibold mb-1.5">เจ้าหน้าที่ตรวจรับ</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">ตรวจคุณภาพก่อนรับเข้าล็อต, ปฏิเสธของชำรุด, ยืนยันจำนวนรับจริงเทียบ PO</p>
+            </div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> สต็อกในระบบต้องตรงกับของจริงเสมอ ทุกล็อตต้องมีต้นทุนนำเข้าและวันหมดอายุที่ถูกต้อง และการตัดสต็อกต้องเป็นไปตามกฎ FIFO/FEFO อย่างเคร่งครัด</div>
+        </div>
+
+        <!-- 3.2 Use Cases & Data Entry -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · บันทึกข้อมูลยังไง</h3></div>
+
+          <div class="grid lg:grid-cols-2 gap-6">
+            <!-- UC Goods Receipt -->
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">UC-3.1 · GOODS RECEIPT (รับสินค้าเข้าคลัง)</div>
+              <div class="mt-2">
+                <div class="step"><span class="sn">1</span><p class="text-[13.5px]">เปิดใบรับสินค้า (GRN) อ้างอิง PO จาก supplier-bc (<span class="mono text-[12px]" style="color:var(--accent)">poId, supplierId</span>)</p></div>
+                <div class="step"><span class="sn">2</span><p class="text-[13.5px]">กรอกจำนวนรับจริง, <b>ต้นทุน/หน่วย</b>, <b>lot_number</b>, <b>expiry_date</b>, คลังปลายทาง</p></div>
+                <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ระบบสร้าง <b>Lot ใหม่</b> ต่อรายการ กำหนด <span class="mono text-[12px]">available_qty = received_qty</span></p></div>
+                <div class="step"><span class="sn">4</span><p class="text-[13.5px]">บันทึก <span class="mono text-[12px]">stock_movement (type=RECEIPT)</span> + emit <span class="mono text-[12px]" style="color:var(--signal)">lot.created</span></p></div>
+              </div>
+            </div>
+            <!-- UC Goods Issue -->
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">UC-3.2 · GOODS ISSUE (ตัดสต็อก FIFO/FEFO)</div>
+              <div class="mt-2">
+                <div class="step"><span class="sn">1</span><p class="text-[13.5px]">รับคำขอจ่ายออก: <span class="mono text-[12px]">productId, qty, warehouse, strategy</span></p></div>
+                <div class="step"><span class="sn">2</span><p class="text-[13.5px]">เลือกล็อตเรียงตาม <b>receivedAt</b> (FIFO) หรือ <b>expiryDate</b> (FEFO)</p></div>
+                <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ตัด <span class="mono text-[12px]">available_qty</span> ทีละล็อต สร้าง allocation (lotId, qty, <b>unitCost</b>)</p></div>
+                <div class="step"><span class="sn">4</span><p class="text-[13.5px]">บันทึก movement (ISSUE) + emit <span class="mono text-[12px]" style="color:var(--signal)">stock.deducted</span></p></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-6 mt-6">
+            <div class="mono text-[11px] mb-3" style="color:var(--signal)">UC-3.3 · BUNDLE EXPLOSION (ขายแบบชุด)</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">เมื่อรายการที่จ่ายเป็น <span class="mono text-[12px]">type=bundle</span> ระบบจะ <b>แตกชุด</b> ตาม BOM (<span class="mono text-[12px]">bundle_items</span>) × จำนวนชุด → รวม demand ต่อสินค้าย่อย → ตัด FIFO/FEFO ของแต่ละสินค้าย่อย <b>ในทรานแซกชันเดียว</b>. COGS ของชุด = ผลรวมต้นทุนจากทุกล็อตของทุกสินค้าย่อย</p>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">ข้อมูลที่บันทึกในแต่ละขั้น</h4>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>Field</th><th>บันทึกที่ขั้น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>lot_number</td><td>Goods Receipt</td><td>รหัสล็อตจากผู้ผลิต/กำหนดเอง</td></tr>
+                <tr><td>import_cost</td><td>Goods Receipt</td><td>ต้นทุน/หน่วยของล็อตนั้น (ใช้คำนวณ COGS)</td></tr>
+                <tr><td>expiry_date</td><td>Goods Receipt</td><td>วันหมดอายุเฉพาะล็อต (ขับเคลื่อน FEFO)</td></tr>
+                <tr><td>available_qty</td><td>Receipt / Issue</td><td>คงเหลือใช้ได้จริง · ต้อง ≥ 0 เสมอ</td></tr>
+                <tr><td>allocations[]</td><td>Goods Issue</td><td>รายการ (lotId, qty, unitCost) ที่ถูกตัด — snapshot</td></tr>
+                <tr><td>movement.type</td><td>ทุกขั้น</td><td>RECEIPT · ISSUE · ADJUSTMENT</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge"><div class="tag mb-1">สต็อกไม่พอ</div><p class="text-[13px]">ตอน Goods Issue หากรวมทุกล็อตแล้วไม่พอ → <b>throw InsufficientStock</b> และ rollback ทั้งรายการ (all-or-nothing) ห้ามตัดบางส่วน</p></div>
+            <div class="edge"><div class="tag mb-1">ล็อตหมดอายุ</div><p class="text-[13px]">FIFO/FEFO ต้อง <b>ข้ามล็อตที่ expiry &lt; วันนี้</b> ไม่นำไปขาย และแจ้งเตือนให้ทำ write-off ผ่านใบปรับสต็อกแยก</p></div>
+            <div class="edge"><div class="tag mb-1">รับไม่ครบ PO</div><p class="text-[13px]">Partial receipt → สร้างล็อตเท่าที่รับจริง PO ยังคงเปิดค้าง (สถานะ PARTIAL) รอรับส่วนที่เหลือ</p></div>
+            <div class="edge"><div class="tag mb-1">Bundle ขาดชิ้น</div><p class="text-[13px]">หากสินค้าย่อยตัวใดในชุดสต็อกไม่พอ → rollback <b>ทั้งชุด</b> ไม่ตัดสินค้าย่อยตัวอื่นทิ้งไว้</p></div>
+          </div>
+        </div>
+
+        <!-- 3.3 Data Flow -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">03</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
+          <div class="card p-6 mb-5">
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">inventory-bc</b> เป็นทั้งผู้ฟังและผู้ส่ง: รับ <span class="mono text-[12px]">po.received</span> จาก supplier เพื่อสร้างล็อต และรับ <span class="mono text-[12px]">delivery.confirmed</span> จาก sales เพื่อตัดสต็อก แล้วส่ง <span class="mono text-[12px]">stock.deducted</span> พร้อม allocations (มี unitCost) ต่อไปให้ finance และ report</p>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-6">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">EMITS (ส่งออก)</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-emit">lot.created</span>
+                <span class="evt evt-emit">stock.deducted</span>
+                <span class="evt evt-emit">stock.adjusted</span>
+                <span class="evt evt-emit">stock.low</span>
+                <span class="evt evt-emit">expiry.approaching</span>
+              </div>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">LISTENS / SERVES</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-listen">po.received ← supplier</span>
+                <span class="evt evt-listen">delivery.confirmed ← sales</span>
+                <span class="evt evt-tcp">checkAvailability (TCP) ← sales</span>
+              </div>
+            </div>
+          </div>
+          <div class="card overflow-hidden mt-5">
+            <table class="d">
+              <thead><tr><th>Event</th><th>Producer</th><th>Consumers</th></tr></thead>
+              <tbody>
+                <tr><td>stock.deducted</td><td>inventory-bc</td><td>finance-bc (COGS) · report-bc</td></tr>
+                <tr><td>lot.created</td><td>inventory-bc</td><td>report-bc (inventory summary)</td></tr>
+                <tr><td>expiry.approaching</td><td>inventory-bc</td><td>report-bc · notification</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 3.4 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">04</span><h3 class="text-xl font-semibold">ER Diagram · inventory-bc</h3></div>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    CATEGORIES {
+        uuid id PK
+        jsonb name "i18n th_en"
+    }
+    PRODUCTS {
+        uuid id PK
+        string sku
+        jsonb name "i18n th_en"
+        string type "single_or_bundle"
+        uuid category_id FK
+        uuid supplier_id "ref supplier-bc"
+    }
+    WAREHOUSES {
+        uuid id PK
+        jsonb name "i18n th_en"
+    }
+    LOTS {
+        uuid id PK
+        uuid product_id FK
+        uuid warehouse_id FK
+        string lot_number
+        decimal import_cost "unit cost"
+        int received_qty
+        int available_qty "CHECK gte 0"
+        date expiry_date
+        uuid supplier_id "ref supplier-bc"
+        timestamp received_at
+    }
+    STOCK_MOVEMENTS {
+        uuid id PK
+        uuid lot_id FK
+        string type "RECEIPT_ISSUE_ADJUST"
+        int qty
+        decimal unit_cost "snapshot"
+        uuid source_doc_id "ref sales_or_grn"
+        timestamp created_at
+    }
+    GOODS_RECEIPTS {
+        uuid id PK
+        uuid po_id "ref supplier-bc"
+        uuid warehouse_id FK
+        string status
+    }
+    GOODS_RECEIPT_ITEMS {
+        uuid id PK
+        uuid receipt_id FK
+        uuid product_id FK
+        uuid lot_id FK
+        int qty
+        decimal import_cost
+    }
+    BUNDLE_ITEMS {
+        uuid id PK
+        uuid bundle_product_id FK
+        uuid component_product_id FK
+        int quantity "per one set"
+    }
+    STOCK_ADJUSTMENTS {
+        uuid id PK
+        uuid lot_id FK
+        int qty_delta
+        string reason
+        uuid approved_by "ref iam"
+    }
+    REORDER_LEVELS {
+        uuid id PK
+        uuid product_id FK
+        int alert_qty
+    }
+    CATEGORIES ||--o{ PRODUCTS : classifies
+    PRODUCTS ||--o{ LOTS : "stocked as"
+    WAREHOUSES ||--o{ LOTS : holds
+    LOTS ||--o{ STOCK_MOVEMENTS : tracks
+    GOODS_RECEIPTS ||--o{ GOODS_RECEIPT_ITEMS : contains
+    GOODS_RECEIPT_ITEMS ||--|| LOTS : creates
+    PRODUCTS ||--o{ BUNDLE_ITEMS : "bundle of"
+    LOTS ||--o{ STOCK_ADJUSTMENTS : adjusts
+    PRODUCTS ||--o| REORDER_LEVELS : has
+</pre>
+          </div>
+        </div>
+
+        <!-- 3.5 Dev Guide -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · TRANSACTION</div><p class="text-[13.5px]">การตัดสต็อกทั้งหมด (รวมทุก component ของ bundle) ต้องอยู่ใน <b>Database Transaction เดียว</b> — ถ้าล้มเหลวส่วนใด rollback ทั้งหมด</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · CONCURRENCY LOCK</div><p class="text-[13.5px]">ก่อนอ่าน <span class="mono text-[12px]">available_qty</span> ต้องล็อกแถวล็อตด้วย <b>pessimistic write lock</b> (<span class="mono text-[12px]">SELECT ... FOR UPDATE</span>) เพื่อกัน race condition ระหว่างการตัด FIFO พร้อมกันหลาย request</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · ORDERING</div><p class="text-[13.5px]">FEFO: <span class="mono text-[12px]">ORDER BY expiry_date ASC, received_at ASC</span> · FIFO: <span class="mono text-[12px]">ORDER BY received_at ASC</span> — ต้อง tie-break ให้ deterministic</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · COST SNAPSHOT</div><p class="text-[13.5px]"><span class="mono text-[12px]">unit_cost</span> ในทุก movement ต้องเป็น <b>snapshot ต้นทุนจริงของล็อต</b> (immutable) ห้ามคำนวณย้อนหลังจากราคาเฉลี่ย</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · EXPIRY FILTER</div><p class="text-[13.5px]">การตัดปกติต้อง <span class="mono text-[12px]">WHERE expiry_date &gt; now()</span> — ห้ามขายล็อตหมดอายุ</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · OUTBOX / IDEMPOTENCY</div><p class="text-[13.5px]">ส่ง event <b>หลัง commit</b> ด้วย Outbox pattern และ consumer ต้อง idempotent (เก็บ processed event id) กัน event ซ้ำจาก RabbitMQ</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · UUID ONLY</div><p class="text-[13.5px]">อ้างอิงข้าม BC ด้วย UUID เท่านั้น · ห้าม Foreign Key ข้ามฐานข้อมูล · <span class="mono text-[12px]">available_qty</span> ใช้ CHECK constraint ≥ 0</p></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule"></div>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 4 : PROCUREMENT & SALES                                 -->
+      <!-- ============================================================= -->
+      <section id="p4" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(37,99,235,.02))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(11,61,145,.16);color:var(--blue);border:1px solid rgba(11,61,145,.3)">PHASE 4</span>
+              <span class="eyebrow" style="color:var(--blueprint)">supplier-bc · sales-bc</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Procurement &amp; Sales — PO · Quotation → SO → Delivery</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">งานจัดซื้อเข้าและงานขายออก เชื่อมกับ inventory-bc เพื่อทริกเกอร์การเคลื่อนไหวสต็อก</p>
+          </div>
+        </div>
+
+        <!-- 4.1 Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครทำอะไร</h3></div>
+          <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--blueprint)">PROCUREMENT</div><div class="font-semibold mb-1.5">เจ้าหน้าที่จัดซื้อ</div><p class="text-[13px]" style="color:var(--ink-soft)">สร้าง PO, เจรจาต้นทุน, ติดตามการส่งมอบ, จัดการข้อมูล supplier</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--blueprint)">PROC. MANAGER</div><div class="font-semibold mb-1.5">ผู้จัดการจัดซื้อ</div><p class="text-[13px]" style="color:var(--ink-soft)">อนุมัติ PO ที่เกินวงเงิน, กำหนดผู้ขายหลัก</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--blueprint)">SALES REP</div><div class="font-semibold mb-1.5">พนักงานขาย</div><p class="text-[13px]" style="color:var(--ink-soft)">ออกใบเสนอราคา, แปลงเป็น SO, ออกใบส่งของ, ดูแลลูกค้า</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--blueprint)">SALES MANAGER</div><div class="font-semibold mb-1.5">ผู้จัดการขาย</div><p class="text-[13px]" style="color:var(--ink-soft)">อนุมัติส่วนลดพิเศษ/วงเงินเครดิต, ปิดการขายรายใหญ่</p></div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> ให้กระบวนการซื้อและขายเป็นเอกสารที่ตรวจสอบได้ตั้งแต่ต้นทาง (PO / Quotation) ถึงปลายทาง (รับเข้า / ส่งมอบ) และเชื่อมกับสต็อกอย่างถูกต้อง</div>
+        </div>
+
+        <!-- 4.2 Use Cases -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · บันทึกข้อมูลยังไง</h3></div>
+
+          <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">กระบวนการขาย · Quotation → SO → Delivery</h4>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>สร้างใบเสนอราคา (Quotation)</b> — เลือกลูกค้า, สินค้า, <b>unit price</b>, <b>discount</b>, <b>ภาษี</b>, วันหมดอายุใบเสนอราคา (<span class="mono text-[12px]">valid_until</span>) → สถานะ DRAFT/SENT</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>ลูกค้าอนุมัติ</b> → Quotation เปลี่ยนสถานะเป็น APPROVED</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>แปลงเป็น Sales Order (SO)</b> — คัดลอกรายการ + <b>ตรวจ availability</b> จาก inventory ผ่าน <span class="mono text-[12px]" style="color:var(--accent)">TCP (sync)</span> → สถานะ CONFIRMED (ยังไม่ตัดสต็อก)</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ออกใบส่งของ (Delivery Note)</b> → emit <span class="mono text-[12px]" style="color:var(--signal)">delivery.confirmed</span> → inventory ตัดสต็อก FIFO/FEFO และส่ง allocations กลับมาเก็บใน delivery item</p></div>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">กระบวนการจัดซื้อ · Purchase Order</h4>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>สร้าง PO</b> — เลือก supplier, สินค้า (<span class="mono text-[12px]">productId</span> ref inventory), จำนวน, <b>ต้นทุนที่ตกลง</b>, วันส่งมอบ → DRAFT</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>อนุมัติ &amp; ส่ง</b> → APPROVED → SENT (emit <span class="mono text-[12px]" style="color:var(--signal)">po.approved</span>)</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>รับสินค้า</b> (เชื่อม UC-3.1) → emit <span class="mono text-[12px]" style="color:var(--signal)">po.received</span> → inventory สร้างล็อต → PO เป็น PARTIAL/RECEIVED</p></div>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">ข้อมูลที่บันทึกในแต่ละขั้น</h4>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>Field</th><th>เอกสาร</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>unit_price</td><td>Quotation / SO</td><td>ราคาขาย/หน่วย (รองรับราคาพิเศษตามช่วงวันที่)</td></tr>
+                <tr><td>discount</td><td>Quotation / SO</td><td>ส่วนลดต่อรายการ (%/บาท) เกินสิทธิ์ต้องอนุมัติ</td></tr>
+                <tr><td>product_name_snapshot</td><td>ทุกเอกสาร</td><td>ชื่อสินค้า ณ เวลาออกเอกสาร (denormalized กัน master เปลี่ยน)</td></tr>
+                <tr><td>valid_until</td><td>Quotation</td><td>วันหมดอายุใบเสนอราคา</td></tr>
+                <tr><td>unit_cost</td><td>Purchase Order</td><td>ต้นทุนที่ตกลงกับ supplier (จะกลายเป็น import_cost ของล็อต)</td></tr>
+                <tr><td>lot_allocations</td><td>Delivery Note</td><td>ล็อตที่ถูกตัดจริง (คืนมาจาก stock.deducted)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge"><div class="tag mb-1">สต็อกไม่พอตอน SO</div><p class="text-[13px]">ตอน confirm SO ตรวจแล้วสต็อกไม่พอ → <b>เตือน</b> และตาม policy: อนุญาต backorder หรือ block. <b>ไม่ตัดสต็อก</b>จนกว่าจะออกใบส่งของ</p></div>
+            <div class="edge"><div class="tag mb-1">Quotation หมดอายุ</div><p class="text-[13px]">หาก <span class="mono text-[12px]">valid_until</span> ผ่านไปแล้ว ห้ามแปลงเป็น SO ต้องต่ออายุหรือออกใบใหม่</p></div>
+            <div class="edge"><div class="tag mb-1">ราคาพิเศษ</div><p class="text-[13px]">รองรับราคาพิเศษ 1/2/3 ตามช่วงวันที่ (เริ่ม–ถึง) — ระบบเลือกราคาที่มีผลอัตโนมัติ</p></div>
+            <div class="edge"><div class="tag mb-1">รับของไม่ครบ PO</div><p class="text-[13px]">รับได้บางส่วน → PO สถานะ PARTIAL รอรับส่วนที่เหลือ ไม่ปิด PO อัตโนมัติ</p></div>
+          </div>
+        </div>
+
+        <!-- 4.3 Data Flow -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">03</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
+          <div class="card p-6 mb-5">
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">SO → Goods Issue mapping:</b> sales-bc ไม่ตัดสต็อกเอง แต่ส่ง <span class="mono text-[12px]">delivery.confirmed</span> ให้ inventory-bc เป็นผู้ตัดสต็อก (Goods Issue) การตรวจ availability ตอน confirm SO ใช้ <b>TCP แบบ sync</b> ส่วนการตัดจริงเป็น <b>async event</b> (eventual consistency)</p>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-6">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">EMITS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-emit">quotation.created</span>
+                <span class="evt evt-emit">so.confirmed</span>
+                <span class="evt evt-emit">delivery.confirmed</span>
+                <span class="evt evt-emit">po.approved</span>
+                <span class="evt evt-emit">po.received</span>
+              </div>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">LISTENS / CALLS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-tcp">checkAvailability (TCP) → inventory</span>
+                <span class="evt evt-listen">stock.deducted ← inventory</span>
+              </div>
+            </div>
+          </div>
+          <div class="card overflow-hidden mt-5">
+            <table class="d">
+              <thead><tr><th>Event</th><th>Producer</th><th>Consumers</th></tr></thead>
+              <tbody>
+                <tr><td>delivery.confirmed</td><td>sales-bc</td><td>inventory-bc (ตัดสต็อก) · finance-bc (ตั้งใบกำกับ)</td></tr>
+                <tr><td>so.confirmed</td><td>sales-bc</td><td>finance-bc · report-bc</td></tr>
+                <tr><td>po.received</td><td>supplier-bc</td><td>inventory-bc (สร้างล็อต)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 4.4 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">04</span><h3 class="text-xl font-semibold">ER Diagram · supplier-bc + sales-bc</h3></div>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    SUPPLIERS {
+        uuid id PK
+        jsonb name "i18n th_en"
+        string tax_id
+        string phone
+    }
+    PURCHASE_ORDERS {
+        uuid id PK
+        uuid supplier_id FK
+        string po_number
+        string status "DRAFT_APPROVED_SENT_RECEIVED"
+        date expected_date
+        decimal total
+    }
+    PURCHASE_ORDER_ITEMS {
+        uuid id PK
+        uuid po_id FK
+        uuid product_id "ref inventory-bc"
+        int qty
+        decimal unit_cost
+    }
+    INBOUND_SHIPMENTS {
+        uuid id PK
+        uuid po_id FK
+        string status
+        timestamp arrived_at
+    }
+    CUSTOMERS {
+        uuid id PK
+        jsonb name "i18n th_en"
+        string province
+        string tax_id
+    }
+    QUOTATIONS {
+        uuid id PK
+        uuid customer_id FK
+        string status "DRAFT_SENT_APPROVED_EXPIRED"
+        date valid_until
+        decimal total
+    }
+    QUOTATION_ITEMS {
+        uuid id PK
+        uuid quotation_id FK
+        uuid product_id "ref inventory-bc"
+        string name_snapshot
+        int qty
+        decimal unit_price
+        decimal discount
+    }
+    SALES_ORDERS {
+        uuid id PK
+        uuid quotation_id FK
+        uuid customer_id FK
+        string so_number
+        string status "CONFIRMED_PARTIAL_CLOSED"
+    }
+    SALES_ORDER_ITEMS {
+        uuid id PK
+        uuid so_id FK
+        uuid product_id "ref inventory-bc"
+        int qty
+        decimal unit_price
+        decimal discount
+    }
+    DELIVERY_NOTES {
+        uuid id PK
+        uuid so_id FK
+        string dn_number
+        string status "PENDING_CONFIRMED"
+        timestamp delivered_at
+    }
+    DELIVERY_NOTE_ITEMS {
+        uuid id PK
+        uuid dn_id FK
+        uuid product_id "ref inventory-bc"
+        int qty
+        jsonb lot_allocations "from stock.deducted"
+    }
+    SUPPLIERS ||--o{ PURCHASE_ORDERS : receives
+    PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ITEMS : contains
+    PURCHASE_ORDERS ||--o{ INBOUND_SHIPMENTS : ships
+    CUSTOMERS ||--o{ QUOTATIONS : requests
+    QUOTATIONS ||--o{ QUOTATION_ITEMS : contains
+    QUOTATIONS ||--o| SALES_ORDERS : "converts to"
+    CUSTOMERS ||--o{ SALES_ORDERS : places
+    SALES_ORDERS ||--o{ SALES_ORDER_ITEMS : contains
+    SALES_ORDERS ||--o{ DELIVERY_NOTES : fulfills
+    DELIVERY_NOTES ||--o{ DELIVERY_NOTE_ITEMS : contains
+</pre>
+          </div>
+        </div>
+
+        <!-- 4.5 Dev Guide -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · NO CROSS-DB QUERY</div><p class="text-[13.5px]">sales-bc / supplier-bc <b>ห้าม query ตาราง products</b> ของ inventory ตรง ๆ ให้เรียกผ่าน TCP หรือใช้ replicated read model</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · SYNC CHECK, ASYNC DEDUCT</div><p class="text-[13.5px]">ตรวจ availability ตอน confirm SO เป็น <b>TCP sync</b> แต่การตัดสต็อกจริงเป็น <b>event async</b> — ยอมรับ eventual consistency</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · IDEMPOTENT DELIVERY</div><p class="text-[13.5px]">การยิง <span class="mono text-[12px]">delivery.confirmed</span> ต้อง idempotent (มี delivery id) ป้องกันการตัดสต็อกซ้ำเมื่อ event ถูกส่งซ้ำ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · DENORMALIZE SNAPSHOT</div><p class="text-[13.5px]">เก็บ <b>ชื่อสินค้า + ราคา ณ เวลาออกเอกสาร</b> ในตาราง item เพราะ master data อาจเปลี่ยนภายหลัง</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · STATE MACHINE</div><p class="text-[13.5px]">สถานะเอกสารเป็น state machine ชัดเจน (DRAFT→…→CLOSED) <b>ห้าม skip state</b> และตรวจ transition ที่ถูกต้อง</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · SAGA + COMPENSATION</div><p class="text-[13.5px]">ใช้ Saga สำหรับ SO→delivery→stock→invoice หากตัดสต็อกล้มเหลว ต้อง <b>compensate</b> (delivery กลับเป็น PENDING)</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · MONEY TYPE</div><p class="text-[13.5px]">จำนวนเงินใช้ <span class="mono text-[12px]">decimal</span> หรือ integer (สตางค์) <b>ห้ามใช้ float</b></p></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule"></div>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 5 : FINANCE                                             -->
+      <!-- ============================================================= -->
+      <section id="p5" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(14,124,134,.12),rgba(14,124,134,.04))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(14,124,134,.16);color:var(--teal);border:1px solid rgba(14,124,134,.3)">PHASE 5</span>
+              <span class="eyebrow" style="color:var(--accent)">finance-bc · Critical Path</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Finance — Tax Invoice · Billing · COGS &amp; P&amp;L ต่อ Lot</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">คำนวณต้นทุนขายและกำไร/ขาดทุนจากต้นทุนจริงของแต่ละล็อต ไม่ใช่ต้นทุนเฉลี่ย</p>
+          </div>
+        </div>
+
+        <!-- 5.1 Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครทำอะไร</h3></div>
+          <div class="grid sm:grid-cols-3 gap-4">
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">ACCOUNTANT</div><div class="font-semibold mb-1.5">นักบัญชี</div><p class="text-[13px]" style="color:var(--ink-soft)">ออกใบกำกับภาษี, ใบวางบิล, บันทึกบัญชี, ปิดงวด, กระทบยอด COGS/กำไร</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">FINANCE MANAGER</div><div class="font-semibold mb-1.5">ผู้จัดการการเงิน</div><p class="text-[13px]" style="color:var(--ink-soft)">อนุมัติเอกสาร, วิเคราะห์กำไรขั้นต้นต่อล็อต/ต่อสินค้า, ควบคุมงบ</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">AR / AP CLERK</div><div class="font-semibold mb-1.5">เจ้าหน้าที่การเงิน</div><p class="text-[13px]" style="color:var(--ink-soft)">ตั้งลูกหนี้/เจ้าหนี้, ติดตามการชำระ, ออกใบเสร็จ</p></div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> ออกเอกสารภาษีถูกต้องตามกฎหมาย และคำนวณ COGS + กำไร/ขาดทุน <b style="color:var(--accent)">แม่นยำระดับล็อต</b> จากต้นทุนนำเข้าจริงของล็อตที่ถูกตัด</div>
+        </div>
+
+        <!-- 5.2 Use Cases -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · บันทึกข้อมูลยังไง</h3></div>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>รับ event <span class="mono text-[12px]" style="color:var(--signal)">stock.deducted</span></b> (allocations พร้อม unitCost) → คำนวณ <b>COGS ต่อ allocation</b> = qty × lot.unitCost → บันทึก <span class="mono text-[12px]">cogs_entries</span> ต่อล็อต</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>ดึงราคาขาย</b> จาก sales-bc (TCP) → คำนวณ <b>กำไรต่อล็อต</b> = revenue − COGS → บันทึก <span class="mono text-[12px]">profit_loss_records</span> ต่อ allocation</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>ออกใบกำกับภาษี (Tax Invoice)</b> อ้างอิง delivery/SO → คำนวณ VAT (ภาษี 1/ภาษี 2), เลขที่ใบกำกับแบบต่อเนื่อง → emit <span class="mono text-[12px]" style="color:var(--signal)">invoice.issued</span></p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ใบวางบิล (Billing Note)</b> รวมหลายใบกำกับเพื่อเรียกเก็บเงินรอบเดียว</p></div>
+          </div>
+
+          <h4 class="font-semibold mt-2 mb-3 text-[15px]">ข้อมูลที่บันทึก</h4>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>Field</th><th>เอกสาร</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>invoice_number</td><td>Tax Invoice</td><td>เลขที่ต่อเนื่องไม่ข้าม/ไม่ซ้ำ (ตามกฎหมาย)</td></tr>
+                <tr><td>vat_amount</td><td>Tax Invoice</td><td>ภาษีมูลค่าเพิ่มตาม tax_config (ภาษี 1/2)</td></tr>
+                <tr><td>unit_cost</td><td>COGS Entry</td><td><b>ต้นทุนจริงของล็อต</b> (จาก event) — ห้ามเฉลี่ย</td></tr>
+                <tr><td>cogs</td><td>COGS Entry</td><td>qty × lot.unit_cost ต่อ allocation</td></tr>
+                <tr><td>gross_profit</td><td>P&amp;L Record</td><td>revenue − cogs ต่อล็อต</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge"><div class="tag mb-1">แก้ใบกำกับที่ออกแล้ว</div><p class="text-[13px]">ใบกำกับที่ออกแล้ว <b>ห้ามแก้</b> ต้องออก <b>ใบลดหนี้/เพิ่มหนี้</b> (credit/debit note) แทน</p></div>
+            <div class="edge"><div class="tag mb-1">COGS event มาช้า</div><p class="text-[13px]">ถ้า allocation (stock.deducted) มาช้ากว่า invoice → คำนวณ COGS แบบ provisional แล้ว reconcile เมื่อ event มาถึง</p></div>
+            <div class="edge"><div class="tag mb-1">สินค้าคืน (Return)</div><p class="text-[13px]">ต้อง <b>กลับรายการ COGS</b> และคืนสต็อกเข้าล็อตเดิม พร้อมออกใบลดหนี้</p></div>
+            <div class="edge"><div class="tag mb-1">หลายอัตราภาษี</div><p class="text-[13px]">รองรับสินค้าที่ยกเว้นภาษี/หลายอัตราในใบเดียว คำนวณแยกบรรทัด</p></div>
+          </div>
+        </div>
+
+        <!-- 5.3 Data Flow -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">03</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
+          <div class="grid sm:grid-cols-2 gap-6">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">EMITS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-emit">invoice.issued</span>
+                <span class="evt evt-emit">profit.calculated</span>
+                <span class="evt evt-emit">payment.received</span>
+              </div>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">LISTENS / CALLS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-listen">stock.deducted ← inventory</span>
+                <span class="evt evt-listen">delivery.confirmed ← sales</span>
+                <span class="evt evt-tcp">getSalePrice (TCP) → sales</span>
+              </div>
+            </div>
+          </div>
+          <div class="card overflow-hidden mt-5">
+            <table class="d">
+              <thead><tr><th>Event</th><th>Producer</th><th>Consumers</th></tr></thead>
+              <tbody>
+                <tr><td>stock.deducted</td><td>inventory-bc</td><td><b>finance-bc</b> → สร้าง COGS/P&amp;L</td></tr>
+                <tr><td>invoice.issued</td><td>finance-bc</td><td>report-bc (ยอดขาย/ภาษี)</td></tr>
+                <tr><td>profit.calculated</td><td>finance-bc</td><td>report-bc (กำไรต่อล็อต)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 5.4 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">04</span><h3 class="text-xl font-semibold">ER Diagram · finance-bc</h3></div>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    TAX_INVOICES {
+        uuid id PK
+        string invoice_number UK "gapless"
+        uuid customer_id "ref sales-bc"
+        uuid delivery_note_id "ref sales-bc"
+        decimal net_amount
+        decimal vat_amount
+        decimal total
+        string status "ISSUED_VOID"
+        timestamp issued_at
+    }
+    TAX_INVOICE_ITEMS {
+        uuid id PK
+        uuid invoice_id FK
+        uuid product_id "ref inventory-bc"
+        int qty
+        decimal unit_price
+        decimal line_total
+    }
+    COGS_ENTRIES {
+        uuid id PK
+        uuid sale_id "ref sales-bc"
+        uuid lot_id "ref inventory-bc"
+        int qty
+        decimal unit_cost "lot exact"
+        decimal cogs
+    }
+    PROFIT_LOSS_RECORDS {
+        uuid id PK
+        uuid sale_id "ref sales-bc"
+        uuid lot_id "ref inventory-bc"
+        decimal revenue
+        decimal cogs
+        decimal gross_profit
+    }
+    BILLING_NOTES {
+        uuid id PK
+        uuid customer_id "ref sales-bc"
+        decimal total
+        string status
+    }
+    BILLING_NOTE_INVOICES {
+        uuid id PK
+        uuid billing_note_id FK
+        uuid invoice_id FK
+    }
+    TAX_CONFIGS {
+        uuid id PK
+        string name "VAT7 etc"
+        decimal rate
+        boolean accumulate
+    }
+    CREDIT_NOTES {
+        uuid id PK
+        uuid invoice_id FK
+        decimal amount
+        string reason
+    }
+    LEDGER_ENTRIES {
+        uuid id PK
+        string account
+        decimal debit
+        decimal credit
+        uuid ref_doc_id
+    }
+    TAX_INVOICES ||--o{ TAX_INVOICE_ITEMS : contains
+    TAX_INVOICES ||--o{ CREDIT_NOTES : "amended by"
+    TAX_INVOICES ||--o{ BILLING_NOTE_INVOICES : "billed in"
+    BILLING_NOTES ||--o{ BILLING_NOTE_INVOICES : groups
+    COGS_ENTRIES ||--|| PROFIT_LOSS_RECORDS : feeds
+</pre>
+          </div>
+        </div>
+
+        <!-- 5.5 Dev Guide -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · EXACT LOT COST</div><p class="text-[13.5px]"><b>COGS = Σ(allocation.qty × allocation.unit_cost)</b> ต้องใช้ <b>unit_cost ที่มากับ event</b> เท่านั้น <b>ห้าม</b>คำนวณเฉลี่ย และห้าม query ราคาปัจจุบันของสินค้า</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PER-ALLOCATION P&amp;L</div><p class="text-[13.5px]">คำนวณกำไรต่อ allocation แล้วค่อย aggregate — หนึ่ง delivery อาจกินหลายล็อตที่ต้นทุนต่างกัน</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · IMMUTABLE COGS</div><p class="text-[13.5px]">COGS เก็บเป็น snapshot immutable แก้ไขผ่าน <b>adjusting entry</b> เท่านั้น</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · GAPLESS NUMBERING</div><p class="text-[13.5px]">เลขที่ใบกำกับต้อง gapless &amp; transaction-safe (ใช้ advisory lock / sequence table) กันเลขซ้ำ/ข้าม</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · DECIMAL &amp; ROUNDING</div><p class="text-[13.5px]">ใช้ <span class="mono text-[12px]">decimal(18,4)</span> หรือ integer สตางค์ · ปัดเศษตามกฎภาษี · ห้าม float</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · IDEMPOTENT CONSUMER</div><p class="text-[13.5px]">consumer ของ <span class="mono text-[12px]">stock.deducted</span> ต้อง idempotent (processed_events) กันการสร้าง COGS ซ้ำ</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · INVOICE IMMUTABILITY</div><p class="text-[13.5px]">ใบกำกับที่ออกแล้ว immutable → แก้ไขด้วย credit/debit note pattern เท่านั้น</p></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule"></div>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 6 : REPORTING (CQRS)                                    -->
+      <!-- ============================================================= -->
+      <section id="p6" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(8,145,178,.08),rgba(8,145,178,.02))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(14,124,134,.16);color:var(--cyan);border:1px solid rgba(14,124,134,.3)">PHASE 6</span>
+              <span class="eyebrow" style="color:var(--accent)">report-bc · CQRS Read Side</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Reporting — CQRS Read Models &amp; Executive Dashboards</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">บริโภค event จากทุกบริการเพื่อสร้าง Read Model ที่อ่านเร็ว สำหรับ Dashboard ผู้บริหาร</p>
+          </div>
+        </div>
+
+        <!-- 6.1 Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครทำอะไร</h3></div>
+          <div class="grid sm:grid-cols-3 gap-4">
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">EXECUTIVE</div><div class="font-semibold mb-1.5">ผู้บริหาร</div><p class="text-[13px]" style="color:var(--ink-soft)">ดู Dashboard ยอดขาย, กำไรขั้นต้น, สินค้าขายดี, สต็อกใกล้หมด/หมดอายุ ในภาพรวม</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">DEPT. MANAGER</div><div class="font-semibold mb-1.5">ผู้จัดการฝ่าย</div><p class="text-[13px]" style="color:var(--ink-soft)">รายงานเชิงลึกของแผนก (ขาย/คลัง/จัดซื้อ) แบบสรุปและละเอียด</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">BUSINESS ANALYST</div><div class="font-semibold mb-1.5">นักวิเคราะห์</div><p class="text-[13px]" style="color:var(--ink-soft)">ดึงข้อมูล, สร้างรายงานเฉพาะกิจ, วิเคราะห์แนวโน้ม (กราฟ/สรุป/ละเอียด)</p></div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> แยกภาระการอ่าน (read) ออกจากฐานข้อมูล transactional ด้วย CQRS — report-bc มีฐานข้อมูลของตัวเองที่ denormalized มาแล้ว ทำให้ Dashboard ตอบเร็วโดยไม่กระทบระบบหลัก</div>
+        </div>
+
+        <!-- 6.2 Use Cases -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · สร้าง Read Model ยังไง</h3></div>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>Subscribe events</b> จากทุกบริการ (so.confirmed, stock.deducted, profit.calculated, expiry.approaching ฯลฯ)</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>Project เข้า Read Model</b> — UPSERT เข้าตารางสรุป เช่น <span class="mono text-[12px]">sales_summary, profit_by_lot, low_stock</span></p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>Dashboard/API</b> อ่านจาก Read Model โดยตรง (pre-computed) — query เร็ว &lt; 200ms</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Drill-down</b> รายงานแบบ กราฟ / สรุป / ละเอียด ตามรูปแบบเดิมของระบบ</p></div>
+          </div>
+          <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)"><b style="color:var(--ink)">รายงานหลัก:</b> ยอดขายรายวัน/เดือน, กำไรขั้นต้นต่อล็อต, สินค้าขายดี, สินค้าใกล้หมด (low stock), ล็อตใกล้หมดอายุ, ลูกค้าแต่ละจังหวัด</p>
+
+          <h4 class="font-semibold mt-6 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge"><div class="tag mb-1">Event มาไม่เรียงลำดับ</div><p class="text-[13px]">out-of-order → ใช้ <b>version / event timestamp</b> และ UPSERT idempotent เพื่อไม่ให้ข้อมูลเก่าทับข้อมูลใหม่</p></div>
+            <div class="edge"><div class="tag mb-1">Event หาย / rebuild</div><p class="text-[13px]">Read model ต้อง <b>สร้างใหม่ได้ (replay)</b> จาก event store/outbox โดยไม่กระทบระบบหลัก</p></div>
+            <div class="edge"><div class="tag mb-1">Eventual consistency</div><p class="text-[13px]">Dashboard อาจ lag ไม่กี่วินาที — ยอมรับได้สำหรับรายงาน แต่ต้องระบุเวลา last-updated</p></div>
+            <div class="edge"><div class="tag mb-1">Event ซ้ำ</div><p class="text-[13px]">consumer ต้อง idempotent ผ่านตาราง <span class="mono text-[12px]">processed_events</span> (event_id unique)</p></div>
+          </div>
+        </div>
+
+        <!-- 6.3 Data Flow -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">03</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
+          <div class="card p-6 mb-5"><p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">report-bc เป็น terminal consumer</b> — ฟัง event จากทุกบริการแต่ <b>ไม่ปล่อย business event กลับ</b> (อาจปล่อยเพียง <span class="mono text-[12px]">report.generated</span>) และ <b>ไม่เรียก transactional service ตอน query</b> เพราะ pre-compute ไว้แล้ว</p></div>
+          <div class="card p-5 mb-5">
+            <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">LISTENS (ทั้งหมด)</div>
+            <div class="flex flex-wrap gap-2">
+              <span class="evt evt-listen">so.confirmed</span>
+              <span class="evt evt-listen">delivery.confirmed</span>
+              <span class="evt evt-listen">stock.deducted</span>
+              <span class="evt evt-listen">lot.created</span>
+              <span class="evt evt-listen">expiry.approaching</span>
+              <span class="evt evt-listen">stock.low</span>
+              <span class="evt evt-listen">invoice.issued</span>
+              <span class="evt evt-listen">profit.calculated</span>
+              <span class="evt evt-listen">payment.received</span>
+            </div>
+          </div>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>Read Model</th><th>สร้างจาก event</th><th>ใช้ใน Dashboard</th></tr></thead>
+              <tbody>
+                <tr><td>sales_summary</td><td>so.confirmed · invoice.issued</td><td>ยอดขายรายวัน/เดือน</td></tr>
+                <tr><td>profit_by_lot</td><td>profit.calculated</td><td>กำไรขั้นต้นต่อล็อต</td></tr>
+                <tr><td>expiry_alerts</td><td>expiry.approaching · lot.created</td><td>ล็อตใกล้หมดอายุ</td></tr>
+                <tr><td>low_stock</td><td>stock.deducted · stock.low</td><td>สินค้าใกล้หมด</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 6.4 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">04</span><h3 class="text-xl font-semibold">ER Diagram · report-bc (Read Models)</h3></div>
+          <p class="text-[13px] mb-4" style="color:var(--muted)">Read Model เป็นตาราง denormalized แยกอิสระ (ไม่มีความสัมพันธ์แบบ normalized) ทุก id อ้างอิงบริการต้นทางด้วย UUID</p>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    SALES_SUMMARY {
+        uuid id PK
+        date period
+        decimal total_sales
+        decimal gross_profit
+        int order_count
+        timestamp updated_at
+    }
+    INVENTORY_SUMMARY {
+        uuid product_id PK "ref inventory-bc"
+        jsonb product_name "denormalized i18n"
+        int total_available
+        int lot_count
+    }
+    PROFIT_BY_LOT {
+        uuid id PK
+        uuid lot_id "ref inventory-bc"
+        uuid product_id "ref inventory-bc"
+        decimal revenue
+        decimal cogs
+        decimal profit
+    }
+    EXPIRY_ALERTS {
+        uuid lot_id PK "ref inventory-bc"
+        uuid product_id "ref inventory-bc"
+        date expiry_date
+        int days_left
+        int available_qty
+    }
+    LOW_STOCK {
+        uuid product_id PK "ref inventory-bc"
+        int available_qty
+        int alert_qty
+    }
+    CUSTOMER_BY_PROVINCE {
+        string province PK
+        int customer_count
+        decimal total_sales
+    }
+    PROCESSED_EVENTS {
+        string event_id PK "idempotency"
+        string event_type
+        timestamp processed_at
+    }
+</pre>
+          </div>
+        </div>
+
+        <!-- 6.5 Dev Guide -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · DENORMALIZE FOR READ</div><p class="text-[13.5px]">Read model ออกแบบเพื่อ <b>อ่านเร็ว</b> — ยอมให้ข้อมูลซ้ำ/denormalized เก็บชื่อสินค้า (JSONB) มาด้วย ไม่ต้อง join ข้ามบริการตอน query</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · IDEMPOTENT PROJECTION</div><p class="text-[13.5px]">ทุก consumer ต้อง idempotent ผ่านตาราง <span class="mono text-[12px]">processed_events</span> (event_id unique) กันการนับซ้ำ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · HANDLE OUT-OF-ORDER</div><p class="text-[13.5px]">ใช้ <span class="mono text-[12px]">version / updated_at</span> + <b>UPSERT</b> เพื่อกัน event เก่าทับใหม่</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · NO SYNC CALL ON QUERY</div><p class="text-[13.5px]">ตอน query dashboard <b>ห้ามเรียก transactional service</b> — ต้อง pre-compute ล่วงหน้าเท่านั้น</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · SEPARATE READ DB</div><p class="text-[13.5px]">report-bc มีฐานข้อมูลของตัวเอง แยกจากบริการอื่น <b>สามารถ rebuild ได้จาก replay</b></p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · EVENT-DRIVEN REFRESH</div><p class="text-[13.5px]">อัปเดต summary ตาม event ที่เข้ามา <b>ไม่ใช้ polling</b> · ใช้ index ครบเพื่อให้ query &lt; 200ms</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · SHOW FRESHNESS</div><p class="text-[13.5px]">แสดง <span class="mono text-[12px]">last_updated</span> บน dashboard เพื่อสื่อสาร eventual consistency ให้ผู้ใช้ทราบ</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="border-t pt-8 pb-4" style="border-color:var(--line)">
+        <div class="flex flex-col sm:flex-row justify-between gap-3 text-[12px]" style="color:var(--muted)">
+          <div class="mono">ERP SYSTEM · SRS · PHASE 3–6 (INVENTORY · SALES · FINANCE · REPORTING)</div>
+          <div class="mono">DDD · RABBITMQ · TCP · CQRS · POSTGRESQL</div>
+        </div>
+      </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // scroll-spy
+  const links=[...document.querySelectorAll('#nav .navlink')];
+  const map=new Map(links.map(l=>[l.getAttribute('href').slice(1),l]));
+  const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));const k=map.get(e.target.id);if(k)k.classList.add('active');}});},{rootMargin:'-15% 0px -75% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+</script>
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+    background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
+</body>
+</html>

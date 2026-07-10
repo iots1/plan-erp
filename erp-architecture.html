@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ERP Architecture — Microservices DDD Design · Development Plan</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side hidden lg:flex flex-col w-[290px] shrink-0 sticky top-0 h-screen">
+    <div class="px-7 pt-8 pb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg blueprint-bg border border-white/10 flex items-center justify-center">
+          <span class="mono text-white text-sm font-semibold">E</span>
+        </div>
+        <div>
+          <div class="text-white font-semibold text-[15px] leading-none">Enterprise ERP</div>
+          <div class="mono text-[10px] tracking-wider text-[#5E7391] mt-1">DDD ARCHITECTURE · v1.0</div>
+        </div>
+      </div>
+    </div>
+    <nav class="px-5 flex-1 overflow-y-auto space-y-1" id="nav">
+      <a href="#overview"     class="navlink"><span class="n">01</span> บทสรุปผู้บริหาร</a>
+      <a href="#architecture" class="navlink"><span class="n">02</span> พิมพ์เขียวสถาปัตยกรรม</a>
+      <a href="#i18n"         class="navlink"><span class="n">03</span> กลยุทธ์ 2 ภาษา (i18n)</a>
+      <a href="#contexts"     class="navlink"><span class="n">04</span> Bounded Contexts</a>
+      <a href="#fifo"         class="navlink"><span class="n">05</span> FIFO · Lot · กำไร/ขาดทุน</a>
+      <a href="#events"       class="navlink"><span class="n">06</span> Event Storming</a>
+      <a href="#roadmap"      class="navlink"><span class="n">07</span> แผนพัฒนาแบบเฟส</a>
+      <a href="#migration"    class="navlink"><span class="n">08</span> การย้ายระบบเดิม</a>
+    </nav>
+    <div class="px-7 py-5 border-t border-white/8">
+      <div class="mono text-[10px] leading-relaxed text-[#5E7391]">
+        MONOREPO · NX + PNPM<br>
+        NESTJS 11 · FASTIFY · TS 5.7<br>
+        POSTGRESQL · RABBITMQ · MINIO
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[1080px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <div class="eyebrow text-[#7FE3DE] mb-5">Development Plan &amp; Architecture Document</div>
+        <h1 class="display text-4xl sm:text-[52px] leading-[1.08] max-w-3xl">
+          สถาปัตยกรรม <span class="text-[#7FE3DE]">Microservices</span> แบบ DDD<br>
+          สำหรับระบบ ERP โครงสร้าง Enterprise
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-lg max-w-2xl leading-relaxed">
+          การออกแบบระบบ ERP แบบ Microservices สู่สถาปัตยกรรมแบบ Domain-Driven Design
+          บนหลักการ <span class="text-white font-medium">“Database-per-Context”</span>
+          ควบคุมต้นทุนแม่นยำระดับ Lot พร้อมรองรับ FIFO / FEFO และระบบ 2 ภาษาเต็มรูปแบบ
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Nx + pnpm</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>NestJS 11 · Fastify</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>PostgreSQL · TypeORM</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>RabbitMQ · TCP</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>MinIO (S3)</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Next.js · Redis</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[1080px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 EXECUTIVE SUMMARY ========== -->
+      <section id="overview" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — Executive Summary</div>
+        <h2 class="display text-3xl sm:text-4xl mb-6">บทสรุปผู้บริหาร</h2>
+        <div class="grid md:grid-cols-3 gap-6">
+          <div class="md:col-span-2 space-y-4 text-[var(--ink-soft)] text-[15.5px] leading-[1.85]">
+            <p>
+              ระบบเดิมเป็น <span class="mono text-[13px] text-[var(--ink)]">Legacy ERP System</span>
+              ที่รวมงาน <b class="text-[var(--ink)]">คลังสินค้า (Stock)</b>,
+              <b class="text-[var(--ink)]">หน้าร้าน (Store/POS)</b> และ
+              <b class="text-[var(--ink)]">บัญชี (Accounting)</b> ไว้ในฐานข้อมูลก้อนเดียว (Monolith)
+              ทำให้ขยายยาก แก้ไขเสี่ยง และไม่สามารถคำนวณต้นทุน–กำไรระดับ Lot ได้แม่นยำ
+            </p>
+            <p>
+              เป้าหมายคือการออกแบบใหม่เป็น <b class="text-[var(--ink)]">Microservices แบบ DDD</b>
+              บน Monorepo (Nx + pnpm) โดยแต่ละ Bounded Context เป็นเจ้าของฐานข้อมูลของตนเอง
+              ห้าม Join ข้ามฐานข้อมูล และอ้างอิงข้อมูลข้ามบริบทด้วย
+              <span class="tag-db">UUID</span> เท่านั้น เพื่อให้แต่ละบริการ Deploy และ Scale ได้อิสระ
+            </p>
+            <p>
+              หัวใจของโครงการคือความถูกต้องของ <b class="text-[var(--signal)]">การตัดสต็อกแบบ FIFO/FEFO</b>,
+              <b class="text-[var(--signal)]">การจัดการ Lot &amp; วันหมดอายุ</b> และ
+              <b class="text-[var(--signal)]">การคำนวณ COGS และกำไร/ขาดทุนต่อ Lot</b>
+              ซึ่งอิงต้นทุนนำเข้าจริงของแต่ละล็อต ไม่ใช่ต้นทุนเฉลี่ย
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="eyebrow text-[var(--muted)] mb-4">Target Outcomes</div>
+            <ul class="space-y-4 text-sm">
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">→</span><span><b>8 บริการอิสระ</b> แยกฐานข้อมูลตามบริบทธุรกิจ</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">→</span><span><b>ต้นทุนแม่นยำ</b> ระดับ Lot ทุกธุรกรรม</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">→</span><span><b>2 ภาษา</b> (ไทย/อังกฤษ) ครบทั้ง UI, ข้อความระบบ และ Master Data</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">→</span><span><b>Event-Driven</b> ผ่าน RabbitMQ ลดการผูกกันระหว่างบริการ</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">→</span><span><b>ไฟล์รวมศูนย์</b> บน MinIO พร้อม Presigned URL</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 ARCHITECTURE BLUEPRINT ========== -->
+      <section id="architecture" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Architecture Blueprint</div>
+        <h2 class="display text-3xl sm:text-4xl mb-6">พิมพ์เขียวสถาปัตยกรรม</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
+          ทุกบริการเขียนด้วย <b>NestJS 11 บน Fastify</b> อยู่ในเวิร์กสเปซเดียวกัน (Nx)
+          Frontend เป็น <b>Next.js</b> เรียกใช้ผ่าน API Gateway
+          การสื่อสารระหว่างบริการแบ่งเป็น 2 รูปแบบชัดเจน:
+          <b class="text-[var(--signal)]">RabbitMQ</b> สำหรับเหตุการณ์แบบ async (pub/sub)
+          และ <b class="text-[var(--signal)]">TCP</b> สำหรับการร้องขอแบบ sync (request/response)
+        </p>
+
+        <!-- Context Map Diagram -->
+        <div class="card p-6 sm:p-8 mb-8">
+          <div class="eyebrow text-[var(--muted)] mb-6">System Context Map · Database-per-Context</div>
+          <div class="overflow-x-auto">
+          <svg viewBox="0 0 920 560" class="w-full min-w-[760px]" font-family="IBM Plex Mono, monospace">
+            <defs>
+              <marker id="arw" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                <path d="M0,0 L9,4.5 L0,9 z" fill="#0E7C86"/>
+              </marker>
+              <marker id="arwO" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                <path d="M0,0 L9,4.5 L0,9 z" fill="#DC5A16"/>
+              </marker>
+            </defs>
+
+            <!-- Frontend + Gateway -->
+            <rect x="330" y="16" width="260" height="52" rx="10" fill="#0E1726"/>
+            <text x="460" y="40" fill="#fff" font-size="14" text-anchor="middle" font-weight="600">Next.js Frontend</text>
+            <text x="460" y="57" fill="#9FB0C6" font-size="11" text-anchor="middle">Accept-Language · React</text>
+
+            <rect x="345" y="96" width="230" height="46" rx="10" fill="#12245C"/>
+            <text x="460" y="124" fill="#fff" font-size="13" text-anchor="middle" font-weight="600">API Gateway (NestJS)</text>
+
+            <!-- RabbitMQ bus -->
+            <rect x="120" y="470" width="680" height="46" rx="10" fill="#DC5A16"/>
+            <text x="460" y="493" fill="#fff" font-size="13" text-anchor="middle" font-weight="600">RabbitMQ — Event Bus (async pub/sub)</text>
+            <text x="460" y="508" fill="#FCE0CF" font-size="10.5" text-anchor="middle">Topic exchanges · domain events</text>
+
+            <!-- BCs row -->
+            <g font-size="12.5" font-weight="600" text-anchor="middle">
+              <!-- each: box + db pill -->
+              <g>
+                <rect x="30"  y="200" width="132" height="64" rx="10" fill="#fff" stroke="#0E7C86" stroke-width="1.5"/>
+                <text x="96" y="228" fill="#0E1726">auth</text>
+                <text x="96" y="246" fill="#6B7A90" font-size="10" font-weight="400">JWT · Redis</text>
+                <rect x="46" y="272" width="100" height="20" rx="5" fill="#E9F3F3"/>
+                <text x="96" y="286" fill="#0E7C86" font-size="10" font-weight="500">db: auth</text>
+              </g>
+              <g>
+                <rect x="192" y="200" width="132" height="64" rx="10" fill="#fff" stroke="#0E7C86" stroke-width="1.5"/>
+                <text x="258" y="228" fill="#0E1726">iam</text>
+                <text x="258" y="246" fill="#6B7A90" font-size="10" font-weight="400">Users · Roles</text>
+                <rect x="208" y="272" width="100" height="20" rx="5" fill="#E9F3F3"/>
+                <text x="258" y="286" fill="#0E7C86" font-size="10" font-weight="500">db: iam</text>
+              </g>
+              <g>
+                <rect x="354" y="192" width="132" height="72" rx="10" fill="#fff" stroke="#DC5A16" stroke-width="2"/>
+                <text x="420" y="222" fill="#0E1726">inventory-bc</text>
+                <text x="420" y="240" fill="#DC5A16" font-size="10" font-weight="500">Lot · FIFO/FEFO</text>
+                <rect x="370" y="272" width="100" height="20" rx="5" fill="#FCEEE4"/>
+                <text x="420" y="286" fill="#DC5A16" font-size="10" font-weight="500">db: inventory</text>
+              </g>
+              <g>
+                <rect x="516" y="200" width="132" height="64" rx="10" fill="#fff" stroke="#0E7C86" stroke-width="1.5"/>
+                <text x="582" y="228" fill="#0E1726">supplier-bc</text>
+                <text x="582" y="246" fill="#6B7A90" font-size="10" font-weight="400">PO · Inbound</text>
+                <rect x="532" y="272" width="100" height="20" rx="5" fill="#E9F3F3"/>
+                <text x="582" y="286" fill="#0E7C86" font-size="10" font-weight="500">db: supplier</text>
+              </g>
+              <g>
+                <rect x="678" y="200" width="132" height="64" rx="10" fill="#fff" stroke="#0E7C86" stroke-width="1.5"/>
+                <text x="744" y="228" fill="#0E1726">sales-bc</text>
+                <text x="744" y="246" fill="#6B7A90" font-size="10" font-weight="400">SO · Delivery</text>
+                <rect x="694" y="272" width="100" height="20" rx="5" fill="#E9F3F3"/>
+                <text x="744" y="286" fill="#0E7C86" font-size="10" font-weight="500">db: sales</text>
+              </g>
+
+              <!-- second row -->
+              <g>
+                <rect x="273" y="356" width="132" height="72" rx="10" fill="#fff" stroke="#DC5A16" stroke-width="2"/>
+                <text x="339" y="386" fill="#0E1726">finance-bc</text>
+                <text x="339" y="404" fill="#DC5A16" font-size="10" font-weight="500">COGS · P&amp;L/Lot</text>
+                <rect x="289" y="404" width="100" height="20" rx="5" fill="#FCEEE4"/>
+                <text x="339" y="418" fill="#DC5A16" font-size="10" font-weight="500">db: finance</text>
+              </g>
+              <g>
+                <rect x="435" y="356" width="132" height="72" rx="10" fill="#fff" stroke="#0E7C86" stroke-width="1.5"/>
+                <text x="501" y="386" fill="#0E1726">report-bc</text>
+                <text x="501" y="404" fill="#6B7A90" font-size="10" font-weight="400">Read Models</text>
+                <rect x="451" y="404" width="100" height="20" rx="5" fill="#E9F3F3"/>
+                <text x="501" y="418" fill="#0E7C86" font-size="10" font-weight="500">db: report</text>
+              </g>
+              <g>
+                <rect x="597" y="356" width="132" height="72" rx="10" fill="#fff" stroke="#0E7C86" stroke-width="1.5"/>
+                <text x="663" y="386" fill="#0E1726">storage-bc</text>
+                <text x="663" y="404" fill="#6B7A90" font-size="10" font-weight="400">MinIO · URLs</text>
+                <rect x="613" y="404" width="100" height="20" rx="5" fill="#E9F3F3"/>
+                <text x="663" y="418" fill="#0E7C86" font-size="10" font-weight="500">db: storage</text>
+              </g>
+            </g>
+
+            <!-- gateway to BCs (TCP, sync) -->
+            <g stroke="#0E7C86" stroke-width="1.4" fill="none" marker-end="url(#arw)" opacity="0.55">
+              <path d="M420,142 L96,196"/>
+              <path d="M440,142 L258,196"/>
+              <path d="M460,142 L420,188"/>
+              <path d="M480,142 L582,196"/>
+              <path d="M500,142 L744,196"/>
+            </g>
+            <text x="250" y="168" fill="#0E7C86" font-size="10.5" text-anchor="middle">TCP · sync request/response</text>
+
+            <!-- BCs to bus (async) -->
+            <g stroke="#DC5A16" stroke-width="1.4" fill="none" marker-end="url(#arwO)" opacity="0.65" stroke-dasharray="5 4">
+              <path d="M96,292  L200,466"/>
+              <path d="M420,264 L420,466"/>
+              <path d="M582,264 L560,466"/>
+              <path d="M744,264 L700,466"/>
+              <path d="M339,428 L360,466"/>
+            </g>
+            <!-- report subscribes -->
+            <g stroke="#DC5A16" stroke-width="1.4" fill="none" marker-end="url(#arwO)" opacity="0.65">
+              <path d="M501,466 L501,432"/>
+            </g>
+            <text x="640" y="452" fill="#DC5A16" font-size="10.5" text-anchor="middle">events (dashed) · publish/subscribe</text>
+          </svg>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-6">
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3"><span class="dot" style="background:var(--accent)"></span><h3 class="font-semibold text-[15px]">TCP — Synchronous</h3></div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              ใช้เมื่อผู้เรียก “ต้องรอคำตอบทันที” เช่น Gateway ถามสิทธิ์จาก
+              <span class="mono text-[12px]">iam</span>, ตรวจ Availability จาก
+              <span class="mono text-[12px]">inventory-bc</span> หรือขอ Presigned URL จาก
+              <span class="mono text-[12px]">storage-bc</span>. ใช้ NestJS Microservice Transport แบบ TCP
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3"><span class="dot" style="background:var(--signal)"></span><h3 class="font-semibold text-[15px]">RabbitMQ — Asynchronous</h3></div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              ใช้เผยแพร่ Domain Event แบบ fire-and-forget เช่น
+              <span class="mono text-[12px]">delivery.confirmed</span>,
+              <span class="mono text-[12px]">stock.deducted</span>,
+              <span class="mono text-[12px]">lot.created</span>. ผู้สนใจ (เช่น
+              <span class="mono text-[12px]">finance-bc</span>, <span class="mono text-[12px]">report-bc</span>)
+              Subscribe เองโดยผู้ส่งไม่ต้องรับรู้ ทำให้ระบบ Decoupled
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 i18n ========== -->
+      <section id="i18n" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — Internationalization</div>
+        <h2 class="display text-3xl sm:text-4xl mb-6">กลยุทธ์ 2 ภาษา (ไทย / อังกฤษ)</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
+          ระบบต้องรองรับ <b>ไทยและอังกฤษ</b> ครบทุกชั้น แบ่งความรับผิดชอบชัดเจนระหว่าง
+          Frontend, Backend และ Database
+        </p>
+
+        <div class="grid md:grid-cols-3 gap-5 mb-9">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">LAYER 01</div>
+            <h3 class="font-semibold mb-2">Next.js — UI &amp; Header</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              จัดการ Routing ตามภาษา, แปลข้อความ UI ด้วยไลบรารี i18n และแนบ Header
+              <span class="mono text-[12px] text-[var(--accent)]">Accept-Language: th</span>
+              ในทุก Request ผ่าน Axios Interceptor
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">LAYER 02</div>
+            <h3 class="font-semibold mb-2">NestJS — nestjs-i18n</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              ใช้ <span class="mono text-[12px]">AcceptLanguageResolver</span> อ่าน Header
+              เพื่อเลือกไฟล์แปล (<span class="mono text-[12px]">th.json</span> /
+              <span class="mono text-[12px]">en.json</span>) สำหรับ
+              ข้อความ Error, Validation และข้อความระบบทั้งหมด
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">LAYER 03</div>
+            <h3 class="font-semibold mb-2">PostgreSQL — JSONB</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              Master Data สองภาษา (ชื่อสินค้า, ประเภท) เก็บเป็น
+              <span class="mono text-[12px]">JSONB</span> คอลัมน์เดียว
+              <b>ห้าม</b>ใช้ตารางแปลแยกหรือคอลัมน์
+              <span class="mono text-[12px]">name_th / name_en</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-6 items-start">
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">TypeORM Entity · JSONB Column</div>
+            <div class="code p-5">
+<pre><span class="c">// libs/shared/src/types/localized-text.ts</span>
+<span class="k">export interface</span> <span class="t">LocalizedText</span> { th: <span class="t">string</span>; en: <span class="t">string</span>; }
+
+<span class="c">// inventory-bc/entities/product.entity.ts</span>
+<span class="d">@Entity</span>(<span class="s">'products'</span>)
+<span class="k">export class</span> <span class="t">Product</span> {
+  <span class="d">@PrimaryGeneratedColumn</span>(<span class="s">'uuid'</span>)
+  id: <span class="t">string</span>;
+
+  <span class="c">// ชื่อสินค้า 2 ภาษา ในคอลัมน์เดียว</span>
+  <span class="d">@Column</span>({ type: <span class="s">'jsonb'</span> })
+  name: <span class="t">LocalizedText</span>;   <span class="c">// {"th":"แอปเปิ้ล","en":"Apple"}</span>
+
+  <span class="d">@Column</span>({ type: <span class="s">'jsonb'</span>, nullable: <span class="k">true</span> })
+  description: <span class="t">LocalizedText</span>;
+
+  <span class="c">// อ้างอิงข้ามบริบทด้วย UUID เท่านั้น — ห้าม JOIN</span>
+  <span class="d">@Column</span>(<span class="s">'uuid'</span>)
+  categoryId: <span class="t">string</span>;
+
+  <span class="d">@Column</span>({ type: <span class="s">'uuid'</span>, nullable: <span class="k">true</span> })
+  supplierId: <span class="t">string</span>;
+}</pre>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">Response Interceptor · flatten ตาม locale</div>
+            <div class="code p-5">
+<pre><span class="c">// แปลง JSONB → ภาษาเดียวตาม Accept-Language</span>
+<span class="d">@Injectable</span>()
+<span class="k">export class</span> <span class="t">LocalizeInterceptor</span> <span class="k">implements</span> <span class="t">NestInterceptor</span> {
+  intercept(ctx, next) {
+    <span class="k">const</span> lang = I18nContext.current()?.lang ?? <span class="s">'th'</span>;
+    <span class="k">return</span> next.handle().pipe(
+      map(data =&gt; pickLocale(data, lang))
+    );
+  }
+}
+
+<span class="c">// GET /products?lang=en  →  { "name": "Apple" }</span>
+<span class="c">// GET /products?lang=th  →  { "name": "แอปเปิ้ล" }</span>
+<span class="c">// ค่า raw JSONB ยังคงถูกส่งได้เมื่อ front ต้องแก้ไข 2 ภาษา</span></pre>
+            </div>
+            <div class="mt-4 p-4 rounded-xl" style="background:var(--signal-soft);border:1px solid #F3D9C6;">
+              <p class="text-[13.5px] text-[#8A4218] leading-relaxed">
+                <b>ข้อดี JSONB:</b> Schema สะอาด, เพิ่มภาษาใหม่ได้โดยไม่ต้อง Migrate โครงสร้าง,
+                Query ได้ด้วย <span class="mono text-[12px]">name-&gt;&gt;'th'</span> และเหมาะกับ Microservice ที่ไม่ต้องการตารางแปลกระจาย
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 BOUNDED CONTEXTS ========== -->
+      <section id="contexts" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — Bounded Contexts</div>
+        <h2 class="display text-3xl sm:text-4xl mb-6">การแบ่ง Bounded Contexts</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
+          8 บริการ แต่ละบริการเป็นเจ้าของฐานข้อมูลของตนเอง (<span class="tag-db">db-per-context</span>)
+          entity ที่ระบุด้วย <span class="mono text-[12px] text-[var(--accent)]">uuid→</span> คือการอ้างอิงข้ามบริบท
+        </p>
+
+        <div class="grid sm:grid-cols-2 gap-5">
+
+          <div class="bc-card p-6">
+            <div class="flex items-start justify-between mb-3">
+              <div><h3 class="font-semibold text-[17px] mono">auth</h3><p class="text-[13px] text-[var(--muted)]">Authentication</p></div>
+              <span class="tag-db">db: auth</span>
+            </div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ออก/ตรวจ JWT, จัดการ Session ใน Redis และ <b>เก็บสถานะความปลอดภัยในฐานข้อมูลของตนเอง</b></p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">credentials</span><span class="chip">refresh_tokens</span>
+              <span class="chip">login_histories</span><span class="chip">blocked_users</span>
+              <span class="chip">security_logs</span>
+            </div>
+          </div>
+
+          <div class="bc-card p-6">
+            <div class="flex items-start justify-between mb-3">
+              <div><h3 class="font-semibold text-[17px] mono">iam</h3><p class="text-[13px] text-[var(--muted)]">Identity &amp; Access</p></div>
+              <span class="tag-db">db: iam</span>
+            </div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">จัดการผู้ใช้ บทบาท และสิทธิ์ (RBAC) เป็นแหล่งความจริงของ Users</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">users</span><span class="chip">roles</span>
+              <span class="chip">permissions</span><span class="chip">user_roles</span>
+              <span class="chip">role_permissions</span>
+            </div>
+          </div>
+
+          <div class="bc-card p-6" style="border-color:#F0C9AF;">
+            <div class="flex items-start justify-between mb-3">
+              <div><h3 class="font-semibold text-[17px] mono text-[var(--signal)]">inventory-bc</h3><p class="text-[13px] text-[var(--muted)]">Core Stock &amp; Lot</p></div>
+              <span class="tag-db" style="background:var(--signal-soft);color:var(--signal)">db: inventory</span>
+            </div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">หัวใจของระบบ: Lot, วันหมดอายุ, ตัดสต็อก FIFO/FEFO, รับ/จ่าย และปรับสต็อก</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">products</span><span class="chip">categories</span>
+              <span class="chip">warehouses</span><span class="chip" style="color:var(--signal)">lots</span>
+              <span class="chip">stock_movements</span><span class="chip">goods_receipts</span>
+              <span class="chip">goods_issues</span><span class="chip">stock_adjustments</span>
+              <span class="chip">reorder_levels</span>
+              <span class="chip" style="color:var(--signal)">product_bundles</span>
+              <span class="chip" style="color:var(--signal)">bundle_items</span>
+            </div>
+          </div>
+
+          <div class="bc-card p-6">
+            <div class="flex items-start justify-between mb-3">
+              <div><h3 class="font-semibold text-[17px] mono">supplier-bc</h3><p class="text-[13px] text-[var(--muted)]">Procurement</p></div>
+              <span class="tag-db">db: supplier</span>
+            </div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ผู้จัดซื้อ (Vendor), ใบสั่งซื้อ (PO) และการรับเข้าสินค้า</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">suppliers</span><span class="chip">purchase_orders</span>
+              <span class="chip">purchase_order_items</span><span class="chip">inbound_shipments</span>
+            </div>
+          </div>
+
+          <div class="bc-card p-6">
+            <div class="flex items-start justify-between mb-3">
+              <div><h3 class="font-semibold text-[17px] mono">sales-bc</h3><p class="text-[13px] text-[var(--muted)]">Sales</p></div>
+              <span class="tag-db">db: sales</span>
+            </div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ลูกค้า, ใบเสนอราคา, ใบสั่งขาย และใบส่งของ (<b>ทริกเกอร์การตัดสต็อก</b>)</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">customers</span><span class="chip">quotations</span>
+              <span class="chip">sales_orders</span><span class="chip">sales_order_items</span>
+              <span class="chip">delivery_notes</span>
+            </div>
+          </div>
+
+          <div class="bc-card p-6" style="border-color:#F0C9AF;">
+            <div class="flex items-start justify-between mb-3">
+              <div><h3 class="font-semibold text-[17px] mono text-[var(--signal)]">finance-bc</h3><p class="text-[13px] text-[var(--muted)]">Accounting</p></div>
+              <span class="tag-db" style="background:var(--signal-soft);color:var(--signal)">db: finance</span>
+            </div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ใบกำกับภาษี, ใบวางบิล และ <b>คำนวณ COGS + กำไร/ขาดทุนแม่นยำต่อ Lot</b></p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">tax_invoices</span><span class="chip">billing_notes</span>
+              <span class="chip" style="color:var(--signal)">cogs_entries</span>
+              <span class="chip" style="color:var(--signal)">profit_loss_records</span>
+              <span class="chip">tax_configs</span><span class="chip">ledger_entries</span>
+            </div>
+          </div>
+
+          <div class="bc-card p-6">
+            <div class="flex items-start justify-between mb-3">
+              <div><h3 class="font-semibold text-[17px] mono">report-bc</h3><p class="text-[13px] text-[var(--muted)]">Analytics (CQRS Read)</p></div>
+              <span class="tag-db">db: report</span>
+            </div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ฟัง Event จากทุกบริการ สร้าง Read Model สำหรับรายงาน (สินค้าใกล้หมด, ลูกค้าแต่ละจังหวัด ฯลฯ)</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">sales_summary</span><span class="chip">inventory_summary</span>
+              <span class="chip">expiry_alerts</span><span class="chip">profit_by_lot</span>
+              <span class="chip">low_stock</span><span class="chip">customer_by_province</span>
+            </div>
+          </div>
+
+          <div class="bc-card p-6">
+            <div class="flex items-start justify-between mb-3">
+              <div><h3 class="font-semibold text-[17px] mono">storage-bc</h3><p class="text-[13px] text-[var(--muted)]">File Management</p></div>
+              <span class="tag-db">db: storage</span>
+            </div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">รวมศูนย์ไฟล์บน MinIO: รูปสินค้า, เอกสารแนบ (PO/Invoice) และออก Presigned URL ให้ Frontend</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">file_objects</span><span class="chip">buckets</span>
+              <span class="chip">upload_sessions</span><span class="chip">context_ref (uuid)</span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 FIFO DEEP DIVE ========== -->
+      <section id="fifo" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">05 — Critical Business Logic</div>
+        <h2 class="display text-3xl sm:text-4xl mb-4">Deep Dive: FIFO · Lot · กำไร/ขาดทุน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
+          นี่คือกฎธุรกิจที่ห้ามผิดพลาด <span class="mono text-[13px]">inventory-bc</span> และ
+          <span class="mono text-[13px]">finance-bc</span> ทำงานร่วมกันเพื่อรับประกันว่าต้นทุนที่ตัดออก
+          และกำไรที่คำนวณ อิงต้นทุนนำเข้าจริงของ <b>แต่ละ Lot</b> เสมอ
+        </p>
+
+        <!-- 3 rules -->
+        <div class="grid sm:grid-cols-3 gap-5 mb-10">
+          <div class="p-5 rounded-xl" style="background:var(--signal-soft);border:1px solid #F3D9C6;">
+            <div class="mono text-[11px] text-[var(--signal)] mb-2">RULE 01</div>
+            <h3 class="font-semibold text-[15px] mb-1.5 text-[#8A4218]">Lot &amp; Expiry</h3>
+            <p class="text-[13px] text-[#7A4526] leading-relaxed">สินค้ารับเข้าทุกครั้งต้องผูก Lot ที่บันทึก <b>ต้นทุนนำเข้า</b> และ <b>วันหมดอายุ</b> เฉพาะของล็อตนั้น</p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:var(--signal-soft);border:1px solid #F3D9C6;">
+            <div class="mono text-[11px] text-[var(--signal)] mb-2">RULE 02</div>
+            <h3 class="font-semibold text-[15px] mb-1.5 text-[#8A4218]">FIFO / FEFO</h3>
+            <p class="text-[13px] text-[#7A4526] leading-relaxed">ตัดสต็อกจากล็อตที่ <b>เข้าก่อน (FIFO)</b> หรือ <b>หมดอายุก่อน (FEFO)</b> ก่อนเสมอ โดยอัตโนมัติ</p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:var(--signal-soft);border:1px solid #F3D9C6;">
+            <div class="mono text-[11px] text-[var(--signal)] mb-2">RULE 03</div>
+            <h3 class="font-semibold text-[15px] mb-1.5 text-[#8A4218]">P&amp;L ต่อ Lot</h3>
+            <p class="text-[13px] text-[#7A4526] leading-relaxed">COGS และกำไร/ขาดทุน คำนวณจากต้นทุนจริงของล็อตที่ถูกตัด <b>ไม่ใช่ต้นทุนเฉลี่ย</b></p>
+          </div>
+        </div>
+
+        <!-- Lot example table -->
+        <div class="card overflow-hidden mb-8">
+          <div class="px-6 py-4 border-b" style="border-color:var(--line)">
+            <div class="eyebrow text-[var(--muted)]">ตัวอย่าง · ตัดสต็อกแบบ FEFO 250 หน่วย จากสินค้า “ZAGRO”</div>
+          </div>
+          <table class="spec">
+            <thead>
+              <tr><th>Lot</th><th>รับเข้า</th><th>หมดอายุ</th><th>ต้นทุน/หน่วย</th><th>คงเหลือ</th><th>ตัดออก</th><th>COGS</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono">LOT-A</td><td>01 ม.ค. 68</td><td class="text-[var(--signal)]">31 มี.ค. 69</td><td>฿95.00</td><td>120</td><td><b>120</b></td><td>฿11,400</td></tr>
+              <tr><td class="mono">LOT-B</td><td>15 ม.ค. 68</td><td class="text-[var(--signal)]">30 มิ.ย. 69</td><td>฿98.50</td><td>200</td><td><b>130</b></td><td>฿12,805</td></tr>
+              <tr><td class="mono text-[var(--muted)]">LOT-C</td><td>02 ก.พ. 68</td><td>31 ธ.ค. 69</td><td>฿101.00</td><td>90</td><td class="text-[var(--muted)]">0 (ยังไม่แตะ)</td><td class="text-[var(--muted)]">—</td></tr>
+              <tr style="background:#F8FAFC"><td colspan="5" class="text-right font-semibold">รวมตัดออก 250 หน่วย · COGS รวม</td><td class="font-semibold">250</td><td class="font-semibold text-[var(--signal)]">฿24,205</td></tr>
+            </tbody>
+          </table>
+          <div class="px-6 py-4 text-[13px] text-[var(--ink-soft)] border-t leading-relaxed" style="border-color:var(--line)">
+            หากขายที่ราคา <b>฿250/หน่วย</b> → รายได้ = ฿62,500 · <b class="text-[var(--accent)]">กำไรขั้นต้น = ฿38,295</b>
+            (คำนวณจาก COGS จริงของ 2 ล็อต ไม่ใช่ต้นทุนเฉลี่ย) — LOT-C ยังไม่ถูกแตะเพราะหมดอายุทีหลัง
+          </div>
+        </div>
+
+        <!-- Algorithm code -->
+        <div class="grid lg:grid-cols-2 gap-6 items-start">
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">inventory-bc · Deduction Engine</div>
+            <div class="code p-5">
+<pre><span class="c">// เลือกล็อตตามกลยุทธ์ + ล็อกแถวกันแข่งขัน (concurrency)</span>
+<span class="k">async</span> deductStock(productId, warehouseId, qty, strategy) {
+  <span class="k">return</span> <span class="k">this</span>.dataSource.transaction(<span class="k">async</span> (tx) =&gt; {
+    <span class="k">const</span> order = strategy === <span class="s">'FEFO'</span>
+      ? <span class="s">'lot.expiryDate ASC, lot.receivedAt ASC'</span>
+      : <span class="s">'lot.receivedAt ASC'</span>;            <span class="c">// FIFO</span>
+
+    <span class="k">const</span> lots = <span class="k">await</span> tx.getRepository(<span class="t">Lot</span>)
+      .createQueryBuilder(<span class="s">'lot'</span>)
+      .setLock(<span class="s">'pessimistic_write'</span>)     <span class="c">// SELECT ... FOR UPDATE</span>
+      .where(<span class="s">'lot.productId = :productId'</span>, { productId })
+      .andWhere(<span class="s">'lot.warehouseId = :warehouseId'</span>, { warehouseId })
+      .andWhere(<span class="s">'lot.availableQty &gt; 0'</span>)
+      .orderBy(order)
+      .getMany();
+
+    <span class="k">let</span> remaining = qty;
+    <span class="k">const</span> allocations = [];
+    <span class="k">for</span> (<span class="k">const</span> lot <span class="k">of</span> lots) {
+      <span class="k">if</span> (remaining &lt;= 0) <span class="k">break</span>;
+      <span class="k">const</span> take = Math.min(lot.availableQty, remaining);
+      lot.availableQty -= take;
+      remaining -= take;
+      allocations.push({
+        lotId: lot.id, qty: take, unitCost: lot.importCost
+      });
+      <span class="k">await</span> tx.save(lot);
+    }
+    <span class="k">if</span> (remaining &gt; 0) <span class="k">throw new</span> <span class="t">InsufficientStock</span>();
+
+    <span class="c">// ส่ง event ให้ finance-bc คำนวณ COGS/P&amp;L ต่อล็อต</span>
+    <span class="k">await</span> <span class="k">this</span>.bus.publish(<span class="s">'stock.deducted'</span>, { allocations });
+    <span class="k">return</span> allocations;
+  });
+}</pre>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">finance-bc · COGS &amp; Profit per Lot</div>
+            <div class="code p-5">
+<pre><span class="c">// รับ event → คำนวณต้นทุนและกำไรราย allocation</span>
+<span class="d">@EventPattern</span>(<span class="s">'stock.deducted'</span>)
+<span class="k">async</span> onStockDeducted(msg: { allocations, saleId }) {
+  <span class="k">const</span> sale = <span class="k">await</span> <span class="k">this</span>.sales.get(msg.saleId); <span class="c">// TCP</span>
+  <span class="k">let</span> totalCOGS = 0, totalRevenue = 0;
+
+  <span class="k">for</span> (<span class="k">const</span> a <span class="k">of</span> msg.allocations) {
+    <span class="k">const</span> lineCost    = a.qty * a.unitCost;
+    <span class="k">const</span> lineRevenue = a.qty * sale.unitPrice;
+    totalCOGS    += lineCost;
+    totalRevenue += lineRevenue;
+
+    <span class="k">await</span> <span class="k">this</span>.cogs.save({
+      lotId: a.lotId, qty: a.qty,
+      unitCost: a.unitCost, cogs: lineCost,
+      profit: lineRevenue - lineCost   <span class="c">// กำไรต่อล็อต</span>
+    });
+  }
+
+  <span class="k">await</span> <span class="k">this</span>.pnl.save({
+    saleId: msg.saleId,
+    revenue: totalRevenue,
+    cogs: totalCOGS,
+    grossProfit: totalRevenue - totalCOGS
+  });
+}</pre>
+            </div>
+          </div>
+        </div>
+        <!-- SINGLE vs BUNDLE -->
+        <div class="mt-12">
+          <div class="eyebrow text-[var(--signal)] mb-3">Single vs Bundle · การขายแบบเดี่ยว &amp; แบบชุด</div>
+          <h3 class="display text-2xl mb-3">ขายแบบชุด (Bundle) ต้องตัด Lot ให้ถูกต้อง</h3>
+          <p class="text-[var(--ink-soft)] text-[15px] max-w-3xl mb-7 leading-[1.85]">
+            สินค้ามี 2 ชนิด: <b>เดี่ยว (single)</b> ตัดล็อตของตัวเองตรง ๆ และ
+            <b>ชุด (bundle/kit)</b> ที่ประกอบจากสินค้าย่อยหลายรายการตาม BOM
+            เมื่อขายชุด ระบบต้อง <b class="text-[var(--signal)]">“แตกชุด” (explode)</b> เป็นสินค้าย่อยก่อน
+            แล้วตัด FIFO/FEFO ของ <b>แต่ละสินค้าย่อยแยกกัน</b> — COGS ของชุด = ผลรวมต้นทุนจากทุกล็อตของทุกสินค้าย่อย
+          </p>
+
+          <!-- explode diagram -->
+          <div class="card p-6 sm:p-8 mb-8">
+            <div class="eyebrow text-[var(--muted)] mb-6">ตัวอย่าง · ขาย “ชุดของขวัญ A” จำนวน 10 ชุด</div>
+            <div class="flex flex-col lg:flex-row lg:items-center gap-4 text-[13px]">
+              <div class="flow-node p-4 lg:w-[220px] shrink-0" style="border-color:#F0C9AF">
+                <div class="mono text-[11px] text-[var(--signal)] mb-1">BUNDLE · type=bundle</div>
+                <div class="font-semibold text-[15px]">ชุดของขวัญ A × 10</div>
+                <div class="text-[var(--muted)] mt-1">BOM: 2× สินค้า X + 1× สินค้า Y</div>
+              </div>
+              <div class="hidden lg:flex items-center text-[var(--signal)] mono text-lg px-1">⇒</div>
+              <div class="grid sm:grid-cols-2 gap-4 flex-1">
+                <div class="flow-node p-4">
+                  <div class="mono text-[11px] text-[var(--muted)] mb-1">ต้องตัด · สินค้า X = 20 หน่วย</div>
+                  <div class="text-[13px] leading-relaxed">
+                    <div class="flex justify-between"><span class="mono">X-LOT1</span><span>15 @ ฿30 <span class="text-[var(--muted)]">= ฿450</span></span></div>
+                    <div class="flex justify-between"><span class="mono">X-LOT2</span><span>5 @ ฿32 <span class="text-[var(--muted)]">= ฿160</span></span></div>
+                    <div class="flex justify-between mt-1 pt-1 border-t font-semibold" style="border-color:var(--line)"><span>COGS X</span><span class="text-[var(--signal)]">฿610</span></div>
+                  </div>
+                </div>
+                <div class="flow-node p-4">
+                  <div class="mono text-[11px] text-[var(--muted)] mb-1">ต้องตัด · สินค้า Y = 10 หน่วย</div>
+                  <div class="text-[13px] leading-relaxed">
+                    <div class="flex justify-between"><span class="mono">Y-LOT1</span><span>10 @ ฿48 <span class="text-[var(--muted)]">= ฿480</span></span></div>
+                    <div class="flex justify-between"><span class="mono text-[var(--muted)]">Y-LOT2</span><span class="text-[var(--muted)]">0 (ยังไม่แตะ)</span></div>
+                    <div class="flex justify-between mt-1 pt-1 border-t font-semibold" style="border-color:var(--line)"><span>COGS Y</span><span class="text-[var(--signal)]">฿480</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="mt-5 pt-4 border-t text-[13.5px] text-[var(--ink-soft)] leading-relaxed" style="border-color:var(--line)">
+              <b class="text-[var(--signal)]">COGS ชุดของขวัญ A (10 ชุด) = ฿610 + ฿480 = ฿1,090</b> —
+              แต่ละสินค้าย่อยตัดตามลำดับ FEFO ของตัวเอง และทั้งหมดต้องอยู่ใน
+              <b>ทรานแซกชันเดียว</b> (all-or-nothing) หากสินค้าย่อยตัวใดสต็อกไม่พอ ต้อง rollback ทั้งชุด
+            </div>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6 items-start">
+            <div>
+              <div class="eyebrow text-[var(--muted)] mb-3">inventory-bc · Bundle Explosion</div>
+              <div class="code p-5">
+<pre><span class="c">// entity: product_bundles + bundle_items (BOM)</span>
+<span class="d">@Entity</span>(<span class="s">'bundle_items'</span>)
+<span class="k">class</span> <span class="t">BundleItem</span> {
+  <span class="d">@Column</span>(<span class="s">'uuid'</span>) bundleProductId: <span class="t">string</span>;
+  <span class="d">@Column</span>(<span class="s">'uuid'</span>) componentProductId: <span class="t">string</span>;
+  <span class="d">@Column</span>(<span class="s">'int'</span>)  quantity: <span class="t">number</span>;  <span class="c">// ต่อ 1 ชุด</span>
+}
+
+<span class="c">// แตกชุด → รวมเป็นรายการตัดสต็อกของสินค้าย่อย</span>
+<span class="k">async</span> explode(line: { productId, qty }) {
+  <span class="k">const</span> product = <span class="k">await</span> <span class="k">this</span>.products.get(line.productId);
+  <span class="k">if</span> (product.type === <span class="s">'single'</span>)
+    <span class="k">return</span> [{ productId: line.productId, qty: line.qty }];
+
+  <span class="c">// type === 'bundle' → ขยายตาม BOM × จำนวนชุด</span>
+  <span class="k">const</span> items = <span class="k">await</span> <span class="k">this</span>.bomRepo.find({
+    where: { bundleProductId: line.productId }
+  });
+  <span class="k">return</span> items.map(i =&gt; ({
+    productId: i.componentProductId,
+    qty: i.quantity * line.qty
+  }));
+}</pre>
+              </div>
+            </div>
+            <div>
+              <div class="eyebrow text-[var(--muted)] mb-3">รวมทุกบรรทัด → ตัด FEFO ในทรานแซกชันเดียว</div>
+              <div class="code p-5">
+<pre><span class="k">async</span> issueForSale(saleLines, strategy) {
+  <span class="k">return</span> <span class="k">this</span>.dataSource.transaction(<span class="k">async</span> (tx) =&gt; {
+    <span class="c">// 1) แตกทั้งเดี่ยวและชุดให้เป็นสินค้าย่อย</span>
+    <span class="k">const</span> exploded = (<span class="k">await</span> Promise.all(
+      saleLines.map(l =&gt; <span class="k">this</span>.explode(l))
+    )).flat();
+
+    <span class="c">// 2) รวมยอดสินค้าเดียวกัน (ชุด+เดี่ยวปนกันได้)</span>
+    <span class="k">const</span> demand = mergeByProduct(exploded);
+
+    <span class="c">// 3) ตัด FIFO/FEFO ทีละสินค้า — ล็อกล็อตทุกตัว</span>
+    <span class="k">const</span> allocations = [];
+    <span class="k">for</span> (<span class="k">const</span> d <span class="k">of</span> demand) {
+      allocations.push(
+        ...<span class="k">await</span> <span class="k">this</span>.deductStock(
+          d.productId, d.warehouseId, d.qty, strategy, tx
+        )
+      );
+    }
+    <span class="c">// ถ้าตัวใดไม่พอ → throw → rollback ทั้งชุด</span>
+    <span class="k">await</span> <span class="k">this</span>.bus.publish(<span class="s">'stock.deducted'</span>, { allocations });
+    <span class="k">return</span> allocations;   <span class="c">// finance รวม COGS ต่อล็อตต่อสินค้าย่อย</span>
+  });
+}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 EVENT STORMING ========== -->
+      <section id="events" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — Event Storming &amp; Integration</div>
+        <h2 class="display text-3xl sm:text-4xl mb-6">การสื่อสารระหว่างบริการ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-10 leading-[1.85]">
+          3 ตัวอย่างสำคัญของการไหลของเหตุการณ์ผ่าน RabbitMQ (เส้นประ = event)
+          และการเรียกแบบ TCP (เส้นทึบ = sync)
+        </p>
+
+        <!-- FLOW 1 -->
+        <div class="card p-6 sm:p-8 mb-7">
+          <div class="flex items-center gap-3 mb-6">
+            <span class="w-7 h-7 rounded-full flex items-center justify-center mono text-[13px] text-white shrink-0" style="background:var(--signal)">1</span>
+            <h3 class="font-semibold text-[17px]">ขายของ → ตัดสต็อก FIFO → คำนวณกำไรต่อล็อต</h3>
+          </div>
+          <div class="flex flex-col md:flex-row md:items-stretch gap-3 md:gap-2 text-[13px]">
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">sales-bc</div>
+              <div class="font-medium">ยืนยันใบส่งของ</div>
+              <div class="flow-evt text-[var(--signal)] mt-2">→ delivery.confirmed</div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--signal)] mono">⇢</div>
+            <div class="flow-node p-4 flex-1" style="border-color:#F0C9AF">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">inventory-bc</div>
+              <div class="font-medium">ตัดสต็อก FEFO + ล็อกล็อต</div>
+              <div class="flow-evt text-[var(--signal)] mt-2">→ stock.deducted<br><span class="text-[var(--muted)]">(allocations + unitCost)</span></div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--signal)] mono">⇢</div>
+            <div class="flow-node p-4 flex-1" style="border-color:#F0C9AF">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">finance-bc</div>
+              <div class="font-medium">สร้างใบกำกับ + COGS/กำไรต่อล็อต</div>
+              <div class="flow-evt text-[var(--signal)] mt-2">→ invoice.issued</div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--signal)] mono">⇢</div>
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">report-bc</div>
+              <div class="font-medium">อัปเดต Read Model ยอดขาย/กำไร</div>
+              <div class="flow-evt text-[var(--accent)] mt-2">subscribes ทุก event</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FLOW 2 -->
+        <div class="card p-6 sm:p-8 mb-7">
+          <div class="flex items-center gap-3 mb-6">
+            <span class="w-7 h-7 rounded-full flex items-center justify-center mono text-[13px] text-white shrink-0" style="background:var(--accent)">2</span>
+            <h3 class="font-semibold text-[17px]">รับสินค้าจาก PO → สร้าง Lot ต้นทุน + วันหมดอายุ</h3>
+          </div>
+          <div class="flex flex-col md:flex-row md:items-stretch gap-3 md:gap-2 text-[13px]">
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">supplier-bc</div>
+              <div class="font-medium">บันทึกรับเข้าตาม PO</div>
+              <div class="flow-evt text-[var(--signal)] mt-2">→ po.received</div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--accent)] mono">⇢</div>
+            <div class="flow-node p-4 flex-1" style="border-color:#F0C9AF">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">inventory-bc</div>
+              <div class="font-medium">สร้าง Lot (importCost, expiryDate)</div>
+              <div class="flow-evt text-[var(--signal)] mt-2">→ lot.created</div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--accent)] mono">⇢</div>
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">storage-bc</div>
+              <div class="font-medium">แนบไฟล์ใบรับ (GRN) ไว้บน MinIO</div>
+              <div class="flow-evt text-[var(--accent)] mt-2">context_ref = receiptId</div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--accent)] mono">⇢</div>
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">report-bc</div>
+              <div class="font-medium">อัปเดตสต็อก + แจ้งเตือนใกล้หมดอายุ</div>
+              <div class="flow-evt text-[var(--accent)] mt-2">expiry_alerts</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FLOW 3 -->
+        <div class="card p-6 sm:p-8">
+          <div class="flex items-center gap-3 mb-6">
+            <span class="w-7 h-7 rounded-full flex items-center justify-center mono text-[13px] text-white shrink-0" style="background:var(--blueprint)">3</span>
+            <h3 class="font-semibold text-[17px]">อัปโหลดรูปสินค้า → storage-bc ออก Presigned URL</h3>
+          </div>
+          <div class="flex flex-col md:flex-row md:items-stretch gap-3 md:gap-2 text-[13px]">
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">Next.js</div>
+              <div class="font-medium">ขอ Presigned PUT URL</div>
+              <div class="flow-evt text-[var(--accent)] mt-2">TCP → storage-bc</div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--accent)] mono">→</div>
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">Frontend → MinIO</div>
+              <div class="font-medium">อัปโหลดไฟล์ตรงเข้า MinIO</div>
+              <div class="flow-evt text-[var(--accent)] mt-2">(ไม่ผ่าน backend)</div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--signal)] mono">⇢</div>
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">storage-bc</div>
+              <div class="font-medium">บันทึก file_object + emit</div>
+              <div class="flow-evt text-[var(--signal)] mt-2">→ file.uploaded<br><span class="text-[var(--muted)]">(context_ref = productId)</span></div>
+            </div>
+            <div class="hidden md:flex items-center text-[var(--signal)] mono">⇢</div>
+            <div class="flow-node p-4 flex-1">
+              <div class="mono text-[11px] text-[var(--muted)] mb-1">inventory-bc</div>
+              <div class="font-medium">ผูก object_key เข้ากับสินค้า</div>
+              <div class="flow-evt text-[var(--accent)] mt-2">แสดงผลด้วย Presigned GET</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 ROADMAP ========== -->
+      <section id="roadmap" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — Development Plan</div>
+        <h2 class="display text-3xl sm:text-4xl mb-4">แผนพัฒนาแบบเฟส · Task &amp; Man-hours</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          แตกงานทั้ง <b>Backend</b> และ <b>Frontend</b> เป็นงานย่อย พร้อมประมาณ Man-hours และ Duration
+          วางเป็น Gantt Chart รวม <b>~24 สัปดาห์</b> (ประมาณการบนทีม 2 Backend + 2 Frontend + 1 QA/PM
+          ที่ 1 man-day = 8 ชั่วโมง)
+        </p>
+
+        <!-- SUMMARY BAND -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-px rounded-xl overflow-hidden mb-8" style="background:var(--line)">
+          <div class="bg-white p-5">
+            <div class="mono text-[11px] text-[var(--muted)]">TOTAL</div>
+            <div class="display text-2xl mt-1">1,924<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
+            <div class="text-[12px] text-[var(--muted)] mt-0.5">≈ 240 man-days</div>
+          </div>
+          <div class="bg-white p-5">
+            <div class="mono text-[11px]" style="color:var(--accent)">BACKEND</div>
+            <div class="display text-2xl mt-1" style="color:var(--accent)">1,108<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
+            <div class="text-[12px] text-[var(--muted)] mt-0.5">58% ของงาน</div>
+          </div>
+          <div class="bg-white p-5">
+            <div class="mono text-[11px]" style="color:#4F63C4">FRONTEND</div>
+            <div class="display text-2xl mt-1" style="color:#4F63C4">816<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
+            <div class="text-[12px] text-[var(--muted)] mt-0.5">42% ของงาน</div>
+          </div>
+          <div class="bg-white p-5">
+            <div class="mono text-[11px] text-[var(--muted)]">DURATION</div>
+            <div class="display text-2xl mt-1">24<span class="text-sm font-normal text-[var(--muted)]"> สัปดาห์</span></div>
+            <div class="text-[12px] text-[var(--muted)] mt-0.5">≈ 6 เดือน</div>
+          </div>
+          <div class="bg-white p-5 col-span-2 sm:col-span-1">
+            <div class="mono text-[11px] text-[var(--muted)]">TEAM</div>
+            <div class="display text-2xl mt-1">5<span class="text-sm font-normal text-[var(--muted)]"> คน</span></div>
+            <div class="text-[12px] text-[var(--muted)] mt-0.5">2 BE · 2 FE · 1 QA/PM</div>
+          </div>
+        </div>
+
+        <!-- LEGEND -->
+        <div class="flex flex-wrap gap-4 mb-4 text-[12px]">
+          <span class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-[3px]" style="background:var(--blueprint)"></span>Infra / DevOps</span>
+          <span class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-[3px]" style="background:var(--accent)"></span>Backend</span>
+          <span class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-[3px]" style="background:#4F63C4"></span>Frontend</span>
+          <span class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-[3px]" style="background:var(--signal)"></span>Critical Path (Lot / FIFO / P&amp;L)</span>
+        </div>
+
+        <!-- GANTT -->
+        <div class="gantt-wrap mb-4">
+          <div class="gantt">
+            <!-- header -->
+            <div class="gantt-head">
+              <div class="corner">TASK · MAN-HOURS</div>
+              <div class="gantt-months">
+                <span>เดือน 1<br>W1–4</span><span>เดือน 2<br>W5–8</span><span>เดือน 3<br>W9–12</span>
+                <span>เดือน 4<br>W13–16</span><span>เดือน 5<br>W17–20</span><span>เดือน 6<br>W21–24</span>
+              </div>
+            </div>
+
+            <!-- PHASE 0 -->
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--blueprint)"></span>PHASE 0 · รากฐาน (Foundation)</div><div class="ph-hours"><span class="hbadge hb-be">BE 100</span><span class="hbadge hb-fe">FE 64</span><span>· 164 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Nx workspace + pnpm + module boundaries</span><span class="hbadge hb-be">BE 16</span></div><div class="gantt-track"><div class="gbar infra" style="left:0%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Shared libs (types, i18n, event contracts)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar infra" style="left:0%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Docker Compose (8×PG, Redis, MQ, MinIO)</span><span class="hbadge hb-be">BE 20</span></div><div class="gantt-track"><div class="gbar infra" style="left:0%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>CI/CD pipeline (lint · test · build · deploy)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar infra" style="left:4.17%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>API Gateway + Next.js scaffold</span><span class="flex gap-1"><span class="hbadge hb-be">BE 16</span><span class="hbadge hb-fe">FE 24</span></span></div><div class="gantt-track"><div class="gbar fe" style="left:4.17%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Design system / UI kit + i18n provider</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:0%;width:8.33%">2w</div></div></div>
+
+            <!-- PHASE 1 -->
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 1 · Identity &amp; Access</div><div class="ph-hours"><span class="hbadge hb-be">BE 120</span><span class="hbadge hb-fe">FE 88</span><span>· 208 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>auth: JWT + refresh + Redis sessions</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:8.33%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>auth: login_histories · blocked_users · logs</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar be" style="left:12.5%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>iam: users · roles · permissions + RBAC guard</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:8.33%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: login / logout / route guards</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:12.5%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: user &amp; role management screens</span><span class="hbadge hb-fe">FE 48</span></div><div class="gantt-track"><div class="gbar fe" style="left:16.67%;width:6.25%">1.5w</div></div></div>
+
+            <!-- PHASE 2 -->
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 2 · Master Data &amp; Storage</div><div class="ph-hours"><span class="hbadge hb-be">BE 120</span><span class="hbadge hb-fe">FE 128</span><span>· 248 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>inventory: products/categories (JSONB i18n)</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:16.67%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>storage: MinIO + presigned URL service</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:20.83%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>supplier: suppliers CRUD</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar be" style="left:20.83%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: product mgmt (list + bilingual form)</span><span class="hbadge hb-fe">FE 56</span></div><div class="gantt-track"><div class="gbar fe" style="left:25%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: category + supplier screens</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:25%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: image upload (presigned flow)</span><span class="hbadge hb-fe">FE 32</span></div><div class="gantt-track"><div class="gbar fe" style="left:29.17%;width:4.17%">1w</div></div></div>
+
+            <!-- PHASE 3 -->
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--signal)"></span>PHASE 3 · Inventory Core · Lot &amp; FIFO/Bundle</div><div class="ph-hours"><span class="hbadge hb-be">BE 200</span><span class="hbadge hb-fe">FE 128</span><span>· 328 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Lot entity + goods receipt</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar crit" style="left:29.17%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FIFO/FEFO deduction engine + row locking</span><span class="hbadge hb-be">BE 64</span></div><div class="gantt-track"><div class="gbar crit" style="left:33.33%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Bundle/kit BOM + explosion logic</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar crit" style="left:37.5%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Stock adjustments</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:41.67%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Expiry alert scheduler</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:41.67%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: goods receipt screen</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:37.5%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: stock / lot views · adjust · expiry</span><span class="hbadge hb-fe">FE 56</span></div><div class="gantt-track"><div class="gbar fe" style="left:41.67%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: bundle definition UI (BOM builder)</span><span class="hbadge hb-fe">FE 32</span></div><div class="gantt-track"><div class="gbar fe" style="left:45.83%;width:4.17%">1w</div></div></div>
+
+            <!-- PHASE 4 -->
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 4 · Procurement &amp; Sales</div><div class="ph-hours"><span class="hbadge hb-be">BE 160</span><span class="hbadge hb-fe">FE 144</span><span>· 304 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>supplier: PO + inbound shipments</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:45.83%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>sales: customers</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:50%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>sales: quotations + sales orders</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:50%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>sales: delivery note → stock.deducted event</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar crit" style="left:58.33%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: PO screens</span><span class="hbadge hb-fe">FE 48</span></div><div class="gantt-track"><div class="gbar fe" style="left:54.17%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: customer screens</span><span class="hbadge hb-fe">FE 32</span></div><div class="gantt-track"><div class="gbar fe" style="left:54.17%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: quotation / SO / delivery (single+bundle)</span><span class="hbadge hb-fe">FE 64</span></div><div class="gantt-track"><div class="gbar fe" style="left:58.33%;width:8.33%">2w</div></div></div>
+
+            <!-- PHASE 5 -->
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--signal)"></span>PHASE 5 · Finance · COGS &amp; P&amp;L</div><div class="ph-hours"><span class="hbadge hb-be">BE 128</span><span class="hbadge hb-fe">FE 96</span><span>· 224 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>finance: tax invoices + billing notes</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:62.5%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>finance: COGS + P&amp;L per lot (incl. bundle)</span><span class="hbadge hb-be">BE 56</span></div><div class="gantt-track"><div class="gbar crit" style="left:66.67%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>finance: tax configs (ภาษี 1 / ภาษี 2)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:62.5%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: invoice / billing screens</span><span class="hbadge hb-fe">FE 56</span></div><div class="gantt-track"><div class="gbar fe" style="left:70.83%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: P&amp;L / COGS views</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:70.83%;width:6.25%">1.5w</div></div></div>
+
+            <!-- PHASE 6 -->
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 6 · Reporting &amp; Analytics</div><div class="ph-hours"><span class="hbadge hb-be">BE 104</span><span class="hbadge hb-fe">FE 120</span><span>· 224 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>report: event consumers + read models</span><span class="hbadge hb-be">BE 56</span></div><div class="gantt-track"><div class="gbar be" style="left:75%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>report: APIs (sales/inv/expiry/profit-by-lot)</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:79.17%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: dashboard + charts</span><span class="hbadge hb-fe">FE 64</span></div><div class="gantt-track"><div class="gbar fe" style="left:83.33%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: report screens (detail/summary/graph)</span><span class="hbadge hb-fe">FE 56</span></div><div class="gantt-track"><div class="gbar fe" style="left:83.33%;width:8.33%">2w</div></div></div>
+
+            <!-- PHASE 7 -->
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--blueprint)"></span>PHASE 7 · Migration · Hardening · Cutover</div><div class="ph-hours"><span class="hbadge hb-be">BE 176</span><span class="hbadge hb-fe">FE 48</span><span>· 224 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>ETL scripts + legacy_id_map</span><span class="hbadge hb-be">BE 56</span></div><div class="gantt-track"><div class="gbar infra" style="left:87.5%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>File migration → MinIO (mc mirror)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar infra" style="left:87.5%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Reconciliation tooling (stock + ledger)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar infra" style="left:91.67%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Load / security testing + hardening</span><span class="flex gap-1"><span class="hbadge hb-be">BE 40</span><span class="hbadge hb-fe">FE 24</span></span></div><div class="gantt-track"><div class="gbar infra" style="left:91.67%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>UAT + cutover + rollback rehearsal</span><span class="flex gap-1"><span class="hbadge hb-be">BE 24</span><span class="hbadge hb-fe">FE 24</span></span></div><div class="gantt-track"><div class="gbar infra" style="left:95.83%;width:4.17%">1w</div></div></div>
+
+          </div>
+        </div>
+        <p class="text-[12px] text-[var(--muted)] mb-9">↔ เลื่อนแนวนอนเพื่อดูไทม์ไลน์เต็ม · แถบสีคือช่วงเวลาทำงาน (ความยาว = duration) · ตัวเลขในแถบ = จำนวนสัปดาห์</p>
+
+        <!-- MAN-HOUR TABLE -->
+        <div class="card overflow-hidden">
+          <div class="px-6 py-4 border-b" style="border-color:var(--line)"><div class="eyebrow text-[var(--muted)]">สรุป Man-hours ต่อเฟส</div></div>
+          <table class="spec">
+            <thead><tr><th>Phase</th><th>ขอบเขตหลัก</th><th class="!text-right">Backend</th><th class="!text-right">Frontend</th><th class="!text-right">รวม (ชม.)</th><th class="!text-right">สัปดาห์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">P0</td><td>Foundation · DevOps · UI kit</td><td class="text-right">100</td><td class="text-right">64</td><td class="text-right font-semibold">164</td><td class="text-right">W1–2</td></tr>
+              <tr><td class="mono">P1</td><td>Auth &amp; IAM</td><td class="text-right">120</td><td class="text-right">88</td><td class="text-right font-semibold">208</td><td class="text-right">W3–5</td></tr>
+              <tr><td class="mono">P2</td><td>Master Data &amp; Storage</td><td class="text-right">120</td><td class="text-right">128</td><td class="text-right font-semibold">248</td><td class="text-right">W5–8</td></tr>
+              <tr style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P3</td><td>Inventory · Lot · FIFO · Bundle</td><td class="text-right">200</td><td class="text-right">128</td><td class="text-right font-semibold text-[var(--signal)]">328</td><td class="text-right">W8–12</td></tr>
+              <tr><td class="mono">P4</td><td>Procurement &amp; Sales</td><td class="text-right">160</td><td class="text-right">144</td><td class="text-right font-semibold">304</td><td class="text-right">W12–16</td></tr>
+              <tr style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P5</td><td>Finance · COGS &amp; P&amp;L</td><td class="text-right">128</td><td class="text-right">96</td><td class="text-right font-semibold text-[var(--signal)]">224</td><td class="text-right">W16–19</td></tr>
+              <tr><td class="mono">P6</td><td>Reporting &amp; Analytics</td><td class="text-right">104</td><td class="text-right">120</td><td class="text-right font-semibold">224</td><td class="text-right">W19–22</td></tr>
+              <tr><td class="mono">P7</td><td>Migration &amp; Cutover</td><td class="text-right">176</td><td class="text-right">48</td><td class="text-right font-semibold">224</td><td class="text-right">W22–24</td></tr>
+              <tr style="background:#0E1726"><td class="mono text-white">รวม</td><td class="text-white">8 Phases · 46 tasks</td><td class="text-right font-semibold" style="color:#7FE3DE">1,108</td><td class="text-right font-semibold" style="color:#A9B6EC">816</td><td class="text-right font-bold text-white">1,924</td><td class="text-right text-white">24 wk</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[12px] text-[var(--muted)] mt-4 leading-relaxed">
+          * ประมาณการเป็น “effort ชั่วโมงพัฒนาสุทธิ” ยังไม่รวม overhead (meeting, code review, rework ~20–30%)
+          และยังไม่รวมงาน QA เชิงลึก · ตัวเลขควรปรับตามความเร็วจริงของทีมหลัง Sprint แรก
+        </p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 MIGRATION ========== -->
+      <section id="migration" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Legacy Migration</div>
+        <h2 class="display text-3xl sm:text-4xl mb-6">การย้ายระบบเดิม</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
+          ใช้รูปแบบ <b>Strangler Fig</b> — รันระบบใหม่คู่ขนานกับระบบเดิม แล้วค่อย ๆ ย้ายทีละโมดูล
+          ลดความเสี่ยงและไม่ต้องหยุดธุรกิจ
+        </p>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-4"><span class="dot" style="background:var(--accent)"></span><h3 class="font-semibold text-[15px]">การย้ายข้อมูล (ETL)</h3></div>
+            <ul class="space-y-3 text-[14px] text-[var(--ink-soft)]">
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">01</span><span>สร้างตาราง <span class="mono text-[12px]">legacy_id_map</span> จับคู่ ID เดิม ↔ UUID ใหม่ ทุกบริการ</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">02</span><span>แปลง field เดิมเข้าสู่ schema ใหม่: <span class="mono text-[12px]">ชื่อสินค้า → name.th</span>, <span class="mono text-[12px]">ประเภท → category</span>, <span class="mono text-[12px]">ราคาต้นทุน/ราคาขาย/ภาษี</span></span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">03</span><span>ยอดคงเหลือปัจจุบัน (<span class="mono text-[12px]">จำนวน</span>) แปลงเป็น <b>“Migration Lot”</b> ตั้งต้น 1 ล็อต/สินค้า พร้อมต้นทุนล่าสุดและวันหมดอายุ</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">04</span><span>แยกข้อมูลลูกค้า/ผู้จัดซื้อไปยัง sales-bc / supplier-bc ตามบริบท</span></li>
+            </ul>
+          </div>
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-4"><span class="dot" style="background:var(--signal)"></span><h3 class="font-semibold text-[15px]">การย้ายไฟล์สู่ MinIO</h3></div>
+            <ul class="space-y-3 text-[14px] text-[var(--ink-soft)]">
+              <li class="flex gap-3"><span class="mono text-[var(--signal)] text-xs mt-0.5">01</span><span>Bulk copy โฟลเดอร์รูปสินค้า/เอกสารเดิมเข้าสู่ MinIO buckets ด้วย <span class="mono text-[12px]">mc mirror</span> หรือ SDK</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--signal)] text-xs mt-0.5">02</span><span>ลงทะเบียน <span class="mono text-[12px]">file_objects</span> พร้อม <span class="mono text-[12px]">context_ref</span> = UUID ของสินค้า/เอกสารที่แมปไว้</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--signal)] text-xs mt-0.5">03</span><span>ตรวจ Checksum และจำนวนไฟล์หลังย้าย ก่อนตัดการเข้าถึงพาธเดิม</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--signal)] text-xs mt-0.5">04</span><span>Frontend เปลี่ยนมาเรียก Presigned URL จาก storage-bc แทน static path เดิม</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="mt-8 p-6 rounded-xl blueprint-bg text-white">
+          <div class="eyebrow text-[#7FE3DE] mb-2">Cutover Principle</div>
+          <p class="text-[15px] text-[#D6E2F2] leading-relaxed max-w-3xl">
+            ทำ <b class="text-white">Dry-run</b> การย้ายข้อมูลซ้ำหลายรอบบน Staging, กระทบยอด (Reconcile)
+            ยอดสต็อกและยอดบัญชีให้ตรงกับระบบเดิม แล้วจึงสลับทีละบริการ พร้อมแผน Rollback ทุกงวด
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="border-t py-8 mb-4" style="border-color:var(--line)">
+        <div class="flex flex-col sm:flex-row justify-between gap-3 text-[13px] text-[var(--muted)]">
+          <div class="mono">ERP SYSTEM · MICROSERVICES DDD ARCHITECTURE &amp; DEVELOPMENT PLAN</div>
+          <div class="mono">Nx · NestJS 11 · PostgreSQL · RabbitMQ · MinIO · Next.js</div>
+        </div>
+      </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section.section').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
