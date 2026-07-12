@@ -9,35 +9,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
 </head>
 <body>
 
-<div class="docnav">
-  <a href="index.html">🏠 Home</a>
-  <span class="sep">/</span>
-  <a href="erp-architecture.html" class="current">📐 ERP Architecture</a>
-  <span class="sep">/</span>
-  <a href="core-feature.html">SRS · Phase 3–6</a>
-  <span class="sep">/</span>
-  <a href="i18n-guide.html">i18n Guide (TH/EN)</a>
-</div>
+<erp-docnav></erp-docnav>
 
 <div class="flex min-h-screen">
 
   <!-- ============ SIDEBAR ============ -->
-  <aside class="side hidden lg:flex flex-col w-[290px] shrink-0 sticky top-[44px] h-[calc(100vh-44px)]">
-    <div class="px-7 pt-8 pb-6">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg blueprint-bg border border-white/10 flex items-center justify-center">
-          <span class="mono text-white text-sm font-semibold">E</span>
-        </div>
-        <div>
-          <div class="text-white font-semibold text-[15px] leading-none">Enterprise ERP</div>
-          <div class="mono text-[10px] tracking-wider text-[#5E7391] mt-1">DDD ARCHITECTURE · v1.0</div>
-        </div>
-      </div>
-    </div>
-    <nav class="px-5 flex-1 overflow-y-auto space-y-1" id="nav">
+  <erp-sidebar badge="E" title="Enterprise ERP" subtitle="DDD ARCHITECTURE · v1.0" width="290">
+    <nav slot="nav">
       <a href="#overview"     class="navlink"><span class="n">01</span> บทสรุปผู้บริหาร</a>
       <a href="#architecture" class="navlink"><span class="n">02</span> พิมพ์เขียวสถาปัตยกรรม</a>
       <a href="#i18n"         class="navlink"><span class="n">03</span> กลยุทธ์ 2 ภาษา (i18n)</a>
@@ -47,14 +29,12 @@
       <a href="#roadmap"      class="navlink"><span class="n">07</span> แผนพัฒนาแบบเฟส</a>
       <a href="#migration"    class="navlink"><span class="n">08</span> การย้ายระบบเดิม</a>
     </nav>
-    <div class="px-7 py-5 border-t border-white/8">
-      <div class="mono text-[10px] leading-relaxed text-[#5E7391]">
-        MONOREPO · NX + PNPM<br>
-        NESTJS 11 · FASTIFY · TS 5.7<br>
-        POSTGRESQL · RABBITMQ · MINIO
-      </div>
+    <div slot="footnote">
+      MONOREPO · NX + PNPM<br>
+      NESTJS 11 · FASTIFY · TS 5.7<br>
+      POSTGRESQL · RABBITMQ · MINIO
     </div>
-  </aside>
+  </erp-sidebar>
 
   <!-- ============ MAIN ============ -->
   <main class="flex-1 min-w-0">
@@ -1005,12 +985,10 @@
       </section>
 
       <!-- FOOTER -->
-      <footer class="border-t py-8 mb-4" style="border-color:var(--line)">
-        <div class="flex flex-col sm:flex-row justify-between gap-3 text-[13px] text-[var(--muted)]">
-          <div class="mono">ERP SYSTEM · MICROSERVICES DDD ARCHITECTURE &amp; DEVELOPMENT PLAN</div>
-          <div class="mono">Nx · NestJS 11 · PostgreSQL · RabbitMQ · MinIO · Next.js</div>
-        </div>
-      </footer>
+      <erp-footer
+        line1="ERP SYSTEM · MICROSERVICES DDD ARCHITECTURE &amp; DEVELOPMENT PLAN"
+        line2="Nx · NestJS 11 · PostgreSQL · RabbitMQ · MinIO · Next.js">
+      </erp-footer>
 
     </div>
   </main>

@@ -10,35 +10,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
 </head>
 <body>
 
-<div class="docnav">
-  <a href="index.html">🏠 Home</a>
-  <span class="sep">/</span>
-  <a href="erp-architecture.html">📐 ERP Architecture</a>
-  <span class="sep">/</span>
-  <a href="core-feature.html" class="current">SRS · Phase 3–6</a>
-  <span class="sep">/</span>
-  <a href="i18n-guide.html">i18n Guide (TH/EN)</a>
-</div>
+<erp-docnav></erp-docnav>
 
 <div class="flex min-h-screen">
 
   <!-- SIDEBAR -->
-  <aside class="side hidden lg:flex flex-col w-[280px] shrink-0 sticky top-[44px] h-[calc(100vh-44px)]">
-    <div class="px-7 pt-8 pb-6">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg blueprint-bg border border-white/10 flex items-center justify-center">
-          <span class="mono text-white text-sm font-semibold">S</span>
-        </div>
-        <div>
-          <div class="text-white font-semibold text-[15px] leading-none">ERP · SRS</div>
-          <div class="mono text-[10px] tracking-wider text-[#5E7391] mt-1">PHASE 3–6 SPEC</div>
-        </div>
-      </div>
-    </div>
-    <nav class="px-5 flex-1 overflow-y-auto space-y-1" id="nav">
+  <erp-sidebar badge="S" title="ERP · SRS" subtitle="PHASE 3–6 SPEC" width="280">
+    <nav slot="nav">
       <a href="#sitemap" class="navlink"><span class="n" style="color:var(--accent)">IA</span> Sidebar Sitemap</a>
       <a href="#p3" class="navlink"><span class="n" style="color:var(--signal)">P3</span> Inventory Core</a>
       <a href="#p4" class="navlink"><span class="n" style="color:var(--blueprint)">P4</span> Procurement &amp; Sales</a>
@@ -52,10 +34,8 @@
       <div class="navsub">4 · ER Diagram</div>
       <div class="navsub">5 · Dev Guide</div>
     </nav>
-    <div class="px-7 py-5 border-t border-white/8">
-      <div class="mono text-[10px] leading-relaxed text-[#5E7391]">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
-    </div>
-  </aside>
+    <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
+  </erp-sidebar>
 
   <!-- MAIN -->
   <main class="flex-1 min-w-0">
@@ -1224,12 +1204,10 @@ erDiagram
       </section>
 
       <!-- FOOTER -->
-      <footer class="border-t pt-8 pb-4" style="border-color:var(--line)">
-        <div class="flex flex-col sm:flex-row justify-between gap-3 text-[12px]" style="color:var(--muted)">
-          <div class="mono">ERP SYSTEM · SRS · PHASE 3–6 (INVENTORY · SALES · FINANCE · REPORTING)</div>
-          <div class="mono">DDD · RABBITMQ · TCP · CQRS · POSTGRESQL</div>
-        </div>
-      </footer>
+      <erp-footer
+        line1="ERP SYSTEM · SRS · PHASE 3–6 (INVENTORY · SALES · FINANCE · REPORTING)"
+        line2="DDD · RABBITMQ · TCP · CQRS · POSTGRESQL">
+      </erp-footer>
 
     </div>
   </main>

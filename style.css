@@ -37,6 +37,22 @@ body{
 h1,h2,h3,h4{ letter-spacing:-.2px; line-height:1.28; }
 .display{ font-weight:700; }
 
+/* ===== web components: FOUC prevention ===== */
+/* Reserve layout space & hide content until each custom element upgrades,
+   so nothing flashes as raw <erp-sidebar>...</erp-sidebar> text/unstyled
+   children before connectedCallback() runs. */
+erp-docnav:not(:defined),
+erp-sidebar:not(:defined),
+erp-footer:not(:defined) {
+  visibility: hidden;
+}
+erp-docnav:not(:defined) { display: block; height: 44px; }
+erp-sidebar:not(:defined) { display: none; }
+@media (min-width: 1024px) {
+  erp-sidebar:not(:defined) { display: block; width: 280px; min-height: calc(100vh - 44px); background: var(--ink); flex-shrink: 0; }
+}
+erp-footer:not(:defined) { display: block; height: 84px; }
+
 /* ===== sidebar nav ===== */
 .side{ background:var(--ink); }
 .navlink{
