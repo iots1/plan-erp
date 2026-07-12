@@ -29,6 +29,7 @@
       </div>
     </div>
     <nav class="px-5 flex-1 overflow-y-auto space-y-1" id="nav">
+      <a href="#sitemap" class="navlink"><span class="n" style="color:var(--accent)">IA</span> Sidebar Sitemap</a>
       <a href="#p3" class="navlink"><span class="n" style="color:var(--signal)">P3</span> Inventory Core</a>
       <a href="#p4" class="navlink"><span class="n" style="color:var(--blueprint)">P4</span> Procurement &amp; Sales</a>
       <a href="#p5" class="navlink"><span class="n" style="color:var(--accent)">P5</span> Finance</a>
@@ -75,6 +76,93 @@
     <div class="max-w-[1000px] mx-auto px-6 sm:px-10 py-14 space-y-20">
 
       <!-- ============================================================= -->
+      <!-- SITEMAP : LEFT SIDEBAR (STOCK MODULE)                         -->
+      <!-- ============================================================= -->
+      <section id="sitemap" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(14,124,134,.12),rgba(14,124,134,.04))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(14,124,134,.16);color:var(--accent);border:1px solid rgba(14,124,134,.3)">SITEMAP</span>
+              <span class="eyebrow" style="color:var(--accent)">Information Architecture · Left Sidebar</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Site Map — เมนู Stock บน Left Sidebar</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">โครงเมนูจัดกลุ่มตามงาน (Main · Tools · Setup · Reports · Settings) พร้อม <b>ตัดขอบเขต (scope) ตามลำดับความสำคัญ</b> ว่าอันไหนทำใน Phase 3 ตอนนี้ อันไหนเลื่อนไป Phase หลัง อันไหนเป็น backlog</p>
+          </div>
+        </div>
+
+        <!-- legend -->
+        <div class="flex flex-wrap items-center gap-3 mb-6 text-[12.5px]" style="color:var(--ink-soft)">
+          <span class="flex items-center gap-2"><span class="smb smb-now">NOW · P3</span> ทำตอนนี้ (MVP สต็อก)</span>
+          <span class="flex items-center gap-2"><span class="smb smb-soon">SOON</span> Phase 4–6 (ผูกกับ Sales / Finance / Report)</span>
+          <span class="flex items-center gap-2"><span class="smb smb-later">LATER</span> Backlog (ยังไม่จำเป็น)</span>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-5">
+
+          <!-- MAIN -->
+          <div class="smcol">
+            <div class="smcol-head"><span>🏠</span> Main Menu · เมนูหลัก</div>
+            <div class="smrow"><span class="lbl">Dashboard <small>แดชบอร์ดภาพรวม</small></span><span class="smb smb-soon">SOON · P6</span></div>
+            <div class="smrow"><span class="lbl">Stock Entry <small>โอนคลัง / เบิกใช้ / แปรรูป (repack)</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Purchase Receipt <small>ใบรับสินค้า (Goods Receipt)</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Delivery Note <small>ใบส่งสินค้า → ตัดสต็อก</small></span><span class="smb smb-soon">SOON · P4</span></div>
+            <div class="smrow"><span class="lbl">Material Request <small>ใบขอซื้อ / ขอเบิกวัสดุ</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Pick List <small>รายการหยิบสินค้า</small></span><span class="smb smb-later">LATER</span></div>
+          </div>
+
+          <!-- SETUP -->
+          <div class="smcol">
+            <div class="smcol-head"><span>⚙️</span> Setup · ตั้งค่าสินค้า (Master Data)</div>
+            <div class="smrow"><span class="lbl">Item <small>สินค้า (ตัวหลัก)</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Item Group <small>กลุ่มสินค้า (tree)</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Item Attribute <small>คุณลักษณะ / variant</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Brand <small>แบรนด์</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Warehouse <small>คลังสินค้า</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">UOM <small>หน่วยนับ</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">UOM Conversion Factor <small>อัตราแปลงหน่วย</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Batch No <small>หมายเลขล็อต (= Lot ของเรา)</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Serial No <small>หมายเลขซีเรียล</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Serial & Batch Bundle <small>กลุ่ม serial/batch</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Inventory Dimension <small>มิติสินค้าคงคลัง</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Item Alternative <small>สินค้าทดแทน</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Quality Inspection Template <small>เทมเพลตตรวจคุณภาพ</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Shipping Rule / Delivery Trip <small>กฎจัดส่ง / รอบรถ</small></span><span class="smb smb-later">LATER</span></div>
+          </div>
+
+          <!-- TOOLS -->
+          <div class="smcol">
+            <div class="smcol-head"><span>🛠️</span> Tools · เครื่องมือ</div>
+            <div class="smrow"><span class="lbl">Stock Reconciliation <small>กระทบยอด / ปรับสต็อก (Adjustment)</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Landed Cost Voucher <small>ต้นทุนแฝง / ค่านำเข้า</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Repost Item Valuation <small>คำนวณมูลค่าสต็อกใหม่</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Packing Slip <small>ใบรายการบรรจุ</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Quality Inspection <small>การตรวจสอบคุณภาพ</small></span><span class="smb smb-later">LATER</span></div>
+          </div>
+
+          <!-- REPORTS + SETTINGS -->
+          <div class="smcol">
+            <div class="smcol-head"><span>📊</span> Reports · รายงาน</div>
+            <div class="smrow"><span class="lbl">Stock Ledger <small>บัญชีแยกประเภทสต็อก (จาก stock_movements)</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Stock Balance <small>ยอดคงเหลือ (แยกคลัง / ล็อต)</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Stock Ageing · Batch Expiry <small>อายุสินค้า / ล็อตใกล้หมดอายุ</small></span><span class="smb smb-soon">SOON · P6</span></div>
+            <div class="smrow"><span class="lbl">Stock Analytics · Trends <small>วิเคราะห์ / แนวโน้ม</small></span><span class="smb smb-soon">SOON · P6</span></div>
+            <div class="smrow"><span class="lbl">Item Shortage · Reorder Level <small>สินค้าขาด / จุดสั่งซื้อ</small></span><span class="smb smb-soon">SOON · P6</span></div>
+            <div class="smrow"><span class="lbl">Serial / Batch Traceability <small>ตรวจย้อนกลับ</small></span><span class="smb smb-later">LATER</span></div>
+
+            <div class="smcol-head mt-4"><span>🧩</span> Settings · ตั้งค่าระบบ</div>
+            <div class="smrow"><span class="lbl">Stock Settings <small>valuation, default warehouse, negative stock</small></span><span class="smb smb-now">NOW · P3</span></div>
+            <div class="smrow"><span class="lbl">Item Variant Settings <small>ตั้งค่า variant</small></span><span class="smb smb-soon">SOON</span></div>
+            <div class="smrow"><span class="lbl">Stock Reposting Settings <small>ตั้งค่า repost</small></span><span class="smb smb-later">LATER</span></div>
+            <div class="smrow"><span class="lbl">Delivery Settings <small>ตั้งค่าขนส่ง</small></span><span class="smb smb-later">LATER</span></div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <div class="rule"></div>
+
+      <!-- ============================================================= -->
       <!-- PHASE 3 : INVENTORY CORE                                      -->
       <!-- ============================================================= -->
       <section id="p3" class="scroll-mt-6">
@@ -112,9 +200,94 @@
           <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> สต็อกในระบบต้องตรงกับของจริงเสมอ ทุกล็อตต้องมีต้นทุนนำเข้าและวันหมดอายุที่ถูกต้อง และการตัดสต็อกต้องเป็นไปตามกฎ FIFO/FEFO อย่างเคร่งครัด</div>
         </div>
 
-        <!-- 3.2 Use Cases & Data Entry -->
+        <!-- 3.2 Master Data & Settings (Item Master) -->
         <div class="mb-12">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · บันทึกข้อมูลยังไง</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">02</span><h3 class="text-xl font-semibold">Master Data &amp; Settings · ตั้งค่าสินค้า (Item Master)</h3></div>
+
+          <div class="card p-4 mb-6 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">ตำแหน่งในระบบ:</b> ทุกหัวข้อในส่วนนี้ — Item, Item Group, Item Attribute, Brand, UOM, UOM Conversion Factor — จัดกลุ่มอยู่ในเมนู <b style="color:var(--ink)">"ตั้งค่าสินค้า" (Product / Stock Settings)</b> บน Left Sidebar ของแอปพลิเคชัน เป็น <b style="color:var(--ink)">master data</b> ที่ต้องตั้งค่าให้เสร็จก่อนเริ่มบันทึกธุรกรรมใด ๆ (Goods Receipt, PO, SO ฯลฯ)</div>
+
+          <div class="grid sm:grid-cols-3 gap-4 mb-6">
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">ITEM GROUP</div>
+              <div class="font-semibold mb-1.5">หมวดหมู่สินค้า</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">โครงสร้างแบบ <b>ต้นไม้ (tree)</b> ผูก parent/child ได้หลายชั้น (เช่น เครื่องดื่ม → เครื่องดื่มไม่มีแอลกอฮอล์ → น้ำอัดลม) ใช้จัดกลุ่ม, กำหนดค่าเริ่มต้น (คลัง/บัญชี) และกรองรายงานตามหมวด</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">BRAND</div>
+              <div class="font-semibold mb-1.5">ยี่ห้อสินค้า</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">รายการยี่ห้อ/ผู้ผลิตแบบเรียบง่าย (ไม่มีลำดับชั้น) ผูกกับ Item เพื่อใช้กรองค้นหาและออกรายงานยอดขายแยกตามยี่ห้อ</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">UOM</div>
+              <div class="font-semibold mb-1.5">หน่วยนับ (Unit of Measure)</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">รายการหน่วยกลาง เช่น ชิ้น, กล่อง, กก., ลิตร แต่ละหน่วยระบุ <span class="mono text-[12px]">is_whole_number</span> (บังคับจำนวนเต็ม เช่น "ชิ้น" หรืออนุญาตทศนิยม เช่น "กก.")</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">UOM CONVERSION FACTOR</div>
+              <div class="font-semibold mb-1.5">อัตราแปลงหน่วยต่อสินค้า</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">กำหนด <b>ต่อรายสินค้า</b> ว่า 1 หน่วยทางเลือก = กี่เท่าของ stock UOM เช่น 1 กล่อง = 12 ชิ้น ใช้แปลงจำนวนตอนซื้อ/ขายเป็นหน่วยที่ต่างจากหน่วยเก็บสต็อก</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">ITEM ATTRIBUTE</div>
+              <div class="font-semibold mb-1.5">คุณลักษณะสินค้า (สำหรับตัวเลือก/variant)</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">นิยามแกนตัวเลือก เช่น สี, ขนาด พร้อมรายการค่าที่เป็นไปได้ (attribute values) ใช้ผูกกับ Item ต้นแบบเพื่อ generate สินค้าย่อยแบบ variant (เช่น เสื้อ-แดง-L)</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">ITEM</div>
+              <div class="font-semibold mb-1.5">สินค้า (ตัวหลัก)</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">มาสเตอร์สินค้าหลัก อ้างอิง item group, brand, stock UOM และ (ถ้ามี) attribute ต้นแบบสำหรับ variant — เป็นจุดร่วมที่ Lot, PO, SO, Bundle ทั้งหมดผูกกับ</p>
+            </div>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[15px]">ลำดับการตั้งค่า · Setup Flow</h4>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]">ตั้งค่า <b>UOM</b> พื้นฐาน (ชิ้น, กล่อง, กก. ฯลฯ) และระบุว่าหน่วยใด <span class="mono text-[12px]">is_whole_number</span></p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]">สร้าง <b>Item Group</b> เป็นโครงสร้างต้นไม้ตามที่ธุรกิจต้องการจัดหมวด และสร้าง <b>Brand</b> ตามยี่ห้อที่ขาย</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">(ถ้ามีสินค้าแบบตัวเลือก) สร้าง <b>Item Attribute</b> + attribute values ล่วงหน้า เช่น สี = {แดง, น้ำเงิน}, ขนาด = {S, M, L}</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]">สร้าง <b>Item</b> — เลือก item group, brand, <b>stock UOM</b> (หน่วยหลักที่ใช้เก็บสต็อก) และตั้ง <span class="mono text-[12px]">has_variants=true</span> พร้อมเลือก attribute หากต้องการให้ระบบ generate สินค้าย่อยอัตโนมัติ</p></div>
+            <div class="step"><span class="sn">5</span><p class="text-[13.5px]">ตั้งค่า <b>UOM Conversion Factor</b> ต่อ Item (ถ้าซื้อ/ขายเป็นหน่วยอื่นที่ไม่ใช่ stock UOM) เช่น หน่วยซื้อ = กล่อง (factor 12), หน่วยขาย = ชิ้น (factor 1)</p></div>
+          </div>
+
+          <h4 class="font-semibold mt-2 mb-3 text-[15px]">ข้อมูลที่บันทึกในแต่ละมาสเตอร์</h4>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>Field</th><th>มาสเตอร์</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>parent_item_group_id</td><td>Item Group</td><td>อ้างอิงตัวเอง (self FK) สร้างโครงสร้างต้นไม้หลายชั้น</td></tr>
+                <tr><td>is_group</td><td>Item Group</td><td>true = เป็นโหนดกลุ่ม (ไม่ผูก Item โดยตรง) · false = ใบสุด (leaf) เลือกได้ในหน้า Item</td></tr>
+                <tr><td>stock_uom_id</td><td>Item</td><td>หน่วยหลักที่ใช้บันทึกสต็อกจริง — <b>ล็อกไม่ให้แก้</b> เมื่อมี stock movement แล้ว</td></tr>
+                <tr><td>has_variants</td><td>Item</td><td>true = เป็น "Item ต้นแบบ" ห้ามใช้ทำธุรกรรมตรง ต้องเลือก variant เท่านั้น</td></tr>
+                <tr><td>conversion_factor</td><td>UOM Conversion Factor</td><td>อัตราแปลงจากหน่วยทางเลือกไปเป็น stock_uom (เช่น 12 = 1 กล่อง : 12 ชิ้น)</td></tr>
+                <tr><td>attribute_value</td><td>Item Attribute Value</td><td>ค่าตัวเลือกที่เลือกได้ต่อ attribute หนึ่งตัว (เช่น "แดง" ของ attribute "สี")</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge"><div class="tag mb-1">เปลี่ยน Stock UOM ภายหลัง</div><p class="text-[13px]">ถ้า Item มี stock movement เกิดขึ้นแล้ว <b>ห้ามเปลี่ยน stock UOM</b> เพราะจะทำให้ available_qty ในอดีตตีความผิดหน่วย ต้องปิด item เดิมแล้วสร้างใหม่แทน</p></div>
+            <div class="edge"><div class="tag mb-1">ลบ Item Group ที่มี Item ผูกอยู่</div><p class="text-[13px]">ห้ามลบ/ต้องย้าย Item ไปกลุ่มอื่นก่อน และห้ามลบ Item Group ที่มี child group อยู่ภายใต้</p></div>
+            <div class="edge"><div class="tag mb-1">Conversion Factor กับหน่วยจำนวนเต็ม</div><p class="text-[13px]">ถ้า stock UOM มี <span class="mono text-[12px]">is_whole_number=true</span> (เช่น ชิ้น) การแปลงต้องได้ผลลัพธ์เป็นจำนวนเต็มเสมอ ห้ามตั้ง factor ที่ทำให้ปัดเศษ</p></div>
+            <div class="edge"><div class="tag mb-1">ใช้ Item ต้นแบบ (template) ทำธุรกรรม</div><p class="text-[13px]">Item ที่ <span class="mono text-[12px]">has_variants=true</span> ต้อง <b>บล็อกไม่ให้เลือก</b>ใน Goods Receipt/PO/SO โดยตรง — บังคับให้เลือกที่ variant ที่ระบบ generate ไว้เท่านั้น</p></div>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Stock Settings · ค่าตั้งต้นระบบสต็อก</h4>
+          <div class="card p-6">
+            <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)">หน้า <b>Stock Settings</b> (เมนู Settings) เก็บค่า config ระดับระบบที่ business logic ทุกจุดต้องอ่าน — ต้องตั้งให้เสร็จก่อนเปิดใช้งานจริง</p>
+            <div class="grid sm:grid-cols-2 gap-3">
+              <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">valuation_method</div><p class="text-[13px]">กลยุทธ์ตัดสต็อกตั้งต้น: <span class="mono text-[12px]">FIFO</span> หรือ <span class="mono text-[12px]">FEFO</span> (ต่อ Item override ได้)</p></div>
+              <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">allow_negative_stock</div><p class="text-[13px]">อนุญาตให้ตัดจนติดลบหรือไม่ — ค่าเริ่มต้น <b>false</b> (ตรงกับ CHECK ≥ 0)</p></div>
+              <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">default_warehouse</div><p class="text-[13px]">คลังตั้งต้นเวลาสร้างเอกสารใหม่ (ลดการกรอกซ้ำ)</p></div>
+              <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">expiry_alert_days</div><p class="text-[13px]">จำนวนวันก่อนหมดอายุที่จะยิง <span class="mono text-[12px]">expiry.approaching</span></p></div>
+              <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">stock_frozen_upto</div><p class="text-[13px]"><b>ล็อกงวดอดีต</b>: ห้ามบันทึก/แก้ movement ที่ posting_date ≤ วันนี้ (กันแก้ย้อนหลังกระทบบัญชี)</p></div>
+              <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">over_receipt_allowance</div><p class="text-[13px]">% ที่ยอมให้รับ/ส่งเกินจำนวนในเอกสารอ้างอิง (เช่น รับเกิน PO ได้ 5%)</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.3 Use Cases & Data Entry -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">03</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · บันทึกข้อมูลยังไง</h3></div>
 
           <div class="grid lg:grid-cols-2 gap-6">
             <!-- UC Goods Receipt -->
@@ -144,6 +317,29 @@
             <p class="text-[13.5px]" style="color:var(--ink-soft)">เมื่อรายการที่จ่ายเป็น <span class="mono text-[12px]">type=bundle</span> ระบบจะ <b>แตกชุด</b> ตาม BOM (<span class="mono text-[12px]">bundle_items</span>) × จำนวนชุด → รวม demand ต่อสินค้าย่อย → ตัด FIFO/FEFO ของแต่ละสินค้าย่อย <b>ในทรานแซกชันเดียว</b>. COGS ของชุด = ผลรวมต้นทุนจากทุกล็อตของทุกสินค้าย่อย</p>
           </div>
 
+          <div class="card p-6 mt-6">
+            <div class="mono text-[11px] mb-3" style="color:var(--signal)">UC-3.4 · STOCK ENTRY (รับเข้า / โอนคลัง / เบิกใช้ภายใน / แปรรูป)</div>
+            <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)">เอกสารกลางสำหรับการเคลื่อนไหวสต็อกที่ <b>ไม่ผูกกับ PO/SO</b> — ครอบคลุม 4 ประเภทหลัก:</p>
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>Material Receipt</b> — รับเข้าที่ไม่ผูก PO: ยอดยกมาตอนเปิดระบบ (opening) / ของแถม / ปรับเพิ่ม — สร้างล็อตใหม่พร้อม <b>import_cost + expiry</b> (RECEIPT)</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>Material Transfer</b> — ย้ายล็อตระหว่างคลัง: ตัด available ที่คลังต้นทาง (ISSUE) + สร้าง/เพิ่มล็อตที่คลังปลายทาง (RECEIPT) <b>คงต้นทุนล็อตเดิม</b> ไม่สร้างกำไร/ขาดทุน · รองรับ <b>in-transit warehouse</b> สำหรับการโอนข้ามสาขา</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>Material Issue</b> — เบิกใช้ภายใน (ของเสีย / ตัวอย่าง / ใช้ในองค์กร): ตัด FIFO/FEFO เหมือน Goods Issue แต่ปลายทางเป็นบัญชีค่าใช้จ่าย ไม่ใช่ลูกค้า</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Repack</b> — แปรรูป: ตัดสินค้าต้นทาง (source items) → สร้างล็อตสินค้าปลายทางใหม่ โดย <b>ม้วนต้นทุนต้นทางเข้าเป็น import_cost ของล็อตใหม่</b> (value in = value out)</p></div>
+            <div class="step"><span class="sn">5</span><p class="text-[13.5px]">ทุกประเภทบันทึก <span class="mono text-[12px]">stock_movement</span> คู่ (out/in) ใน <b>ทรานแซกชันเดียว</b> + emit <span class="mono text-[12px]" style="color:var(--signal)">stock.adjusted</span> / <span class="mono text-[12px]" style="color:var(--signal)">lot.created</span></p></div>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Core Operational Reports · รายงานขั้นต่ำ (query ตรงจาก inventory-bc)</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-2" style="color:var(--accent)">STOCK LEDGER · บัญชีแยกประเภทสต็อก</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">ไล่ทุก <span class="mono text-[12px]">stock_movement</span> ตามเวลา (in/out/adjust) พร้อม running balance ต่อ item×warehouse×lot — เป็น <b>source of truth</b> สำหรับตรวจสอบ ต่างจากรายงานเชิงวิเคราะห์ที่อยู่ Phase 6</p>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-2" style="color:var(--accent)">STOCK BALANCE · ยอดคงเหลือ</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">สรุป <span class="mono text-[12px]">available_qty</span> คงเหลือ ณ ปัจจุบัน แยกตามคลัง / ล็อต / วันหมดอายุ + มูลค่าคงคลัง (Σ qty×import_cost) ใช้ตรวจกับของจริง</p>
+            </div>
+          </div>
+          <p class="text-[12.5px] mt-2" style="color:var(--muted)">* รายงานทั้ง 2 นี้ query จาก transactional DB ของ inventory-bc โดยตรง (operational) — ส่วนรายงานเชิงวิเคราะห์/แดชบอร์ด (ageing, trends, analytics) ไปทำใน report-bc (Phase 6 · CQRS)</p>
+
           <h4 class="font-semibold mt-8 mb-3 text-[15px]">ข้อมูลที่บันทึกในแต่ละขั้น</h4>
           <div class="card overflow-hidden">
             <table class="d">
@@ -154,7 +350,8 @@
                 <tr><td>expiry_date</td><td>Goods Receipt</td><td>วันหมดอายุเฉพาะล็อต (ขับเคลื่อน FEFO)</td></tr>
                 <tr><td>available_qty</td><td>Receipt / Issue</td><td>คงเหลือใช้ได้จริง · ต้อง ≥ 0 เสมอ</td></tr>
                 <tr><td>allocations[]</td><td>Goods Issue</td><td>รายการ (lotId, qty, unitCost) ที่ถูกตัด — snapshot</td></tr>
-                <tr><td>movement.type</td><td>ทุกขั้น</td><td>RECEIPT · ISSUE · ADJUSTMENT</td></tr>
+                <tr><td>movement.type</td><td>ทุกขั้น</td><td>RECEIPT · ISSUE · ADJUSTMENT · TRANSFER_IN/OUT</td></tr>
+                <tr><td>entry_type</td><td>Stock Entry</td><td>RECEIPT · TRANSFER · ISSUE · REPACK — กำหนดพฤติกรรมของเอกสาร</td></tr>
               </tbody>
             </table>
           </div>
@@ -162,17 +359,18 @@
           <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
           <div class="grid sm:grid-cols-2 gap-4">
             <div class="edge"><div class="tag mb-1">สต็อกไม่พอ</div><p class="text-[13px]">ตอน Goods Issue หากรวมทุกล็อตแล้วไม่พอ → <b>throw InsufficientStock</b> และ rollback ทั้งรายการ (all-or-nothing) ห้ามตัดบางส่วน</p></div>
+            <div class="edge"><div class="tag mb-1">โอนคลังต้องคงต้นทุน</div><p class="text-[13px]">Material Transfer ห้ามเปลี่ยน <span class="mono text-[12px]">import_cost</span> ของล็อต — ปลายทางต้องได้ต้นทุนเท่าต้นทาง (ไม่ใช่การซื้อใหม่)</p></div>
             <div class="edge"><div class="tag mb-1">ล็อตหมดอายุ</div><p class="text-[13px]">FIFO/FEFO ต้อง <b>ข้ามล็อตที่ expiry &lt; วันนี้</b> ไม่นำไปขาย และแจ้งเตือนให้ทำ write-off ผ่านใบปรับสต็อกแยก</p></div>
             <div class="edge"><div class="tag mb-1">รับไม่ครบ PO</div><p class="text-[13px]">Partial receipt → สร้างล็อตเท่าที่รับจริง PO ยังคงเปิดค้าง (สถานะ PARTIAL) รอรับส่วนที่เหลือ</p></div>
             <div class="edge"><div class="tag mb-1">Bundle ขาดชิ้น</div><p class="text-[13px]">หากสินค้าย่อยตัวใดในชุดสต็อกไม่พอ → rollback <b>ทั้งชุด</b> ไม่ตัดสินค้าย่อยตัวอื่นทิ้งไว้</p></div>
           </div>
         </div>
 
-        <!-- 3.3 Data Flow -->
+        <!-- 3.4 Data Flow -->
         <div class="mb-12">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">03</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">04</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
           <div class="card p-6 mb-5">
-            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">inventory-bc</b> เป็นทั้งผู้ฟังและผู้ส่ง: รับ <span class="mono text-[12px]">po.received</span> จาก supplier เพื่อสร้างล็อต และรับ <span class="mono text-[12px]">delivery.confirmed</span> จาก sales เพื่อตัดสต็อก แล้วส่ง <span class="mono text-[12px]">stock.deducted</span> พร้อม allocations (มี unitCost) ต่อไปให้ finance และ report</p>
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">inventory-bc</b> เป็นทั้งผู้ฟังและผู้ส่ง: รับ <span class="mono text-[12px]">po.received</span> จาก supplier เพื่อสร้างล็อต และรับ <span class="mono text-[12px]">delivery.confirmed</span> จาก sales เพื่อตัดสต็อก แล้วส่ง <span class="mono text-[12px]">stock.deducted</span> พร้อม allocations (มี unitCost) ต่อไปให้ finance และ report การเปลี่ยนแปลง master data (Item/Item Group/Brand/UOM) ก็ยิง event แจ้ง report-bc เพื่ออัปเดตชื่อ/หมวดหมู่ที่ denormalize ไว้เช่นกัน</p>
           </div>
           <div class="grid sm:grid-cols-2 gap-6">
             <div class="card p-5">
@@ -183,6 +381,7 @@
                 <span class="evt evt-emit">stock.adjusted</span>
                 <span class="evt evt-emit">stock.low</span>
                 <span class="evt evt-emit">expiry.approaching</span>
+                <span class="evt evt-emit">item.updated</span>
               </div>
             </div>
             <div class="card p-5">
@@ -191,6 +390,7 @@
                 <span class="evt evt-listen">po.received ← supplier</span>
                 <span class="evt evt-listen">delivery.confirmed ← sales</span>
                 <span class="evt evt-tcp">checkAvailability (TCP) ← sales</span>
+                <span class="evt evt-tcp">getItemUom (TCP) ← supplier · sales</span>
               </div>
             </div>
           </div>
@@ -201,32 +401,79 @@
                 <tr><td>stock.deducted</td><td>inventory-bc</td><td>finance-bc (COGS) · report-bc</td></tr>
                 <tr><td>lot.created</td><td>inventory-bc</td><td>report-bc (inventory summary)</td></tr>
                 <tr><td>expiry.approaching</td><td>inventory-bc</td><td>report-bc · notification</td></tr>
+                <tr><td>item.updated</td><td>inventory-bc</td><td>report-bc (ชื่อ/หมวดหมู่/ยี่ห้อ denormalized) · sales-bc, supplier-bc (cache)</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- 3.4 ER Diagram -->
+        <!-- 3.5 ER Diagram -->
         <div class="mb-12">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">04</span><h3 class="text-xl font-semibold">ER Diagram · inventory-bc</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">05</span><h3 class="text-xl font-semibold">ER Diagram · inventory-bc</h3></div>
           <div class="diagram">
 <pre class="mermaid">
 erDiagram
-    CATEGORIES {
+    ITEM_GROUPS {
         uuid id PK
         jsonb name "i18n th_en"
+        uuid parent_item_group_id FK "self ref, tree"
+        boolean is_group "true=node false=leaf"
+        int lft "nested set"
+        int rgt "nested set"
+    }
+    BRANDS {
+        uuid id PK
+        string name
+        string logo_url
+    }
+    UOMS {
+        uuid id PK
+        string name "Nos_Box_Kg_Litre"
+        boolean is_whole_number
+    }
+    UOM_CONVERSION_FACTORS {
+        uuid id PK
+        uuid product_id FK
+        uuid uom_id FK
+        decimal conversion_factor "to stock_uom"
+        string uom_type "purchase_sales"
+    }
+    ITEM_ATTRIBUTES {
+        uuid id PK
+        string name "e.g. Color_Size"
+    }
+    ITEM_ATTRIBUTE_VALUES {
+        uuid id PK
+        uuid attribute_id FK
+        string value
+        string abbr
+    }
+    ITEM_VARIANT_ATTRIBUTES {
+        uuid id PK
+        uuid variant_product_id FK
+        uuid attribute_id FK
+        uuid attribute_value_id FK
     }
     PRODUCTS {
         uuid id PK
         string sku
         jsonb name "i18n th_en"
         string type "single_or_bundle"
-        uuid category_id FK
+        uuid item_group_id FK
+        uuid brand_id FK
+        uuid stock_uom_id FK
+        boolean has_variants "true=template item"
+        uuid template_product_id FK "self ref, variant of"
         uuid supplier_id "ref supplier-bc"
     }
     WAREHOUSES {
         uuid id PK
         jsonb name "i18n th_en"
+        uuid parent_warehouse_id FK "self ref, tree"
+        boolean is_group
+        string warehouse_type "stock_transit_reject"
+        int lft "nested set"
+        int rgt "nested set"
     }
     LOTS {
         uuid id PK
@@ -276,12 +523,41 @@ erDiagram
         string reason
         uuid approved_by "ref iam"
     }
+    STOCK_ENTRIES {
+        uuid id PK
+        string entry_type "RECEIPT_TRANSFER_ISSUE_REPACK"
+        uuid from_warehouse_id FK
+        uuid to_warehouse_id FK
+        uuid in_transit_warehouse_id FK
+        string status
+        timestamp posted_at
+    }
+    STOCK_ENTRY_ITEMS {
+        uuid id PK
+        uuid stock_entry_id FK
+        uuid product_id FK
+        uuid source_lot_id FK
+        uuid target_lot_id FK
+        int qty
+        decimal unit_cost "carried"
+    }
     REORDER_LEVELS {
         uuid id PK
         uuid product_id FK
         int alert_qty
     }
-    CATEGORIES ||--o{ PRODUCTS : classifies
+    ITEM_GROUPS ||--o{ ITEM_GROUPS : "parent of"
+    WAREHOUSES ||--o{ WAREHOUSES : "parent of"
+    ITEM_GROUPS ||--o{ PRODUCTS : classifies
+    BRANDS ||--o{ PRODUCTS : brands
+    UOMS ||--o{ PRODUCTS : "stock uom"
+    UOMS ||--o{ UOM_CONVERSION_FACTORS : "alt uom"
+    PRODUCTS ||--o{ UOM_CONVERSION_FACTORS : "converts as"
+    ITEM_ATTRIBUTES ||--o{ ITEM_ATTRIBUTE_VALUES : has
+    PRODUCTS ||--o{ ITEM_VARIANT_ATTRIBUTES : "variant of"
+    ITEM_ATTRIBUTES ||--o{ ITEM_VARIANT_ATTRIBUTES : defines
+    ITEM_ATTRIBUTE_VALUES ||--o{ ITEM_VARIANT_ATTRIBUTES : selects
+    PRODUCTS ||--o{ PRODUCTS : "template of"
     PRODUCTS ||--o{ LOTS : "stocked as"
     WAREHOUSES ||--o{ LOTS : holds
     LOTS ||--o{ STOCK_MOVEMENTS : tracks
@@ -289,20 +565,33 @@ erDiagram
     GOODS_RECEIPT_ITEMS ||--|| LOTS : creates
     PRODUCTS ||--o{ BUNDLE_ITEMS : "bundle of"
     LOTS ||--o{ STOCK_ADJUSTMENTS : adjusts
+    STOCK_ENTRIES ||--o{ STOCK_ENTRY_ITEMS : contains
+    LOTS ||--o{ STOCK_ENTRY_ITEMS : "moves / repacks"
+    WAREHOUSES ||--o{ STOCK_ENTRIES : "from / to"
     PRODUCTS ||--o| REORDER_LEVELS : has
 </pre>
           </div>
         </div>
 
-        <!-- 3.5 Dev Guide -->
+        <!-- 3.6 Dev Guide -->
         <div>
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">06</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
           <div class="space-y-3">
             <div class="rulebox"><div class="rc mb-1">RULE · TRANSACTION</div><p class="text-[13.5px]">การตัดสต็อกทั้งหมด (รวมทุก component ของ bundle) ต้องอยู่ใน <b>Database Transaction เดียว</b> — ถ้าล้มเหลวส่วนใด rollback ทั้งหมด</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · CONCURRENCY LOCK</div><p class="text-[13.5px]">ก่อนอ่าน <span class="mono text-[12px]">available_qty</span> ต้องล็อกแถวล็อตด้วย <b>pessimistic write lock</b> (<span class="mono text-[12px]">SELECT ... FOR UPDATE</span>) เพื่อกัน race condition ระหว่างการตัด FIFO พร้อมกันหลาย request</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · ORDERING</div><p class="text-[13.5px]">FEFO: <span class="mono text-[12px]">ORDER BY expiry_date ASC, received_at ASC</span> · FIFO: <span class="mono text-[12px]">ORDER BY received_at ASC</span> — ต้อง tie-break ให้ deterministic</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · COST SNAPSHOT</div><p class="text-[13.5px]"><span class="mono text-[12px]">unit_cost</span> ในทุก movement ต้องเป็น <b>snapshot ต้นทุนจริงของล็อต</b> (immutable) ห้ามคำนวณย้อนหลังจากราคาเฉลี่ย</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · EXPIRY FILTER</div><p class="text-[13.5px]">การตัดปกติต้อง <span class="mono text-[12px]">WHERE expiry_date &gt; now()</span> — ห้ามขายล็อตหมดอายุ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · STOCK UOM IMMUTABLE</div><p class="text-[13.5px]"><span class="mono text-[12px]">stock_uom_id</span> ของ Item <b>ห้ามแก้ไข</b>ทันทีที่มี <span class="mono text-[12px]">stock_movement</span> แรกเกิดขึ้นแล้ว (บังคับด้วย DB trigger หรือ application guard) กัน available_qty ในอดีตตีความหน่วยผิด</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · TEMPLATE ITEM NOT TRANSACTABLE</div><p class="text-[13.5px]">Item ที่ <span class="mono text-[12px]">has_variants=true</span> ต้องถูกปฏิเสธที่ระดับ service เมื่อถูกใช้ใน Goods Receipt/Issue/PO/SO โดยตรง — อนุญาตเฉพาะ variant ที่ generate จาก Item Attribute เท่านั้น</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · CONVERSION ROUND CHECK</div><p class="text-[13.5px]">ก่อนบันทึกจำนวนที่แปลงหน่วยแล้ว หาก stock UOM ปลายทางมี <span class="mono text-[12px]">is_whole_number=true</span> ต้องตรวจว่าไม่มีเศษ (qty × conversion_factor เป็นจำนวนเต็ม) มิฉะนั้น reject</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · LEDGER SINGLE SOURCE</div><p class="text-[13.5px]"><b>Stock Ledger / Balance</b> ต้อง derive จาก <span class="mono text-[12px]">stock_movements</span> เท่านั้น (append-only, immutable) ห้ามมี "ยอดคงเหลือ" เก็บซ้ำที่แก้มือได้ · <span class="mono text-[12px]">available_qty</span> บนล็อตเป็น cache ที่ต้อง reconcile กับผลรวม movement ได้เสมอ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · STOCK ENTRY ATOMIC PAIR</div><p class="text-[13.5px]">Stock Entry แบบ TRANSFER/REPACK ต้องเขียน movement <b>คู่ out+in ในทรานแซกชันเดียว</b> — ยอดรวมของระบบต้องไม่เปลี่ยน (conservation) ยกเว้น ISSUE ที่ตัดออกจริง</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · SETTINGS DRIVEN</div><p class="text-[13.5px]">business logic (negative stock, default strategy, expiry days) ต้อง <b>อ่านจาก Stock Settings</b> ไม่ hardcode · ต่อ Item ที่ override ได้ให้ item ชนะ setting ระดับระบบ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · NESTED-SET TREE</div><p class="text-[13.5px]">Item Group และ Warehouse เป็น <b>tree</b> — ใช้ nested set (<span class="mono text-[12px]">lft/rgt</span>) หรือ recursive CTE เพื่อ query ทั้ง subtree ได้เร็ว (รายงานตามหมวด/สาขา) · การ insert/move node ต้อง rebuild lft/rgt ใน transaction · เฉพาะ <b>leaf</b> (is_group=false) เท่านั้นที่ผูก Item/เก็บสต็อกได้</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · RUNNING BALANCE + CACHE</div><p class="text-[13.5px]">แต่ละ movement เก็บ <span class="mono text-[12px]">qty_after_transaction</span> (running balance) ทำให้ Stock Ledger อ่านตรง ๆ · แนะนำตาราง cache <b>balance ต่อ item×warehouse</b> (actual/reserved/valuation) เพื่อให้ Stock Balance เร็ว โดย cache ต้อง derive ได้จาก ledger เสมอ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · ABSOLUTE RECONCILIATION</div><p class="text-[13.5px]">Stock Reconciliation รับ <b>จำนวนที่นับได้จริง (absolute)</b> แล้วให้ระบบคำนวณ <span class="mono text-[12px]">qty_delta = counted − current</span> เอง แล้วสร้าง adjustment movement — ไม่ให้ผู้ใช้กรอก delta ตรง ๆ (กันคำนวณผิด)</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · SUBMITTABLE DOCUMENTS</div><p class="text-[13.5px]">เอกสารเคลื่อนไหวสต็อกทุกใบ (GRN, Delivery, Stock Entry, Reconciliation) เป็น <b>submittable</b>: <span class="mono text-[12px]">DRAFT → SUBMITTED → CANCELLED</span> · สต็อกจะเคลื่อน (post ledger) เฉพาะตอน <b>submit</b> เท่านั้น · การ cancel ต้อง <b>reverse movement</b> ที่โพสต์ไว้ ไม่ใช่ลบทิ้ง · draft แก้ได้อิสระโดยไม่กระทบสต็อก</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · OUTBOX / IDEMPOTENCY</div><p class="text-[13.5px]">ส่ง event <b>หลัง commit</b> ด้วย Outbox pattern และ consumer ต้อง idempotent (เก็บ processed event id) กัน event ซ้ำจาก RabbitMQ</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · UUID ONLY</div><p class="text-[13.5px]">อ้างอิงข้าม BC ด้วย UUID เท่านั้น · ห้าม Foreign Key ข้ามฐานข้อมูล · <span class="mono text-[12px]">available_qty</span> ใช้ CHECK constraint ≥ 0</p></div>
           </div>
@@ -502,6 +791,25 @@ erDiagram
         int qty
         jsonb lot_allocations "from stock.deducted"
     }
+    PACKED_ITEMS {
+        uuid id PK
+        uuid parent_doc_id FK "SO_or_delivery"
+        uuid bundle_product_id
+        uuid component_product_id
+        int qty
+    }
+    PRICING_RULES {
+        uuid id PK
+        string apply_on "item_group_brand"
+        uuid target_id "product_or_group"
+        uuid customer_id "nullable"
+        int min_qty
+        date valid_from
+        date valid_to
+        string rate_or_discount
+        decimal value
+        int priority
+    }
     SUPPLIERS ||--o{ PURCHASE_ORDERS : receives
     PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ITEMS : contains
     PURCHASE_ORDERS ||--o{ INBOUND_SHIPMENTS : ships
@@ -512,6 +820,8 @@ erDiagram
     SALES_ORDERS ||--o{ SALES_ORDER_ITEMS : contains
     SALES_ORDERS ||--o{ DELIVERY_NOTES : fulfills
     DELIVERY_NOTES ||--o{ DELIVERY_NOTE_ITEMS : contains
+    SALES_ORDERS ||--o{ PACKED_ITEMS : explodes
+    PRICING_RULES ||--o{ SALES_ORDER_ITEMS : "prices"
 </pre>
           </div>
         </div>
@@ -527,6 +837,9 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · STATE MACHINE</div><p class="text-[13.5px]">สถานะเอกสารเป็น state machine ชัดเจน (DRAFT→…→CLOSED) <b>ห้าม skip state</b> และตรวจ transition ที่ถูกต้อง</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · SAGA + COMPENSATION</div><p class="text-[13.5px]">ใช้ Saga สำหรับ SO→delivery→stock→invoice หากตัดสต็อกล้มเหลว ต้อง <b>compensate</b> (delivery กลับเป็น PENDING)</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · MONEY TYPE</div><p class="text-[13.5px]">จำนวนเงินใช้ <span class="mono text-[12px]">decimal</span> หรือ integer (สตางค์) <b>ห้ามใช้ float</b></p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PRICING RULE ENGINE</div><p class="text-[13.5px]">ราคาพิเศษ/ส่วนลดเป็น <b>engine แยก</b> (pricing rule) ไม่ใช่ field คงที่ — match ตามเงื่อนไข (สินค้า/กลุ่ม/ลูกค้า/ช่วงวันที่/จำนวนขั้นต่ำ) แล้วเลือกกฎที่ priority สูงสุด · ราคาที่ได้ต้อง <b>snapshot ลงเอกสาร</b></p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · TAX PER LINE</div><p class="text-[13.5px]">คำนวณภาษี <b>รายบรรทัด</b> (per-line) ตาม item tax template แล้วค่อย aggregate หัวเอกสาร — รองรับหลายอัตรา/ยกเว้นภาษีในใบเดียว · เก็บ item-wise tax detail ไว้ตรวจสอบ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · BUNDLE = PACKED ITEM</div><p class="text-[13.5px]">เมื่อขายสินค้า bundle ให้ <b>explode เป็น packed_items</b> เก็บ denormalized บนเอกสาร (SO/Delivery) เพื่อส่งให้ inventory ตัดสต็อกรายสินค้าย่อย และคง traceability</p></div>
           </div>
         </div>
       </section>
@@ -680,6 +993,7 @@ erDiagram
     TAX_CONFIGS {
         uuid id PK
         string name "VAT7 etc"
+        string tax_type "VAT_or_WHT"
         decimal rate
         boolean accumulate
     }
@@ -689,17 +1003,44 @@ erDiagram
         decimal amount
         string reason
     }
+    PAYMENT_ENTRIES {
+        uuid id PK
+        string payment_type "receive_or_pay"
+        uuid party_id "customer_or_supplier"
+        decimal paid_amount
+        decimal wht_amount "withholding"
+        decimal unallocated_amount
+        string status
+    }
+    PAYMENT_ALLOCATIONS {
+        uuid id PK
+        uuid payment_entry_id FK
+        uuid invoice_id FK
+        decimal allocated_amount
+    }
+    PAYMENT_SCHEDULES {
+        uuid id PK
+        uuid invoice_id FK
+        date due_date
+        decimal amount
+        decimal outstanding
+    }
     LEDGER_ENTRIES {
         uuid id PK
         string account
         decimal debit
         decimal credit
         uuid ref_doc_id
+        string voucher_type
+        boolean is_cancelled
     }
     TAX_INVOICES ||--o{ TAX_INVOICE_ITEMS : contains
     TAX_INVOICES ||--o{ CREDIT_NOTES : "amended by"
     TAX_INVOICES ||--o{ BILLING_NOTE_INVOICES : "billed in"
+    TAX_INVOICES ||--o{ PAYMENT_SCHEDULES : "credit terms"
     BILLING_NOTES ||--o{ BILLING_NOTE_INVOICES : groups
+    PAYMENT_ENTRIES ||--o{ PAYMENT_ALLOCATIONS : allocates
+    TAX_INVOICES ||--o{ PAYMENT_ALLOCATIONS : "settled by"
     COGS_ENTRIES ||--|| PROFIT_LOSS_RECORDS : feeds
 </pre>
           </div>
@@ -716,6 +1057,9 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · DECIMAL &amp; ROUNDING</div><p class="text-[13.5px]">ใช้ <span class="mono text-[12px]">decimal(18,4)</span> หรือ integer สตางค์ · ปัดเศษตามกฎภาษี · ห้าม float</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · IDEMPOTENT CONSUMER</div><p class="text-[13.5px]">consumer ของ <span class="mono text-[12px]">stock.deducted</span> ต้อง idempotent (processed_events) กันการสร้าง COGS ซ้ำ</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · INVOICE IMMUTABILITY</div><p class="text-[13.5px]">ใบกำกับที่ออกแล้ว immutable → แก้ไขด้วย credit/debit note pattern เท่านั้น</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · GL DOUBLE-ENTRY BALANCED</div><p class="text-[13.5px]">ทุก financial transaction โพสต์ลง GL เป็นคู่ <b>debit = credit</b> เสมอ (ยอดรวมต้องเป็นศูนย์) · GL เป็น <b>append-only + immutable</b> เหมือน stock ledger · การ cancel เอกสารต้องโพสต์ entry กลับด้าน ไม่ลบของเดิม</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PAYMENT ALLOCATION</div><p class="text-[13.5px]">1 การชำระเงิน allocate ไปได้ <b>หลายใบกำกับ</b> · ผลรวม allocation ≤ paid_amount · ส่วนเกินเก็บเป็น <span class="mono text-[12px]">unallocated_amount</span> (เครดิตลูกค้า) · outstanding ของใบกำกับ = total − Σ allocation</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · WITHHOLDING TAX</div><p class="text-[13.5px]">รองรับภาษี <b>หัก ณ ที่จ่าย (WHT)</b> แยกจาก VAT — ตอนรับ/จ่ายเงินคำนวณ WHT ตามอัตราของประเภทเงินได้ แล้วออกหนังสือรับรองหัก ณ ที่จ่าย · WHT ลดยอดเงินสดจริงแต่ไม่ลดยอดหนี้</p></div>
           </div>
         </div>
       </section>

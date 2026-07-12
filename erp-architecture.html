@@ -702,31 +702,33 @@
         <h2 class="display text-3xl sm:text-4xl mb-4">แผนพัฒนาแบบเฟส · Task &amp; Man-hours</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           แตกงานทั้ง <b>Backend</b> และ <b>Frontend</b> เป็นงานย่อย พร้อมประมาณ Man-hours และ Duration
-          วางเป็น Gantt Chart รวม <b>~24 สัปดาห์</b> (ประมาณการบนทีม 2 Backend + 2 Frontend + 1 QA/PM
-          ที่ 1 man-day = 8 ชั่วโมง)
+          วางเป็น Gantt Chart รวม <b>~28 สัปดาห์</b> (ประมาณการบนทีม 2 Backend + 2 Frontend + 1 QA/PM
+          ที่ 1 man-day = 8 ชั่วโมง) — รวมขอบเขต <b>Stock master data</b> (Item Group · Attribute · Brand · UOM · UOM Conversion),
+          <b>Stock Entry · Stock Settings · Core Reports</b>, และงานฝั่ง <b>Procurement/Sales</b> (Pricing Rule · Taxes engine)
+          กับ <b>Finance</b> (GL double-entry · Payment allocation · Withholding tax) ที่แตกจากโครงสร้างจริง
         </p>
 
         <!-- SUMMARY BAND -->
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-px rounded-xl overflow-hidden mb-8" style="background:var(--line)">
           <div class="bg-white p-5">
             <div class="mono text-[11px] text-[var(--muted)]">TOTAL</div>
-            <div class="display text-2xl mt-1">1,924<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
-            <div class="text-[12px] text-[var(--muted)] mt-0.5">≈ 240 man-days</div>
+            <div class="display text-2xl mt-1">2,388<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
+            <div class="text-[12px] text-[var(--muted)] mt-0.5">≈ 299 man-days</div>
           </div>
           <div class="bg-white p-5">
             <div class="mono text-[11px]" style="color:var(--accent)">BACKEND</div>
-            <div class="display text-2xl mt-1" style="color:var(--accent)">1,108<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
+            <div class="display text-2xl mt-1" style="color:var(--accent)">1,380<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
             <div class="text-[12px] text-[var(--muted)] mt-0.5">58% ของงาน</div>
           </div>
           <div class="bg-white p-5">
             <div class="mono text-[11px]" style="color:#4F63C4">FRONTEND</div>
-            <div class="display text-2xl mt-1" style="color:#4F63C4">816<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
+            <div class="display text-2xl mt-1" style="color:#4F63C4">1,008<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
             <div class="text-[12px] text-[var(--muted)] mt-0.5">42% ของงาน</div>
           </div>
           <div class="bg-white p-5">
             <div class="mono text-[11px] text-[var(--muted)]">DURATION</div>
-            <div class="display text-2xl mt-1">24<span class="text-sm font-normal text-[var(--muted)]"> สัปดาห์</span></div>
-            <div class="text-[12px] text-[var(--muted)] mt-0.5">≈ 6 เดือน</div>
+            <div class="display text-2xl mt-1">~28<span class="text-sm font-normal text-[var(--muted)]"> สัปดาห์</span></div>
+            <div class="text-[12px] text-[var(--muted)] mt-0.5">≈ 7 เดือน</div>
           </div>
           <div class="bg-white p-5 col-span-2 sm:col-span-1">
             <div class="mono text-[11px] text-[var(--muted)]">TEAM</div>
@@ -744,8 +746,13 @@
         </div>
 
         <!-- GANTT -->
+        <div class="gantt-toolbar">
+          <span class="mono text-[11px] text-[var(--muted)]">คลิกหัวข้อเฟสเพื่อย่อ/ขยาย ·</span>
+          <button type="button" class="gbtn" id="ganttExpandAll">ขยายทั้งหมด</button>
+          <button type="button" class="gbtn" id="ganttCollapseAll">ย่อทั้งหมด</button>
+        </div>
         <div class="gantt-wrap mb-4">
-          <div class="gantt">
+          <div class="gantt" id="ganttChart">
             <!-- header -->
             <div class="gantt-head">
               <div class="corner">TASK · MAN-HOURS</div>
@@ -773,42 +780,55 @@
             <div class="gantt-row"><div class="gantt-label"><span>FE: user &amp; role management screens</span><span class="hbadge hb-fe">FE 48</span></div><div class="gantt-track"><div class="gbar fe" style="left:16.67%;width:6.25%">1.5w</div></div></div>
 
             <!-- PHASE 2 -->
-            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 2 · Master Data &amp; Storage</div><div class="ph-hours"><span class="hbadge hb-be">BE 120</span><span class="hbadge hb-fe">FE 128</span><span>· 248 ชม.</span></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>inventory: products/categories (JSONB i18n)</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:16.67%;width:8.33%">2w</div></div></div>
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 2 · Master Data &amp; Storage</div><div class="ph-hours"><span class="hbadge hb-be">BE 192</span><span class="hbadge hb-fe">FE 192</span><span>· 384 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>inventory: item master (JSONB i18n · stock_uom · variants)</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:16.67%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>inventory: item group (tree) + brand + UOM</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:16.67%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>inventory: UOM conversion + item attribute/variant</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar be" style="left:25%;width:6.25%">1.5w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>storage: MinIO + presigned URL service</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:20.83%;width:6.25%">1.5w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>supplier: suppliers CRUD</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar be" style="left:20.83%;width:4.17%">1w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: product mgmt (list + bilingual form)</span><span class="hbadge hb-fe">FE 56</span></div><div class="gantt-track"><div class="gbar fe" style="left:25%;width:8.33%">2w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: category + supplier screens</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:25%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: item mgmt (list + bilingual form)</span><span class="hbadge hb-fe">FE 56</span></div><div class="gantt-track"><div class="gbar fe" style="left:25%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: item group tree + brand / UOM / conversion / attribute</span><span class="hbadge hb-fe">FE 64</span></div><div class="gantt-track"><div class="gbar fe" style="left:25%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: supplier screens</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:29.17%;width:6.25%">1.5w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>FE: image upload (presigned flow)</span><span class="hbadge hb-fe">FE 32</span></div><div class="gantt-track"><div class="gbar fe" style="left:29.17%;width:4.17%">1w</div></div></div>
 
             <!-- PHASE 3 -->
-            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--signal)"></span>PHASE 3 · Inventory Core · Lot &amp; FIFO/Bundle</div><div class="ph-hours"><span class="hbadge hb-be">BE 200</span><span class="hbadge hb-fe">FE 128</span><span>· 328 ชม.</span></div></div>
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--signal)"></span>PHASE 3 · Inventory Core · Lot &amp; FIFO/Bundle</div><div class="ph-hours"><span class="hbadge hb-be">BE 288</span><span class="hbadge hb-fe">FE 208</span><span>· 496 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Stock Settings + settings-driven config</span><span class="hbadge hb-be">BE 16</span></div><div class="gantt-track"><div class="gbar be" style="left:29.17%;width:4.17%">1w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>Lot entity + goods receipt</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar crit" style="left:29.17%;width:6.25%">1.5w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>FIFO/FEFO deduction engine + row locking</span><span class="hbadge hb-be">BE 64</span></div><div class="gantt-track"><div class="gbar crit" style="left:33.33%;width:8.33%">2w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>Bundle/kit BOM + explosion logic</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar crit" style="left:37.5%;width:6.25%">1.5w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>Stock adjustments</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:41.67%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Stock Entry (transfer / repack / issue)</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:41.67%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Stock adjustments (reconciliation)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:41.67%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>Core reports: Stock Ledger + Stock Balance</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar be" style="left:45.83%;width:4.17%">1w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>Expiry alert scheduler</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:41.67%;width:4.17%">1w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: goods receipt screen</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:37.5%;width:6.25%">1.5w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: stock / lot views · adjust · expiry</span><span class="hbadge hb-fe">FE 56</span></div><div class="gantt-track"><div class="gbar fe" style="left:41.67%;width:8.33%">2w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: bundle definition UI (BOM builder)</span><span class="hbadge hb-fe">FE 32</span></div><div class="gantt-track"><div class="gbar fe" style="left:45.83%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: goods receipt + stock entry screens</span><span class="hbadge hb-fe">FE 64</span></div><div class="gantt-track"><div class="gbar fe" style="left:37.5%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: stock / lot views · adjust · expiry · ledger/balance</span><span class="hbadge hb-fe">FE 96</span></div><div class="gantt-track"><div class="gbar fe" style="left:41.67%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: bundle definition UI (BOM builder) + stock settings</span><span class="hbadge hb-fe">FE 48</span></div><div class="gantt-track"><div class="gbar fe" style="left:45.83%;width:6.25%">1.5w</div></div></div>
 
             <!-- PHASE 4 -->
-            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 4 · Procurement &amp; Sales</div><div class="ph-hours"><span class="hbadge hb-be">BE 160</span><span class="hbadge hb-fe">FE 144</span><span>· 304 ชม.</span></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>supplier: PO + inbound shipments</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:45.83%;width:6.25%">1.5w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>sales: customers</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:50%;width:4.17%">1w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>sales: quotations + sales orders</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:50%;width:8.33%">2w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>sales: delivery note → stock.deducted event</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar crit" style="left:58.33%;width:4.17%">1w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: PO screens</span><span class="hbadge hb-fe">FE 48</span></div><div class="gantt-track"><div class="gbar fe" style="left:54.17%;width:6.25%">1.5w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: customer screens</span><span class="hbadge hb-fe">FE 32</span></div><div class="gantt-track"><div class="gbar fe" style="left:54.17%;width:4.17%">1w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: quotation / SO / delivery (single+bundle)</span><span class="hbadge hb-fe">FE 64</span></div><div class="gantt-track"><div class="gbar fe" style="left:58.33%;width:8.33%">2w</div></div></div>
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 4 · Procurement &amp; Sales</div><div class="ph-hours"><span class="hbadge hb-be">BE 208</span><span class="hbadge hb-fe">FE 168</span><span>· 376 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>party master: supplier + customer (accounts · credit limit)</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:45.83%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>buying: PO + supplier quotation + inbound</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:50%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>pricing rule engine (special price / discount by qty·date)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar be" style="left:50%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>taxes &amp; charges engine (per-line · item-wise tax)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:54.17%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>selling: quotation → SO (state machine · availability TCP)</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:54.17%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>delivery note → stock.deducted + packed item (bundle)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar crit" style="left:58.33%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: supplier + customer screens</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:54.17%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: PO / supplier quotation screens</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:54.17%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: quotation / SO / delivery (tabbed · single+bundle)</span><span class="hbadge hb-fe">FE 64</span></div><div class="gantt-track"><div class="gbar fe" style="left:58.33%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: pricing rule + tax template config</span><span class="hbadge hb-fe">FE 24</span></div><div class="gantt-track"><div class="gbar fe" style="left:62.5%;width:4.17%">1w</div></div></div>
 
             <!-- PHASE 5 -->
-            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--signal)"></span>PHASE 5 · Finance · COGS &amp; P&amp;L</div><div class="ph-hours"><span class="hbadge hb-be">BE 128</span><span class="hbadge hb-fe">FE 96</span><span>· 224 ชม.</span></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>finance: tax invoices + billing notes</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar be" style="left:62.5%;width:6.25%">1.5w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>finance: COGS + P&amp;L per lot (incl. bundle)</span><span class="hbadge hb-be">BE 56</span></div><div class="gantt-track"><div class="gbar crit" style="left:66.67%;width:8.33%">2w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>finance: tax configs (ภาษี 1 / ภาษี 2)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:62.5%;width:4.17%">1w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: invoice / billing screens</span><span class="hbadge hb-fe">FE 56</span></div><div class="gantt-track"><div class="gbar fe" style="left:70.83%;width:6.25%">1.5w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>FE: P&amp;L / COGS views</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:70.83%;width:6.25%">1.5w</div></div></div>
+            <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--signal)"></span>PHASE 5 · Finance · COGS &amp; P&amp;L</div><div class="ph-hours"><span class="hbadge hb-be">BE 192</span><span class="hbadge hb-fe">FE 120</span><span>· 312 ชม.</span></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>GL double-entry engine (post/cancel · balanced · immutable)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar crit" style="left:62.5%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>finance: tax invoice + billing note (submittable)</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:66.67%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>finance: COGS + P&amp;L per lot (incl. bundle)</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar crit" style="left:66.67%;width:8.33%">2w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>payment entry + allocation to invoices (AR/AP)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar be" style="left:70.83%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>tax configs: VAT (ภาษี 1/2) + withholding (หัก ณ ที่จ่าย)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:62.5%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>credit/debit note + payment schedule (credit terms)</span><span class="hbadge hb-be">BE 16</span></div><div class="gantt-track"><div class="gbar be" style="left:75%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: invoice / billing screens (tabbed · big form)</span><span class="hbadge hb-fe">FE 48</span></div><div class="gantt-track"><div class="gbar fe" style="left:70.83%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: payment / receipt + allocation screens</span><span class="hbadge hb-fe">FE 32</span></div><div class="gantt-track"><div class="gbar fe" style="left:75%;width:4.17%">1w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>FE: P&amp;L / COGS + GL / ledger views</span><span class="hbadge hb-fe">FE 40</span></div><div class="gantt-track"><div class="gbar fe" style="left:75%;width:6.25%">1.5w</div></div></div>
 
             <!-- PHASE 6 -->
             <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--accent)"></span>PHASE 6 · Reporting &amp; Analytics</div><div class="ph-hours"><span class="hbadge hb-be">BE 104</span><span class="hbadge hb-fe">FE 120</span><span>· 224 ชม.</span></div></div>
@@ -837,20 +857,100 @@
             <tbody>
               <tr><td class="mono">P0</td><td>Foundation · DevOps · UI kit</td><td class="text-right">100</td><td class="text-right">64</td><td class="text-right font-semibold">164</td><td class="text-right">W1–2</td></tr>
               <tr><td class="mono">P1</td><td>Auth &amp; IAM</td><td class="text-right">120</td><td class="text-right">88</td><td class="text-right font-semibold">208</td><td class="text-right">W3–5</td></tr>
-              <tr><td class="mono">P2</td><td>Master Data &amp; Storage</td><td class="text-right">120</td><td class="text-right">128</td><td class="text-right font-semibold">248</td><td class="text-right">W5–8</td></tr>
-              <tr style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P3</td><td>Inventory · Lot · FIFO · Bundle</td><td class="text-right">200</td><td class="text-right">128</td><td class="text-right font-semibold text-[var(--signal)]">328</td><td class="text-right">W8–12</td></tr>
-              <tr><td class="mono">P4</td><td>Procurement &amp; Sales</td><td class="text-right">160</td><td class="text-right">144</td><td class="text-right font-semibold">304</td><td class="text-right">W12–16</td></tr>
-              <tr style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P5</td><td>Finance · COGS &amp; P&amp;L</td><td class="text-right">128</td><td class="text-right">96</td><td class="text-right font-semibold text-[var(--signal)]">224</td><td class="text-right">W16–19</td></tr>
-              <tr><td class="mono">P6</td><td>Reporting &amp; Analytics</td><td class="text-right">104</td><td class="text-right">120</td><td class="text-right font-semibold">224</td><td class="text-right">W19–22</td></tr>
-              <tr><td class="mono">P7</td><td>Migration &amp; Cutover</td><td class="text-right">176</td><td class="text-right">48</td><td class="text-right font-semibold">224</td><td class="text-right">W22–24</td></tr>
-              <tr style="background:#0E1726"><td class="mono text-white">รวม</td><td class="text-white">8 Phases · 46 tasks</td><td class="text-right font-semibold" style="color:#7FE3DE">1,108</td><td class="text-right font-semibold" style="color:#A9B6EC">816</td><td class="text-right font-bold text-white">1,924</td><td class="text-right text-white">24 wk</td></tr>
+              <tr style="background:var(--signal-soft)"><td class="mono">P2</td><td>Master Data &amp; Storage <span class="text-[11px] text-[var(--muted)]">(+ Item Group/Attr/Brand/UOM)</span></td><td class="text-right">192</td><td class="text-right">192</td><td class="text-right font-semibold">384</td><td class="text-right">W5–9</td></tr>
+              <tr style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P3</td><td>Inventory · Lot · FIFO · Bundle <span class="text-[11px] text-[var(--muted)]">(+ Stock Entry/Settings/Ledger)</span></td><td class="text-right">288</td><td class="text-right">208</td><td class="text-right font-semibold text-[var(--signal)]">496</td><td class="text-right">W9–13</td></tr>
+              <tr style="background:var(--signal-soft)"><td class="mono">P4</td><td>Procurement &amp; Sales <span class="text-[11px] text-[var(--muted)]">(+ Pricing Rule/Taxes engine)</span></td><td class="text-right">208</td><td class="text-right">168</td><td class="text-right font-semibold">376</td><td class="text-right">W13–18</td></tr>
+              <tr style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P5</td><td>Finance · COGS &amp; P&amp;L <span class="text-[11px] text-[var(--muted)]">(+ GL/Payment/WHT)</span></td><td class="text-right">192</td><td class="text-right">120</td><td class="text-right font-semibold text-[var(--signal)]">312</td><td class="text-right">W18–22</td></tr>
+              <tr><td class="mono">P6</td><td>Reporting &amp; Analytics</td><td class="text-right">104</td><td class="text-right">120</td><td class="text-right font-semibold">224</td><td class="text-right">W22–25</td></tr>
+              <tr><td class="mono">P7</td><td>Migration &amp; Cutover</td><td class="text-right">176</td><td class="text-right">48</td><td class="text-right font-semibold">224</td><td class="text-right">W25–28</td></tr>
+              <tr style="background:#0E1726"><td class="mono text-white">รวม</td><td class="text-white">8 Phases · 62 tasks</td><td class="text-right font-semibold" style="color:#7FE3DE">1,380</td><td class="text-right font-semibold" style="color:#A9B6EC">1,008</td><td class="text-right font-bold text-white">2,388</td><td class="text-right text-white">~28 wk</td></tr>
             </tbody>
           </table>
         </div>
         <p class="text-[12px] text-[var(--muted)] mt-4 leading-relaxed">
           * ประมาณการเป็น “effort ชั่วโมงพัฒนาสุทธิ” ยังไม่รวม overhead (meeting, code review, rework ~20–30%)
-          และยังไม่รวมงาน QA เชิงลึก · ตัวเลขควรปรับตามความเร็วจริงของทีมหลัง Sprint แรก
+          และยังไม่รวมงาน QA เชิงลึก · ตัวเลขควรปรับตามความเร็วจริงของทีมหลัง Sprint แรก ·
+          Gantt วาดบนกริด 24 สัปดาห์เพื่อดูลำดับงาน — ขอบเขต Stock ที่เพิ่ม (+304 ชม.) ดันเส้นชัยไปที่ <b>~สัปดาห์ 26</b>
         </p>
+
+        <!-- STOCK SCOPE PRIORITY -->
+        <div class="mt-12">
+          <div class="eyebrow text-[var(--accent)] mb-2">Build Order</div>
+          <h3 class="display text-2xl mb-3">ลำดับความสำคัญ · ทำอะไรก่อน (Stock Scope)</h3>
+          <p class="text-[var(--ink-soft)] text-[14px] max-w-3xl mb-6 leading-[1.8]">
+            แตกงาน Stock module ละเอียดขึ้นพร้อมจัด <b>Priority</b> เป็น 3 ระดับ: <b style="color:#15803D">P0 Must</b> (แกนที่บล็อกงานอื่น ทำก่อน),
+            <b style="color:var(--blueprint)">P1 Should</b> (ต่อยอดหลังแกนเสร็จ), <b style="color:#64748B">P2 Later</b> (backlog) —
+            เรียงตาม <b>dependency</b> ไม่ใช่แค่ความยาก
+          </p>
+
+          <div class="flex flex-wrap gap-3 mb-4 text-[12px]">
+            <span class="flex items-center gap-2"><span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">P0 · MUST</span> ทำก่อน (blocker)</span>
+            <span class="flex items-center gap-2"><span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P1 · SHOULD</span> ต่อทันทีหลังแกน</span>
+            <span class="flex items-center gap-2"><span class="pchip" style="background:rgba(100,116,139,.1);color:#64748B;border:1px solid rgba(100,116,139,.25)">P2 · LATER</span> backlog</span>
+          </div>
+
+          <div class="card overflow-hidden">
+            <table class="spec">
+              <thead><tr><th style="width:66px">ลำดับ</th><th>Task</th><th style="width:96px">Priority</th><th class="!text-right" style="width:70px">ชม.</th><th>ขึ้นกับ (depends on)</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">1</td><td>UOM + UOM Conversion Factor (+ conversion logic)</td><td><span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">P0</span></td><td class="text-right">56</td><td class="text-[13px] text-[var(--muted)]">—</td></tr>
+                <tr><td class="mono">2</td><td>Item Group (tree) + Brand</td><td><span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">P0</span></td><td class="text-right">64</td><td class="text-[13px] text-[var(--muted)]">—</td></tr>
+                <tr><td class="mono">3</td><td>Item master (stock_uom · group · brand · has_variants)</td><td><span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">P0</span></td><td class="text-right">104</td><td class="text-[13px] text-[var(--muted)]">#1 · #2</td></tr>
+                <tr><td class="mono">4</td><td>Stock Settings (valuation · negative · default wh)</td><td><span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">P0</span></td><td class="text-right">32</td><td class="text-[13px] text-[var(--muted)]">—</td></tr>
+                <tr><td class="mono">5</td><td>Warehouse + Lot entity + Goods Receipt</td><td><span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">P0</span></td><td class="text-right">88</td><td class="text-[13px] text-[var(--muted)]">#3</td></tr>
+                <tr><td class="mono">6</td><td>FIFO/FEFO deduction engine + row locking</td><td><span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">P0</span></td><td class="text-right">64</td><td class="text-[13px] text-[var(--muted)]">#4 · #5</td></tr>
+                <tr><td class="mono">7</td><td>Stock Ledger + Stock Balance (core reports)</td><td><span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P1</span></td><td class="text-right">64</td><td class="text-[13px] text-[var(--muted)]">#5 · #6</td></tr>
+                <tr><td class="mono">8</td><td>Stock Entry (transfer / repack / issue)</td><td><span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P1</span></td><td class="text-right">72</td><td class="text-[13px] text-[var(--muted)]">#6</td></tr>
+                <tr><td class="mono">9</td><td>Stock Reconciliation / adjustments</td><td><span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P1</span></td><td class="text-right">40</td><td class="text-[13px] text-[var(--muted)]">#6</td></tr>
+                <tr><td class="mono">10</td><td>Bundle / kit BOM + explosion</td><td><span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P1</span></td><td class="text-right">40</td><td class="text-[13px] text-[var(--muted)]">#6</td></tr>
+                <tr><td class="mono">11</td><td>Item Attribute + variant generation</td><td><span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P1</span></td><td class="text-right">48</td><td class="text-[13px] text-[var(--muted)]">#3</td></tr>
+                <tr><td class="mono">12</td><td>Expiry alert scheduler</td><td><span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P1</span></td><td class="text-right">24</td><td class="text-[13px] text-[var(--muted)]">#5</td></tr>
+                <tr><td class="mono">13</td><td>Serial No · Serial & Batch Bundle</td><td><span class="pchip" style="background:rgba(100,116,139,.1);color:#64748B;border:1px solid rgba(100,116,139,.25)">P2</span></td><td class="text-right">—</td><td class="text-[13px] text-[var(--muted)]">backlog</td></tr>
+                <tr><td class="mono">14</td><td>Landed Cost · Repost Valuation · Packing Slip · QI</td><td><span class="pchip" style="background:rgba(100,116,139,.1);color:#64748B;border:1px solid rgba(100,116,139,.25)">P2</span></td><td class="text-right">—</td><td class="text-[13px] text-[var(--muted)]">backlog</td></tr>
+                <tr><td class="mono">15</td><td>Analytics reports (ageing · trends · shortage) → report-bc</td><td><span class="pchip" style="background:rgba(100,116,139,.1);color:#64748B;border:1px solid rgba(100,116,139,.25)">P2</span></td><td class="text-right">—</td><td class="text-[13px] text-[var(--muted)]">Phase 6</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[12px] text-[var(--muted)] mt-3 leading-relaxed">
+            ชม. รวม BE+FE ต่อรายการ · #1–#6 (P0) คือ critical path ของ Stock — ต้องเสร็จก่อนจึงจะเดิน Phase 4 (Sales/PO) ได้ ·
+            งาน P2 ไม่กระทบ schema หลัก เพิ่มภายหลังได้โดยไม่ break ของเดิม
+          </p>
+
+          <div class="card p-6 mt-6" style="border-left:3px solid var(--accent)">
+            <div class="eyebrow text-[var(--accent)] mb-3">ปรับความแม่นยำจากการตรวจโครงสร้าง + source code จริง</div>
+            <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)">รายละเอียดต่อไปนี้ถูก <b>ยืนยัน/เพิ่มเข้า scope</b> หลังตรวจ schema (736 ตาราง) และ controller logic ของระบบสต็อกเชิงอ้างอิง ทำให้ประมาณการงานสมจริงขึ้น (รวม ~<b>+40–60 ชม.</b> กระจายใน P0/P1):</p>
+            <ul class="space-y-2.5 text-[13.5px] text-[var(--ink-soft)]">
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">01</span><span><b>Item Group + Warehouse เป็น tree (nested-set lft/rgt)</b> ไม่ใช่ parent FK เฉย ๆ — ต้องเขียน logic rebuild lft/rgt ตอน insert/move (BE +16)</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">02</span><span><b>Ledger เก็บ running balance ต่อ movement + ตาราง cache balance</b> ต่อ item×warehouse (แบบ Bin) เพื่อให้ Stock Balance เร็ว (BE +16)</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">03</span><span><b>Stock Entry เพิ่มเป็น 4 ประเภท</b> (Receipt / Transfer / Issue / Repack) + รองรับ <b>in-transit warehouse</b> ตอนโอนข้ามสาขา (BE +8)</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">04</span><span><b>Stock Reconciliation ใช้จำนวน absolute</b> (นับได้จริง) แล้วระบบคำนวณ delta เอง — เปลี่ยนจากกรอก qty_delta ตรง ๆ</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">05</span><span><b>Stock Settings เพิ่ม frozen period + over-receipt allowance</b> · เตรียม <b>seed หน่วยนับมาตรฐาน (UOM)</b> ~200+ รายการเป็น master data ตั้งต้น (BE +8)</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">06</span><span><b>ทุกเอกสารธุรกรรมเป็น submittable</b> (draft → submit → cancel) — ต้องมี state machine + logic โพสต์/ยกเลิก ledger ทุกใบ (GR, Delivery, Stock Entry, Reconciliation) ไม่ใช่ CRUD ธรรมดา</span></li>
+              <li class="flex gap-3"><span class="mono text-[var(--accent)] text-xs mt-0.5">07</span><span><b>งานที่หนักสุดคือ valuation engine</b> (FIFO/FEFO ต่อ warehouse×batch + recompute) — ในระบบอ้างอิงเป็นโค้ด ~2,600 บรรทัด · และ <b>ฟอร์ม Item ใหญ่มาก</b> (79 ฟิลด์ + 8 child tables: barcode, reorder, UOM conversion, variant, default, supplier ฯลฯ) → FE ต้องทำแบบ tabbed form</span></li>
+            </ul>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-5 mt-5">
+            <div class="card p-6" style="border-left:3px solid var(--blueprint)">
+              <div class="eyebrow mb-3" style="color:var(--blueprint)">Phase 4 · Procurement &amp; Sales — ที่พบจริง (+72 ชม.)</div>
+              <ul class="space-y-2.5 text-[13px] text-[var(--ink-soft)]">
+                <li class="flex gap-3"><span class="mono text-[var(--blueprint)] text-xs mt-0.5">01</span><span><b>Pricing Rule engine</b> — ราคาพิเศษ/ส่วนลดตามจำนวน·ช่วงวันที่·ลูกค้า เป็นเครื่องมือแยก ไม่ใช่ field ธรรมดา (BE +32)</span></li>
+                <li class="flex gap-3"><span class="mono text-[var(--blueprint)] text-xs mt-0.5">02</span><span><b>Taxes &amp; Charges แบบ per-line</b> + item-wise tax detail ผูกทุกเอกสาร (Quotation/SO/PO) — ใช้ร่วมกับ P5 (BE +16)</span></li>
+                <li class="flex gap-3"><span class="mono text-[var(--blueprint)] text-xs mt-0.5">03</span><span><b>Packed Item</b> — bundle ถูก explode และเก็บ denormalized บนตัวเอกสาร SO/Delivery (BE +8)</span></li>
+                <li class="flex gap-3"><span class="mono text-[var(--blueprint)] text-xs mt-0.5">04</span><span><b>เอกสารใหญ่มาก</b>: SO 113 ฟิลด์ · PO 104 ฟิลด์ · Quotation 87 ฟิลด์ (submittable, 5–7 child tables) → FE tabbed form (FE +24)</span></li>
+              </ul>
+            </div>
+            <div class="card p-6" style="border-left:3px solid var(--signal)">
+              <div class="eyebrow mb-3" style="color:var(--signal)">Phase 5 · Finance — ที่พบจริง (+88 ชม.)</div>
+              <ul class="space-y-2.5 text-[13px] text-[var(--ink-soft)]">
+                <li class="flex gap-3"><span class="mono text-[var(--signal)] text-xs mt-0.5">01</span><span><b>GL = double-entry ledger</b> (debit=credit ต่อ account, immutable, post/cancel) — เป็น engine คู่ขนานกับ stock ledger, งานหลักของเฟส (BE +32)</span></li>
+                <li class="flex gap-3"><span class="mono text-[var(--signal)] text-xs mt-0.5">02</span><span><b>Payment Entry + allocation</b> — จ่าย/รับเงินแล้ว allocate ไปหลายใบกำกับ (AR/AP) พร้อม over/under-payment (BE +32)</span></li>
+                <li class="flex gap-3"><span class="mono text-[var(--signal)] text-xs mt-0.5">03</span><span><b>Withholding Tax (หัก ณ ที่จ่าย)</b> เพิ่มจาก VAT ปกติ — จำเป็นสำหรับภาษีไทย · + payment schedule (credit terms) (BE +16)</span></li>
+                <li class="flex gap-3"><span class="mono text-[var(--signal)] text-xs mt-0.5">04</span><span><b>Sales Invoice = เอกสารใหญ่สุด</b> 157 ฟิลด์ + 11 child tables (advances, timesheet, payment schedule, WHT) → FE +24</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </section>
 
       <div class="rule my-14"></div>
@@ -920,6 +1020,28 @@
     });
   }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
   document.querySelectorAll('section.section').forEach(s => obs.observe(s));
+
+  // Gantt phase collapse/expand
+  (function(){
+    const chart = document.getElementById('ganttChart');
+    if(!chart) return;
+    const heads = [...chart.querySelectorAll('.phase-head-row')];
+    function setPhase(head, collapsed){
+      head.classList.toggle('collapsed', collapsed);
+      let el = head.nextElementSibling;
+      while(el && !el.classList.contains('phase-head-row')){
+        if(el.classList.contains('gantt-row')) el.classList.toggle('gr-hidden', collapsed);
+        el = el.nextElementSibling;
+      }
+    }
+    heads.forEach(h => h.addEventListener('click', () => setPhase(h, !h.classList.contains('collapsed'))));
+    const ea = document.getElementById('ganttExpandAll');
+    const ca = document.getElementById('ganttCollapseAll');
+    if(ea) ea.addEventListener('click', () => heads.forEach(h => setPhase(h, false)));
+    if(ca) ca.addEventListener('click', () => heads.forEach(h => setPhase(h, true)));
+    // default: collapse all except the critical Stock phase (PHASE 3)
+    heads.forEach(h => setPhase(h, !/PHASE 3\b/.test(h.textContent)));
+  })();
 </script>
 
 </body>
