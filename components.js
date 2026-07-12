@@ -42,14 +42,17 @@ class ErpSidebar extends HTMLElement {
 
     this.innerHTML = `
 <aside class="side hidden lg:flex flex-col shrink-0 sticky top-[44px] h-[calc(100vh-44px)]" style="width:${width}px">
-  <div class="px-7 pt-8 pb-6">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg blueprint-bg border border-white/10 flex items-center justify-center">
+  <div class="px-7 pt-8 pb-6 relative">
+    <button type="button" class="sidebar-toggle" title="ย่อเมนู" aria-label="ย่อเมนู" aria-expanded="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+    <div class="flex items-center gap-3 pr-9">
+      <div class="w-9 h-9 rounded-lg blueprint-bg border border-white/10 flex items-center justify-center shrink-0">
         <span class="mono text-white text-sm font-semibold">${badge}</span>
       </div>
-      <div>
-        <div class="text-white font-semibold text-[15px] leading-none">${title}</div>
-        <div class="mono text-[10px] tracking-wider text-[#5E7391] mt-1">${subtitle}</div>
+      <div class="min-w-0">
+        <div class="text-white font-semibold text-[15px] leading-none truncate">${title}</div>
+        <div class="mono text-[10px] tracking-wider text-[#5E7391] mt-1 truncate">${subtitle}</div>
       </div>
     </div>
   </div>
@@ -57,9 +60,13 @@ class ErpSidebar extends HTMLElement {
   <div class="px-7 py-5 border-t border-white/8">
     <div class="mono text-[10px] leading-relaxed text-[#5E7391]">${footnoteHTML}</div>
   </div>
-</aside>`;
+</aside>
+<button type="button" class="sidebar-expand-fab" title="ขยายเมนู" aria-label="ขยายเมนู">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+</button>`;
 
     this.#markActiveLink();
+    this.#setupCollapse();
   }
 
   // Active-state handling: for any non-hash link in the sidebar (i.e. it
@@ -74,6 +81,28 @@ class ErpSidebar extends HTMLElement {
         a.classList.add('active');
       }
     });
+  }
+
+  // Expand/collapse: lets the reader hide the sidebar to read a doc at
+  // full width. State is remembered per-browser via localStorage so it
+  // stays collapsed when navigating between pages.
+  #setupCollapse() {
+    const STORAGE_KEY = 'erp-sidebar-collapsed';
+    const aside = this.querySelector('aside.side');
+    const collapseBtn = this.querySelector('.sidebar-toggle');
+    const expandFab = this.querySelector('.sidebar-expand-fab');
+
+    const apply = (collapsed) => {
+      aside.classList.toggle('is-collapsed', collapsed);
+      expandFab.classList.toggle('show', collapsed);
+      collapseBtn.setAttribute('aria-expanded', String(!collapsed));
+      localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+    };
+
+    apply(localStorage.getItem(STORAGE_KEY) === '1');
+
+    collapseBtn.addEventListener('click', () => apply(!aside.classList.contains('is-collapsed')));
+    expandFab.addEventListener('click', () => apply(false));
   }
 }
 
