@@ -303,70 +303,29 @@
           </div>
           <div class="card p-6">
             <div class="mono text-[11px] text-[var(--muted)] mb-2">LAYER 03</div>
-            <h3 class="font-semibold mb-2">PostgreSQL — JSONB</h3>
+            <h3 class="font-semibold mb-2">PostgreSQL — Flat Columns</h3>
             <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
-              Master Data สองภาษา (ชื่อสินค้า, ประเภท) เก็บเป็น
-              <span class="mono text-[12px]">JSONB</span> คอลัมน์เดียว
-              <b>ห้าม</b>ใช้ตารางแปลแยกหรือคอลัมน์
+              ทุกฟิลด์ 2 ภาษาแยกเป็นคอลัมน์คู่ขนานเสมอ
               <span class="mono text-[12px]">name_th / name_en</span>
+              เพื่อประสิทธิภาพสูงสุดในการทำ Index และ Full-Text Search
+              <b>ไม่ใช้ JSONB</b> สำหรับฟิลด์ทั่วไป
             </p>
           </div>
         </div>
 
-        <div class="grid lg:grid-cols-2 gap-6 items-start">
+        <!-- Technical link -->
+        <div class="card p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
           <div>
-            <div class="eyebrow text-[var(--muted)] mb-3">TypeORM Entity · JSONB Column</div>
-            <div class="code p-5">
-<pre><span class="c">// libs/shared/src/types/localized-text.ts</span>
-<span class="k">export interface</span> <span class="t">LocalizedText</span> { th: <span class="t">string</span>; en: <span class="t">string</span>; }
-
-<span class="c">// inventory-bc/entities/product.entity.ts</span>
-<span class="d">@Entity</span>(<span class="s">'products'</span>)
-<span class="k">export class</span> <span class="t">Product</span> {
-  <span class="d">@PrimaryGeneratedColumn</span>(<span class="s">'uuid'</span>)
-  id: <span class="t">string</span>;
-
-  <span class="c">// ชื่อสินค้า 2 ภาษา ในคอลัมน์เดียว</span>
-  <span class="d">@Column</span>({ type: <span class="s">'jsonb'</span> })
-  name: <span class="t">LocalizedText</span>;   <span class="c">// {"th":"แอปเปิ้ล","en":"Apple"}</span>
-
-  <span class="d">@Column</span>({ type: <span class="s">'jsonb'</span>, nullable: <span class="k">true</span> })
-  description: <span class="t">LocalizedText</span>;
-
-  <span class="c">// อ้างอิงข้ามบริบทด้วย UUID เท่านั้น — ห้าม JOIN</span>
-  <span class="d">@Column</span>(<span class="s">'uuid'</span>)
-  categoryId: <span class="t">string</span>;
-
-  <span class="d">@Column</span>({ type: <span class="s">'uuid'</span>, nullable: <span class="k">true</span> })
-  supplierId: <span class="t">string</span>;
-}</pre>
-            </div>
+            <div class="eyebrow text-[var(--muted)] mb-2">Technical Deep Dive</div>
+            <h3 class="font-semibold text-lg mb-1.5">แนวทางการพัฒนาและจัดการระบบ 2 ภาษาแบบละเอียด</h3>
+            <p class="text-sm text-[var(--ink-soft)] max-w-xl leading-relaxed">
+              มาตรฐาน Entity, DTO, Interceptor และ Frontend Helper สำหรับทีมพัฒนา
+              ครบทั้ง Backend (NestJS) และ Frontend พร้อมตัวอย่างโค้ดจริง
+            </p>
           </div>
-          <div>
-            <div class="eyebrow text-[var(--muted)] mb-3">Response Interceptor · flatten ตาม locale</div>
-            <div class="code p-5">
-<pre><span class="c">// แปลง JSONB → ภาษาเดียวตาม Accept-Language</span>
-<span class="d">@Injectable</span>()
-<span class="k">export class</span> <span class="t">LocalizeInterceptor</span> <span class="k">implements</span> <span class="t">NestInterceptor</span> {
-  intercept(ctx, next) {
-    <span class="k">const</span> lang = I18nContext.current()?.lang ?? <span class="s">'th'</span>;
-    <span class="k">return</span> next.handle().pipe(
-      map(data =&gt; pickLocale(data, lang))
-    );
-  }
-}
-
-<span class="c">// GET /products?lang=en  →  { "name": "Apple" }</span>
-<span class="c">// GET /products?lang=th  →  { "name": "แอปเปิ้ล" }</span>
-<span class="c">// ค่า raw JSONB ยังคงถูกส่งได้เมื่อ front ต้องแก้ไข 2 ภาษา</span></pre>
-            </div>
-            <div class="mt-4 p-4 rounded-xl" style="background:var(--signal-soft);border:1px solid #F3D9C6;">
-              <p class="text-[13.5px] text-[#8A4218] leading-relaxed">
-                <b>ข้อดี JSONB:</b> Schema สะอาด, เพิ่มภาษาใหม่ได้โดยไม่ต้อง Migrate โครงสร้าง,
-                Query ได้ด้วย <span class="mono text-[12px]">name-&gt;&gt;'th'</span> และเหมาะกับ Microservice ที่ไม่ต้องการตารางแปลกระจาย
-              </p>
-            </div>
-          </div>
+          <a href="i18n-guide.html" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--ink);color:#fff;border-color:var(--ink)">
+            ดูเอกสารเทคนิค (i18n Guide) →
+          </a>
         </div>
       </section>
 
@@ -546,79 +505,19 @@
           </div>
         </div>
 
-        <!-- Algorithm code -->
-        <div class="grid lg:grid-cols-2 gap-6 items-start">
+        <!-- Technical link -->
+        <div class="card p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
           <div>
-            <div class="eyebrow text-[var(--muted)] mb-3">inventory-bc · Deduction Engine</div>
-            <div class="code p-5">
-<pre><span class="c">// เลือกล็อตตามกลยุทธ์ + ล็อกแถวกันแข่งขัน (concurrency)</span>
-<span class="k">async</span> deductStock(productId, warehouseId, qty, strategy) {
-  <span class="k">return</span> <span class="k">this</span>.dataSource.transaction(<span class="k">async</span> (tx) =&gt; {
-    <span class="k">const</span> order = strategy === <span class="s">'FEFO'</span>
-      ? <span class="s">'lot.expiryDate ASC, lot.receivedAt ASC'</span>
-      : <span class="s">'lot.receivedAt ASC'</span>;            <span class="c">// FIFO</span>
-
-    <span class="k">const</span> lots = <span class="k">await</span> tx.getRepository(<span class="t">Lot</span>)
-      .createQueryBuilder(<span class="s">'lot'</span>)
-      .setLock(<span class="s">'pessimistic_write'</span>)     <span class="c">// SELECT ... FOR UPDATE</span>
-      .where(<span class="s">'lot.productId = :productId'</span>, { productId })
-      .andWhere(<span class="s">'lot.warehouseId = :warehouseId'</span>, { warehouseId })
-      .andWhere(<span class="s">'lot.availableQty &gt; 0'</span>)
-      .orderBy(order)
-      .getMany();
-
-    <span class="k">let</span> remaining = qty;
-    <span class="k">const</span> allocations = [];
-    <span class="k">for</span> (<span class="k">const</span> lot <span class="k">of</span> lots) {
-      <span class="k">if</span> (remaining &lt;= 0) <span class="k">break</span>;
-      <span class="k">const</span> take = Math.min(lot.availableQty, remaining);
-      lot.availableQty -= take;
-      remaining -= take;
-      allocations.push({
-        lotId: lot.id, qty: take, unitCost: lot.importCost
-      });
-      <span class="k">await</span> tx.save(lot);
-    }
-    <span class="k">if</span> (remaining &gt; 0) <span class="k">throw new</span> <span class="t">InsufficientStock</span>();
-
-    <span class="c">// ส่ง event ให้ finance-bc คำนวณ COGS/P&amp;L ต่อล็อต</span>
-    <span class="k">await</span> <span class="k">this</span>.bus.publish(<span class="s">'stock.deducted'</span>, { allocations });
-    <span class="k">return</span> allocations;
-  });
-}</pre>
-            </div>
+            <div class="eyebrow text-[var(--muted)] mb-2">Technical Deep Dive</div>
+            <h3 class="font-semibold text-lg mb-1.5">Deduction Engine &amp; COGS Calculation</h3>
+            <p class="text-sm text-[var(--ink-soft)] max-w-xl leading-relaxed">
+              รายละเอียดเชิงเทคนิคของการล็อกแถวกันแข่งขัน (concurrency lock), ลำดับการตัด FIFO/FEFO
+              และการคำนวณ COGS/กำไรต่อ Lot อยู่ในเอกสาร Developer Implementation Guide
+            </p>
           </div>
-          <div>
-            <div class="eyebrow text-[var(--muted)] mb-3">finance-bc · COGS &amp; Profit per Lot</div>
-            <div class="code p-5">
-<pre><span class="c">// รับ event → คำนวณต้นทุนและกำไรราย allocation</span>
-<span class="d">@EventPattern</span>(<span class="s">'stock.deducted'</span>)
-<span class="k">async</span> onStockDeducted(msg: { allocations, saleId }) {
-  <span class="k">const</span> sale = <span class="k">await</span> <span class="k">this</span>.sales.get(msg.saleId); <span class="c">// TCP</span>
-  <span class="k">let</span> totalCOGS = 0, totalRevenue = 0;
-
-  <span class="k">for</span> (<span class="k">const</span> a <span class="k">of</span> msg.allocations) {
-    <span class="k">const</span> lineCost    = a.qty * a.unitCost;
-    <span class="k">const</span> lineRevenue = a.qty * sale.unitPrice;
-    totalCOGS    += lineCost;
-    totalRevenue += lineRevenue;
-
-    <span class="k">await</span> <span class="k">this</span>.cogs.save({
-      lotId: a.lotId, qty: a.qty,
-      unitCost: a.unitCost, cogs: lineCost,
-      profit: lineRevenue - lineCost   <span class="c">// กำไรต่อล็อต</span>
-    });
-  }
-
-  <span class="k">await</span> <span class="k">this</span>.pnl.save({
-    saleId: msg.saleId,
-    revenue: totalRevenue,
-    cogs: totalCOGS,
-    grossProfit: totalRevenue - totalCOGS
-  });
-}</pre>
-            </div>
-          </div>
+          <a href="core-feature.html#p3" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--ink);color:#fff;border-color:var(--ink)">
+            ดู Developer Guide →
+          </a>
         </div>
         <!-- SINGLE vs BUNDLE -->
         <div class="mt-12">
@@ -667,64 +566,19 @@
             </div>
           </div>
 
-          <div class="grid lg:grid-cols-2 gap-6 items-start">
+          <!-- Technical link -->
+          <div class="card p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
             <div>
-              <div class="eyebrow text-[var(--muted)] mb-3">inventory-bc · Bundle Explosion</div>
-              <div class="code p-5">
-<pre><span class="c">// entity: product_bundles + bundle_items (BOM)</span>
-<span class="d">@Entity</span>(<span class="s">'bundle_items'</span>)
-<span class="k">class</span> <span class="t">BundleItem</span> {
-  <span class="d">@Column</span>(<span class="s">'uuid'</span>) bundleProductId: <span class="t">string</span>;
-  <span class="d">@Column</span>(<span class="s">'uuid'</span>) componentProductId: <span class="t">string</span>;
-  <span class="d">@Column</span>(<span class="s">'int'</span>)  quantity: <span class="t">number</span>;  <span class="c">// ต่อ 1 ชุด</span>
-}
-
-<span class="c">// แตกชุด → รวมเป็นรายการตัดสต็อกของสินค้าย่อย</span>
-<span class="k">async</span> explode(line: { productId, qty }) {
-  <span class="k">const</span> product = <span class="k">await</span> <span class="k">this</span>.products.get(line.productId);
-  <span class="k">if</span> (product.type === <span class="s">'single'</span>)
-    <span class="k">return</span> [{ productId: line.productId, qty: line.qty }];
-
-  <span class="c">// type === 'bundle' → ขยายตาม BOM × จำนวนชุด</span>
-  <span class="k">const</span> items = <span class="k">await</span> <span class="k">this</span>.bomRepo.find({
-    where: { bundleProductId: line.productId }
-  });
-  <span class="k">return</span> items.map(i =&gt; ({
-    productId: i.componentProductId,
-    qty: i.quantity * line.qty
-  }));
-}</pre>
-              </div>
+              <div class="eyebrow text-[var(--muted)] mb-2">Technical Deep Dive</div>
+              <h3 class="font-semibold text-lg mb-1.5">Bundle Explosion Logic</h3>
+              <p class="text-sm text-[var(--ink-soft)] max-w-xl leading-relaxed">
+                รายละเอียดการแตกชุด (BOM), การรวม demand ต่อสินค้าย่อย และกฎ all-or-nothing
+                transaction อยู่ในเอกสาร Developer Implementation Guide
+              </p>
             </div>
-            <div>
-              <div class="eyebrow text-[var(--muted)] mb-3">รวมทุกบรรทัด → ตัด FEFO ในทรานแซกชันเดียว</div>
-              <div class="code p-5">
-<pre><span class="k">async</span> issueForSale(saleLines, strategy) {
-  <span class="k">return</span> <span class="k">this</span>.dataSource.transaction(<span class="k">async</span> (tx) =&gt; {
-    <span class="c">// 1) แตกทั้งเดี่ยวและชุดให้เป็นสินค้าย่อย</span>
-    <span class="k">const</span> exploded = (<span class="k">await</span> Promise.all(
-      saleLines.map(l =&gt; <span class="k">this</span>.explode(l))
-    )).flat();
-
-    <span class="c">// 2) รวมยอดสินค้าเดียวกัน (ชุด+เดี่ยวปนกันได้)</span>
-    <span class="k">const</span> demand = mergeByProduct(exploded);
-
-    <span class="c">// 3) ตัด FIFO/FEFO ทีละสินค้า — ล็อกล็อตทุกตัว</span>
-    <span class="k">const</span> allocations = [];
-    <span class="k">for</span> (<span class="k">const</span> d <span class="k">of</span> demand) {
-      allocations.push(
-        ...<span class="k">await</span> <span class="k">this</span>.deductStock(
-          d.productId, d.warehouseId, d.qty, strategy, tx
-        )
-      );
-    }
-    <span class="c">// ถ้าตัวใดไม่พอ → throw → rollback ทั้งชุด</span>
-    <span class="k">await</span> <span class="k">this</span>.bus.publish(<span class="s">'stock.deducted'</span>, { allocations });
-    <span class="k">return</span> allocations;   <span class="c">// finance รวม COGS ต่อล็อตต่อสินค้าย่อย</span>
-  });
-}</pre>
-              </div>
-            </div>
+            <a href="core-feature.html#p3" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--ink);color:#fff;border-color:var(--ink)">
+              ดู Developer Guide →
+            </a>
           </div>
         </div>
       </section>

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แนวทางการพัฒนาระบบ 2 ภาษา (TH/EN) — Technical Guide · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side hidden lg:flex flex-col w-[280px] shrink-0 sticky top-0 h-screen">
+    <div class="px-7 pt-8 pb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg blueprint-bg border border-white/10 flex items-center justify-center">
+          <span class="mono text-white text-sm font-semibold">L</span>
+        </div>
+        <div>
+          <div class="text-white font-semibold text-[15px] leading-none">i18n / Bilingual</div>
+          <div class="mono text-[10px] tracking-wider text-[#5E7391] mt-1">TECHNICAL GUIDE · TH/EN</div>
+        </div>
+      </div>
+    </div>
+    <nav class="px-5 flex-1 overflow-y-auto space-y-1" id="nav">
+      <a href="#principle"     class="navlink"><span class="n">01</span> หลักการออกแบบ</a>
+      <a href="#database"      class="navlink"><span class="n">02</span> Database &amp; Entity</a>
+      <a href="#request"       class="navlink"><span class="n">03</span> Backend · Request</a>
+      <a href="#response"      class="navlink"><span class="n">04</span> Backend · Response</a>
+      <a href="#frontend-view" class="navlink"><span class="n">05</span> Frontend · แสดงผล</a>
+      <a href="#frontend-form" class="navlink"><span class="n">06</span> Frontend · ฟอร์ม</a>
+    </nav>
+    <div class="px-7 py-5 border-t border-white/8">
+      <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="erp-architecture.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่เอกสารสถาปัตยกรรม (Executive Overview)
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Technical Implementation Guide</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          แนวทางการพัฒนาและจัดการระบบ 2 ภาษา<br>
+          <span class="text-[#7FE3DE]">(Bilingual: TH / EN)</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          มาตรฐานการออกแบบและการเขียนโค้ดเพื่อรองรับข้อมูล 2 ภาษา ครอบคลุมตั้งแต่ Database, Backend (NestJS)
+          จนถึง Frontend โดยใช้หลักการ <span class="text-white font-medium">“จัดเก็บแบบแยกคอลัมน์ (Flat) แต่ส่งออกเป็นออบเจกต์ (Nested Object)”</span>
+          เพื่อให้ API ใช้งานง่ายและโค้ดสะอาดที่สุด
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>TypeORM · Flat Columns</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>NestJS Interceptor</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Nested Response Object</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Frontend Helper</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 PRINCIPLE ========== -->
+      <section id="principle" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — Design Principle</div>
+        <h2 class="display text-3xl mb-6">หลักการออกแบบ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เราจะใช้หลักการ Suffix <span class="mono text-[13px] text-[var(--ink)]">_th</span> และ
+          <span class="mono text-[13px] text-[var(--ink)]">_en</span> ในการแยกคอลัมน์เสมอ
+          (<b class="text-[var(--signal)]">ไม่ใช้ JSONB</b> สำหรับฟิลด์ทั่วไป) เพื่อให้ได้ประสิทธิภาพสูงสุดในการทำ Index
+          และ Full-Text Search — แต่เพื่อไม่ให้ Frontend ต้องยุ่งกับคอลัมน์คู่ขนาน Backend จะยุบทั้งสองคอลัมน์ให้เป็น
+          Nested Object เดียวกันเสมอผ่าน Interceptor ก่อนส่งออก
+        </p>
+
+        <div class="card overflow-hidden">
+          <div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">DATABASE</div>
+              <h3 class="font-semibold mb-2 text-[15px]">Flat Columns</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                <span class="mono text-[12px]">description_th</span>,
+                <span class="mono text-[12px]">description_en</span> — แยกคอลัมน์จริงในตาราง
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">BACKEND</div>
+              <h3 class="font-semibold mb-2 text-[15px]">Interceptor</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">รวบคู่คอลัมน์เป็น Object กลาง Response ทุก Endpoint โดยอัตโนมัติ</p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">FRONTEND</div>
+              <h3 class="font-semibold mb-2 text-[15px]">Nested Object</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                <span class="mono text-[12px]">patient.title?.th</span> — อ่านค่าตรงจาก Object ไม่ต้องต่อ String Key
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 DATABASE ========== -->
+      <section id="database" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Database &amp; Entity (TypeORM)</div>
+        <h2 class="display text-3xl mb-6">การออกแบบ Database และ Entity</h2>
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">กรณี 1 — Master Data</div>
+            <h3 class="font-semibold mb-2 text-[15px]">Code + Text ที่แปลแล้ว</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              เช่น คำนำหน้า, สิทธิการรักษา — เก็บทั้ง <span class="mono text-[12px]">title_code</span>,
+              <span class="mono text-[12px]">title_th</span>, <span class="mono text-[12px]">title_en</span>
+              เพื่อลดการ Join ตอนอ่าน
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">กรณี 2 — Free Text</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ผู้ใช้พิมพ์เอง</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              เช่น หมายเหตุ, รายละเอียด — เก็บแยกคอลัมน์ตรง ๆ
+              <span class="mono text-[12px]">description_th</span> /
+              <span class="mono text-[12px]">description_en</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ตัวอย่าง · Patient Entity</div>
+        <div class="code p-5">
+<pre><span class="k">import</span> { <span class="t">Entity</span>, <span class="t">Column</span> } <span class="k">from</span> <span class="s">'typeorm'</span>;
+
+<span class="d">@Entity</span>(<span class="s">'patients'</span>)
+<span class="k">export class</span> <span class="t">Patient</span> {
+  <span class="c">// 1. กรณี Master Data: เก็บทั้ง Code และ Text ที่แปลแล้ว (เพื่อลดการ Join)</span>
+  <span class="d">@Column</span>({ nullable: <span class="k">true</span> })
+  title_code: <span class="t">string</span>;
+
+  <span class="d">@Column</span>({ nullable: <span class="k">true</span> })
+  title_th: <span class="t">string</span>;
+
+  <span class="d">@Column</span>({ nullable: <span class="k">true</span> })
+  title_en: <span class="t">string</span>;
+
+  <span class="c">// 2. กรณี Free-text (ผู้ใช้พิมพ์เอง): เก็บแยกคอลัมน์</span>
+  <span class="d">@Column</span>({ type: <span class="s">'text'</span>, nullable: <span class="k">true</span> })
+  description_th: <span class="t">string</span>;
+
+  <span class="d">@Column</span>({ type: <span class="s">'text'</span>, nullable: <span class="k">true</span> })
+  description_en: <span class="t">string</span>;
+}</pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 REQUEST ========== -->
+      <section id="request" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — Backend (NestJS) · Request Payload</div>
+        <h2 class="display text-3xl mb-6">ข้อมูลขาเข้า (Request)</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          การรับข้อมูลจาก Frontend (ผ่าน DTO) แบ่งเป็น 2 กรณีตามชนิดข้อมูล
+        </p>
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3"><span class="dot" style="background:var(--accent)"></span><h3 class="font-semibold text-[15px]">Master Data</h3></div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              เช่น คำนำหน้า, สิทธิการรักษา — Frontend ส่งมาแค่
+              <span class="mono text-[12px]">title_code</span> หน้าที่หาคำแปล
+              ไทย/อังกฤษเป็นของ <b>Backend</b> (ไปดึงจาก Master Data Microservice แล้วเซฟลง
+              <span class="mono text-[12px]">_th</span>, <span class="mono text-[12px]">_en</span>)
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3"><span class="dot" style="background:var(--signal)"></span><h3 class="font-semibold text-[15px]">Free Text</h3></div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              เช่น หมายเหตุ, รายละเอียด — Frontend ต้องส่งมาเป็น Flat Key ตาม Database คือ
+              <span class="mono text-[12px]">description_th</span> และ
+              <span class="mono text-[12px]">description_en</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 RESPONSE ========== -->
+      <section id="response" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — Backend (NestJS) · Response Payload</div>
+        <h2 class="display text-3xl mb-6">ข้อมูลขาออก (Response)</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เพื่อไม่ให้ Frontend ต้องเขียนโค้ดที่รกด้วยการต่อ String
+          (<span class="mono text-[13px]">key + '_th'</span>) Backend จะทำการ
+          <b>ยุบคอลัมน์คู่ขนานให้กลายเป็น Object เสมอ</b> ผ่าน Interceptor
+        </p>
+
+        <div class="grid lg:grid-cols-2 gap-6 items-start mb-8">
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">ตัวอย่าง API Response ที่ Frontend จะได้รับ</div>
+            <div class="code p-5">
+<pre>{
+  <span class="s">"id"</span>: <span class="s">"uuid-1234"</span>,
+  <span class="s">"title_code"</span>: <span class="s">"01"</span>,
+  <span class="s">"title"</span>: {
+    <span class="s">"th"</span>: <span class="s">"นาย"</span>,
+    <span class="s">"en"</span>: <span class="s">"Mr."</span>
+  },
+  <span class="s">"description"</span>: {
+    <span class="s">"th"</span>: <span class="s">"ปวดหัว"</span>,
+    <span class="s">"en"</span>: <span class="k">null</span>
+  },
+  <span class="s">"remark"</span>: {
+    <span class="s">"th"</span>: <span class="k">null</span>,
+    <span class="s">"en"</span>: <span class="k">null</span>
+  }
+}</pre>
+            </div>
+            <div class="mt-4 p-4 rounded-xl" style="background:var(--signal-soft);border:1px solid #F3D9C6;">
+              <p class="text-[13.5px] text-[#8A4218] leading-relaxed">
+                สังเกตว่าจะมีการส่งค่า <span class="mono text-[12px]">{ th: null, en: null }</span> ออกไปเสมอ
+                แม้ข้อมูลใน DB จะเป็น Null เพื่อรักษา <b>API Contract</b> ให้คงที่
+              </p>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">Interceptor · รวบฟิลด์ (Global หรือระดับ Controller)</div>
+            <div class="code p-5">
+<pre><span class="k">import</span> { <span class="t">Injectable</span>, <span class="t">NestInterceptor</span>, <span class="t">ExecutionContext</span>, <span class="t">CallHandler</span> } <span class="k">from</span> <span class="s">'@nestjs/common'</span>;
+<span class="k">import</span> { <span class="t">Observable</span> } <span class="k">from</span> <span class="s">'rxjs'</span>;
+<span class="k">import</span> { map } <span class="k">from</span> <span class="s">'rxjs/operators'</span>;
+
+<span class="d">@Injectable</span>()
+<span class="k">export class</span> <span class="t">LocalizationInterceptor</span> <span class="k">implements</span> <span class="t">NestInterceptor</span> {
+  intercept(context: <span class="t">ExecutionContext</span>, next: <span class="t">CallHandler</span>): <span class="t">Observable</span>&lt;<span class="k">any</span>&gt; {
+    <span class="k">return</span> next.handle().pipe(
+      map((data) =&gt; <span class="k">this</span>.transformToLocaleObject(data))
+    );
+  }
+
+  <span class="k">private</span> transformToLocaleObject(data: <span class="k">any</span>): <span class="k">any</span> {
+    <span class="k">if</span> (data === <span class="k">null</span> || <span class="k">typeof</span> data !== <span class="s">'object'</span> || data <span class="k">instanceof</span> <span class="t">Date</span>) <span class="k">return</span> data;
+    <span class="k">if</span> (<span class="t">Array</span>.isArray(data)) <span class="k">return</span> data.map(item =&gt; <span class="k">this</span>.transformToLocaleObject(item));
+
+    <span class="k">const</span> transformed = {};
+    <span class="k">const</span> processedKeys = <span class="k">new</span> <span class="t">Set</span>&lt;<span class="t">string</span>&gt;();
+
+    <span class="k">for</span> (<span class="k">const</span> key <span class="k">in</span> data) {
+      <span class="k">if</span> (processedKeys.has(key)) <span class="k">continue</span>;
+
+      <span class="c">// ตรวจจับคู่ _th และ _en</span>
+      <span class="k">if</span> (key.endsWith(<span class="s">'_th'</span>) || key.endsWith(<span class="s">'_en'</span>)) {
+        <span class="k">const</span> baseKey = key.replace(<span class="s">/(_th|_en)$/</span>, <span class="s">''</span>);
+
+        <span class="c">// รวบเป็น Object เดียวกัน และบังคับโครงสร้างแม้อีกภาษาจะไม่มีค่า</span>
+        transformed[baseKey] = {
+          th: data[<span class="s">`${baseKey}_th`</span>] ?? <span class="k">null</span>,
+          en: data[<span class="s">`${baseKey}_en`</span>] ?? <span class="k">null</span>
+        };
+
+        processedKeys.add(<span class="s">`${baseKey}_th`</span>);
+        processedKeys.add(<span class="s">`${baseKey}_en`</span>);
+      } <span class="k">else</span> {
+        transformed[key] = <span class="k">this</span>.transformToLocaleObject(data[key]);
+      }
+    }
+    <span class="k">return</span> transformed;
+  }
+}</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 FRONTEND VIEW ========== -->
+      <section id="frontend-view" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Frontend (React / Angular / Vue) · การแสดงผล</div>
+        <h2 class="display text-3xl mb-6">View Mode</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เนื่องจาก Backend ส่งข้อมูลมาเป็น Object เสมอ แต่ต้องระวังกรณีสุดวิสัยที่ Backend อาจส่งผิดพลาด
+          ให้ Frontend ใช้ <span class="mono text-[13px]">?.</span> (Optional Chaining) และ
+          <span class="mono text-[13px]">??</span> (Nullish Coalescing) เสมอ
+        </p>
+
+        <div class="grid lg:grid-cols-2 gap-6 items-start">
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">การเรียกใช้ที่ถูกต้อง</div>
+            <div class="code p-5">
+<pre><span class="k">const</span> currentLang = <span class="s">'th'</span>; <span class="c">// หรือรับจาก Context/Store</span>
+
+<span class="c">// จะคืนค่า '' แทนที่จะขึ้น undefined หรือทำให้แอปพัง</span>
+<span class="k">const</span> displayTitle = patient.title?.[currentLang] ?? <span class="s">''</span>;
+<span class="k">const</span> displayDesc = patient.description?.[currentLang] ?? <span class="s">''</span>;</pre>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">Helper Function กลาง · แนะนำให้ใช้ทั่วทั้งแอป</div>
+            <div class="code p-5">
+<pre><span class="c">// utils/localization.util.ts</span>
+<span class="k">export type</span> <span class="t">LocalizedString</span> = { th: <span class="t">string</span> | <span class="k">null</span>; en: <span class="t">string</span> | <span class="k">null</span> };
+
+<span class="k">export const</span> getLocaleText = (
+  localeObj: <span class="t">LocalizedString</span> | <span class="k">null</span> | <span class="k">undefined</span>,
+  lang: <span class="s">'th'</span> | <span class="s">'en'</span>
+): <span class="t">string</span> =&gt; {
+  <span class="k">if</span> (!localeObj) <span class="k">return</span> <span class="s">''</span>;
+  <span class="c">// คืนค่าภาษาที่เลือก -&gt; Fallback ไปอีกภาษา -&gt; คืนค่าว่าง</span>
+  <span class="k">return</span> localeObj[lang] ?? localeObj[lang === <span class="s">'th'</span> ? <span class="s">'en'</span> : <span class="s">'th'</span>] ?? <span class="s">''</span>;
+};</pre>
+            </div>
+            <div class="mt-4 p-4 rounded-xl" style="background:var(--line-soft);border:1px solid var(--line);">
+              <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mb-2">การใช้งานในหน้า UI:</p>
+              <div class="code p-3" style="font-size:12px">
+<pre>&lt;span&gt;{{ getLocaleText(patient.title, currentLang) }}&lt;/span&gt;
+&lt;p&gt;{{ getLocaleText(patient.description, currentLang) }}&lt;/p&gt;</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 FRONTEND FORM ========== -->
+      <section id="frontend-form" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — Frontend · การสร้าง/แก้ไขข้อมูล</div>
+        <h2 class="display text-3xl mb-6">Create / Edit Form</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เมื่อดึงข้อมูลเพื่อมาทำฟอร์มแก้ไข Frontend สามารถ Map ข้อมูลจาก Object กลับไปใส่ Input 2 ช่องได้ทันที
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ตัวอย่าง · Initial Form State</div>
+        <div class="code p-5 mb-6">
+<pre><span class="k">const</span> formData = {
+  title_code: patient.title_code,
+  description_th: patient.description?.th ?? <span class="s">''</span>,
+  description_en: patient.description?.en ?? <span class="s">''</span>
+};</pre>
+        </div>
+
+        <div class="p-5 rounded-xl" style="background:var(--signal-soft);border:1px solid #F3D9C6;">
+          <div class="mono text-[11px] text-[var(--signal)] mb-2">ข้อควรจำ</div>
+          <p class="text-[13.5px] text-[#7A4526] leading-relaxed">
+            ตอน Submit API ให้ส่งข้อมูลกลับไปให้ Backend ในรูปแบบ <b>Flat Keys</b>
+            (<span class="mono text-[12px]">description_th</span>, <span class="mono text-[12px]">description_en</span>)
+            ตามที่กำหนดใน DTO เสมอ — Object รูปแบบ Nested ใช้เฉพาะฝั่ง Response เท่านั้น
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="border-t py-8 mb-4" style="border-color:var(--line)">
+        <div class="flex flex-col sm:flex-row justify-between gap-3 text-[13px] text-[var(--muted)]">
+          <div class="mono">ERP SYSTEM · TECHNICAL GUIDE · BILINGUAL TH/EN</div>
+          <div class="mono">TypeORM · NestJS · React / Angular / Vue</div>
+        </div>
+      </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
