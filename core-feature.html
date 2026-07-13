@@ -284,7 +284,7 @@
             <div class="card p-6">
               <div class="mono text-[11px] mb-3" style="color:var(--signal)">UC-3.1 · GOODS RECEIPT (รับสินค้าเข้าคลัง)</div>
               <div class="mt-2">
-                <div class="step"><span class="sn">1</span><p class="text-[13.5px]">เปิดใบรับสินค้า (GRN) อ้างอิง PO จาก supplier-bc (<span class="mono text-[12px]" style="color:var(--accent)">poId, supplierId</span>)</p></div>
+                <div class="step"><span class="sn">1</span><p class="text-[13.5px]">เปิดใบรับสินค้า (GRN) อ้างอิง PO จาก supplier-bc (<span class="mono text-[12px]" style="color:var(--accent)">po_id, supplier_id</span>)</p></div>
                 <div class="step"><span class="sn">2</span><p class="text-[13.5px]">กรอกจำนวนรับจริง, <b>ต้นทุน/หน่วย</b>, <b>lot_number</b>, <b>expiry_date</b>, คลังปลายทาง</p></div>
                 <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ระบบสร้าง <b>Lot ใหม่</b> ต่อรายการ กำหนด <span class="mono text-[12px]">available_qty = received_qty</span></p></div>
                 <div class="step"><span class="sn">4</span><p class="text-[13.5px]">บันทึก <span class="mono text-[12px]">stock_movement (type=RECEIPT)</span> + emit <span class="mono text-[12px]" style="color:var(--signal)">lot.created</span></p></div>
@@ -294,9 +294,9 @@
             <div class="card p-6">
               <div class="mono text-[11px] mb-3" style="color:var(--signal)">UC-3.2 · GOODS ISSUE (ตัดสต็อก FIFO/FEFO)</div>
               <div class="mt-2">
-                <div class="step"><span class="sn">1</span><p class="text-[13.5px]">รับคำขอจ่ายออก: <span class="mono text-[12px]">productId, qty, warehouse, strategy</span></p></div>
-                <div class="step"><span class="sn">2</span><p class="text-[13.5px]">เลือกล็อตเรียงตาม <b>receivedAt</b> (FIFO) หรือ <b>expiryDate</b> (FEFO)</p></div>
-                <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ตัด <span class="mono text-[12px]">available_qty</span> ทีละล็อต สร้าง allocation (lotId, qty, <b>unitCost</b>)</p></div>
+                <div class="step"><span class="sn">1</span><p class="text-[13.5px]">รับคำขอจ่ายออก: <span class="mono text-[12px]">product_id, qty, warehouse, strategy</span></p></div>
+                <div class="step"><span class="sn">2</span><p class="text-[13.5px]">เลือกล็อตเรียงตาม <b>received_at</b> (FIFO) หรือ <b>expiry_date</b> (FEFO)</p></div>
+                <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ตัด <span class="mono text-[12px]">available_qty</span> ทีละล็อต สร้าง allocation (lot_id, qty, <b>unit_cost</b>)</p></div>
                 <div class="step"><span class="sn">4</span><p class="text-[13.5px]">บันทึก movement (ISSUE) + emit <span class="mono text-[12px]" style="color:var(--signal)">stock.deducted</span></p></div>
               </div>
             </div>
@@ -339,7 +339,7 @@
                 <tr><td>import_cost</td><td>Goods Receipt</td><td>ต้นทุน/หน่วยของล็อตนั้น (ใช้คำนวณ COGS)</td></tr>
                 <tr><td>expiry_date</td><td>Goods Receipt</td><td>วันหมดอายุเฉพาะล็อต (ขับเคลื่อน FEFO)</td></tr>
                 <tr><td>available_qty</td><td>Receipt / Issue</td><td>คงเหลือใช้ได้จริง · ต้อง ≥ 0 เสมอ</td></tr>
-                <tr><td>allocations[]</td><td>Goods Issue</td><td>รายการ (lotId, qty, unitCost) ที่ถูกตัด — snapshot</td></tr>
+                <tr><td>allocations[]</td><td>Goods Issue</td><td>รายการ (lot_id, qty, unit_cost) ที่ถูกตัด — snapshot</td></tr>
                 <tr><td>movement.type</td><td>ทุกขั้น</td><td>RECEIPT · ISSUE · ADJUSTMENT · TRANSFER_IN/OUT</td></tr>
                 <tr><td>entry_type</td><td>Stock Entry</td><td>RECEIPT · TRANSFER · ISSUE · REPACK — กำหนดพฤติกรรมของเอกสาร</td></tr>
               </tbody>
@@ -360,7 +360,7 @@
         <div class="mb-12">
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">04</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
           <div class="card p-6 mb-5">
-            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">inventory-bc</b> เป็นทั้งผู้ฟังและผู้ส่ง: รับ <span class="mono text-[12px]">po.received</span> จาก supplier เพื่อสร้างล็อต และรับ <span class="mono text-[12px]">delivery.confirmed</span> จาก sales เพื่อตัดสต็อก แล้วส่ง <span class="mono text-[12px]">stock.deducted</span> พร้อม allocations (มี unitCost) ต่อไปให้ finance และ report การเปลี่ยนแปลง master data (Item/Item Group/Brand/UOM) ก็ยิง event แจ้ง report-bc เพื่ออัปเดตชื่อ/หมวดหมู่ที่ denormalize ไว้เช่นกัน</p>
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">inventory-bc</b> เป็นทั้งผู้ฟังและผู้ส่ง: รับ <span class="mono text-[12px]">po.received</span> จาก supplier เพื่อสร้างล็อต และรับ <span class="mono text-[12px]">delivery.confirmed</span> จาก sales เพื่อตัดสต็อก แล้วส่ง <span class="mono text-[12px]">stock.deducted</span> พร้อม allocations (มี unit_cost) ต่อไปให้ finance และ report การเปลี่ยนแปลง master data (Item/Item Group/Brand/UOM) ก็ยิง event แจ้ง report-bc เพื่ออัปเดตชื่อ/หมวดหมู่ที่ denormalize ไว้เช่นกัน</p>
           </div>
           <div class="grid sm:grid-cols-2 gap-6">
             <div class="card p-5">
@@ -586,6 +586,308 @@ erDiagram
             <div class="rulebox ok"><div class="rc mb-1">RULE · UUID ONLY</div><p class="text-[13.5px]">อ้างอิงข้าม BC ด้วย UUID เท่านั้น · ห้าม Foreign Key ข้ามฐานข้อมูล · <span class="mono text-[12px]">available_qty</span> ใช้ CHECK constraint ≥ 0</p></div>
           </div>
         </div>
+
+        <!-- 3.7 SRS Deep-Dive : UC-3.1 Goods Receipt (Backend + Frontend Handoff) -->
+        <div class="mt-14">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">07</span><h3 class="text-xl font-semibold">SRS Deep-Dive · UC-3.1 Goods Receipt — Backend + Frontend Handoff</h3></div>
+
+          <div class="card p-6 mb-9" style="border-left:3px solid var(--signal)">
+            <p class="text-[14px]" style="color:var(--ink-soft)">ส่วนขยายเชิงลึกของ <b style="color:var(--ink)">UC-3.1</b> (สรุปย่ออยู่ในหัวข้อ 03) สำหรับส่งมอบทีม <b style="color:var(--ink)">Backend (NestJS 11 · Fastify)</b> และ <b style="color:var(--ink)">Frontend (Next.js)</b> — ยึดกฎหลัก 2 ข้อของโครงการเสมอ: <b style="color:var(--ink)">i18n แบบ flat-column</b> (ขาเข้าเป็น <span class="mono text-[12px]">_th/_en</span>, ขาออกยุบเป็น nested object ผ่าน Interceptor) และ <b style="color:var(--ink)">submittable document</b> (<span class="mono text-[12px]">DRAFT → SUBMITTED → CANCELLED</span> · สต็อกเคลื่อนเฉพาะตอน submit)</p>
+          </div>
+
+          <!-- ===== A · Business Flow & State Machine ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">A</span><h4 class="font-semibold text-[16px]">Business Flow &amp; State Machine</h4></div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-6">
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">SUBMIT FLOW · ต่อรายการ (per line)</div>
+              <div class="step"><span class="sn">1</span><p class="text-[13.5px]">เปิด GRN อ้างอิง PO (<span class="mono text-[12px]" style="color:var(--accent)">po_id, supplier_id</span>) → สร้างสถานะ <b>DRAFT</b> (ยังไม่กระทบสต็อก แก้/ลบได้อิสระ)</p></div>
+              <div class="step"><span class="sn">2</span><p class="text-[13.5px]">แปลงจำนวนที่กรอก → <b>stock UOM</b> ด้วย <span class="mono text-[12px]">conversion_factor</span> (ต้องลงตัวถ้า <span class="mono text-[12px]">is_whole_number</span>)</p></div>
+              <div class="step"><span class="sn">3</span><p class="text-[13.5px]">สร้าง <b>Lot ใหม่</b> ผูก <span class="mono text-[12px]">import_cost + expiry_date</span> ของล็อตนั้น กำหนด <span class="mono text-[12px]">available_qty = received_qty</span></p></div>
+              <div class="step"><span class="sn">4</span><p class="text-[13.5px]">บันทึก <span class="mono text-[12px]">stock_movement (RECEIPT)</span> พร้อม <span class="mono text-[12px]">unit_cost</span> snapshot + อัปเดต balance cache (Bin) ต่อ item×warehouse</p></div>
+              <div class="step"><span class="sn">5</span><p class="text-[13.5px]">emit <span class="mono text-[12px]" style="color:var(--signal)">lot.created</span> (→ report-bc) + <span class="mono text-[12px]" style="color:var(--signal)">goods_receipt.submitted</span> (→ supplier-bc เพื่อ reconcile สถานะ PO)</p></div>
+            </div>
+            <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    [*] --> DRAFT : create GRN
+    DRAFT --> DRAFT : edit / delete lines
+    DRAFT --> SUBMITTED : submit · post ledger · create lots · emit events
+    SUBMITTED --> CANCELLED : cancel · reverse movements · rollback qty
+    SUBMITTED --> [*]
+    CANCELLED --> [*]
+    note right of DRAFT
+      ไม่กระทบสต็อก
+      แก้ไข/ลบได้อิสระ
+    end note
+    note right of SUBMITTED
+      lots live · immutable
+      available_qty = received_qty
+    end note
+</pre>
+            </div>
+          </div>
+          <div class="card overflow-hidden mb-4">
+            <table class="d">
+              <thead><tr><th>From → To</th><th>Trigger</th><th>Side effects / Guards</th></tr></thead>
+              <tbody>
+                <tr><td>· → DRAFT</td><td>create</td><td>ไม่มีผลต่อสต็อก · แก้/ลบได้เต็มที่</td></tr>
+                <tr><td>DRAFT → SUBMITTED</td><td>submit</td><td><b>ทรานแซกชันเดียว all-or-nothing</b>: สร้าง lots + post RECEIPT movements + bump balance cache + emit events · Guard: posting_date &gt; frozen, over-receipt ≤ allowance, product ไม่ใช่ template</td></tr>
+                <tr><td>SUBMITTED → CANCELLED</td><td>cancel</td><td>post reversing movement + คืน available_qty · <b>Block</b> ถ้าล็อตถูกตัดไปบางส่วนแล้ว (<span class="mono text-[12px]">available_qty &lt; received_qty</span>) → ให้ทำใบปรับสต็อกแทน</td></tr>
+                <tr><td>SUBMITTED → SUBMITTED</td><td>—</td><td>Immutable · แก้ได้เฉพาะผ่าน cancel+สร้างใหม่ หรือ Stock Adjustment</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="edge mb-10"><div class="tag mb-1">Partial receipt</div><p class="text-[13px]">รับไม่ครบ PO → สร้างล็อตเท่าที่รับจริงในทรานแซกชันนี้ · PO ที่ <b>supplier-bc</b> ยังเปิดค้าง (<span class="mono text-[12px]">PARTIAL</span>) รอ GRN ใบถัดไป — จัดการโดย consumer ของ <span class="mono text-[12px]">goods_receipt.submitted</span></p></div>
+
+          <!-- ===== B · Backend ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">B</span><h4 class="font-semibold text-[16px]">Backend (NestJS 11 · Fastify · TypeORM) Implementation</h4></div>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.1 · API Endpoints <span class="mono text-[11px]" style="color:var(--muted)">(ผ่าน API Gateway → inventory-bc)</span></h5>
+          <div class="card overflow-hidden mb-7">
+            <table class="d">
+              <thead><tr><th>Method</th><th>Route</th><th>Purpose</th><th>State</th></tr></thead>
+              <tbody>
+                <tr><td>POST</td><td>/inventory/goods-receipts</td><td>สร้าง GRN (draft)</td><td>→ DRAFT</td></tr>
+                <tr><td>GET</td><td>/inventory/goods-receipts/:id</td><td>ดึงใบเดียว (response i18n-nested)</td><td>—</td></tr>
+                <tr><td>GET</td><td>/inventory/goods-receipts</td><td>list/filter (po_id · status · warehouse)</td><td>—</td></tr>
+                <tr><td>PATCH</td><td>/inventory/goods-receipts/:id</td><td>แก้ไข draft lines</td><td>DRAFT only</td></tr>
+                <tr><td>POST</td><td>/inventory/goods-receipts/:id/submit</td><td>post ledger · สร้าง lots</td><td>DRAFT → SUBMITTED</td></tr>
+                <tr><td>POST</td><td>/inventory/goods-receipts/:id/cancel</td><td>reverse posting</td><td>SUBMITTED → CANCELLED</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[13px] mb-7" style="color:var(--ink-soft)">ทุก request แนบ <span class="mono text-[12px]">Accept-Language: th|en</span> → <span class="mono text-[12px]">nestjs-i18n</span> AcceptLanguageResolver เลือกไฟล์แปล error/validation · <span class="mono text-[12px]">LocalizationInterceptor</span> ผูกระดับ controller ให้ทุก response ยุบ <span class="mono text-[12px]">_th/_en</span> เป็น nested object อัตโนมัติ</p>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.2 · DTO — ขาเข้าเป็น flat keys ตาม i18n Guide</h5>
+          <pre class="code p-4 mb-3"><span class="c">// create-goods-receipt.dto.ts — INPUT ใช้ flat keys ตามคอลัมน์ DB เสมอ</span>
+<span class="k">export class</span> <span class="t">CreateGoodsReceiptItemDTO</span> {
+  <span class="d">@IsUUID()</span>  product_id: <span class="t">string</span>;      <span class="c">// ห้ามเป็น has_variants=true (template)</span>
+  <span class="d">@IsUUID()</span>  warehouse_id: <span class="t">string</span>;    <span class="c">// คลังปลายทาง — leaf เท่านั้น</span>
+  <span class="d">@IsInt()</span> <span class="d">@Min(1)</span>  received_qty: <span class="t">number</span>;   <span class="c">// จำนวนในหน่วยที่กรอก</span>
+  <span class="d">@IsUUID()</span> <span class="d">@IsOptional()</span>  uom_id?: <span class="t">string</span>;   <span class="c">// หน่วยที่กรอก → แปลงเป็น stock_uom</span>
+  <span class="d">@IsNumber()</span> <span class="d">@Min(0)</span>  import_cost: <span class="t">number</span>;   <span class="c">// ต้นทุน/หน่วยของล็อตนี้</span>
+  <span class="d">@IsString()</span> <span class="d">@IsNotEmpty()</span>  lot_number: <span class="t">string</span>;  <span class="c">// string ธรรมดา ไม่ใช่ i18n</span>
+  <span class="d">@IsDateString()</span> <span class="d">@IsOptional()</span>  expiry_date?: <span class="t">string</span>;
+}
+
+<span class="k">export class</span> <span class="t">CreateGoodsReceiptDTO</span> {
+  <span class="d">@IsUUID()</span>  po_id: <span class="t">string</span>;                <span class="c">// ref supplier-bc</span>
+  <span class="d">@IsUUID()</span>  supplier_id: <span class="t">string</span>;
+  <span class="d">@IsDateString()</span>  posting_date: <span class="t">string</span>;    <span class="c">// ตรวจกับ stock_frozen_upto</span>
+  <span class="c">// free-text 2 ภาษา → ส่งเป็น FLAT keys (ไม่ใช่ nested) ตาม i18n Guide</span>
+  <span class="d">@IsString()</span> <span class="d">@IsOptional()</span>  remark_th?: <span class="t">string</span>;
+  <span class="d">@IsString()</span> <span class="d">@IsOptional()</span>  remark_en?: <span class="t">string</span>;
+  <span class="d">@ValidateNested({ each: true })</span> <span class="d">@Type(() =&gt; CreateGoodsReceiptItemDTO)</span>
+  <span class="d">@ArrayMinSize(1)</span>  items: <span class="t">CreateGoodsReceiptItemDTO</span>[];
+}</pre>
+          <p class="text-[12.5px] mb-3" style="color:var(--muted)">master-data refs (product/warehouse/supplier) ส่งเป็น <b>UUID เท่านั้น</b> — backend หาคำแปลเอง · เฉพาะ free-text บนตัว GRN (เช่น <span class="mono">remark</span>) ที่เป็น 2 ภาษาจึงส่ง flat</p>
+
+          <h5 class="font-semibold mb-3 mt-6 text-[14px]" style="color:var(--ink)">B.3 · Response — ยุบเป็น nested object (contract คงที่แม้ null)</h5>
+          <pre class="code p-4 mb-7">{
+  <span class="s">"id"</span>: <span class="s">"uuid-grn"</span>, <span class="s">"po_id"</span>: <span class="s">"uuid-po"</span>, <span class="s">"supplier_id"</span>: <span class="s">"uuid-sup"</span>,
+  <span class="s">"status"</span>: <span class="s">"SUBMITTED"</span>,
+  <span class="s">"remark"</span>: { <span class="s">"th"</span>: <span class="s">"ของครบ"</span>, <span class="s">"en"</span>: null },      <span class="c">// เสมอเป็น {th,en} ไม่ใช่ string เปล่า</span>
+  <span class="s">"items"</span>: [{
+    <span class="s">"id"</span>: <span class="s">"uuid-line"</span>, <span class="s">"product_id"</span>: <span class="s">"uuid-prod"</span>,
+    <span class="s">"product"</span>: { <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"ยาเซโกร"</span>, <span class="s">"en"</span>: <span class="s">"Zagro"</span> } },
+    <span class="s">"lot_id"</span>: <span class="s">"uuid-lot"</span>, <span class="s">"lot_number"</span>: <span class="s">"LOT-B"</span>,
+    <span class="s">"qty"</span>: 200, <span class="s">"import_cost"</span>: 98.5,
+    <span class="s">"warehouse"</span>: { <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"คลังหลัก"</span>, <span class="s">"en"</span>: <span class="s">"Main WH"</span> } }
+  }]
+}</pre>
+          <p class="text-[12.5px] mb-7" style="color:var(--muted)">ข้างบนคือส่วน <span class="mono">attributes</span> ของ resource · ชั้น HTTP จะถูกห่อด้วย JSON:API envelope (<span class="mono text-[12px]">status · data · meta · links</span>) โดย <span class="mono text-[12px]">TransformInterceptor</span> อีกชั้น — ดูมาตรฐานเต็มที่ <a href="backend-convention.html" style="color:var(--accent);text-decoration:underline">Backend Conventions</a></p>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.4 · Base Entity — audit + soft-delete (ทุกตารางสืบทอด)</h5>
+          <p class="text-[13px] mb-3" style="color:var(--ink-soft)">ทุก entity ในทุก BC <b>สืบทอด <span class="mono text-[12px]">BaseEntity</span></b> จึงได้ <span class="mono text-[12px]">id</span> + audit (<span class="mono text-[12px]">created_at/by · updated_at/by</span>) + soft-delete (<span class="mono text-[12px]">is_deleted · deleted_reason · deleted_at · deleted_by</span>) โดยไม่ต้องประกาศซ้ำ — คอลัมน์ทั้งหมดเป็น snake_case</p>
+          <pre class="code p-4 mb-4"><span class="k">export abstract class</span> <span class="t">BaseEntity</span> <span class="k">implements</span> <span class="t">ITimestamp</span> {
+  <span class="d">@PrimaryGeneratedColumn</span>(<span class="s">'uuid'</span>, { comment: <span class="s">'รหัสอ้างอิงหลัก'</span> })  id: <span class="t">string</span>;
+  <span class="d">@CreateDateColumn</span>({ type: <span class="s">'timestamptz'</span> })  created_at: <span class="t">Date</span>;
+  <span class="d">@Column</span>({ type: <span class="s">'uuid'</span>, nullable: <span class="k">true</span> })   created_by: <span class="t">string</span>;
+  <span class="d">@UpdateDateColumn</span>({ type: <span class="s">'timestamptz'</span> })  updated_at: <span class="t">Date</span>;
+  <span class="d">@Column</span>({ type: <span class="s">'uuid'</span>, nullable: <span class="k">true</span> })   updated_by: <span class="t">string</span> | <span class="k">null</span>;
+  <span class="d">@Column</span>({ type: <span class="s">'boolean'</span>, default: <span class="k">false</span> })  is_deleted: <span class="t">boolean</span>;   <span class="c">// soft-delete flag</span>
+  <span class="d">@Column</span>({ type: <span class="s">'text'</span>, nullable: <span class="k">true</span> })   deleted_reason: <span class="t">string</span> | <span class="k">null</span>;
+  <span class="d">@DeleteDateColumn</span>({ type: <span class="s">'timestamptz'</span> })  deleted_at: <span class="t">Date</span> | <span class="k">null</span>;
+  <span class="d">@Column</span>({ type: <span class="s">'uuid'</span>, nullable: <span class="k">true</span> })   deleted_by: <span class="t">string</span> | <span class="k">null</span>;
+}
+
+<span class="c">// entity จริงเพิ่มเฉพาะฟิลด์ของโดเมน — audit/soft-delete มาจาก BaseEntity</span>
+<span class="d">@Entity</span>(<span class="s">'goods_receipts'</span>)
+<span class="k">export class</span> <span class="t">GoodsReceipt</span> <span class="k">extends</span> <span class="t">BaseEntity</span> {
+  <span class="d">@Column</span>()  po_id: <span class="t">string</span>;
+  <span class="d">@Column</span>()  warehouse_id: <span class="t">string</span>;
+  <span class="d">@Column</span>()  status: <span class="t">string</span>;
+}</pre>
+          <div class="space-y-3 mb-8">
+            <div class="rulebox"><div class="rc mb-1">SOFT-DELETE · ไม่ hard delete</div><p class="text-[13.5px]">การลบ = set <span class="mono text-[12px]">is_deleted=true</span> + <span class="mono text-[12px]">deleted_at/by/reason</span> (ผ่าน <span class="mono text-[12px]">@DeleteDateColumn</span> · <span class="mono text-[12px]">softRemove</span>) · query ปกติกรอง <span class="mono text-[12px]">is_deleted=false</span> อัตโนมัติ — โดยเฉพาะเอกสารสต็อกที่ post ledger แล้วห้ามลบจริง</p></div>
+            <div class="rulebox"><div class="rc mb-1">AUDIT · created_by / updated_by</div><p class="text-[13.5px]">เก็บ <span class="mono text-[12px]">uuid</span> ผู้ใช้ (ref <b>iam</b>) ทุก mutation — ใช้ตรวจสอบย้อนหลังว่าใครสร้าง/แก้/ลบ GRN</p></div>
+          </div>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.5 · Transaction boundary = submit (concurrency + locking)</h5>
+          <pre class="code p-4 mb-4"><span class="k">await</span> this.dataSource.transaction(<span class="s">'READ COMMITTED'</span>, <span class="k">async</span> (mgr) =&gt; {
+  <span class="k">const</span> grn = <span class="k">await</span> mgr.findOneOrFail(<span class="t">GoodsReceipt</span>, {
+    where: { id },
+    lock: { mode: <span class="s">'pessimistic_write'</span> },   <span class="c">// ล็อก header กัน submit ซ้ำ (idempotent)</span>
+  });
+  <span class="k">if</span> (grn.status !== <span class="s">'DRAFT'</span>) <span class="k">throw new</span> <span class="t">ConflictException</span>(<span class="s">'goods_receipt.not_draft'</span>);
+  assertNotFrozen(grn.posting_date, settings.stock_frozen_upto);
+  <span class="k">await</span> this.assertWithinPoAllowance(grn);   <span class="c">// TCP → supplier-bc.getPurchaseOrder</span>
+
+  <span class="k">for</span> (<span class="k">const</span> line <span class="k">of</span> grn.items) {
+    <span class="k">const</span> qty = convertToStockUom(line);        <span class="c">// integer-safe ถ้า is_whole_number</span>
+    <span class="k">const</span> lot = <span class="k">await</span> mgr.save(mgr.create(<span class="t">Lot</span>, {
+      product_id: line.product_id, warehouse_id: line.warehouse_id,
+      lot_number: line.lot_number, import_cost: line.import_cost,
+      received_qty: qty, available_qty: qty,      <span class="c">// CHECK (available_qty &gt;= 0)</span>
+      expiry_date: line.expiry_date, supplier_id: grn.supplier_id,
+      received_at: grn.posting_date,
+    }));
+    <span class="k">await</span> mgr.save(mgr.create(<span class="t">StockMovement</span>, {
+      lot_id: lot.id, type: <span class="s">'RECEIPT'</span>, qty,
+      unit_cost: line.import_cost, source_doc_id: grn.id,   <span class="c">// snapshot ต้นทุนจริง</span>
+    }));
+    <span class="k">await</span> this.bumpBalanceCache(mgr, line, +qty);   <span class="c">// SELECT ... FOR UPDATE ก่อน +</span>
+    line.lot_id = lot.id;
+  }
+  grn.status = <span class="s">'SUBMITTED'</span>;
+  <span class="k">await</span> mgr.save(grn);
+  <span class="k">await</span> this.outbox.stage(mgr, events);   <span class="c">// Outbox: relay ส่ง event หลัง commit</span>
+});</pre>
+          <div class="space-y-3 mb-8">
+            <div class="rulebox"><div class="rc mb-1">LOCK · HEADER</div><p class="text-[13.5px]">ล็อก GRN header ด้วย <span class="mono text-[12px]">pessimistic_write</span> ตอน submit → 2 request submit พร้อมกันจะไม่ double-post (idempotent)</p></div>
+            <div class="rulebox"><div class="rc mb-1">LOCK · BALANCE CACHE</div><p class="text-[13.5px]">ก่อน increment balance cache (Bin) ต่อ item×warehouse ต้อง <span class="mono text-[12px]">SELECT ... FOR UPDATE</span> — แถวยอดรวมคือ hot row ที่ต้องกัน lost update (วินัยเดียวกับ FIFO engine)</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">OUTBOX · AFTER COMMIT</div><p class="text-[13.5px]">stage <span class="mono text-[12px]">lot.created</span> / <span class="mono text-[12px]">goods_receipt.submitted</span> ในทรานแซกชันเดียวกับ ledger → relay publish เข้า RabbitMQ หลัง commit · consumer ต้อง idempotent (เก็บ processed event id)</p></div>
+          </div>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.6 · Event Handling</h5>
+          <div class="grid sm:grid-cols-2 gap-6 mb-5">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">EMITS (หลัง commit)</div>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <span class="evt evt-emit">lot.created</span>
+                <span class="evt evt-emit">goods_receipt.submitted</span>
+              </div>
+              <p class="text-[12.5px]" style="color:var(--muted)">receipt <b>ไม่</b> emit <span class="mono">stock.deducted</span> / <span class="mono">stock.low</span> (นั่นคือ Goods Issue / reorder) — GR สร้างสต็อกเท่านั้น</p>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">LISTENS / SERVES</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-listen">po.received ← supplier</span>
+                <span class="evt evt-tcp">getPurchaseOrder (TCP) → supplier</span>
+              </div>
+              <p class="text-[12.5px] mt-3" style="color:var(--muted)"><span class="mono">po.received</span> = flow อัตโนมัติ (auto-draft GRN) เสริมจาก flow user-driven · <span class="mono">getPurchaseOrder</span> จำเป็นเพื่อเช็ค over-receipt กับจำนวนสั่งจริง</p>
+            </div>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-4 mb-8">
+            <pre class="code p-4"><span class="c">// lot.created — 1 event ต่อล็อต → report-bc</span>
+{
+  <span class="s">"event_type"</span>: <span class="s">"lot.created"</span>, <span class="s">"context"</span>: <span class="s">"inventory-bc"</span>,
+  <span class="s">"occurred_at"</span>: <span class="s">"2026-07-14T04:00:00Z"</span>,
+  <span class="s">"payload"</span>: {
+    <span class="s">"lot_id"</span>: <span class="s">"uuid-lot"</span>, <span class="s">"product_id"</span>: <span class="s">"uuid-prod"</span>,
+    <span class="s">"warehouse_id"</span>: <span class="s">"uuid-wh"</span>, <span class="s">"lot_number"</span>: <span class="s">"LOT-B"</span>,
+    <span class="s">"import_cost"</span>: 98.5, <span class="s">"received_qty"</span>: 200, <span class="s">"available_qty"</span>: 200,
+    <span class="s">"expiry_date"</span>: <span class="s">"2026-06-30"</span>, <span class="s">"supplier_id"</span>: <span class="s">"uuid-sup"</span>,
+    <span class="s">"source_doc_type"</span>: <span class="s">"GOODS_RECEIPT"</span>, <span class="s">"source_doc_id"</span>: <span class="s">"uuid-grn"</span>
+  }
+}</pre>
+            <pre class="code p-4"><span class="c">// goods_receipt.submitted → supplier-bc (reconcile PO)</span>
+{
+  <span class="s">"event_type"</span>: <span class="s">"goods_receipt.submitted"</span>,
+  <span class="s">"context"</span>: <span class="s">"inventory-bc"</span>,
+  <span class="s">"payload"</span>: {
+    <span class="s">"grn_id"</span>: <span class="s">"uuid-grn"</span>, <span class="s">"po_id"</span>: <span class="s">"uuid-po"</span>,
+    <span class="s">"supplier_id"</span>: <span class="s">"uuid-sup"</span>,
+    <span class="s">"lines"</span>: [
+      { <span class="s">"product_id"</span>: <span class="s">"uuid-prod"</span>, <span class="s">"received_qty"</span>: 200,
+        <span class="s">"lot_id"</span>: <span class="s">"uuid-lot"</span> }
+    ]
+  }
+}</pre>
+          </div>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.7 · Edge Cases &amp; Validations (เฉพาะ Goods Receipt)</h5>
+          <div class="grid sm:grid-cols-2 gap-4 mb-4">
+            <div class="edge"><div class="tag mb-1">Variant template</div><p class="text-[13px]"><span class="mono text-[12px]">product.has_variants=true</span> → reject <span class="mono text-[12px]">product.is_template_cannot_transact</span> ต้องเลือก variant ที่ generate ไว้</p></div>
+            <div class="edge"><div class="tag mb-1">Over-receipt vs PO</div><p class="text-[13px]">(received + รับไปแล้ว) เทียบ <span class="mono text-[12px]">ordered × (1 + over_receipt_allowance)</span> · เกิน → <span class="mono text-[12px]">422 over_receipt.exceeded</span></p></div>
+            <div class="edge"><div class="tag mb-1">Frozen period</div><p class="text-[13px]"><span class="mono text-[12px]">posting_date ≤ stock_frozen_upto</span> → <span class="mono text-[12px]">422 posting_date.frozen</span></p></div>
+            <div class="edge"><div class="tag mb-1">Negative / zero</div><p class="text-[13px]"><span class="mono text-[12px]">received_qty ≥ 1</span> · <span class="mono text-[12px]">import_cost ≥ 0</span> · DB CHECK <span class="mono text-[12px]">available_qty ≥ 0</span></p></div>
+            <div class="edge"><div class="tag mb-1">UOM rounding</div><p class="text-[13px]">ถ้า stock UOM <span class="mono text-[12px]">is_whole_number</span> แล้วแปลงได้เศษ → <span class="mono text-[12px]">422 uom.non_integer_conversion</span></p></div>
+            <div class="edge"><div class="tag mb-1">Cancel หลังถูกตัด</div><p class="text-[13px]">ถ้า <span class="mono text-[12px]">available_qty &lt; received_qty</span> → block cancel ให้ไปทำ Stock Adjustment แทน</p></div>
+          </div>
+          <div class="edge mb-10" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">Group warehouse / expiry ในอดีต</div><p class="text-[13px]">ปฏิเสธคลังที่ <span class="mono text-[12px]">is_group=true</span> (ต้องรับเข้า leaf) · ล็อตที่ <span class="mono text-[12px]">expiry &lt; today</span> รับได้ (เช่น clearance) แต่จะถูกข้ามอัตโนมัติตอน FEFO picking</p></div>
+
+          <!-- ===== C · Frontend ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">C</span><h4 class="font-semibold text-[16px]">Frontend (Next.js) Implementation</h4></div>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">C.1 · UI/UX — Master–detail, tabbed form</h5>
+          <div class="grid sm:grid-cols-2 gap-4 mb-7">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-2" style="color:var(--accent)">HEADER TAB</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">PO picker (async search → supplier-bc), supplier (auto-fill จาก PO), posting date, <span class="mono text-[12px]">remark</span> 2 ภาษา + status chip (DRAFT/SUBMITTED/CANCELLED)</p>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-2" style="color:var(--accent)">ITEMS TAB</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">grid แก้ไข line: product picker (บล็อก template), destination warehouse (leaf), received qty + UOM, import_cost, lot_number, expiry_date + คอลัมน์ <b>received vs PO ordered</b> พร้อม badge เตือน over-receipt</p>
+            </div>
+          </div>
+          <div class="edge mb-8" style="background:rgba(11,61,145,.06);border-color:rgba(11,61,145,.22)"><div class="tag mb-1" style="color:var(--blueprint)">Action bar</div><p class="text-[13px]"><span class="mono text-[12px]">Save Draft · Submit · Cancel</span> enable ตาม state ปัจจุบัน · เมื่อ <b>SUBMITTED</b> ฟอร์มกลายเป็น read-only · แสดง master-data text ด้วย helper กลาง <span class="mono text-[12px]">getLocaleText(product.name, lang)</span></p></div>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">C.2 · State &amp; Form — map nested response ↔ flat submit</h5>
+          <pre class="code p-4 mb-3"><span class="c">// hydrate ฟอร์มแก้ไขจาก response (nested) → state (flat)</span>
+<span class="k">const</span> formData = {
+  po_id: grn.po_id, supplier_id: grn.supplier_id, posting_date: grn.posting_date,
+  remark_th: grn.remark?.th ?? <span class="s">''</span>,      <span class="c">// nested → flat</span>
+  remark_en: grn.remark?.en ?? <span class="s">''</span>,
+  items: grn.items.map((i) =&gt; ({
+    product_id: i.product_id, warehouse_id: i.warehouse?.id,
+    received_qty: i.qty, import_cost: i.import_cost,
+    lot_number: i.lot_number, expiry_date: i.expiry_date ?? <span class="s">''</span>,
+  })),
+};
+<span class="c">// ตอน submit ส่งกลับเป็น FLAT keys ตรง DTO (remark_th/remark_en + UUID) เสมอ</span></pre>
+          <p class="text-[12.5px] mb-7" style="color:var(--muted)">ใช้ React Hook Form + Zod schema สะท้อน DTO ฝั่ง backend · Axios interceptor แนบ <span class="mono">Accept-Language</span> · Nested object ใช้เฉพาะฝั่ง response — ตอนส่งกลับ flat เสมอ</p>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">C.3 · Eventual Consistency</h5>
+          <div class="space-y-3 mb-8">
+            <div class="rulebox ok"><div class="rc mb-1">SYNC · งานสต็อกยืนยันทันที</div><p class="text-[13.5px]">lots + movements commit ในทรานแซกชันเดียวก่อน HTTP 200 → เจ้าหน้าที่เห็นเลขล็อตที่สร้างทันทีจาก response (authoritative) แสดง GRN เป็น <b>SUBMITTED</b> ได้เลย</p></div>
+            <div class="rulebox"><div class="rc mb-1">ASYNC · fan-out ตามหลัง</div><p class="text-[13.5px]">โชว์ toast รอง <i>"กำลัง sync ไปรายงาน &amp; PO…"</i> สำหรับ consumer async (<span class="mono text-[12px]">report-bc</span>, <span class="mono text-[12px]">supplier-bc</span>) — <b>อย่า block UI</b> · สถานะ PO (<span class="mono text-[12px]">PARTIAL/COMPLETED</span>) ที่ supplier-bc เป็นเจ้าของอาจ lag ไม่กี่วินาที → หน้า PO ให้ refetch/poll อย่าเดาว่าพลิกทันที</p></div>
+          </div>
+
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">C.4 · Error Handling — map machine code → UI</h5>
+          <div class="card overflow-hidden mb-8">
+            <table class="d">
+              <thead><tr><th>HTTP / code</th><th>UI treatment</th></tr></thead>
+              <tbody>
+                <tr><td>422 over_receipt.exceeded</td><td>inline error ที่ช่อง qty + banner · เสนอ "รับได้ถึง allowance"</td></tr>
+                <tr><td>422 posting_date.frozen</td><td>field error ที่ posting date</td></tr>
+                <tr><td>400 product.is_template_cannot_transact</td><td>block ที่ product picker + tooltip</td></tr>
+                <tr><td>422 uom.non_integer_conversion</td><td>inline ที่ช่อง qty/UOM</td></tr>
+                <tr><td>409 goods_receipt.not_draft</td><td>banner "ถูก submit แล้ว" → refetch resync state</td></tr>
+                <tr><td>409 cancel.lot_consumed</td><td>modal นำผู้ใช้ไปทำ Stock Adjustment</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[12.5px] mb-8" style="color:var(--muted)">submit เป็น atomic → error ใด ๆ ไม่มีล็อตค้างครึ่ง ๆ · UI คงฟอร์มไว้ที่ <span class="mono">DRAFT</span> ให้แก้แล้วลองใหม่ได้ปลอดภัย · ข้อความ error มาจาก <span class="mono">nestjs-i18n</span> (แปลตาม Accept-Language) พร้อม machine code คงที่</p>
+
+          <!-- Handoff checklist -->
+          <div class="card p-6" style="border-left:3px solid var(--accent)">
+            <div class="mono text-[11px] mb-3" style="color:var(--accent)">HANDOFF CHECKLIST</div>
+            <div class="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-[13px]" style="color:var(--ink-soft)">
+              <p><b style="color:var(--ink)">BE ·</b> entities goods_receipts / goods_receipt_items / lots / stock_movements + Bin cache</p>
+              <p><b style="color:var(--ink)">FE ·</b> tabbed master–detail GRN form</p>
+              <p><b style="color:var(--ink)">BE ·</b> submit/cancel state machine + pessimistic locks</p>
+              <p><b style="color:var(--ink)">FE ·</b> nested↔flat mapping (RHF + Zod)</p>
+              <p><b style="color:var(--ink)">BE ·</b> transactional outbox: lot.created + goods_receipt.submitted</p>
+              <p><b style="color:var(--ink)">FE ·</b> state-driven action bar + read-only เมื่อ submitted</p>
+              <p><b style="color:var(--ink)">BE ·</b> TCP client → supplier-bc.getPurchaseOrder (over-receipt)</p>
+              <p><b style="color:var(--ink)">FE ·</b> error-code map + eventual-consistency affordance</p>
+              <p><b style="color:var(--ink)">BE ·</b> LocalizationInterceptor + nestjs-i18n + Stock Settings reads</p>
+              <p><b style="color:var(--ink)">FE ·</b> getLocaleText helper สำหรับ master-data text</p>
+            </div>
+          </div>
+        </div>
       </section>
 
       <div class="rule"></div>
@@ -631,7 +933,7 @@ erDiagram
 
           <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">กระบวนการจัดซื้อ · Purchase Order</h4>
           <div class="card p-6 mb-6">
-            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>สร้าง PO</b> — เลือก supplier, สินค้า (<span class="mono text-[12px]">productId</span> ref inventory), จำนวน, <b>ต้นทุนที่ตกลง</b>, วันส่งมอบ → DRAFT</p></div>
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>สร้าง PO</b> — เลือก supplier, สินค้า (<span class="mono text-[12px]">product_id</span> ref inventory), จำนวน, <b>ต้นทุนที่ตกลง</b>, วันส่งมอบ → DRAFT</p></div>
             <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>อนุมัติ &amp; ส่ง</b> → APPROVED → SENT (emit <span class="mono text-[12px]" style="color:var(--signal)">po.approved</span>)</p></div>
             <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>รับสินค้า</b> (เชื่อม UC-3.1) → emit <span class="mono text-[12px]" style="color:var(--signal)">po.received</span> → inventory สร้างล็อต → PO เป็น PARTIAL/RECEIVED</p></div>
           </div>
@@ -866,7 +1168,7 @@ erDiagram
         <div class="mb-12">
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · บันทึกข้อมูลยังไง</h3></div>
           <div class="card p-6 mb-6">
-            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>รับ event <span class="mono text-[12px]" style="color:var(--signal)">stock.deducted</span></b> (allocations พร้อม unitCost) → คำนวณ <b>COGS ต่อ allocation</b> = qty × lot.unitCost → บันทึก <span class="mono text-[12px]">cogs_entries</span> ต่อล็อต</p></div>
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>รับ event <span class="mono text-[12px]" style="color:var(--signal)">stock.deducted</span></b> (allocations พร้อม unit_cost) → คำนวณ <b>COGS ต่อ allocation</b> = qty × lot.unit_cost → บันทึก <span class="mono text-[12px]">cogs_entries</span> ต่อล็อต</p></div>
             <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>ดึงราคาขาย</b> จาก sales-bc (TCP) → คำนวณ <b>กำไรต่อล็อต</b> = revenue − COGS → บันทึก <span class="mono text-[12px]">profit_loss_records</span> ต่อ allocation</p></div>
             <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>ออกใบกำกับภาษี (Tax Invoice)</b> อ้างอิง delivery/SO → คำนวณ VAT (ภาษี 1/ภาษี 2), เลขที่ใบกำกับแบบต่อเนื่อง → emit <span class="mono text-[12px]" style="color:var(--signal)">invoice.issued</span></p></div>
             <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ใบวางบิล (Billing Note)</b> รวมหลายใบกำกับเพื่อเรียกเก็บเงินรอบเดียว</p></div>

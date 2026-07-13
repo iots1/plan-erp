@@ -11,6 +11,7 @@ class ErpDocnav extends HTMLElement {
       { href: 'erp-architecture.html', label: '📐 ERP Architecture' },
       { href: 'core-feature.html', label: 'SRS · Phase 3–6' },
       { href: 'i18n-guide.html', label: 'i18n Guide (TH/EN)' },
+      { href: 'backend-convention.html', label: 'Backend Conventions' },
     ];
 
     // Active-state handling: read the current path and flag the matching link.

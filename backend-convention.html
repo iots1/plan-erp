@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backend Conventions — Naming · Response · Error · Query · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="N" title="Backend Conventions" subtitle="NESTJS · POSTGRESQL · JSON:API" width="280">
+    <nav slot="nav">
+      <a href="#overview"   class="navlink"><span class="n">01</span> ภาพรวม &amp; หลักการ</a>
+      <a href="#naming"     class="navlink"><span class="n">02</span> NestJS Naming</a>
+      <a href="#prefixes"   class="navlink"><span class="n">03</span> Boolean Prefixes</a>
+      <a href="#database"   class="navlink"><span class="n">04</span> Database Naming</a>
+      <a href="#response"   class="navlink"><span class="n">05</span> Response · JSON:API</a>
+      <a href="#errors"     class="navlink"><span class="n">06</span> Error Handling</a>
+      <a href="#query"      class="navlink"><span class="n">07</span> Query Params</a>
+    </nav>
+    <div slot="footnote">
+      <a href="i18n-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ i18n Guide (TH/EN)</a><br>
+      <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="index.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่หน้าดัชนีเอกสาร
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Backend Implementation Standard</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Backend Conventions<br>
+          <span class="text-[#7FE3DE]">NestJS · PostgreSQL · JSON:API</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          มาตรฐานการตั้งชื่อ (ไฟล์ · โฟลเดอร์ · คลาส · ตาราง/คอลัมน์) และสถาปัตยกรรม API — โครงสร้าง Response
+          แบบ <span class="text-white font-medium">JSON:API</span>, การ throw error ด้วย exception เฉพาะเจาะจง
+          และการจัดการ Query Params — เพื่อให้โค้ดฐานเดียวกันทั้งทีม อ่านง่ายและ
+          <span class="text-white font-medium">self-documenting</span>
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>snake_case Properties</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>JSON:API Envelope</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Specific Exceptions</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>@ValidatedQuery</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 OVERVIEW ========== -->
+      <section id="overview" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — Overview &amp; Principles</div>
+        <h2 class="display text-3xl mb-6">ภาพรวม &amp; หลักการ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เอกสารนี้สรุป <b>convention กลางขององค์กร</b> สำหรับทุกบริการ NestJS — ตั้งแต่การตั้งชื่อไฟล์/คลาส/ตาราง
+          ไปจนถึงรูปแบบ Response, การ throw error และ Query Params เป้าหมายคือความ
+          <b class="text-[var(--ink)]">สม่ำเสมอ</b> ทำให้ทั้ง codebase และ schema เข้าใจตรงกัน อ่านโค้ดแล้วรู้เจตนาทันที
+        </p>
+        <div class="card overflow-hidden">
+          <div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+            <div class="p-6">
+              <div class="mono text-[11px] mb-2" style="color:var(--accent)">NAMING</div>
+              <p class="text-[13.5px]" style="color:var(--ink-soft)">Singular Module · Plural Controller/Service · <b>snake_case</b> property/column · kebab-case ไฟล์/โฟลเดอร์</p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] mb-2" style="color:var(--accent)">RESPONSE</div>
+              <p class="text-[13.5px]" style="color:var(--ink-soft)"><b>JSON:API</b> envelope: <span class="mono text-[12px]">status · data|errors · meta · links</span> — ห่ออัตโนมัติด้วย TransformInterceptor</p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] mb-2" style="color:var(--accent)">ERRORS</div>
+              <p class="text-[13.5px]" style="color:var(--ink-soft)">Exception เฉพาะเจาะจงเสมอ · code 6 หลัก · controller ไม่ catch ปล่อยขึ้น global filter</p>
+            </div>
+          </div>
+        </div>
+        <div class="rulebox ok mt-6"><div class="rc mb-1">CORE PRINCIPLE</div><p class="text-[13.5px]">โครงสร้าง envelope ชัดเจน · ส่ง <b>อย่างใดอย่างหนึ่งระหว่าง <span class="mono text-[12px]">data</span> กับ <span class="mono text-[12px]">errors</span></b> ไม่ปนกัน · ใช้ exception ที่เจาะจงแทน <span class="mono text-[12px]">Error</span> ทั่วไป · ใส่ context เต็มใน exception · <b>ไม่ leak ข้อมูล sensitive</b> (password/token/internal) · log ทุกอย่างภายใน</p></div>
+      </section>
+
+      <!-- ========== 02 NAMING ========== -->
+      <section id="naming" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — NestJS Naming Convention</div>
+        <h2 class="display text-3xl mb-6">การตั้งชื่อ (NestJS)</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          Module เป็น <b>เอกพจน์</b> (แคปซูลเดียวของฟีเจอร์) ส่วน Controller/Service เป็น <b>พหูพจน์</b>
+          (จัดการหลาย endpoint/method) · Property ของ Entity/DTO เป็น <b class="text-[var(--signal)]">snake_case</b>
+          เพื่อ map 1-to-1 กับคอลัมน์ PostgreSQL ลดการใช้ <span class="mono text-[13px]">@Column({ name: '…' })</span>
+        </p>
+        <div class="card overflow-hidden mb-7">
+          <table class="d">
+            <thead><tr><th>Category</th><th>Pattern</th><th>Examples</th></tr></thead>
+            <tbody>
+              <tr><td>Module</td><td>Singular + Module</td><td>GoodsReceiptModule, MedicalVisitModule</td></tr>
+              <tr><td>Controller</td><td>Plural + Controller</td><td>GoodsReceiptsController, PatientsController</td></tr>
+              <tr><td>Service</td><td>Plural + Service</td><td>GoodsReceiptsService, PatientsService</td></tr>
+              <tr><td>Entity / DTO (class)</td><td>Singular · PascalCase</td><td>GoodsReceipt, CreateGoodsReceiptDTO</td></tr>
+              <tr><td>Property</td><td>snake_case</td><td>import_cost, lot_number, is_active</td></tr>
+              <tr><td>Enum</td><td>Singular · PascalCase</td><td>GoodsReceiptStatus, QueueStatus</td></tr>
+              <tr><td>Folder</td><td>kebab-case</td><td>goods-receipt, patient-change-request</td></tr>
+              <tr><td>Filename</td><td>kebab-case + .type.ts</td><td>goods-receipt.module.ts, goods-receipts.controller.ts</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="eyebrow text-[var(--muted)] mb-3">ตัวอย่าง · Entity property = snake_case (1-to-1 กับคอลัมน์)</div>
+        <div class="code p-5 mb-4">
+<pre><span class="d">@Entity</span>(<span class="s">'goods_receipts'</span>)
+<span class="k">export class</span> <span class="t">GoodsReceipt</span> {
+  <span class="d">@PrimaryGeneratedColumn</span>(<span class="s">'uuid'</span>)  id: <span class="t">string</span>;
+  <span class="c">// snake_case → ไม่ต้องใส่ @Column({ name: '...' })</span>
+  <span class="d">@Column</span>()  po_id: <span class="t">string</span>;
+  <span class="d">@Column</span>()  supplier_id: <span class="t">string</span>;
+  <span class="d">@Column</span>({ type: <span class="s">'numeric'</span> })  import_cost: <span class="t">number</span>;
+  <span class="d">@Column</span>()  lot_number: <span class="t">string</span>;
+  <span class="d">@Column</span>({ type: <span class="s">'date'</span>, nullable: <span class="k">true</span> })  expiry_date: <span class="t">Date</span>;
+  <span class="d">@Column</span>({ default: <span class="k">false</span> })  is_cancelled: <span class="t">boolean</span>;
+}</pre>
+        </div>
+        <div class="edge"><div class="tag mb-1">Class vs Property</div><p class="text-[13px]">คลาสเป็น <b>PascalCase เอกพจน์</b> (มาตรฐาน OOP/NestJS) แต่ property เป็น <b>snake_case</b> (มาตรฐาน PostgreSQL) — สองระดับนี้ต่างกันโดยตั้งใจ</p></div>
+      </section>
+
+      <!-- ========== 03 BOOLEAN PREFIXES ========== -->
+      <section id="prefixes" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — Boolean &amp; Status Prefixes</div>
+        <h2 class="display text-3xl mb-6">Prefix ของ Boolean / Status</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          ฟิลด์ boolean/status ต้องมี prefix เสมอ เพื่อไม่ให้กำกวมระหว่าง “คำนาม / คำกริยา / สถานะ”
+          — เช่น <span class="mono text-[13px]">active</span> อาจเป็นคำนามหรือคำสั่ง แต่
+          <span class="mono text-[13px]">is_active</span> ตอบชัดว่า “มันกำลัง active หรือไม่?”
+        </p>
+        <div class="card overflow-hidden mb-7">
+          <table class="d">
+            <thead><tr><th>Prefix</th><th>Use Case</th><th>ความหมาย</th><th>Examples</th></tr></thead>
+            <tbody>
+              <tr><td>is_</td><td>Status / Identity</td><td>“อยู่ในสถานะ/ชนิดนี้ไหม?”</td><td>is_active, is_deleted, is_verified, is_public</td></tr>
+              <tr><td>has_</td><td>Possession / Existence</td><td>“มี/ประกอบด้วยไหม?”</td><td>has_attachment, has_permission, has_signature</td></tr>
+              <tr><td>can_</td><td>Ability / Rights</td><td>“ทำได้/ได้รับอนุญาตไหม?”</td><td>can_edit, can_delete, can_approve</td></tr>
+              <tr><td>should_</td><td>Conditions / Actions</td><td>“ควรเกิดสิ่งนี้ไหม?”</td><td>should_notify, should_archive, should_refresh</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--signal)">❌ กำกวม</div>
+            <div class="code p-4">
+<pre>approved: <span class="t">boolean</span>;
+email_verified: <span class="t">boolean</span>;
+admin: <span class="t">boolean</span>;
+public: <span class="t">boolean</span>;</pre>
+            </div>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--accent)">✅ ชัดเจน</div>
+            <div class="code p-4">
+<pre>is_approved: <span class="t">boolean</span>;
+is_email_verified: <span class="t">boolean</span>;
+is_admin: <span class="t">boolean</span>;
+is_public: <span class="t">boolean</span>;</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== 04 DATABASE NAMING ========== -->
+      <section id="database" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — PostgreSQL Naming</div>
+        <h2 class="display text-3xl mb-6">การตั้งชื่อ Database</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          ตารางเป็น <b>พหูพจน์ snake_case</b> (สื่อว่าเป็น collection ของ record) · คอลัมน์ snake_case ·
+          และตั้งชื่อ constraint/index แบบมี prefix ให้ค้นหาและสื่อความหมายได้ทันที
+        </p>
+        <div class="card overflow-hidden mb-7">
+          <table class="d">
+            <thead><tr><th>Component</th><th>Format</th><th>Examples</th></tr></thead>
+            <tbody>
+              <tr><td>Table</td><td>plural · snake_case</td><td>goods_receipts, lots, patient_insurances</td></tr>
+              <tr><td>Column</td><td>snake_case</td><td>import_cost, birth_date, is_active</td></tr>
+              <tr><td>Primary key</td><td>id · pk_&lt;table&gt;</td><td>id, pk_goods_receipts</td></tr>
+              <tr><td>Foreign key</td><td>singular_table_id</td><td>product_id, patient_id, warehouse_id</td></tr>
+              <tr><td>Index</td><td>idx_&lt;table&gt;_&lt;cols&gt;</td><td>idx_lots_expiry_date, idx_patients_national_id</td></tr>
+              <tr><td>Unique constraint</td><td>uq_&lt;table&gt;_&lt;cols&gt;</td><td>uq_lots_lot_number, uq_users_email</td></tr>
+              <tr><td>Check constraint</td><td>chk_&lt;table&gt;_&lt;condition&gt;</td><td>chk_lots_available_qty, chk_visits_visit_type</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="eyebrow text-[var(--muted)] mb-3">ตัวอย่าง · DDL ตาม convention</div>
+        <div class="code p-5">
+<pre><span class="k">CREATE TABLE</span> goods_receipts (
+  id            <span class="t">uuid</span> <span class="k">DEFAULT</span> gen_random_uuid(),
+  po_id         <span class="t">uuid</span> <span class="k">NOT NULL</span>,          <span class="c">-- FK → supplier-bc (ข้าม BC = UUID เท่านั้น)</span>
+  warehouse_id  <span class="t">uuid</span> <span class="k">NOT NULL</span>,
+  status        <span class="t">varchar</span> <span class="k">NOT NULL</span>,
+  is_cancelled  <span class="t">boolean</span> <span class="k">NOT NULL DEFAULT</span> <span class="k">false</span>,
+  <span class="k">CONSTRAINT</span> pk_goods_receipts <span class="k">PRIMARY KEY</span> (id),
+  <span class="k">CONSTRAINT</span> chk_goods_receipts_status <span class="k">CHECK</span> (status <span class="k">IN</span> (<span class="s">'DRAFT'</span>,<span class="s">'SUBMITTED'</span>,<span class="s">'CANCELLED'</span>))
+);
+<span class="k">CREATE INDEX</span> idx_goods_receipts_po_id <span class="k">ON</span> goods_receipts (po_id);</pre>
+        </div>
+      </section>
+
+      <!-- ========== 05 RESPONSE ========== -->
+      <section id="response" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — API Response (JSON:API)</div>
+        <h2 class="display text-3xl mb-6">โครงสร้าง Response</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          ทุก Response ห่อด้วย envelope แบบ <b>JSON:API</b>: <span class="mono text-[13px]">status</span> ·
+          <span class="mono text-[13px]">data</span> หรือ <span class="mono text-[13px]">errors</span> (อย่างใดอย่างหนึ่ง) ·
+          <span class="mono text-[13px]">meta</span> · <span class="mono text-[13px]">links</span> — ทำงานอัตโนมัติผ่าน
+          <span class="mono text-[13px]">TransformInterceptor</span> เมื่อ controller ประกาศ
+          <span class="mono text-[13px]">@ResourceType()</span>
+        </p>
+        <div class="eyebrow text-[var(--muted)] mb-3">โครง envelope · Success</div>
+        <div class="code p-5 mb-5">
+<pre>{
+  <span class="s">"status"</span>: { <span class="s">"code"</span>: 200000, <span class="s">"message"</span>: <span class="s">"Request Succeeded"</span> },
+  <span class="s">"data"</span>: {
+    <span class="s">"type"</span>: <span class="s">"goods-receipts"</span>,          <span class="c">// จาก @ResourceType('goods-receipts')</span>
+    <span class="s">"id"</span>: <span class="s">"uuid-grn"</span>,
+    <span class="s">"attributes"</span>: {                    <span class="c">// snake_case + i18n nested object</span>
+      <span class="s">"status"</span>: <span class="s">"SUBMITTED"</span>,
+      <span class="s">"po_id"</span>: <span class="s">"uuid-po"</span>, <span class="s">"import_cost"</span>: 98.5,
+      <span class="s">"remark"</span>: { <span class="s">"th"</span>: <span class="s">"ของครบ"</span>, <span class="s">"en"</span>: null },
+      <span class="s">"product"</span>: { <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"ยาเซโกร"</span>, <span class="s">"en"</span>: <span class="s">"Zagro"</span> } }
+    }
+  },
+  <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"2026-07-14T10:30:00.000Z"</span> },
+  <span class="s">"links"</span>: { <span class="s">"self"</span>: <span class="s">"/inventory/goods-receipts/uuid-grn"</span> }
+}</pre>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-4 mb-6">
+          <div class="card p-5"><div class="mono text-[11px] mb-2" style="color:var(--accent)">SINGLE</div><p class="text-[13px]" style="color:var(--ink-soft)"><span class="mono text-[12px]">data: { type, id, attributes }</span></p></div>
+          <div class="card p-5"><div class="mono text-[11px] mb-2" style="color:var(--accent)">COLLECTION</div><p class="text-[13px]" style="color:var(--ink-soft)"><span class="mono text-[12px]">data: [ { type, id, … } ]</span></p></div>
+          <div class="card p-5"><div class="mono text-[11px] mb-2" style="color:var(--accent)">PAGINATED</div><p class="text-[13px]" style="color:var(--ink-soft)"><span class="mono text-[12px]">data: [ … ] + meta.pagination</span></p></div>
+        </div>
+        <div class="eyebrow text-[var(--muted)] mb-3">@ResourceType จำเป็นบนทุก Controller</div>
+        <div class="code p-5 mb-4">
+<pre><span class="d">@Controller</span>(<span class="s">'goods-receipts'</span>)
+<span class="d">@ResourceType</span>(<span class="s">'goods-receipts'</span>)   <span class="c">// ✅ กำหนด type ใน response · ถ้าไม่ใส่ = คืน raw ไม่ transform</span>
+<span class="k">export class</span> <span class="t">GoodsReceiptsController</span> {
+  <span class="d">@Get</span>()  findAll() { <span class="k">return</span> <span class="k">this</span>.service.findAll(); }
+}</pre>
+        </div>
+        <div class="rulebox"><div class="rc mb-1">STATUS CODE · 6 หลัก</div><p class="text-[13.5px]"><span class="mono text-[12px]">status.code</span> เป็นเลข 6 หลัก = HTTP status × 1000 + serial · success = <span class="mono text-[12px]">200000</span> · ต้องมี <b>อย่างใดอย่างหนึ่งระหว่าง <span class="mono text-[12px]">data</span> กับ <span class="mono text-[12px]">errors</span></b> ไม่ส่งพร้อมกัน</p></div>
+        <div class="edge mt-4" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">i18n interplay</div><p class="text-[13px]">ภายใน <span class="mono text-[12px]">attributes</span> ฟิลด์ 2 ภาษาถูกยุบเป็น nested object <span class="mono text-[12px]">{ th, en }</span> ด้วย <span class="mono text-[12px]">LocalizationInterceptor</span> เสมอ (แม้ค่าเป็น null) — ห้าม frontend ต่อ string key เอง ดู <a href="i18n-guide.html" style="color:var(--accent);text-decoration:underline">i18n Guide</a></p></div>
+      </section>
+
+      <!-- ========== 06 ERRORS ========== -->
+      <section id="errors" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — Error Handling</div>
+        <h2 class="display text-3xl mb-6">การจัดการ Error</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          ใช้ exception ที่ <b>เฉพาะเจาะจงที่สุด</b> เสมอ (ห้าม <span class="mono text-[13px]">throw new Error()</span>
+          หรือ <span class="mono text-[13px]">new HttpException()</span> ดิบ ๆ) · <b>Controller ไม่ catch</b> — ปล่อยให้ลอยขึ้น
+          <span class="mono text-[13px]">AllExceptionsFilter</span> จัดรูป envelope <span class="mono text-[13px]">errors</span> ให้เอง
+        </p>
+        <div class="eyebrow text-[var(--muted)] mb-3">Exception Hierarchy &amp; Status Codes</div>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>Code</th><th>Exception</th><th>Use</th><th>Trigger</th></tr></thead>
+            <tbody>
+              <tr><td>400</td><td>BadRequestException</td><td>business logic / invalid state transition</td><td>Manual</td></tr>
+              <tr><td>400001</td><td>ValidationException</td><td>Body validation ล้มเหลว</td><td><span class="mono text-[12px]">@Body()</span> auto</td></tr>
+              <tr><td>400002</td><td>InvalidParameterException</td><td>Query parameter ไม่ผ่าน</td><td><span class="mono text-[12px]">@ValidatedQuery()</span></td></tr>
+              <tr><td>401</td><td>UnauthorizedException</td><td>token หาย/ไม่ถูกต้อง/หมดอายุ</td><td>Guards</td></tr>
+              <tr><td>403</td><td>ForbiddenException</td><td>ล็อกอินแล้วแต่สิทธิ์ไม่พอ</td><td>Guards</td></tr>
+              <tr><td>404</td><td>NotFoundException</td><td>ไม่พบ resource (เช็ค null หลัง query เสมอ)</td><td>Services</td></tr>
+              <tr><td>409</td><td>ConflictException</td><td>ซ้ำ / ชน constraint</td><td>DB auto / manual</td></tr>
+              <tr><td>422</td><td>UnprocessableEntityException</td><td>ถูก syntax แต่ผิดเชิงความหมาย</td><td>Manual</td></tr>
+              <tr><td>500</td><td>InternalServerErrorException</td><td>error ไม่คาดคิด</td><td>Auto / manual</td></tr>
+              <tr><td>503</td><td>ServiceUnavailableException</td><td>ปิดชั่วคราว / maintenance</td><td>Manual</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="eyebrow text-[var(--muted)] mb-3">โครง envelope · Error (data / errors ไม่ปนกัน)</div>
+        <div class="code p-5 mb-5">
+<pre>{
+  <span class="s">"status"</span>: { <span class="s">"code"</span>: 400001, <span class="s">"message"</span>: <span class="s">"Validation Failed"</span> },
+  <span class="s">"errors"</span>: [
+    { <span class="s">"code"</span>: <span class="s">"400001"</span>, <span class="s">"detail"</span>: <span class="s">"received_qty must be a positive integer"</span>,
+      <span class="s">"source"</span>: { <span class="s">"pointer"</span>: <span class="s">"/data/attributes/received_qty"</span> } }
+  ],
+  <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"2026-07-14T10:30:00.000Z"</span> }
+}
+<span class="c">// query param error (400002) ใช้ source.parameter แทน pointer:</span>
+<span class="c">//   "source": { "parameter": "page" }</span></pre>
+        </div>
+        <div class="eyebrow text-[var(--muted)] mb-3">Service layer · executeDbOperation (แมป error DB อัตโนมัติ)</div>
+        <div class="code p-5 mb-4">
+<pre><span class="k">async</span> createGoodsReceipt(dto: <span class="t">CreateGoodsReceiptDTO</span>): <span class="t">Promise</span>&lt;<span class="t">GoodsReceipt</span>&gt; {
+  <span class="k">return this</span>.executeDbOperation(<span class="k">async</span> () =&gt; {
+    <span class="k">return await this</span>.goodsReceiptRepository.save(dto);
+  });
+}
+<span class="c">// business validation: ปล่อย exception ลอยขึ้น global filter</span>
+<span class="k">if</span> (grn.status === <span class="t">GoodsReceiptStatus</span>.SUBMITTED) {
+  <span class="k">throw new</span> <span class="t">BadRequestException</span>(<span class="s">'Cannot edit a submitted goods receipt'</span>);
+}</pre>
+        </div>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>Database Error</th><th>PG Code</th><th>Exception</th><th>HTTP</th></tr></thead>
+            <tbody>
+              <tr><td>Unique constraint violation</td><td>23505</td><td>ConflictException</td><td>409</td></tr>
+              <tr><td>Foreign key violation</td><td>23503</td><td>BadRequestException</td><td>400</td></tr>
+              <tr><td>Not-null violation</td><td>23502</td><td>BadRequestException</td><td>400</td></tr>
+              <tr><td>Invalid UUID / text format</td><td>22P02</td><td>BadRequestException</td><td>400</td></tr>
+              <tr><td>Optimistic lock mismatch</td><td>—</td><td>ConflictException</td><td>409</td></tr>
+              <tr><td>Generic query error</td><td>—</td><td>InternalServerErrorException</td><td>500</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="space-y-3">
+          <div class="rulebox"><div class="rc mb-1">CONTROLLER · ไม่ catch</div><p class="text-[13.5px]">controller ปล่อย exception ลอยขึ้น <span class="mono text-[12px]">AllExceptionsFilter</span> — catch เฉพาะกรณีต้องเพิ่ม context เฉพาะทาง (เช่น file upload) เท่านั้น</p></div>
+          <div class="rulebox"><div class="rc mb-1">NULL CHECK · หลัง query</div><p class="text-[13.5px]">เช็ค <span class="mono text-[12px]">null</span> หลัง DB read เสมอ → <span class="mono text-[12px]">throw new NotFoundException(...)</span> · ห้าม service คืน <span class="mono text-[12px]">null</span></p></div>
+          <div class="rulebox ok"><div class="rc mb-1">SECURITY · ไม่ leak internal</div><p class="text-[13.5px]">ห้ามส่ง stack/token/ข้อความภายในออกไป · ใช้ข้อความ generic + <b>log context เต็มภายใน</b> (service, userId, ids)</p></div>
+        </div>
+      </section>
+
+      <!-- ========== 07 QUERY PARAMS ========== -->
+      <section id="query" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — Query Parameters</div>
+        <h2 class="display text-3xl mb-6">Query Params</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          ใช้ <span class="mono text-[13px] text-[var(--signal)]">@ValidatedQuery(QueryParamsDTO)</span> แทน
+          <span class="mono text-[13px]">@Query()</span> — ได้ทั้ง type-safe และ throw error code ถูกต้อง
+          (<span class="mono text-[13px]">400002</span>) · ถ้าใช้ <span class="mono text-[13px]">@Query()</span>
+          กับ DTO ที่มี type จะไปโดน Global ValidationPipe → ได้ <span class="mono text-[13px]">400001</span> ที่ผิด
+        </p>
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--signal)">❌ @Query()</div>
+            <div class="code p-4">
+<pre><span class="d">@Get</span>()
+findAll(<span class="d">@Query</span>() q: <span class="t">any</span>) {
+  <span class="c">// เสีย type safety</span>
+  <span class="k">return this</span>.service.findAll(q);
+}</pre>
+            </div>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--accent)">✅ @ValidatedQuery</div>
+            <div class="code p-4">
+<pre><span class="d">@Get</span>()
+findAll(<span class="d">@ValidatedQuery</span>(<span class="t">QueryParamsDTO</span>) q: <span class="t">QueryParamsDTO</span>) {
+  <span class="c">// type-safe + throw 400002</span>
+  <span class="k">return this</span>.service.findAll(q);
+}</pre>
+            </div>
+          </div>
+        </div>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>Feature</th><th>@Query()</th><th>@Query() + type</th><th>@ValidatedQuery(DTO)</th></tr></thead>
+            <tbody>
+              <tr><td>Type Safety</td><td>❌ (any)</td><td>⚠️ (โดน Global Pipe)</td><td>✅ Full</td></tr>
+              <tr><td>Error Code</td><td>—</td><td>400001 (ผิด)</td><td>400002 (ถูก)</td></tr>
+              <tr><td>Validation</td><td>Manual</td><td>Auto (pipe ผิด)</td><td>Auto (ถูก)</td></tr>
+              <tr><td>Recommended</td><td>❌</td><td>❌</td><td>✅</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">FEATURES · @ValidatedQuery</div><p class="text-[13.5px]">แปลง type อัตโนมัติ (<span class="mono text-[12px]">"123"→123</span>, <span class="mono text-[12px]">"true"→true</span>) · strip property แปลกปลอม (whitelist) · รองรับ nested validation และ array filter syntax <span class="mono text-[12px]">filter[]=field||$eq||value</span></p></div>
+        <div class="eyebrow text-[var(--muted)] mb-3">Manual throw · custom validation (query)</div>
+        <div class="code p-5">
+<pre><span class="k">import</span> { <span class="t">InvalidParameterException</span> } <span class="k">from</span> <span class="s">'@lib/common/utils/http-exception/invalid-parameter.exception'</span>;
+
+<span class="d">@Get</span>(<span class="s">'search'</span>)
+<span class="k">async</span> search(<span class="d">@Query</span>(<span class="s">'keyword'</span>) keyword: <span class="t">string</span>) {
+  <span class="k">const</span> allowed = [<span class="s">'lot_number'</span>, <span class="s">'product_id'</span>];
+  <span class="k">const</span> field = keyword?.split(<span class="s">':'</span>)[0];
+  <span class="k">if</span> (!allowed.includes(field)) {
+    <span class="k">throw new</span> <span class="t">InvalidParameterException</span>([{
+      field: <span class="s">'keyword'</span>,
+      message: <span class="s">`Invalid search field '${field}'. Allowed: ${allowed.join(', ')}`</span>,
+    }]);
+  }
+  <span class="k">return this</span>.service.search(keyword);
+}</pre>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · BACKEND CONVENTIONS · NESTJS 11 · POSTGRESQL"
+        line2="Naming · JSON:API · Error Handling · Query Params">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const k = map.get(e.target.id);
+        if (k) k.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-15% 0px -75% 0px' });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
