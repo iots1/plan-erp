@@ -30,11 +30,12 @@
       <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
       <div class="navsub">ในเฟสนี้ประกอบด้วย</div>
       <div class="navsub">1 · Business &amp; Roles</div>
-      <div class="navsub">2 · Master + Required Fields</div>
+      <div class="navsub">2 · Master + ตัวอย่างสินค้า</div>
       <div class="navsub">3 · Setup Sequence → Inventory</div>
       <div class="navsub">4 · Storage · MinIO</div>
       <div class="navsub">5 · ER Diagram</div>
       <div class="navsub">6 · Dev Guide</div>
+      <div class="navsub">7 · Glossary</div>
     </nav>
     <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
   </erp-sidebar>
@@ -229,6 +230,77 @@
               </tbody>
             </table>
           </div>
+
+          <!-- PRODUCT TYPE EXAMPLES -->
+          <h4 class="font-semibold mt-10 mb-2 text-[16px]">ตัวอย่างสินค้า 3 ประเภท · ผูกกับอะไร &amp; data เป็นแบบไหน</h4>
+          <p class="text-[13px] mb-5" style="color:var(--ink-soft)">ค่า <span class="mono text-[12px]">*_id</span> ในตัวอย่างเป็น UUID ที่ชี้ไป master อื่น — เขียนเป็นชื่ออ่านง่ายในคอมเมนต์ (<span class="mono text-[12px]">// → …</span>)</p>
+
+          <!-- Single -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">SINGLE</span>
+              <span class="text-[14px] font-semibold">สินค้าเดี่ยว — ปากกาเจล</span>
+            </div>
+            <pre class="code p-4">{
+  <span class="s">"sku"</span>: <span class="s">"PEN-UNI-BL-05"</span>,
+  <span class="s">"name_th"</span>: <span class="s">"ปากกาเจล UNI น้ำเงิน 0.5"</span>, <span class="s">"name_en"</span>: <span class="s">"UNI Gel Pen Blue 0.5"</span>,
+  <span class="s">"type"</span>: <span class="s">"single"</span>,  <span class="s">"has_variants"</span>: false,
+  <span class="s">"item_group_id"</span>: <span class="s">"grp-stationery"</span>,  <span class="c">// → กลุ่ม «เครื่องเขียน» (leaf)</span>
+  <span class="s">"brand_id"</span>: <span class="s">"brand-uni"</span>,           <span class="c">// → ยี่ห้อ «UNI»</span>
+  <span class="s">"stock_uom_id"</span>: <span class="s">"uom-piece"</span>,        <span class="c">// → หน่วยเก็บ «ชิ้น»</span>
+  <span class="s">"supplier_id"</span>: <span class="s">"sup-xyz"</span>            <span class="c">// → ผู้จัดซื้อ (supplier-bc)</span>
+}
+<span class="c">// ซื้อเป็น «กล่อง» (1 กล่อง = 12 ชิ้น) → uom_conversion_factors:</span>
+<span class="c">//   { uom_id: "uom-box", conversion_factor: 12, uom_type: "purchase" }</span></pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)"><b>ถือสต็อกเอง</b> — รับเข้า 5 กล่อง → ระบบสร้าง Lot <b>60 ชิ้น</b> (แปลงเป็น stock_uom)</p>
+          </div>
+
+          <!-- Template → Variant -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(124,58,237,.12);color:#7C3AED;border:1px solid rgba(124,58,237,.3)">TEMPLATE → VARIANT</span>
+              <span class="text-[14px] font-semibold">สินค้ามีตัวเลือก — เสื้อยืด (สี × ขนาด)</span>
+            </div>
+            <pre class="code p-4"><span class="c">// 1) TEMPLATE — ต้นแบบ ห้ามทำธุรกรรมตรง</span>
+{ <span class="s">"sku"</span>: <span class="s">"TSHIRT"</span>, <span class="s">"name_th"</span>: <span class="s">"เสื้อยืดคอกลม"</span>,
+  <span class="s">"type"</span>: <span class="s">"single"</span>, <span class="s">"has_variants"</span>: true, <span class="s">"stock_uom_id"</span>: <span class="s">"uom-piece"</span> }
+
+<span class="c">// attribute: สี = {แดง R, ดำ BK} · ขนาด = {S, M, L}  → generate 2 × 3 = 6 variants</span>
+
+<span class="c">// 2) VARIANT — ตัวที่ทำธุรกรรม/ถือสต็อกได้จริง</span>
+{ <span class="s">"sku"</span>: <span class="s">"TSHIRT-R-M"</span>, <span class="s">"name_th"</span>: <span class="s">"เสื้อยืดคอกลม แดง M"</span>,
+  <span class="s">"type"</span>: <span class="s">"single"</span>, <span class="s">"has_variants"</span>: false,
+  <span class="s">"template_product_id"</span>: <span class="s">"TSHIRT"</span> }   <span class="c">// → อ้างต้นแบบ</span>
+<span class="c">// item_variant_attributes: {attr: สี, value: แดง} · {attr: ขนาด, value: M}</span></pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)"><b>Lot/GR ผูกกับ variant</b> (<span class="mono text-[12px]">TSHIRT-R-M</span>) ไม่ใช่ template · template ใช้จัดกลุ่ม variant เท่านั้น</p>
+          </div>
+
+          <!-- Bundle -->
+          <div class="card p-6 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(220,90,22,.12);color:var(--signal);border:1px solid rgba(220,90,22,.3)">BUNDLE / KIT</span>
+              <span class="text-[14px] font-semibold">สินค้าชุด — ชุดของขวัญปีใหม่</span>
+            </div>
+            <pre class="code p-4">{ <span class="s">"sku"</span>: <span class="s">"GIFTSET-A"</span>, <span class="s">"name_th"</span>: <span class="s">"ชุดของขวัญปีใหม่ A"</span>,
+  <span class="s">"type"</span>: <span class="s">"bundle"</span>, <span class="s">"has_variants"</span>: false, <span class="s">"stock_uom_id"</span>: <span class="s">"uom-set"</span> }
+
+<span class="c">// BOM ผ่าน bundle_items (นิยามใน Phase 3):</span>
+<span class="c">//   { component_product_id: "PEN-UNI-BL-05", quantity: 2 }   // 2 × ปากกา</span>
+<span class="c">//   { component_product_id: "MUG-001",       quantity: 1 }   // 1 × แก้ว</span></pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)"><b>ไม่ถือ Lot เอง</b> — ตอนขายจะ <b>explode</b> เป็นสินค้าย่อย แล้วตัด FIFO/FEFO ของแต่ละตัว (ดู <a href="srs-p3.html" style="color:var(--signal);text-decoration:underline">P3 · UC-3.3</a>)</p>
+          </div>
+
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>ประเภท</th><th>type</th><th>has_variants</th><th>ถือสต็อก/Lot?</th><th>ผูกกับอะไร</th></tr></thead>
+              <tbody>
+                <tr><td>เดี่ยว · Single</td><td>single</td><td>false</td><td><span style="color:#15803D">✓ ตัวเอง</span></td><td>item_group · brand · stock_uom · supplier · conversion</td></tr>
+                <tr><td>ต้นแบบ · Template</td><td>single</td><td>true</td><td><span style="color:var(--signal)">✗ ห้ามทำธุรกรรม</span></td><td>item_attributes → generate variants</td></tr>
+                <tr><td>ตัวเลือก · Variant</td><td>single</td><td>false</td><td><span style="color:#15803D">✓ ตัวเอง</span></td><td>template_product_id · attribute_values</td></tr>
+                <tr><td>ชุด · Bundle</td><td>bundle</td><td>false</td><td><span style="color:var(--signal)">✗ explode ตอนขาย</span></td><td>bundle_items (BOM → components)</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- 2.3 Setup Sequence & Handoff -->
@@ -400,6 +472,68 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · CONVERSION ROUND CHECK</div><p class="text-[13.5px]">ถ้า stock UOM <span class="mono text-[12px]">is_whole_number=true</span> ต้องตรวจว่า qty × conversion_factor เป็นจำนวนเต็ม มิฉะนั้น reject</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · UNIQUE KEYS</div><p class="text-[13.5px]"><span class="mono text-[12px]">uq_products_sku</span> · <span class="mono text-[12px]">uq_suppliers_code</span> — บังคับ unique ระดับ DB · UOM seed ~200+ รายการเป็น master ตั้งต้น</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · UUID CROSS-BC + EVENTS</div><p class="text-[13.5px]"><span class="mono text-[12px]">supplier_id</span> (supplier-bc) และ <span class="mono text-[12px]">context_ref</span> (storage-bc) อ้างด้วย UUID ห้าม FK ข้าม DB · การแก้ master ยิง <span class="mono text-[12px]">item.updated</span> ให้ report-bc/sales/supplier อัปเดต cache</p></div>
+          </div>
+        </div>
+
+        <!-- 2.7 Glossary -->
+        <div class="mt-14">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">07</span><h3 class="text-xl font-semibold">Glossary · อภิธานศัพท์เทคนิค ERP</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">ขยายความศัพท์ที่ใช้ในเอกสารนี้ เพื่อให้ทีมธุรกิจและทีมพัฒนาเข้าใจตรงกัน</p>
+
+          <h4 class="font-semibold mb-3 text-[14px]" style="color:#7C3AED">สินค้า &amp; หน่วยนับ</h4>
+          <div class="card overflow-hidden mb-7">
+            <table class="d">
+              <thead><tr><th style="width:190px">ศัพท์</th><th>ความหมาย</th></tr></thead>
+              <tbody>
+                <tr><td>Master Data</td><td>ข้อมูลหลักที่ตั้งค่าครั้งเดียวแล้วอ้างอิงซ้ำ (สินค้า · คลัง · ผู้จัดซื้อ) — ต่างจาก transaction data ที่เกิดจากงานประจำวัน</td></tr>
+                <tr><td>SKU</td><td>Stock Keeping Unit — รหัสเฉพาะของสินค้าแต่ละรายการ (unique)</td></tr>
+                <tr><td>UOM</td><td>Unit of Measure — หน่วยนับ (ชิ้น · กล่อง · กก. · ลิตร)</td></tr>
+                <tr><td>Stock UOM</td><td>หน่วยหลักที่ใช้บันทึกสต็อกจริง — ล็อกไม่ให้แก้เมื่อมี movement แล้ว</td></tr>
+                <tr><td>Conversion Factor</td><td>อัตราแปลงหน่วยทางเลือก ↔ stock UOM (เช่น 1 กล่อง = 12 ชิ้น)</td></tr>
+                <tr><td>Attribute</td><td>คุณลักษณะสินค้า (สี · ขนาด) ใช้ประกอบเป็น variant</td></tr>
+                <tr><td>Variant</td><td>สินค้าตัวเลือกที่ระบบ generate จากต้นแบบ × attribute (เช่น เสื้อ แดง-M)</td></tr>
+                <tr><td>Template</td><td>สินค้าต้นแบบ (<span class="mono text-[12px]">has_variants=true</span>) ใช้จัดกลุ่ม variant — ห้ามทำธุรกรรมตรง</td></tr>
+                <tr><td>Bundle / Kit</td><td>สินค้าชุดที่ประกอบจากสินค้าย่อยหลายรายการ</td></tr>
+                <tr><td>BOM</td><td>Bill of Materials — สูตร/รายการส่วนประกอบของสินค้าชุด</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]" style="color:#7C3AED">สต็อก &amp; คลัง</h4>
+          <div class="card overflow-hidden mb-7">
+            <table class="d">
+              <thead><tr><th style="width:190px">ศัพท์</th><th>ความหมาย</th></tr></thead>
+              <tbody>
+                <tr><td>Lot / Batch</td><td>ล็อตสินค้า — กลุ่มที่รับเข้าคราวเดียวกัน มี <b>ต้นทุนนำเข้า + วันหมดอายุ</b> เฉพาะของตัวเอง</td></tr>
+                <tr><td>FIFO</td><td>First In First Out — ตัดสต็อกล็อตที่เข้าก่อนออกก่อน</td></tr>
+                <tr><td>FEFO</td><td>First Expired First Out — ตัดล็อตที่หมดอายุก่อนออกก่อน</td></tr>
+                <tr><td>Goods Receipt (GRN)</td><td>ใบรับสินค้าเข้าคลัง → สร้าง Lot ใหม่</td></tr>
+                <tr><td>Warehouse</td><td>คลัง/สถานที่เก็บสต็อก (เป็นโครงต้นไม้)</td></tr>
+                <tr><td>Nested-set (lft/rgt)</td><td>เทคนิคเก็บโครงต้นไม้ใน DB ให้ query ทั้งกิ่ง (subtree) ได้เร็ว</td></tr>
+                <tr><td>Leaf / Node (group)</td><td>Leaf = ปลายกิ่ง ผูกสินค้า/เก็บสต็อกได้ · Node/Group = โหนดจัดกลุ่ม ห้ามผูกข้อมูล</td></tr>
+                <tr><td>Reorder Level</td><td>จุดสั่งซื้อ — ต่ำกว่านี้ระบบแจ้งเตือนให้สั่งเพิ่ม</td></tr>
+                <tr><td>Safety Stock</td><td>สต็อกกันขาด (buffer) เผื่อความไม่แน่นอนของ demand/lead time</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]" style="color:#7C3AED">สถาปัตยกรรม &amp; ระบบ</h4>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th style="width:190px">ศัพท์</th><th>ความหมาย</th></tr></thead>
+              <tbody>
+                <tr><td>Bounded Context (BC)</td><td>ขอบเขตบริบทของแต่ละ microservice ใน DDD — เป็นเจ้าของฐานข้อมูลตัวเอง</td></tr>
+                <tr><td>DDD</td><td>Domain-Driven Design — ออกแบบระบบตามโดเมนธุรกิจ</td></tr>
+                <tr><td>UUID</td><td>รหัสเฉพาะสากล 128-bit ใช้อ้างอิงข้าม BC (แทน FK ข้ามฐานข้อมูล)</td></tr>
+                <tr><td>Denormalize</td><td>เก็บสำเนาข้อมูลซ้ำเพื่อความเร็ว (เช่น report-bc เก็บชื่อสินค้าไว้เอง)</td></tr>
+                <tr><td>Soft-delete</td><td>ลบแบบไม่ลบจริง (ตั้ง <span class="mono text-[12px]">is_deleted=true</span>) เก็บประวัติไว้</td></tr>
+                <tr><td>Audit fields</td><td><span class="mono text-[12px]">created_by/at · updated_by/at</span> — ใครสร้าง/แก้ เมื่อไหร่</td></tr>
+                <tr><td>Presigned URL</td><td>URL ชั่วคราวมีลายเซ็น ให้ upload/download ไฟล์ตรงกับ MinIO โดยไม่ผ่าน backend</td></tr>
+                <tr><td>Seed data</td><td>ข้อมูลตั้งต้นที่ import ล่วงหน้า (เช่น UOM มาตรฐาน ~200 รายการ)</td></tr>
+                <tr><td>i18n</td><td>Internationalization — รองรับหลายภาษา (ไทย/อังกฤษ) ด้วยคอลัมน์ <span class="mono text-[12px]">_th/_en</span></td></tr>
+                <tr><td>AP (Accounts Payable)</td><td>เจ้าหนี้การค้า — ยอดที่ต้องจ่ายผู้จัดซื้อ (ใช้ต่อใน finance-bc)</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
