@@ -941,6 +941,175 @@
             </div>
           </div>
         </div>
+
+        <!-- ========== EXPECTED DELIVERABLES PER PHASE ========== -->
+        <div class="mt-14">
+          <div class="eyebrow text-[var(--accent)] mb-2">Expected Deliverables</div>
+          <h3 class="display text-2xl mb-3">สิ่งที่ลูกค้าได้รับต่อเฟส (Milestone Deliverables)</h3>
+          <p class="text-[var(--ink-soft)] text-[14px] max-w-3xl mb-7 leading-[1.8]">
+            การส่งมอบเป็นแบบ <b>incremental</b> — จบแต่ละเฟสลูกค้าจะได้ <b>increment ที่ใช้งาน/สาธิตได้จริง</b>
+            และผ่าน <b>UAT</b> ก่อนเดินเฟสถัดไป · เฟสที่ทำเครื่องหมาย <span class="mono text-[11px]" style="color:var(--signal)">★</span>
+            คือ <b>Critical Milestone</b> ที่สร้างคุณค่าธุรกิจหลัก
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-5">
+
+            <!-- P0 -->
+            <div class="card p-6" style="border-left:3px solid var(--blueprint)">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P0</span>
+                <div><h4 class="font-semibold text-[15px]">Foundation · รากฐาน</h4><div class="mono text-[11px]" style="color:var(--muted)">WEEK 1–2 · 164 ชม.</div></div>
+              </div>
+              <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
+              <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:var(--blueprint)">→</span><span>Nx monorepo + pnpm ที่ build/lint/test ผ่าน <b>CI/CD pipeline</b></span></li>
+                <li class="flex gap-2.5"><span style="color:var(--blueprint)">→</span><span><b>Docker Compose</b> รัน dev ครบด้วยคำสั่งเดียว (8×PostgreSQL · Redis · RabbitMQ · MinIO)</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--blueprint)">→</span><span>API Gateway (NestJS) + Next.js scaffold + <b>Design System/UI kit</b> + i18n provider (TH/EN)</span></li>
+              </ul>
+              <div class="mt-3.5 flex gap-2.5 items-start p-3 rounded-lg" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.18)">
+                <span class="mono text-[10px] font-semibold mt-0.5" style="color:var(--accent)">✓ UAT</span>
+                <p class="text-[12.5px]" style="color:var(--ink-soft)">ทีมเริ่มพัฒนา feature ได้ทันที · push แล้ว deploy staging อัตโนมัติ · เปิด shell ของแอปได้</p>
+              </div>
+            </div>
+
+            <!-- P1 -->
+            <div class="card p-6" style="border-left:3px solid var(--accent)">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="pchip" style="background:rgba(14,124,134,.1);color:var(--accent);border:1px solid rgba(14,124,134,.28)">P1</span>
+                <div><h4 class="font-semibold text-[15px]">Identity &amp; Access</h4><div class="mono text-[11px]" style="color:var(--muted)">WEEK 3–5 · 208 ชม.</div></div>
+              </div>
+              <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
+              <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:var(--accent)">→</span><span>ระบบ <b>Login/Logout จริง</b> (JWT + refresh · session ใน Redis) + route guard</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--accent)">→</span><span>จัดการ <b>ผู้ใช้ · บทบาท · สิทธิ์ (RBAC)</b> พร้อมหน้าจอ</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--accent)">→</span><span>Login history · blocked users · security log</span></li>
+              </ul>
+              <div class="mt-3.5 flex gap-2.5 items-start p-3 rounded-lg" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.18)">
+                <span class="mono text-[10px] font-semibold mt-0.5" style="color:var(--accent)">✓ UAT</span>
+                <p class="text-[12.5px]" style="color:var(--ink-soft)">แอดมินสร้างผู้ใช้/กำหนดสิทธิ์ได้ · ผู้ใช้ล็อกอินเข้าระบบ 2 ภาษาได้จริง</p>
+              </div>
+            </div>
+
+            <!-- P2 -->
+            <div class="card p-6" style="border-left:3px solid var(--signal)">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="pchip" style="background:rgba(220,90,22,.12);color:var(--signal);border:1px solid rgba(220,90,22,.3)">P2</span>
+                <div><h4 class="font-semibold text-[15px]">Master Data &amp; Storage</h4><div class="mono text-[11px]" style="color:var(--muted)">WEEK 5–9 · 384 ชม.</div></div>
+              </div>
+              <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
+              <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><b>Item Master</b> (ฟอร์ม 2 ภาษา + variant) · Item Group (tree) · Brand · UOM + Conversion</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span>Supplier CRUD</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span>อัปโหลดรูป/เอกสารผ่าน <b>MinIO + Presigned URL</b></span></li>
+              </ul>
+              <div class="mt-3.5 flex gap-2.5 items-start p-3 rounded-lg" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.18)">
+                <span class="mono text-[10px] font-semibold mt-0.5" style="color:var(--accent)">✓ UAT</span>
+                <p class="text-[12.5px]" style="color:var(--ink-soft)">ตั้งค่าสินค้าครบพร้อมเริ่มทำธุรกรรมสต็อก · แนบรูปสินค้า/ไฟล์ได้</p>
+              </div>
+            </div>
+
+            <!-- P3 ★ -->
+            <div class="card p-6" style="border-left:3px solid var(--signal);box-shadow:0 8px 30px -18px rgba(220,90,22,.5)">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="pchip" style="background:rgba(220,90,22,.12);color:var(--signal);border:1px solid rgba(220,90,22,.3)">P3 ★</span>
+                <div><h4 class="font-semibold text-[15px]">Inventory Core</h4><div class="mono text-[11px]" style="color:var(--muted)">WEEK 9–13 · 496 ชม. · CRITICAL</div></div>
+              </div>
+              <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
+              <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><b>รับสินค้าเข้าคลัง (Goods Receipt)</b> → สร้าง Lot ผูกต้นทุน + วันหมดอายุ</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span>Engine ตัดสต็อก <b>FIFO/FEFO</b> · Stock Entry (โอน/เบิก/แปรรูป) · Reconciliation · Bundle BOM</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><b>Stock Ledger + Stock Balance</b> + Expiry alert</span></li>
+              </ul>
+              <div class="mt-3.5 flex gap-2.5 items-start p-3 rounded-lg" style="background:rgba(220,90,22,.07);border:1px solid rgba(220,90,22,.2)">
+                <span class="mono text-[10px] font-semibold mt-0.5" style="color:var(--signal)">✓ UAT</span>
+                <p class="text-[12.5px]" style="color:var(--ink-soft)">สต็อกในระบบตรงของจริง · ทุก movement ตรวจย้อนหลังได้ · <b>ต้นทุนระดับ Lot แม่นยำ</b></p>
+              </div>
+            </div>
+
+            <!-- P4 -->
+            <div class="card p-6" style="border-left:3px solid var(--blueprint)">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="pchip" style="background:rgba(11,61,145,.1);color:var(--blueprint);border:1px solid rgba(11,61,145,.28)">P4</span>
+                <div><h4 class="font-semibold text-[15px]">Procurement &amp; Sales</h4><div class="mono text-[11px]" style="color:var(--muted)">WEEK 13–18 · 376 ชม.</div></div>
+              </div>
+              <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
+              <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:var(--blueprint)">→</span><span><b>ใบสั่งซื้อ (PO)</b> + Supplier Quotation + รับเข้า (เชื่อม P3)</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--blueprint)">→</span><span><b>Quotation → Sales Order → Delivery Note</b> (ตัดสต็อกอัตโนมัติ)</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--blueprint)">→</span><span>Pricing Rule engine + Taxes &amp; Charges</span></li>
+              </ul>
+              <div class="mt-3.5 flex gap-2.5 items-start p-3 rounded-lg" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.18)">
+                <span class="mono text-[10px] font-semibold mt-0.5" style="color:var(--accent)">✓ UAT</span>
+                <p class="text-[12.5px]" style="color:var(--ink-soft)"><b>วงจรซื้อ–ขายครบ end-to-end</b> · ออกใบส่งของแล้วสต็อกถูกตัด FIFO/FEFO ทันที</p>
+              </div>
+            </div>
+
+            <!-- P5 ★ -->
+            <div class="card p-6" style="border-left:3px solid var(--signal);box-shadow:0 8px 30px -18px rgba(220,90,22,.5)">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="pchip" style="background:rgba(220,90,22,.12);color:var(--signal);border:1px solid rgba(220,90,22,.3)">P5 ★</span>
+                <div><h4 class="font-semibold text-[15px]">Finance · COGS &amp; P&amp;L</h4><div class="mono text-[11px]" style="color:var(--muted)">WEEK 18–22 · 312 ชม. · CRITICAL</div></div>
+              </div>
+              <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
+              <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><b>GL double-entry</b> · Tax Invoice + Billing Note · Payment + allocation (AR/AP)</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><b>COGS + กำไร/ขาดทุนต่อ Lot</b> (รวม bundle)</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span>VAT + <b>ภาษีหัก ณ ที่จ่าย</b> · credit/debit note</span></li>
+              </ul>
+              <div class="mt-3.5 flex gap-2.5 items-start p-3 rounded-lg" style="background:rgba(220,90,22,.07);border:1px solid rgba(220,90,22,.2)">
+                <span class="mono text-[10px] font-semibold mt-0.5" style="color:var(--signal)">✓ UAT</span>
+                <p class="text-[12.5px]" style="color:var(--ink-soft)">ออกใบกำกับภาษี/วางบิลได้ · <b>เห็นกำไรต่อล็อตจริง</b> · งบบัญชี balance ตรวจสอบได้</p>
+              </div>
+            </div>
+
+            <!-- P6 -->
+            <div class="card p-6" style="border-left:3px solid var(--accent)">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="pchip" style="background:rgba(14,124,134,.1);color:var(--accent);border:1px solid rgba(14,124,134,.28)">P6</span>
+                <div><h4 class="font-semibold text-[15px]">Reporting &amp; Analytics</h4><div class="mono text-[11px]" style="color:var(--muted)">WEEK 22–25 · 224 ชม.</div></div>
+              </div>
+              <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
+              <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:var(--accent)">→</span><span><b>report-bc</b>: event consumers + read models (CQRS)</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--accent)">→</span><span><b>Dashboard + charts</b> สำหรับผู้บริหาร</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--accent)">→</span><span>รายงาน: ยอดขาย · สต็อก · ล็อตใกล้หมดอายุ · กำไรต่อล็อต</span></li>
+              </ul>
+              <div class="mt-3.5 flex gap-2.5 items-start p-3 rounded-lg" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.18)">
+                <span class="mono text-[10px] font-semibold mt-0.5" style="color:var(--accent)">✓ UAT</span>
+                <p class="text-[12.5px]" style="color:var(--ink-soft)">ผู้บริหารเห็น dashboard + รายงานเชิงวิเคราะห์แบบ near real-time</p>
+              </div>
+            </div>
+
+            <!-- P7 -->
+            <div class="card p-6" style="border-left:3px solid #64748B">
+              <div class="flex items-center gap-3 mb-4">
+                <span class="pchip" style="background:rgba(100,116,139,.1);color:#64748B;border:1px solid rgba(100,116,139,.25)">P7</span>
+                <div><h4 class="font-semibold text-[15px]">Migration · Hardening · Cutover</h4><div class="mono text-[11px]" style="color:var(--muted)">WEEK 25–28 · 224 ชม. · GO-LIVE</div></div>
+              </div>
+              <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
+              <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:#64748B">→</span><span><b>ETL + legacy_id_map</b> · ย้ายไฟล์เดิมเข้า MinIO · Reconciliation tooling</span></li>
+                <li class="flex gap-2.5"><span style="color:#64748B">→</span><span>Load/Security testing + hardening</span></li>
+                <li class="flex gap-2.5"><span style="color:#64748B">→</span><span><b>UAT + cutover + rollback rehearsal</b></span></li>
+              </ul>
+              <div class="mt-3.5 flex gap-2.5 items-start p-3 rounded-lg" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.18)">
+                <span class="mono text-[10px] font-semibold mt-0.5" style="color:var(--accent)">✓ GO-LIVE</span>
+                <p class="text-[12.5px]" style="color:var(--ink-soft)">ข้อมูลเดิมย้ายครบ กระทบยอดตรงระบบเดิม · <b>go-live แทนระบบเก่า</b> พร้อมแผน rollback</p>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="card p-5 mt-6" style="background:#0E1726;border:none">
+            <div class="eyebrow mb-3" style="color:#7FE3DE">Key Business Milestones · จุดที่ลูกค้าเห็นคุณค่า</div>
+            <div class="grid sm:grid-cols-4 gap-4 text-[12.5px]">
+              <div><div class="mono text-[11px] mb-1" style="color:#A9B6EC">P1 · ~สัปดาห์ 5</div><span class="text-white">เข้าใช้งานระบบได้ (Login + สิทธิ์)</span></div>
+              <div><div class="mono text-[11px] mb-1" style="color:#F0A868">P3 · ~สัปดาห์ 13</div><span class="text-white">สต็อก + ต้นทุน Lot ถูกต้อง (คุณค่าหลัก)</span></div>
+              <div><div class="mono text-[11px] mb-1" style="color:#F0A868">P5 · ~สัปดาห์ 22</div><span class="text-white">ครบวงจร ซื้อ–ขาย–บัญชี + กำไรต่อล็อต</span></div>
+              <div><div class="mono text-[11px] mb-1" style="color:#7FE3DE">P7 · ~สัปดาห์ 28</div><span class="text-white">Go-live แทนระบบเดิมเต็มรูปแบบ</span></div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <div class="rule my-14"></div>
@@ -1027,8 +1196,8 @@
     const ca = document.getElementById('ganttCollapseAll');
     if(ea) ea.addEventListener('click', () => heads.forEach(h => setPhase(h, false)));
     if(ca) ca.addEventListener('click', () => heads.forEach(h => setPhase(h, true)));
-    // default: collapse all except the critical Stock phase (PHASE 3)
-    heads.forEach(h => setPhase(h, !/PHASE 3\b/.test(h.textContent)));
+    // default: expand every phase
+    heads.forEach(h => setPhase(h, false));
   })();
 </script>
 
