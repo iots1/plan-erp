@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRS &middot; Phase 6 — Reporting (CQRS) &middot; ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <erp-sidebar badge="P6" title="SRS &middot; Reporting" subtitle="PHASE 6 &middot; REPORT-BC" width="280">
+    <nav slot="nav">
+      <a href="core-feature.html" class="navlink"><span class="n" style="color:var(--accent)">IA</span> Sitemap / Overview</a>
+      <a href="srs-p3.html" class="navlink"><span class="n" style="color:var(--signal)">P3</span> Inventory Core</a>
+      <a href="srs-p4.html" class="navlink"><span class="n" style="color:var(--blueprint)">P4</span> Procurement &amp; Sales</a>
+      <a href="srs-p5.html" class="navlink"><span class="n" style="color:var(--accent)">P5</span> Finance</a>
+      <a href="srs-p6.html" class="navlink"><span class="n" style="color:#38BDF8">P6</span> Reporting (CQRS)</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <div class="navsub">ในเฟสนี้ประกอบด้วย</div>
+      <div class="navsub">1 · Business &amp; Roles</div>
+      <div class="navsub">2 · Use Cases &amp; Data</div>
+      <div class="navsub">3 · Data Flow &amp; Events</div>
+      <div class="navsub">4 · ER Diagram</div>
+      <div class="navsub">5 · Dev Guide</div>
+    </nav>
+    <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
+  </erp-sidebar>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+    <div class="max-w-[1000px] mx-auto px-6 sm:px-10 py-14 space-y-20">
+
+      <section id="p6" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(8,145,178,.08),rgba(8,145,178,.02))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(14,124,134,.16);color:var(--cyan);border:1px solid rgba(14,124,134,.3)">PHASE 6</span>
+              <span class="eyebrow" style="color:var(--accent)">report-bc · CQRS Read Side</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Reporting — CQRS Read Models &amp; Executive Dashboards</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">บริโภค event จากทุกบริการเพื่อสร้าง Read Model ที่อ่านเร็ว สำหรับ Dashboard ผู้บริหาร</p>
+          </div>
+        </div>
+
+        <!-- 6.1 Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครทำอะไร</h3></div>
+          <div class="grid sm:grid-cols-3 gap-4">
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">EXECUTIVE</div><div class="font-semibold mb-1.5">ผู้บริหาร</div><p class="text-[13px]" style="color:var(--ink-soft)">ดู Dashboard ยอดขาย, กำไรขั้นต้น, สินค้าขายดี, สต็อกใกล้หมด/หมดอายุ ในภาพรวม</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">DEPT. MANAGER</div><div class="font-semibold mb-1.5">ผู้จัดการฝ่าย</div><p class="text-[13px]" style="color:var(--ink-soft)">รายงานเชิงลึกของแผนก (ขาย/คลัง/จัดซื้อ) แบบสรุปและละเอียด</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">BUSINESS ANALYST</div><div class="font-semibold mb-1.5">นักวิเคราะห์</div><p class="text-[13px]" style="color:var(--ink-soft)">ดึงข้อมูล, สร้างรายงานเฉพาะกิจ, วิเคราะห์แนวโน้ม (กราฟ/สรุป/ละเอียด)</p></div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> แยกภาระการอ่าน (read) ออกจากฐานข้อมูล transactional ด้วย CQRS — report-bc มีฐานข้อมูลของตัวเองที่ denormalized มาแล้ว ทำให้ Dashboard ตอบเร็วโดยไม่กระทบระบบหลัก</div>
+        </div>
+
+        <!-- 6.2 Use Cases -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · สร้าง Read Model ยังไง</h3></div>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>Subscribe events</b> จากทุกบริการ (so.confirmed, stock.deducted, profit.calculated, expiry.approaching ฯลฯ)</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>Project เข้า Read Model</b> — UPSERT เข้าตารางสรุป เช่น <span class="mono text-[12px]">sales_summary, profit_by_lot, low_stock</span></p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>Dashboard/API</b> อ่านจาก Read Model โดยตรง (pre-computed) — query เร็ว &lt; 200ms</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Drill-down</b> รายงานแบบ กราฟ / สรุป / ละเอียด ตามรูปแบบเดิมของระบบ</p></div>
+          </div>
+          <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)"><b style="color:var(--ink)">รายงานหลัก:</b> ยอดขายรายวัน/เดือน, กำไรขั้นต้นต่อล็อต, สินค้าขายดี, สินค้าใกล้หมด (low stock), ล็อตใกล้หมดอายุ, ลูกค้าแต่ละจังหวัด</p>
+
+          <h4 class="font-semibold mt-6 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge"><div class="tag mb-1">Event มาไม่เรียงลำดับ</div><p class="text-[13px]">out-of-order → ใช้ <b>version / event timestamp</b> และ UPSERT idempotent เพื่อไม่ให้ข้อมูลเก่าทับข้อมูลใหม่</p></div>
+            <div class="edge"><div class="tag mb-1">Event หาย / rebuild</div><p class="text-[13px]">Read model ต้อง <b>สร้างใหม่ได้ (replay)</b> จาก event store/outbox โดยไม่กระทบระบบหลัก</p></div>
+            <div class="edge"><div class="tag mb-1">Eventual consistency</div><p class="text-[13px]">Dashboard อาจ lag ไม่กี่วินาที — ยอมรับได้สำหรับรายงาน แต่ต้องระบุเวลา last-updated</p></div>
+            <div class="edge"><div class="tag mb-1">Event ซ้ำ</div><p class="text-[13px]">consumer ต้อง idempotent ผ่านตาราง <span class="mono text-[12px]">processed_events</span> (event_id unique)</p></div>
+          </div>
+        </div>
+
+        <!-- 6.3 Data Flow -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">03</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
+          <div class="card p-6 mb-5"><p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">report-bc เป็น terminal consumer</b> — ฟัง event จากทุกบริการแต่ <b>ไม่ปล่อย business event กลับ</b> (อาจปล่อยเพียง <span class="mono text-[12px]">report.generated</span>) และ <b>ไม่เรียก transactional service ตอน query</b> เพราะ pre-compute ไว้แล้ว</p></div>
+          <div class="card p-5 mb-5">
+            <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">LISTENS (ทั้งหมด)</div>
+            <div class="flex flex-wrap gap-2">
+              <span class="evt evt-listen">so.confirmed</span>
+              <span class="evt evt-listen">delivery.confirmed</span>
+              <span class="evt evt-listen">stock.deducted</span>
+              <span class="evt evt-listen">lot.created</span>
+              <span class="evt evt-listen">expiry.approaching</span>
+              <span class="evt evt-listen">stock.low</span>
+              <span class="evt evt-listen">invoice.issued</span>
+              <span class="evt evt-listen">profit.calculated</span>
+              <span class="evt evt-listen">payment.received</span>
+            </div>
+          </div>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>Read Model</th><th>สร้างจาก event</th><th>ใช้ใน Dashboard</th></tr></thead>
+              <tbody>
+                <tr><td>sales_summary</td><td>so.confirmed · invoice.issued</td><td>ยอดขายรายวัน/เดือน</td></tr>
+                <tr><td>profit_by_lot</td><td>profit.calculated</td><td>กำไรขั้นต้นต่อล็อต</td></tr>
+                <tr><td>expiry_alerts</td><td>expiry.approaching · lot.created</td><td>ล็อตใกล้หมดอายุ</td></tr>
+                <tr><td>low_stock</td><td>stock.deducted · stock.low</td><td>สินค้าใกล้หมด</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 6.4 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">04</span><h3 class="text-xl font-semibold">ER Diagram · report-bc (Read Models)</h3></div>
+          <p class="text-[13px] mb-4" style="color:var(--muted)">Read Model เป็นตาราง denormalized แยกอิสระ (ไม่มีความสัมพันธ์แบบ normalized) ทุก id อ้างอิงบริการต้นทางด้วย UUID</p>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    SALES_SUMMARY {
+        uuid id PK
+        date period
+        decimal total_sales
+        decimal gross_profit
+        int order_count
+        timestamp updated_at
+    }
+    INVENTORY_SUMMARY {
+        uuid product_id PK "ref inventory-bc"
+        jsonb product_name "denormalized i18n"
+        int total_available
+        int lot_count
+    }
+    PROFIT_BY_LOT {
+        uuid id PK
+        uuid lot_id "ref inventory-bc"
+        uuid product_id "ref inventory-bc"
+        decimal revenue
+        decimal cogs
+        decimal profit
+    }
+    EXPIRY_ALERTS {
+        uuid lot_id PK "ref inventory-bc"
+        uuid product_id "ref inventory-bc"
+        date expiry_date
+        int days_left
+        int available_qty
+    }
+    LOW_STOCK {
+        uuid product_id PK "ref inventory-bc"
+        int available_qty
+        int alert_qty
+    }
+    CUSTOMER_BY_PROVINCE {
+        string province PK
+        int customer_count
+        decimal total_sales
+    }
+    PROCESSED_EVENTS {
+        string event_id PK "idempotency"
+        string event_type
+        timestamp processed_at
+    }
+</pre>
+          </div>
+        </div>
+
+        <!-- 6.5 Dev Guide -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--cyan)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · DENORMALIZE FOR READ</div><p class="text-[13.5px]">Read model ออกแบบเพื่อ <b>อ่านเร็ว</b> — ยอมให้ข้อมูลซ้ำ/denormalized เก็บชื่อสินค้า (JSONB) มาด้วย ไม่ต้อง join ข้ามบริการตอน query</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · IDEMPOTENT PROJECTION</div><p class="text-[13.5px]">ทุก consumer ต้อง idempotent ผ่านตาราง <span class="mono text-[12px]">processed_events</span> (event_id unique) กันการนับซ้ำ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · HANDLE OUT-OF-ORDER</div><p class="text-[13.5px]">ใช้ <span class="mono text-[12px]">version / updated_at</span> + <b>UPSERT</b> เพื่อกัน event เก่าทับใหม่</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · NO SYNC CALL ON QUERY</div><p class="text-[13.5px]">ตอน query dashboard <b>ห้ามเรียก transactional service</b> — ต้อง pre-compute ล่วงหน้าเท่านั้น</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · SEPARATE READ DB</div><p class="text-[13.5px]">report-bc มีฐานข้อมูลของตัวเอง แยกจากบริการอื่น <b>สามารถ rebuild ได้จาก replay</b></p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · EVENT-DRIVEN REFRESH</div><p class="text-[13.5px]">อัปเดต summary ตาม event ที่เข้ามา <b>ไม่ใช้ polling</b> · ใช้ index ครบเพื่อให้ query &lt; 200ms</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · SHOW FRESHNESS</div><p class="text-[13.5px]">แสดง <span class="mono text-[12px]">last_updated</span> บน dashboard เพื่อสื่อสาร eventual consistency ให้ผู้ใช้ทราบ</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM &middot; SRS &middot; PHASE 6 &middot; REPORTING"
+        line2="CQRS READ MODELS &middot; DASHBOARDS">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+    background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>

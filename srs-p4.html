@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRS &middot; Phase 4 — Procurement &amp; Sales &middot; ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <erp-sidebar badge="P4" title="SRS &middot; Procurement &amp; Sales" subtitle="PHASE 4 &middot; SUPPLIER &middot; SALES" width="280">
+    <nav slot="nav">
+      <a href="core-feature.html" class="navlink"><span class="n" style="color:var(--accent)">IA</span> Sitemap / Overview</a>
+      <a href="srs-p3.html" class="navlink"><span class="n" style="color:var(--signal)">P3</span> Inventory Core</a>
+      <a href="srs-p4.html" class="navlink"><span class="n" style="color:var(--blueprint)">P4</span> Procurement &amp; Sales</a>
+      <a href="srs-p5.html" class="navlink"><span class="n" style="color:var(--accent)">P5</span> Finance</a>
+      <a href="srs-p6.html" class="navlink"><span class="n" style="color:#38BDF8">P6</span> Reporting (CQRS)</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <div class="navsub">ในเฟสนี้ประกอบด้วย</div>
+      <div class="navsub">1 · Business &amp; Roles</div>
+      <div class="navsub">2 · Use Cases &amp; Data</div>
+      <div class="navsub">3 · Data Flow &amp; Events</div>
+      <div class="navsub">4 · ER Diagram</div>
+      <div class="navsub">5 · Dev Guide</div>
+    </nav>
+    <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
+  </erp-sidebar>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+    <div class="max-w-[1000px] mx-auto px-6 sm:px-10 py-14 space-y-20">
+
+      <section id="p4" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(37,99,235,.02))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(11,61,145,.16);color:var(--blue);border:1px solid rgba(11,61,145,.3)">PHASE 4</span>
+              <span class="eyebrow" style="color:var(--blueprint)">supplier-bc · sales-bc</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Procurement &amp; Sales — PO · Quotation → SO → Delivery</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">งานจัดซื้อเข้าและงานขายออก เชื่อมกับ inventory-bc เพื่อทริกเกอร์การเคลื่อนไหวสต็อก</p>
+          </div>
+        </div>
+
+        <!-- 4.1 Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครทำอะไร</h3></div>
+          <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--blueprint)">PROCUREMENT</div><div class="font-semibold mb-1.5">เจ้าหน้าที่จัดซื้อ</div><p class="text-[13px]" style="color:var(--ink-soft)">สร้าง PO, เจรจาต้นทุน, ติดตามการส่งมอบ, จัดการข้อมูล supplier</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--blueprint)">PROC. MANAGER</div><div class="font-semibold mb-1.5">ผู้จัดการจัดซื้อ</div><p class="text-[13px]" style="color:var(--ink-soft)">อนุมัติ PO ที่เกินวงเงิน, กำหนดผู้ขายหลัก</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--blueprint)">SALES REP</div><div class="font-semibold mb-1.5">พนักงานขาย</div><p class="text-[13px]" style="color:var(--ink-soft)">ออกใบเสนอราคา, แปลงเป็น SO, ออกใบส่งของ, ดูแลลูกค้า</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--blueprint)">SALES MANAGER</div><div class="font-semibold mb-1.5">ผู้จัดการขาย</div><p class="text-[13px]" style="color:var(--ink-soft)">อนุมัติส่วนลดพิเศษ/วงเงินเครดิต, ปิดการขายรายใหญ่</p></div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> ให้กระบวนการซื้อและขายเป็นเอกสารที่ตรวจสอบได้ตั้งแต่ต้นทาง (PO / Quotation) ถึงปลายทาง (รับเข้า / ส่งมอบ) และเชื่อมกับสต็อกอย่างถูกต้อง</div>
+        </div>
+
+        <!-- 4.2 Use Cases -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · บันทึกข้อมูลยังไง</h3></div>
+
+          <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">กระบวนการขาย · Quotation → SO → Delivery</h4>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>สร้างใบเสนอราคา (Quotation)</b> — เลือกลูกค้า, สินค้า, <b>unit price</b>, <b>discount</b>, <b>ภาษี</b>, วันหมดอายุใบเสนอราคา (<span class="mono text-[12px]">valid_until</span>) → สถานะ DRAFT/SENT</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>ลูกค้าอนุมัติ</b> → Quotation เปลี่ยนสถานะเป็น APPROVED</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>แปลงเป็น Sales Order (SO)</b> — คัดลอกรายการ + <b>ตรวจ availability</b> จาก inventory ผ่าน <span class="mono text-[12px]" style="color:var(--accent)">TCP (sync)</span> → สถานะ CONFIRMED (ยังไม่ตัดสต็อก)</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ออกใบส่งของ (Delivery Note)</b> → emit <span class="mono text-[12px]" style="color:var(--signal)">delivery.confirmed</span> → inventory ตัดสต็อก FIFO/FEFO และส่ง allocations กลับมาเก็บใน delivery item</p></div>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">กระบวนการจัดซื้อ · Purchase Order</h4>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>สร้าง PO</b> — เลือก supplier, สินค้า (<span class="mono text-[12px]">product_id</span> ref inventory), จำนวน, <b>ต้นทุนที่ตกลง</b>, วันส่งมอบ → DRAFT</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>อนุมัติ &amp; ส่ง</b> → APPROVED → SENT (emit <span class="mono text-[12px]" style="color:var(--signal)">po.approved</span>)</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>รับสินค้า</b> (เชื่อม UC-3.1) → emit <span class="mono text-[12px]" style="color:var(--signal)">po.received</span> → inventory สร้างล็อต → PO เป็น PARTIAL/RECEIVED</p></div>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">ข้อมูลที่บันทึกในแต่ละขั้น</h4>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>Field</th><th>เอกสาร</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>unit_price</td><td>Quotation / SO</td><td>ราคาขาย/หน่วย (รองรับราคาพิเศษตามช่วงวันที่)</td></tr>
+                <tr><td>discount</td><td>Quotation / SO</td><td>ส่วนลดต่อรายการ (%/บาท) เกินสิทธิ์ต้องอนุมัติ</td></tr>
+                <tr><td>product_name_snapshot</td><td>ทุกเอกสาร</td><td>ชื่อสินค้า ณ เวลาออกเอกสาร (denormalized กัน master เปลี่ยน)</td></tr>
+                <tr><td>valid_until</td><td>Quotation</td><td>วันหมดอายุใบเสนอราคา</td></tr>
+                <tr><td>unit_cost</td><td>Purchase Order</td><td>ต้นทุนที่ตกลงกับ supplier (จะกลายเป็น import_cost ของล็อต)</td></tr>
+                <tr><td>lot_allocations</td><td>Delivery Note</td><td>ล็อตที่ถูกตัดจริง (คืนมาจาก stock.deducted)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge"><div class="tag mb-1">สต็อกไม่พอตอน SO</div><p class="text-[13px]">ตอน confirm SO ตรวจแล้วสต็อกไม่พอ → <b>เตือน</b> และตาม policy: อนุญาต backorder หรือ block. <b>ไม่ตัดสต็อก</b>จนกว่าจะออกใบส่งของ</p></div>
+            <div class="edge"><div class="tag mb-1">Quotation หมดอายุ</div><p class="text-[13px]">หาก <span class="mono text-[12px]">valid_until</span> ผ่านไปแล้ว ห้ามแปลงเป็น SO ต้องต่ออายุหรือออกใบใหม่</p></div>
+            <div class="edge"><div class="tag mb-1">ราคาพิเศษ</div><p class="text-[13px]">รองรับราคาพิเศษ 1/2/3 ตามช่วงวันที่ (เริ่ม–ถึง) — ระบบเลือกราคาที่มีผลอัตโนมัติ</p></div>
+            <div class="edge"><div class="tag mb-1">รับของไม่ครบ PO</div><p class="text-[13px]">รับได้บางส่วน → PO สถานะ PARTIAL รอรับส่วนที่เหลือ ไม่ปิด PO อัตโนมัติ</p></div>
+          </div>
+        </div>
+
+        <!-- 4.3 Data Flow -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">03</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
+          <div class="card p-6 mb-5">
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">SO → Goods Issue mapping:</b> sales-bc ไม่ตัดสต็อกเอง แต่ส่ง <span class="mono text-[12px]">delivery.confirmed</span> ให้ inventory-bc เป็นผู้ตัดสต็อก (Goods Issue) การตรวจ availability ตอน confirm SO ใช้ <b>TCP แบบ sync</b> ส่วนการตัดจริงเป็น <b>async event</b> (eventual consistency)</p>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-6">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">EMITS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-emit">quotation.created</span>
+                <span class="evt evt-emit">so.confirmed</span>
+                <span class="evt evt-emit">delivery.confirmed</span>
+                <span class="evt evt-emit">po.approved</span>
+                <span class="evt evt-emit">po.received</span>
+              </div>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">LISTENS / CALLS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-tcp">checkAvailability (TCP) → inventory</span>
+                <span class="evt evt-listen">stock.deducted ← inventory</span>
+              </div>
+            </div>
+          </div>
+          <div class="card overflow-hidden mt-5">
+            <table class="d">
+              <thead><tr><th>Event</th><th>Producer</th><th>Consumers</th></tr></thead>
+              <tbody>
+                <tr><td>delivery.confirmed</td><td>sales-bc</td><td>inventory-bc (ตัดสต็อก) · finance-bc (ตั้งใบกำกับ)</td></tr>
+                <tr><td>so.confirmed</td><td>sales-bc</td><td>finance-bc · report-bc</td></tr>
+                <tr><td>po.received</td><td>supplier-bc</td><td>inventory-bc (สร้างล็อต)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 4.4 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">04</span><h3 class="text-xl font-semibold">ER Diagram · supplier-bc + sales-bc</h3></div>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    SUPPLIERS {
+        uuid id PK
+        jsonb name "i18n th_en"
+        string tax_id
+        string phone
+    }
+    PURCHASE_ORDERS {
+        uuid id PK
+        uuid supplier_id FK
+        string po_number
+        string status "DRAFT_APPROVED_SENT_RECEIVED"
+        date expected_date
+        decimal total
+    }
+    PURCHASE_ORDER_ITEMS {
+        uuid id PK
+        uuid po_id FK
+        uuid product_id "ref inventory-bc"
+        int qty
+        decimal unit_cost
+    }
+    INBOUND_SHIPMENTS {
+        uuid id PK
+        uuid po_id FK
+        string status
+        timestamp arrived_at
+    }
+    CUSTOMERS {
+        uuid id PK
+        jsonb name "i18n th_en"
+        string province
+        string tax_id
+    }
+    QUOTATIONS {
+        uuid id PK
+        uuid customer_id FK
+        string status "DRAFT_SENT_APPROVED_EXPIRED"
+        date valid_until
+        decimal total
+    }
+    QUOTATION_ITEMS {
+        uuid id PK
+        uuid quotation_id FK
+        uuid product_id "ref inventory-bc"
+        string name_snapshot
+        int qty
+        decimal unit_price
+        decimal discount
+    }
+    SALES_ORDERS {
+        uuid id PK
+        uuid quotation_id FK
+        uuid customer_id FK
+        string so_number
+        string status "CONFIRMED_PARTIAL_CLOSED"
+    }
+    SALES_ORDER_ITEMS {
+        uuid id PK
+        uuid so_id FK
+        uuid product_id "ref inventory-bc"
+        int qty
+        decimal unit_price
+        decimal discount
+    }
+    DELIVERY_NOTES {
+        uuid id PK
+        uuid so_id FK
+        string dn_number
+        string status "PENDING_CONFIRMED"
+        timestamp delivered_at
+    }
+    DELIVERY_NOTE_ITEMS {
+        uuid id PK
+        uuid dn_id FK
+        uuid product_id "ref inventory-bc"
+        int qty
+        jsonb lot_allocations "from stock.deducted"
+    }
+    PACKED_ITEMS {
+        uuid id PK
+        uuid parent_doc_id FK "SO_or_delivery"
+        uuid bundle_product_id
+        uuid component_product_id
+        int qty
+    }
+    PRICING_RULES {
+        uuid id PK
+        string apply_on "item_group_brand"
+        uuid target_id "product_or_group"
+        uuid customer_id "nullable"
+        int min_qty
+        date valid_from
+        date valid_to
+        string rate_or_discount
+        decimal value
+        int priority
+    }
+    SUPPLIERS ||--o{ PURCHASE_ORDERS : receives
+    PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ITEMS : contains
+    PURCHASE_ORDERS ||--o{ INBOUND_SHIPMENTS : ships
+    CUSTOMERS ||--o{ QUOTATIONS : requests
+    QUOTATIONS ||--o{ QUOTATION_ITEMS : contains
+    QUOTATIONS ||--o| SALES_ORDERS : "converts to"
+    CUSTOMERS ||--o{ SALES_ORDERS : places
+    SALES_ORDERS ||--o{ SALES_ORDER_ITEMS : contains
+    SALES_ORDERS ||--o{ DELIVERY_NOTES : fulfills
+    DELIVERY_NOTES ||--o{ DELIVERY_NOTE_ITEMS : contains
+    SALES_ORDERS ||--o{ PACKED_ITEMS : explodes
+    PRICING_RULES ||--o{ SALES_ORDER_ITEMS : "prices"
+</pre>
+          </div>
+        </div>
+
+        <!-- 4.5 Dev Guide -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · NO CROSS-DB QUERY</div><p class="text-[13.5px]">sales-bc / supplier-bc <b>ห้าม query ตาราง products</b> ของ inventory ตรง ๆ ให้เรียกผ่าน TCP หรือใช้ replicated read model</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · SYNC CHECK, ASYNC DEDUCT</div><p class="text-[13.5px]">ตรวจ availability ตอน confirm SO เป็น <b>TCP sync</b> แต่การตัดสต็อกจริงเป็น <b>event async</b> — ยอมรับ eventual consistency</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · IDEMPOTENT DELIVERY</div><p class="text-[13.5px]">การยิง <span class="mono text-[12px]">delivery.confirmed</span> ต้อง idempotent (มี delivery id) ป้องกันการตัดสต็อกซ้ำเมื่อ event ถูกส่งซ้ำ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · DENORMALIZE SNAPSHOT</div><p class="text-[13.5px]">เก็บ <b>ชื่อสินค้า + ราคา ณ เวลาออกเอกสาร</b> ในตาราง item เพราะ master data อาจเปลี่ยนภายหลัง</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · STATE MACHINE</div><p class="text-[13.5px]">สถานะเอกสารเป็น state machine ชัดเจน (DRAFT→…→CLOSED) <b>ห้าม skip state</b> และตรวจ transition ที่ถูกต้อง</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · SAGA + COMPENSATION</div><p class="text-[13.5px]">ใช้ Saga สำหรับ SO→delivery→stock→invoice หากตัดสต็อกล้มเหลว ต้อง <b>compensate</b> (delivery กลับเป็น PENDING)</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · MONEY TYPE</div><p class="text-[13.5px]">จำนวนเงินใช้ <span class="mono text-[12px]">decimal</span> หรือ integer (สตางค์) <b>ห้ามใช้ float</b></p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PRICING RULE ENGINE</div><p class="text-[13.5px]">ราคาพิเศษ/ส่วนลดเป็น <b>engine แยก</b> (pricing rule) ไม่ใช่ field คงที่ — match ตามเงื่อนไข (สินค้า/กลุ่ม/ลูกค้า/ช่วงวันที่/จำนวนขั้นต่ำ) แล้วเลือกกฎที่ priority สูงสุด · ราคาที่ได้ต้อง <b>snapshot ลงเอกสาร</b></p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · TAX PER LINE</div><p class="text-[13.5px]">คำนวณภาษี <b>รายบรรทัด</b> (per-line) ตาม item tax template แล้วค่อย aggregate หัวเอกสาร — รองรับหลายอัตรา/ยกเว้นภาษีในใบเดียว · เก็บ item-wise tax detail ไว้ตรวจสอบ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · BUNDLE = PACKED ITEM</div><p class="text-[13.5px]">เมื่อขายสินค้า bundle ให้ <b>explode เป็น packed_items</b> เก็บ denormalized บนเอกสาร (SO/Delivery) เพื่อส่งให้ inventory ตัดสต็อกรายสินค้าย่อย และคง traceability</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM &middot; SRS &middot; PHASE 4 &middot; PROCUREMENT &amp; SALES"
+        line2="PO &middot; QUOTATION &rarr; SO &rarr; DELIVERY">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+    background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>

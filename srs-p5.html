@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRS &middot; Phase 5 — Finance &middot; ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <erp-sidebar badge="P5" title="SRS &middot; Finance" subtitle="PHASE 5 &middot; FINANCE-BC" width="280">
+    <nav slot="nav">
+      <a href="core-feature.html" class="navlink"><span class="n" style="color:var(--accent)">IA</span> Sitemap / Overview</a>
+      <a href="srs-p3.html" class="navlink"><span class="n" style="color:var(--signal)">P3</span> Inventory Core</a>
+      <a href="srs-p4.html" class="navlink"><span class="n" style="color:var(--blueprint)">P4</span> Procurement &amp; Sales</a>
+      <a href="srs-p5.html" class="navlink"><span class="n" style="color:var(--accent)">P5</span> Finance</a>
+      <a href="srs-p6.html" class="navlink"><span class="n" style="color:#38BDF8">P6</span> Reporting (CQRS)</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <div class="navsub">ในเฟสนี้ประกอบด้วย</div>
+      <div class="navsub">1 · Business &amp; Roles</div>
+      <div class="navsub">2 · Use Cases &amp; Data</div>
+      <div class="navsub">3 · Data Flow &amp; Events</div>
+      <div class="navsub">4 · ER Diagram</div>
+      <div class="navsub">5 · Dev Guide</div>
+    </nav>
+    <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
+  </erp-sidebar>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+    <div class="max-w-[1000px] mx-auto px-6 sm:px-10 py-14 space-y-20">
+
+      <section id="p5" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(14,124,134,.12),rgba(14,124,134,.04))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(14,124,134,.16);color:var(--teal);border:1px solid rgba(14,124,134,.3)">PHASE 5</span>
+              <span class="eyebrow" style="color:var(--accent)">finance-bc · Critical Path</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Finance — Tax Invoice · Billing · COGS &amp; P&amp;L ต่อ Lot</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">คำนวณต้นทุนขายและกำไร/ขาดทุนจากต้นทุนจริงของแต่ละล็อต ไม่ใช่ต้นทุนเฉลี่ย</p>
+          </div>
+        </div>
+
+        <!-- 5.1 Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครทำอะไร</h3></div>
+          <div class="grid sm:grid-cols-3 gap-4">
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">ACCOUNTANT</div><div class="font-semibold mb-1.5">นักบัญชี</div><p class="text-[13px]" style="color:var(--ink-soft)">ออกใบกำกับภาษี, ใบวางบิล, บันทึกบัญชี, ปิดงวด, กระทบยอด COGS/กำไร</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">FINANCE MANAGER</div><div class="font-semibold mb-1.5">ผู้จัดการการเงิน</div><p class="text-[13px]" style="color:var(--ink-soft)">อนุมัติเอกสาร, วิเคราะห์กำไรขั้นต้นต่อล็อต/ต่อสินค้า, ควบคุมงบ</p></div>
+            <div class="role"><div class="mono text-[11px] mb-1" style="color:var(--accent)">AR / AP CLERK</div><div class="font-semibold mb-1.5">เจ้าหน้าที่การเงิน</div><p class="text-[13px]" style="color:var(--ink-soft)">ตั้งลูกหนี้/เจ้าหนี้, ติดตามการชำระ, ออกใบเสร็จ</p></div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> ออกเอกสารภาษีถูกต้องตามกฎหมาย และคำนวณ COGS + กำไร/ขาดทุน <b style="color:var(--accent)">แม่นยำระดับล็อต</b> จากต้นทุนนำเข้าจริงของล็อตที่ถูกตัด</div>
+        </div>
+
+        <!-- 5.2 Use Cases -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">02</span><h3 class="text-xl font-semibold">Core Use Cases &amp; Data Entry · บันทึกข้อมูลยังไง</h3></div>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>รับ event <span class="mono text-[12px]" style="color:var(--signal)">stock.deducted</span></b> (allocations พร้อม unit_cost) → คำนวณ <b>COGS ต่อ allocation</b> = qty × lot.unit_cost → บันทึก <span class="mono text-[12px]">cogs_entries</span> ต่อล็อต</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>ดึงราคาขาย</b> จาก sales-bc (TCP) → คำนวณ <b>กำไรต่อล็อต</b> = revenue − COGS → บันทึก <span class="mono text-[12px]">profit_loss_records</span> ต่อ allocation</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>ออกใบกำกับภาษี (Tax Invoice)</b> อ้างอิง delivery/SO → คำนวณ VAT (ภาษี 1/ภาษี 2), เลขที่ใบกำกับแบบต่อเนื่อง → emit <span class="mono text-[12px]" style="color:var(--signal)">invoice.issued</span></p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ใบวางบิล (Billing Note)</b> รวมหลายใบกำกับเพื่อเรียกเก็บเงินรอบเดียว</p></div>
+          </div>
+
+          <h4 class="font-semibold mt-2 mb-3 text-[15px]">ข้อมูลที่บันทึก</h4>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th>Field</th><th>เอกสาร</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>invoice_number</td><td>Tax Invoice</td><td>เลขที่ต่อเนื่องไม่ข้าม/ไม่ซ้ำ (ตามกฎหมาย)</td></tr>
+                <tr><td>vat_amount</td><td>Tax Invoice</td><td>ภาษีมูลค่าเพิ่มตาม tax_config (ภาษี 1/2)</td></tr>
+                <tr><td>unit_cost</td><td>COGS Entry</td><td><b>ต้นทุนจริงของล็อต</b> (จาก event) — ห้ามเฉลี่ย</td></tr>
+                <tr><td>cogs</td><td>COGS Entry</td><td>qty × lot.unit_cost ต่อ allocation</td></tr>
+                <tr><td>gross_profit</td><td>P&amp;L Record</td><td>revenue − cogs ต่อล็อต</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge"><div class="tag mb-1">แก้ใบกำกับที่ออกแล้ว</div><p class="text-[13px]">ใบกำกับที่ออกแล้ว <b>ห้ามแก้</b> ต้องออก <b>ใบลดหนี้/เพิ่มหนี้</b> (credit/debit note) แทน</p></div>
+            <div class="edge"><div class="tag mb-1">COGS event มาช้า</div><p class="text-[13px]">ถ้า allocation (stock.deducted) มาช้ากว่า invoice → คำนวณ COGS แบบ provisional แล้ว reconcile เมื่อ event มาถึง</p></div>
+            <div class="edge"><div class="tag mb-1">สินค้าคืน (Return)</div><p class="text-[13px]">ต้อง <b>กลับรายการ COGS</b> และคืนสต็อกเข้าล็อตเดิม พร้อมออกใบลดหนี้</p></div>
+            <div class="edge"><div class="tag mb-1">หลายอัตราภาษี</div><p class="text-[13px]">รองรับสินค้าที่ยกเว้นภาษี/หลายอัตราในใบเดียว คำนวณแยกบรรทัด</p></div>
+          </div>
+        </div>
+
+        <!-- 5.3 Data Flow -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">03</span><h3 class="text-xl font-semibold">Data Flow &amp; Cross-Context Connection · ความเชื่อมโยง</h3></div>
+          <div class="grid sm:grid-cols-2 gap-6">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">EMITS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-emit">invoice.issued</span>
+                <span class="evt evt-emit">profit.calculated</span>
+                <span class="evt evt-emit">payment.received</span>
+              </div>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">LISTENS / CALLS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="evt evt-listen">stock.deducted ← inventory</span>
+                <span class="evt evt-listen">delivery.confirmed ← sales</span>
+                <span class="evt evt-tcp">getSalePrice (TCP) → sales</span>
+              </div>
+            </div>
+          </div>
+          <div class="card overflow-hidden mt-5">
+            <table class="d">
+              <thead><tr><th>Event</th><th>Producer</th><th>Consumers</th></tr></thead>
+              <tbody>
+                <tr><td>stock.deducted</td><td>inventory-bc</td><td><b>finance-bc</b> → สร้าง COGS/P&amp;L</td></tr>
+                <tr><td>invoice.issued</td><td>finance-bc</td><td>report-bc (ยอดขาย/ภาษี)</td></tr>
+                <tr><td>profit.calculated</td><td>finance-bc</td><td>report-bc (กำไรต่อล็อต)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 5.4 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">04</span><h3 class="text-xl font-semibold">ER Diagram · finance-bc</h3></div>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    TAX_INVOICES {
+        uuid id PK
+        string invoice_number UK "gapless"
+        uuid customer_id "ref sales-bc"
+        uuid delivery_note_id "ref sales-bc"
+        decimal net_amount
+        decimal vat_amount
+        decimal total
+        string status "ISSUED_VOID"
+        timestamp issued_at
+    }
+    TAX_INVOICE_ITEMS {
+        uuid id PK
+        uuid invoice_id FK
+        uuid product_id "ref inventory-bc"
+        int qty
+        decimal unit_price
+        decimal line_total
+    }
+    COGS_ENTRIES {
+        uuid id PK
+        uuid sale_id "ref sales-bc"
+        uuid lot_id "ref inventory-bc"
+        int qty
+        decimal unit_cost "lot exact"
+        decimal cogs
+    }
+    PROFIT_LOSS_RECORDS {
+        uuid id PK
+        uuid sale_id "ref sales-bc"
+        uuid lot_id "ref inventory-bc"
+        decimal revenue
+        decimal cogs
+        decimal gross_profit
+    }
+    BILLING_NOTES {
+        uuid id PK
+        uuid customer_id "ref sales-bc"
+        decimal total
+        string status
+    }
+    BILLING_NOTE_INVOICES {
+        uuid id PK
+        uuid billing_note_id FK
+        uuid invoice_id FK
+    }
+    TAX_CONFIGS {
+        uuid id PK
+        string name "VAT7 etc"
+        string tax_type "VAT_or_WHT"
+        decimal rate
+        boolean accumulate
+    }
+    CREDIT_NOTES {
+        uuid id PK
+        uuid invoice_id FK
+        decimal amount
+        string reason
+    }
+    PAYMENT_ENTRIES {
+        uuid id PK
+        string payment_type "receive_or_pay"
+        uuid party_id "customer_or_supplier"
+        decimal paid_amount
+        decimal wht_amount "withholding"
+        decimal unallocated_amount
+        string status
+    }
+    PAYMENT_ALLOCATIONS {
+        uuid id PK
+        uuid payment_entry_id FK
+        uuid invoice_id FK
+        decimal allocated_amount
+    }
+    PAYMENT_SCHEDULES {
+        uuid id PK
+        uuid invoice_id FK
+        date due_date
+        decimal amount
+        decimal outstanding
+    }
+    LEDGER_ENTRIES {
+        uuid id PK
+        string account
+        decimal debit
+        decimal credit
+        uuid ref_doc_id
+        string voucher_type
+        boolean is_cancelled
+    }
+    TAX_INVOICES ||--o{ TAX_INVOICE_ITEMS : contains
+    TAX_INVOICES ||--o{ CREDIT_NOTES : "amended by"
+    TAX_INVOICES ||--o{ BILLING_NOTE_INVOICES : "billed in"
+    TAX_INVOICES ||--o{ PAYMENT_SCHEDULES : "credit terms"
+    BILLING_NOTES ||--o{ BILLING_NOTE_INVOICES : groups
+    PAYMENT_ENTRIES ||--o{ PAYMENT_ALLOCATIONS : allocates
+    TAX_INVOICES ||--o{ PAYMENT_ALLOCATIONS : "settled by"
+    COGS_ENTRIES ||--|| PROFIT_LOSS_RECORDS : feeds
+</pre>
+          </div>
+        </div>
+
+        <!-- 5.5 Dev Guide -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · EXACT LOT COST</div><p class="text-[13.5px]"><b>COGS = Σ(allocation.qty × allocation.unit_cost)</b> ต้องใช้ <b>unit_cost ที่มากับ event</b> เท่านั้น <b>ห้าม</b>คำนวณเฉลี่ย และห้าม query ราคาปัจจุบันของสินค้า</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PER-ALLOCATION P&amp;L</div><p class="text-[13.5px]">คำนวณกำไรต่อ allocation แล้วค่อย aggregate — หนึ่ง delivery อาจกินหลายล็อตที่ต้นทุนต่างกัน</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · IMMUTABLE COGS</div><p class="text-[13.5px]">COGS เก็บเป็น snapshot immutable แก้ไขผ่าน <b>adjusting entry</b> เท่านั้น</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · GAPLESS NUMBERING</div><p class="text-[13.5px]">เลขที่ใบกำกับต้อง gapless &amp; transaction-safe (ใช้ advisory lock / sequence table) กันเลขซ้ำ/ข้าม</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · DECIMAL &amp; ROUNDING</div><p class="text-[13.5px]">ใช้ <span class="mono text-[12px]">decimal(18,4)</span> หรือ integer สตางค์ · ปัดเศษตามกฎภาษี · ห้าม float</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · IDEMPOTENT CONSUMER</div><p class="text-[13.5px]">consumer ของ <span class="mono text-[12px]">stock.deducted</span> ต้อง idempotent (processed_events) กันการสร้าง COGS ซ้ำ</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · INVOICE IMMUTABILITY</div><p class="text-[13.5px]">ใบกำกับที่ออกแล้ว immutable → แก้ไขด้วย credit/debit note pattern เท่านั้น</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · GL DOUBLE-ENTRY BALANCED</div><p class="text-[13.5px]">ทุก financial transaction โพสต์ลง GL เป็นคู่ <b>debit = credit</b> เสมอ (ยอดรวมต้องเป็นศูนย์) · GL เป็น <b>append-only + immutable</b> เหมือน stock ledger · การ cancel เอกสารต้องโพสต์ entry กลับด้าน ไม่ลบของเดิม</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PAYMENT ALLOCATION</div><p class="text-[13.5px]">1 การชำระเงิน allocate ไปได้ <b>หลายใบกำกับ</b> · ผลรวม allocation ≤ paid_amount · ส่วนเกินเก็บเป็น <span class="mono text-[12px]">unallocated_amount</span> (เครดิตลูกค้า) · outstanding ของใบกำกับ = total − Σ allocation</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · WITHHOLDING TAX</div><p class="text-[13.5px]">รองรับภาษี <b>หัก ณ ที่จ่าย (WHT)</b> แยกจาก VAT — ตอนรับ/จ่ายเงินคำนวณ WHT ตามอัตราของประเภทเงินได้ แล้วออกหนังสือรับรองหัก ณ ที่จ่าย · WHT ลดยอดเงินสดจริงแต่ไม่ลดยอดหนี้</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM &middot; SRS &middot; PHASE 5 &middot; FINANCE"
+        line2="TAX INVOICE &middot; BILLING &middot; COGS &amp; P&amp;L / LOT">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+    background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -18,7 +18,11 @@ class ErpDocnav extends HTMLElement {
     const current = window.location.pathname.split('/').pop() || 'index.html';
 
     const links = LINKS.map((link, i) => {
-      const isCurrent = link.href === current;
+      // core-feature.html is the SRS hub; the per-phase pages (srs-p3.html …)
+      // live under it, so keep the SRS entry highlighted while reading a phase.
+      const isCurrent =
+        link.href === current ||
+        (link.href === 'core-feature.html' && /^srs-p\d/.test(current));
       const sep = i > 0 ? '<span class="sep">/</span>' : '';
       return `${sep}<a href="${link.href}"${isCurrent ? ' class="current"' : ''}>${link.label}</a>`;
     }).join('\n  ');
