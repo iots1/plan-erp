@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRS &middot; Phase 2 — Master Data &amp; Storage &middot; ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <erp-sidebar badge="P2" title="SRS &middot; Master Data" subtitle="PHASE 2 &middot; MASTER DATA &amp; STORAGE" width="280">
+    <nav slot="nav">
+      <a href="core-feature.html" class="navlink"><span class="n" style="color:var(--accent)">IA</span> Sitemap / Overview</a>
+      <a href="srs-p2.html" class="navlink"><span class="n" style="color:#7C3AED">P2</span> Master Data &amp; Storage</a>
+      <a href="srs-p3.html" class="navlink"><span class="n" style="color:var(--signal)">P3</span> Inventory Core</a>
+      <a href="srs-p4.html" class="navlink"><span class="n" style="color:var(--blueprint)">P4</span> Procurement &amp; Sales</a>
+      <a href="srs-p5.html" class="navlink"><span class="n" style="color:var(--accent)">P5</span> Finance</a>
+      <a href="srs-p6.html" class="navlink"><span class="n" style="color:#38BDF8">P6</span> Reporting (CQRS)</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <div class="navsub">ในเฟสนี้ประกอบด้วย</div>
+      <div class="navsub">1 · Business &amp; Roles</div>
+      <div class="navsub">2 · Master + Required Fields</div>
+      <div class="navsub">3 · Setup Sequence → Inventory</div>
+      <div class="navsub">4 · Storage · MinIO</div>
+      <div class="navsub">5 · ER Diagram</div>
+      <div class="navsub">6 · Dev Guide</div>
+    </nav>
+    <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
+  </erp-sidebar>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+    <div class="max-w-[1000px] mx-auto px-6 sm:px-10 py-14 space-y-20">
+
+      <section id="p2" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(124,58,237,.04))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(124,58,237,.16);color:#7C3AED;border:1px solid rgba(124,58,237,.3)">PHASE 2</span>
+              <span class="eyebrow" style="color:#7C3AED">inventory-bc · supplier-bc · storage-bc</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Master Data &amp; Storage — Item · Group · UOM · Warehouse · Supplier</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">ข้อมูลตั้งต้นที่ต้อง <b>ตั้งค่าให้ครบก่อนเริ่มทำธุรกรรมสต็อก</b> — เอกสารนี้ระบุว่าแต่ละ master ต้องกรอกฟิลด์ใดบ้าง (required) เพื่อ <b>ส่งต่อให้ inventory (Phase 3)</b> ทำงานได้</p>
+          </div>
+        </div>
+
+        <!-- 2.1 Business & Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครตั้งค่าอะไร</h3></div>
+          <div class="grid sm:grid-cols-3 gap-4">
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:#7C3AED">MASTER DATA ADMIN</div>
+              <div class="font-semibold mb-1.5">ผู้ดูแลข้อมูลหลัก</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">ตั้งค่า UOM, Item Group (โครงต้นไม้), Brand และ Warehouse — โครงสร้างพื้นฐานที่ทุกสินค้าอ้างถึง</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:#7C3AED">PRODUCT OWNER</div>
+              <div class="font-semibold mb-1.5">ผู้ดูแลสินค้า</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">สร้าง Item master (2 ภาษา), กำหนด stock UOM + conversion, สร้าง variant จาก attribute และตั้งจุดสั่งซื้อ</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:#7C3AED">PURCHASING</div>
+              <div class="font-semibold mb-1.5">ฝ่ายจัดซื้อ</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">ตั้งค่า Supplier (ใน supplier-bc) — inventory อ้างถึงด้วย <span class="mono text-[12px]">supplier_id</span> (UUID) ตอนรับสินค้า</p>
+            </div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> master data คือ <b>รากฐาน</b> — ต้องตั้งค่าให้เสร็จก่อนเปิดทำธุรกรรมใด ๆ (Goods Receipt / PO / SO) · ทุกฟิลด์ 2 ภาษาเก็บเป็น <b>flat column</b> <span class="mono text-[12px]">name_th / name_en</span> และทุกตารางสืบทอด <span class="mono text-[12px]">BaseEntity</span> (audit + soft-delete) ตาม <a href="backend-convention.html" style="color:var(--accent);text-decoration:underline">Backend Conventions</a></div>
+        </div>
+
+        <!-- 2.2 Master + Required Fields -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">02</span><h3 class="text-xl font-semibold">Master Data &amp; Required Fields · แต่ละ master กรอกอะไรบ้าง</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)"><span class="mono text-[12px]" style="color:#15803D">✓</span> = จำเป็น (required สำหรับข้อมูลตั้งต้น) · <span class="mono text-[12px]" style="color:var(--muted)">–</span> = ไม่บังคับ · ฟิลด์ <span class="mono text-[12px]">id · created_at/by · updated_at/by · is_deleted …</span> มาจาก <span class="mono text-[12px]">BaseEntity</span> ทุกตาราง (ไม่แสดงซ้ำ)</p>
+
+          <!-- UOM -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div class="mono text-[12px]" style="color:#7C3AED">uoms · หน่วยนับ</div>
+              <span class="chip"><span class="dot" style="background:#7C3AED"></span>ตั้งค่าก่อน (P0 master)</span>
+            </div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>name</td><td><span style="color:#15803D">✓</span></td><td>ชื่อหน่วย (ชิ้น · กล่อง · กก. · ลิตร)</td></tr>
+                <tr><td>is_whole_number</td><td><span style="color:#15803D">✓</span></td><td>หน่วยนับเป็นจำนวนเต็มเท่านั้นหรือไม่ (เช่น "ชิ้น" = true) — คุมการปัดเศษตอนแปลงหน่วย</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ส่งต่อ inventory</div><p class="text-[13px]">เป็น <span class="mono text-[12px]">stock_uom</span> ของสินค้า · แนะนำ <b>seed ~200+ หน่วยมาตรฐาน</b> ไว้ล่วงหน้า</p></div>
+          </div>
+
+          <!-- ITEM GROUP -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">item_groups · กลุ่มสินค้า (tree · nested-set)</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อกลุ่ม (ไทย)</td></tr>
+                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อกลุ่ม (อังกฤษ)</td></tr>
+                <tr><td>is_group</td><td><span style="color:#15803D">✓</span></td><td>node (true) / leaf (false) — <b>เฉพาะ leaf</b> ที่ผูกสินค้าได้</td></tr>
+                <tr><td>parent_item_group_id</td><td><span style="color:var(--muted)">–</span></td><td>กลุ่มแม่ (null = root)</td></tr>
+                <tr><td>lft · rgt</td><td><span style="color:var(--muted)">sys</span></td><td>ระบบคำนวณเอง (nested-set) ตอน insert/move</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ส่งต่อ inventory</div><p class="text-[13px]">สินค้าผูก <span class="mono text-[12px]">item_group_id</span> ที่เป็น leaf · ใช้จัดหมวดในรายงาน (subtree query)</p></div>
+          </div>
+
+          <!-- BRAND -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">brands · ยี่ห้อ</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>name</td><td><span style="color:#15803D">✓</span></td><td>ชื่อยี่ห้อ</td></tr>
+                <tr><td>logo_url</td><td><span style="color:var(--muted)">–</span></td><td>โลโก้ (อัปโหลดผ่าน storage-bc → presigned URL)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ITEM ATTRIBUTE -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">item_attributes + item_attribute_values · คุณลักษณะ (สำหรับ variant)</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>item_attributes.name</td><td><span style="color:#15803D">✓</span></td><td>ชื่อคุณลักษณะ เช่น สี, ขนาด</td></tr>
+                <tr><td>attribute_values.attribute_id</td><td><span style="color:#15803D">✓</span></td><td>อ้างถึง attribute แม่</td></tr>
+                <tr><td>attribute_values.value</td><td><span style="color:#15803D">✓</span></td><td>ค่า เช่น แดง, น้ำเงิน, S, M, L</td></tr>
+                <tr><td>attribute_values.abbr</td><td><span style="color:var(--muted)">–</span></td><td>ตัวย่อ (ใช้ประกอบ SKU ของ variant)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4"><div class="tag mb-1">เมื่อไหร่ต้องมี</div><p class="text-[13px]">เฉพาะสินค้าที่มีตัวเลือก (<span class="mono text-[12px]">has_variants=true</span>) — ระบบใช้ generate variant อัตโนมัติ · ถ้าสินค้าเดี่ยวล้วน ข้ามส่วนนี้ได้</p></div>
+          </div>
+
+          <!-- PRODUCT (core) -->
+          <div class="card p-6 mb-5" style="border-left:3px solid #7C3AED">
+            <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div class="mono text-[12px]" style="color:#7C3AED">products · สินค้า (Item master)</div>
+              <span class="chip"><span class="dot" style="background:var(--signal)"></span>จุดร่วมหลัก — Lot/GR/PO/SO ผูกทั้งหมด</span>
+            </div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>sku</td><td><span style="color:#15803D">✓</span></td><td>รหัสสินค้า — <b>unique</b> (<span class="mono text-[12px]">uq_products_sku</span>)</td></tr>
+                <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อสินค้า (ไทย)</td></tr>
+                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อสินค้า (อังกฤษ)</td></tr>
+                <tr><td>type</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">single</span> | <span class="mono text-[12px]">bundle</span> (ชุด/kit)</td></tr>
+                <tr><td>item_group_id</td><td><span style="color:#15803D">✓</span></td><td>กลุ่มสินค้า (leaf)</td></tr>
+                <tr><td>stock_uom_id</td><td><span style="color:#15803D">✓</span></td><td>หน่วยเก็บสต็อกหลัก — <b>ล็อกไม่ให้แก้เมื่อมี movement</b></td></tr>
+                <tr><td>has_variants</td><td><span style="color:var(--muted)">–</span></td><td>true = สินค้าต้นแบบ (template) <b>ห้ามทำธุรกรรมตรง</b></td></tr>
+                <tr><td>template_product_id</td><td><span style="color:var(--muted)">–</span></td><td>ถ้าเป็น variant → อ้าง product ต้นแบบ</td></tr>
+                <tr><td>brand_id</td><td><span style="color:var(--muted)">–</span></td><td>ยี่ห้อ</td></tr>
+                <tr><td>supplier_id</td><td><span style="color:var(--muted)">–</span></td><td>ผู้จัดซื้อหลัก (ref supplier-bc · UUID)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- UOM CONVERSION -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">uom_conversion_factors · อัตราแปลงหน่วย (ต่อสินค้า)</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>product_id</td><td><span style="color:#15803D">✓</span></td><td>สินค้าที่ใช้อัตรานี้</td></tr>
+                <tr><td>uom_id</td><td><span style="color:#15803D">✓</span></td><td>หน่วยทางเลือก (เช่น กล่อง)</td></tr>
+                <tr><td>conversion_factor</td><td><span style="color:#15803D">✓</span></td><td>เท่าของ stock_uom (เช่น 1 กล่อง = 12 ชิ้น → 12)</td></tr>
+                <tr><td>uom_type</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">purchase</span> | <span class="mono text-[12px]">sales</span></td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4"><div class="tag mb-1">เมื่อไหร่ต้องมี</div><p class="text-[13px]">เฉพาะเมื่อ <b>ซื้อ/ขายด้วยหน่วยที่ต่างจาก stock UOM</b> · GR/PO/SO จะแปลงจำนวนกลับเป็น stock_uom เสมอ — ถ้า stock UOM <span class="mono text-[12px]">is_whole_number</span> ผลแปลงต้องลงตัว</p></div>
+          </div>
+
+          <!-- WAREHOUSE -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">warehouses · คลัง (tree · nested-set)</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อคลัง (ไทย)</td></tr>
+                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อคลัง (อังกฤษ)</td></tr>
+                <tr><td>warehouse_type</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">stock</span> | <span class="mono text-[12px]">transit</span> (โอนข้ามสาขา) | <span class="mono text-[12px]">reject</span> (ของเสีย)</td></tr>
+                <tr><td>is_group</td><td><span style="color:#15803D">✓</span></td><td>node/leaf — <b>เฉพาะ leaf</b> ที่เก็บสต็อก/รับสินค้าได้</td></tr>
+                <tr><td>parent_warehouse_id</td><td><span style="color:var(--muted)">–</span></td><td>คลังแม่ (null = root)</td></tr>
+                <tr><td>lft · rgt</td><td><span style="color:var(--muted)">sys</span></td><td>ระบบคำนวณเอง (nested-set)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ส่งต่อ inventory</div><p class="text-[13px]">Goods Receipt ปลายทางต้องเป็น <b>leaf</b> (<span class="mono text-[12px]">is_group=false</span>, <span class="mono text-[12px]">type=stock</span>)</p></div>
+          </div>
+
+          <!-- SUPPLIER -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div class="mono text-[12px]" style="color:#7C3AED">suppliers · ผู้จัดซื้อ</div>
+              <span class="evt evt-tcp">supplier-bc (ข้าม BC · UUID)</span>
+            </div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>code</td><td><span style="color:#15803D">✓</span></td><td>รหัสผู้จัดซื้อ (unique)</td></tr>
+                <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ (ไทย)</td></tr>
+                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ (อังกฤษ)</td></tr>
+                <tr><td>tax_id</td><td><span style="color:#15803D">✓</span></td><td>เลขประจำตัวผู้เสียภาษี (ใช้ต่อใน finance-bc)</td></tr>
+                <tr><td>contact_phone · address</td><td><span style="color:var(--muted)">–</span></td><td>ข้อมูลติดต่อ</td></tr>
+                <tr><td>credit_terms</td><td><span style="color:var(--muted)">–</span></td><td>เงื่อนไขเครดิต (วัน) — ใช้ตอนตั้งหนี้ AP</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4"><div class="tag mb-1">ขอบเขต</div><p class="text-[13px]"><b>supplier-bc เป็นเจ้าของ</b> · inventory/finance อ้างด้วย <span class="mono text-[12px]">supplier_id</span> (UUID) เท่านั้น ไม่ join ข้าม DB</p></div>
+          </div>
+
+          <!-- REORDER -->
+          <div class="card p-6">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">reorder_levels · จุดสั่งซื้อ (ไม่บังคับ)</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>product_id</td><td><span style="color:#15803D">✓</span></td><td>สินค้าที่เฝ้าระวัง</td></tr>
+                <tr><td>warehouse_id</td><td><span style="color:#15803D">✓</span></td><td>คลังที่ตั้งจุดสั่งซื้อ</td></tr>
+                <tr><td>alert_qty</td><td><span style="color:#15803D">✓</span></td><td>จำนวนขั้นต่ำ — ต่ำกว่านี้จะแจ้งเตือน (stock.low ใน P3)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2.3 Setup Sequence & Handoff -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">03</span><h3 class="text-xl font-semibold">Setup Sequence &amp; Handoff to Inventory · ลำดับตั้งค่า → ส่งต่อ</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">ต้องตั้งค่าตาม <b>ลำดับ dependency</b> (อันหลังอ้างอิงอันหน้า) จึงจะเริ่มรับสินค้า (Goods Receipt · Phase 3) ได้</p>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>UOM</b> — ตั้งหน่วยนับ + ระบุ <span class="mono text-[12px]">is_whole_number</span> (seed ชุดมาตรฐาน)</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>Item Group (tree)</b> + <b>Brand</b> — โครงหมวดหมู่และยี่ห้อ</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">(ถ้ามีตัวเลือก) <b>Item Attribute</b> + values — เตรียมก่อน generate variant</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Product (Item master)</b> — เลือก item_group + stock_uom (+ brand/supplier) · ตั้ง <span class="mono text-[12px]">has_variants</span> ถ้าต้องการ generate</p></div>
+            <div class="step"><span class="sn">5</span><p class="text-[13.5px]"><b>UOM Conversion</b> ต่อสินค้า (ถ้าซื้อ/ขายต่างหน่วยจาก stock UOM)</p></div>
+            <div class="step"><span class="sn">6</span><p class="text-[13.5px]"><b>Warehouse (tree)</b> — สร้างคลังปลายทาง (leaf · type=stock)</p></div>
+            <div class="step"><span class="sn">7</span><p class="text-[13.5px]"><b>Supplier</b> (supplier-bc) — สำหรับอ้างอิงตอนรับสินค้า/PO</p></div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="card p-6" style="border-left:3px solid var(--signal)">
+              <div class="eyebrow mb-3" style="color:var(--signal)">✓ Minimum Data — พร้อมทำ Goods Receipt แรก</div>
+              <ul class="space-y-2 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:#15803D">✓</span><span>≥ 1 <b>UOM</b> (ใช้เป็น stock unit)</span></li>
+                <li class="flex gap-2.5"><span style="color:#15803D">✓</span><span>≥ 1 <b>Item Group</b> (leaf)</span></li>
+                <li class="flex gap-2.5"><span style="color:#15803D">✓</span><span>≥ 1 <b>Product</b> (<span class="mono text-[12px]">type=single</span>, <span class="mono text-[12px]">has_variants=false</span>, มี stock_uom_id + item_group_id)</span></li>
+                <li class="flex gap-2.5"><span style="color:#15803D">✓</span><span>≥ 1 <b>Warehouse</b> (<span class="mono text-[12px]">type=stock</span>, <span class="mono text-[12px]">is_group=false</span>)</span></li>
+                <li class="flex gap-2.5"><span style="color:#15803D">✓</span><span>≥ 1 <b>Supplier</b> (supplier-bc)</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--muted)">+</span><span><b>Stock Settings</b> (valuation · default warehouse · negative flag) — ตั้งใน Phase 3</span></li>
+              </ul>
+            </div>
+            <div class="card p-6" style="border-left:3px solid var(--signal)">
+              <div class="eyebrow mb-3" style="color:var(--signal)">→ inventory รับอะไรไปใช้</div>
+              <ul class="space-y-2 text-[13px]" style="color:var(--ink-soft)">
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><span class="mono text-[12px]">product_id</span> + <span class="mono text-[12px]">stock_uom_id</span> — สร้าง Lot/movement ในหน่วยที่ถูกต้อง</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><span class="mono text-[12px]">conversion_factor</span> — แปลงจำนวนซื้อ/ขาย → stock_uom</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><span class="mono text-[12px]">item_group_id</span> — จัดหมวดในรายงานสต็อก</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><span class="mono text-[12px]">warehouse_id</span> (leaf) — คลังปลายทางของ Goods Receipt</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><span class="mono text-[12px]">supplier_id</span> (UUID) — ผูกกับ Lot ที่รับเข้า</span></li>
+              </ul>
+            </div>
+          </div>
+          <div class="rulebox ok mt-5"><div class="rc mb-1">GATE · ก่อนเปิด Phase 3</div><p class="text-[13.5px]">ถ้า master ไม่ครบ (เช่น product ไม่มี stock_uom, warehouse เป็น group) → <b>Goods Receipt จะถูกปฏิเสธที่ระดับ service</b> · การเปลี่ยน master ที่ inventory denormalize ไว้ (ชื่อ/หมวด/ยี่ห้อ) จะยิง event <span class="mono text-[12px]">item.updated</span> ไปอัปเดต report-bc</p></div>
+        </div>
+
+        <!-- 2.4 Storage -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">04</span><h3 class="text-xl font-semibold">Storage · MinIO — รูปสินค้า &amp; เอกสารแนบ</h3></div>
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">file_objects · storage-bc</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>bucket</td><td><span style="color:#15803D">✓</span></td><td>bucket ปลายทางบน MinIO (เช่น product-images)</td></tr>
+                <tr><td>object_key</td><td><span style="color:#15803D">✓</span></td><td>path/ชื่อไฟล์ใน bucket</td></tr>
+                <tr><td>context_ref</td><td><span style="color:#15803D">✓</span></td><td>UUID ของสิ่งที่ไฟล์ผูกอยู่ (เช่น <span class="mono text-[12px]">product_id</span>)</td></tr>
+                <tr><td>content_type</td><td><span style="color:#15803D">✓</span></td><td>MIME (image/png ฯลฯ)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mono text-[11px] mb-3" style="color:#7C3AED">FLOW · อัปโหลดรูปสินค้า (presigned)</div>
+          <div class="grid sm:grid-cols-4 gap-3">
+            <div class="card p-4"><div class="mono text-[11px] mb-1" style="color:var(--muted)">Next.js</div><p class="text-[12.5px]" style="color:var(--ink-soft)">ขอ <b>Presigned PUT URL</b> (TCP → storage-bc)</p></div>
+            <div class="card p-4"><div class="mono text-[11px] mb-1" style="color:var(--muted)">Frontend → MinIO</div><p class="text-[12.5px]" style="color:var(--ink-soft)">อัปโหลดไฟล์ตรง (ไม่ผ่าน backend)</p></div>
+            <div class="card p-4"><div class="mono text-[11px] mb-1" style="color:var(--muted)">storage-bc</div><p class="text-[12.5px]" style="color:var(--ink-soft)">บันทึก <span class="mono text-[11px]">file_object</span> (<span class="mono text-[11px]">context_ref=product_id</span>)</p></div>
+            <div class="card p-4"><div class="mono text-[11px] mb-1" style="color:var(--muted)">inventory / UI</div><p class="text-[12.5px]" style="color:var(--ink-soft)">แสดงรูปผ่าน <b>Presigned GET</b> ตาม context_ref</p></div>
+          </div>
+        </div>
+
+        <!-- 2.5 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">05</span><h3 class="text-xl font-semibold">ER Diagram · Master Data (i18n flat columns)</h3></div>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    UOMS {
+        uuid id PK
+        string name "ชิ้น/กล่อง/กก."
+        boolean is_whole_number
+    }
+    ITEM_GROUPS {
+        uuid id PK
+        string name_th
+        string name_en
+        uuid parent_item_group_id FK "self ref tree"
+        boolean is_group "node/leaf"
+        int lft
+        int rgt
+    }
+    BRANDS {
+        uuid id PK
+        string name
+        string logo_url "via storage-bc"
+    }
+    ITEM_ATTRIBUTES {
+        uuid id PK
+        string name "Color/Size"
+    }
+    ITEM_ATTRIBUTE_VALUES {
+        uuid id PK
+        uuid attribute_id FK
+        string value
+        string abbr
+    }
+    ITEM_VARIANT_ATTRIBUTES {
+        uuid id PK
+        uuid variant_product_id FK
+        uuid attribute_id FK
+        uuid attribute_value_id FK
+    }
+    PRODUCTS {
+        uuid id PK
+        string sku UK
+        string name_th
+        string name_en
+        string type "single/bundle"
+        uuid item_group_id FK
+        uuid brand_id FK
+        uuid stock_uom_id FK
+        boolean has_variants
+        uuid template_product_id FK "variant of"
+        uuid supplier_id "ref supplier-bc"
+    }
+    UOM_CONVERSION_FACTORS {
+        uuid id PK
+        uuid product_id FK
+        uuid uom_id FK
+        decimal conversion_factor "to stock_uom"
+        string uom_type "purchase/sales"
+    }
+    WAREHOUSES {
+        uuid id PK
+        string name_th
+        string name_en
+        uuid parent_warehouse_id FK "self ref tree"
+        boolean is_group
+        string warehouse_type "stock/transit/reject"
+        int lft
+        int rgt
+    }
+    REORDER_LEVELS {
+        uuid id PK
+        uuid product_id FK
+        uuid warehouse_id FK
+        int alert_qty
+    }
+    ITEM_GROUPS ||--o{ ITEM_GROUPS : "parent of"
+    ITEM_GROUPS ||--o{ PRODUCTS : classifies
+    BRANDS ||--o{ PRODUCTS : brands
+    UOMS ||--o{ PRODUCTS : "stock_uom"
+    PRODUCTS ||--o{ UOM_CONVERSION_FACTORS : has
+    UOMS ||--o{ UOM_CONVERSION_FACTORS : uom
+    PRODUCTS ||--o| PRODUCTS : "template of variant"
+    ITEM_ATTRIBUTES ||--o{ ITEM_ATTRIBUTE_VALUES : has
+    PRODUCTS ||--o{ ITEM_VARIANT_ATTRIBUTES : "variant of"
+    WAREHOUSES ||--o{ WAREHOUSES : "parent of"
+    PRODUCTS ||--o| REORDER_LEVELS : has
+</pre>
+          </div>
+          <p class="text-[12.5px] mt-2" style="color:var(--muted)">* <span class="mono">suppliers</span> อยู่ใน supplier-bc และ <span class="mono">file_objects</span> อยู่ใน storage-bc — อ้างข้าม BC ด้วย UUID เท่านั้น ไม่มี FK ข้ามฐานข้อมูล</p>
+        </div>
+
+        <!-- 2.6 Dev Guide -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">06</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · i18n FLAT COLUMNS</div><p class="text-[13.5px]">ฟิลด์ 2 ภาษาเก็บเป็น <span class="mono text-[12px]">name_th / name_en</span> (ไม่ใช้ JSONB) · Response ยุบเป็น <span class="mono text-[12px]">name: { th, en }</span> ผ่าน LocalizationInterceptor · input (DTO) เป็น flat keys</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · BASE ENTITY</div><p class="text-[13.5px]">ทุกตารางสืบทอด <span class="mono text-[12px]">BaseEntity</span> — ได้ <span class="mono text-[12px]">id · created_at/by · updated_at/by · is_deleted · deleted_at/by/reason</span> · การลบเป็น soft-delete เสมอ</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · NESTED-SET TREE</div><p class="text-[13.5px]"><span class="mono text-[12px]">item_groups</span> และ <span class="mono text-[12px]">warehouses</span> เป็น tree (<span class="mono text-[12px]">lft/rgt</span>) — rebuild ใน transaction ตอน insert/move · <b>เฉพาะ leaf</b> (<span class="mono text-[12px]">is_group=false</span>) ผูกสินค้า/เก็บสต็อกได้</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · STOCK UOM IMMUTABLE</div><p class="text-[13.5px]"><span class="mono text-[12px]">stock_uom_id</span> ห้ามแก้ทันทีที่มี stock movement แรก (DB trigger หรือ app guard) กัน available_qty ในอดีตตีความหน่วยผิด</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · TEMPLATE NOT TRANSACTABLE</div><p class="text-[13.5px]">สินค้า <span class="mono text-[12px]">has_variants=true</span> ต้องถูกปฏิเสธเมื่อใช้ใน GR/PO/SO ตรง — อนุญาตเฉพาะ variant ที่ generate จาก attribute</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · CONVERSION ROUND CHECK</div><p class="text-[13.5px]">ถ้า stock UOM <span class="mono text-[12px]">is_whole_number=true</span> ต้องตรวจว่า qty × conversion_factor เป็นจำนวนเต็ม มิฉะนั้น reject</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · UNIQUE KEYS</div><p class="text-[13.5px]"><span class="mono text-[12px]">uq_products_sku</span> · <span class="mono text-[12px]">uq_suppliers_code</span> — บังคับ unique ระดับ DB · UOM seed ~200+ รายการเป็น master ตั้งต้น</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · UUID CROSS-BC + EVENTS</div><p class="text-[13.5px]"><span class="mono text-[12px]">supplier_id</span> (supplier-bc) และ <span class="mono text-[12px]">context_ref</span> (storage-bc) อ้างด้วย UUID ห้าม FK ข้าม DB · การแก้ master ยิง <span class="mono text-[12px]">item.updated</span> ให้ report-bc/sales/supplier อัปเดต cache</p></div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · SRS · PHASE 2 · MASTER DATA &amp; STORAGE"
+        line2="ITEM · GROUP · UOM · WAREHOUSE · SUPPLIER · MINIO">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+    background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>
