@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IAM Admin - ระบบจัดการสิทธิ์ผู้ใช้งาน</title>
+    <title>ERP IAM Admin - ระบบจัดการสิทธิ์ผู้ใช้งาน (Identity &amp; Access)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -52,8 +52,8 @@
     <!-- Sidebar -->
     <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col hidden md:flex shrink-0 transition-all duration-300">
         <div class="p-6 flex items-center gap-3">
-            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">M</div>
-            <span class="text-xl font-bold text-white tracking-wider">MEDITECH IAM</span>
+            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">E</div>
+            <span class="text-xl font-bold text-white tracking-wider">ERP IAM</span>
         </div>
         
         <nav class="flex-1 px-4 space-y-1 overflow-y-auto" id="sidebarMenu">
@@ -173,8 +173,10 @@
                     <div class="flex items-center gap-2 w-full sm:w-auto">
                         <select id="filterDept" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none" onchange="filterUsers()">
                             <option value="">ทุกแผนก (Department)</option>
-                            <option value="Cardiology">Cardiology</option>
-                            <option value="Nursing">Nursing</option>
+                            <option value="Warehouse">Warehouse</option>
+                            <option value="Purchasing">Purchasing</option>
+                            <option value="Sales">Sales</option>
+                            <option value="Accounting">Accounting</option>
                         </select>
                     </div>
                 </div>
@@ -187,7 +189,7 @@
                                 <tr class="bg-slate-50 border-b text-slate-500 text-xs uppercase font-semibold tracking-wide">
                                     <th class="px-6 py-4">ผู้ใช้งาน (Username)</th>
                                     <th class="px-6 py-4">รหัสพนักงาน</th>
-                                    <th class="px-6 py-4">แผนก / วอร์ด</th>
+                                    <th class="px-6 py-4">แผนก / คลัง</th>
                                     <th class="px-6 py-4">บทบาท (Roles)</th>
                                     <th class="px-6 py-4">สถานะ</th>
                                     <th class="px-6 py-4 text-right">จัดการ</th>
@@ -242,11 +244,11 @@
                     <div class="p-6 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-slate-700">รหัสบทบาท (Role ID) <span class="text-red-500">*</span></label>
-                            <input type="text" id="frmRoleId" required placeholder="เช่น ROLE_HEAD_NURSE" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-mono text-sm">
+                            <input type="text" id="frmRoleId" required placeholder="เช่น ROLE_WAREHOUSE_MANAGER" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-mono text-sm">
                         </div>
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-slate-700">ชื่อบทบาท (Role Name) <span class="text-red-500">*</span></label>
-                            <input type="text" id="frmRoleName" required placeholder="เช่น หัวหน้าพยาบาล" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input type="text" id="frmRoleName" required placeholder="เช่น ผู้จัดการคลังสินค้า" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                     </div>
 
@@ -299,11 +301,11 @@
                         <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-slate-700">ชื่อ Policy <span class="text-red-500">*</span></label>
-                                <input type="text" id="frmPolName" required placeholder="เช่น ManagerDashboardAccess" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <input type="text" id="frmPolName" required placeholder="เช่น WarehouseManagerGoodsReceiptAccess" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-slate-700">คำอธิบาย (Description) <span class="text-red-500">*</span></label>
-                                <input type="text" id="frmPolDesc" required placeholder="อนุญาตให้เข้าหน้า Dashboard และเห็นบางส่วน" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <input type="text" id="frmPolDesc" required placeholder="อนุญาตให้บันทึกและยืนยันใบรับสินค้าเข้าคลัง" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             </div>
                         </div>
                     </div>
@@ -476,7 +478,7 @@
                 <div class="mb-4"><label class="text-sm font-medium text-slate-700">ชื่อผู้ใช้งาน</label><input type="text" id="frmUsername" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 mt-1"></div>
                 <div class="mb-6"><label class="text-sm font-medium text-slate-700">บทบาทหลัก</label>
                     <select id="frmRole" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 mt-1 bg-white">
-                        <option value="ROLE_DOCTOR">Doctor</option><option value="ROLE_NURSE">Nurse</option>
+                        <option value="ROLE_WAREHOUSE_MANAGER">Warehouse Manager</option><option value="ROLE_PURCHASING_STAFF">Purchasing Staff</option>
                     </select>
                 </div>
                 <div class="flex gap-3">
@@ -492,28 +494,29 @@
         // 1. Mock Data Dictionary
         const mockApiData = {
             users: [
-                { id: "USR001", username: "dr.somchai", full_name: "นพ.สมชาย ใจดี", employee_id: "EMP2024001", department: "Cardiology", ward: "CARD-A", email: "somchai@meditech.th", status: "active", roles: ["ROLE_DOCTOR"] },
-                { id: "USR002", username: "nurse.somying", full_name: "น.ส.สมหญิง รักษ์ดี", employee_id: "EMP2024050", department: "Nursing", ward: "CARD-A", email: "somying@meditech.th", status: "active", roles: ["ROLE_NURSE"] }
+                { id: "USR001", username: "warehouse.somchai", full_name: "สมชาย คลังสมบูรณ์", employee_id: "EMP2024001", department: "Warehouse", warehouse: "WH-MAIN", email: "somchai@erp-system.th", status: "active", roles: ["ROLE_WAREHOUSE_MANAGER"] },
+                { id: "USR002", username: "purchasing.somying", full_name: "สมหญิง จัดซื้อดี", employee_id: "EMP2024050", department: "Purchasing", warehouse: "WH-MAIN", email: "somying@erp-system.th", status: "active", roles: ["ROLE_PURCHASING_STAFF"] }
             ],
             roles: [
-                { id: "ROLE_DOCTOR", name: "Doctor", description: "แพทย์ผู้มีใบอนุญาต", userCount: 120, policies: ["POL_DOCTOR_OWN_PATIENT"] }
+                { id: "ROLE_WAREHOUSE_MANAGER", name: "Warehouse Manager", description: "ผู้จัดการคลังสินค้า อนุมัติรับ/จ่ายสินค้าและปรับสต็อก", userCount: 12, policies: ["POL_WAREHOUSE_GOODS_RECEIPT"] }
             ],
             policies: [
-                { id: "POL_DOCTOR_OWN_PATIENT", name: "Doctor Access Own Patients Only", description: "เข้าถึงได้เฉพาะผู้ป่วยของตนเอง", effect: "Allow", type: "Condition Based" }
+                { id: "POL_WAREHOUSE_GOODS_RECEIPT", name: "Warehouse Manager - Goods Receipt Access", description: "อนุญาตให้บันทึกและยืนยันใบรับสินค้าเข้าคลังของสาขาตนเอง", effect: "Allow", type: "Condition Based" }
             ]
         };
 
         // 🌟 Data Structure ใหม่: แยกอิสระระหว่าง API และ UI
         const stmtOptions = {
             api_services: [
-                { id: "emr-bc", label: "emr-bc (เวชระเบียน / API)" },
-                { id: "opd-bc", label: "opd-bc (ผู้ป่วยนอก / API)" },
+                { id: "inventory-bc", label: "inventory-bc (คลังสินค้า / API)" },
+                { id: "supplier-bc", label: "supplier-bc (จัดซื้อ / API)" },
+                { id: "sales-bc", label: "sales-bc (งานขาย / API)" },
                 { id: "system-admin", label: "system-admin (ระบบบริหารจัดการหลัก)" }
             ],
             api_resources: [
-                { id: "patient", label: "patient (ข้อมูลผู้ป่วย)" },
-                { id: "appointment", label: "appointment (ระบบนัดหมายผู้ป่วย)" },
-                { id: "queue", label: "queue (ระบบจัดการคิวตรวจ)" },
+                { id: "goods_receipt", label: "goods_receipt (ใบรับสินค้าเข้าคลัง)" },
+                { id: "purchase_order", label: "purchase_order (ใบสั่งซื้อ)" },
+                { id: "customer", label: "customer (ข้อมูลลูกค้า)" },
                 { id: "user_account", label: "user_account (บัญชีผู้ใช้งานระบบ)" },
                 { id: "system_config", label: "system_config (การตั้งค่าระบบ)" }
             ],
@@ -528,19 +531,21 @@
         };
 
         const apiActionDictionary = {
-            "patient": [
-                { permission: "patient:read", permission_name_th: "ดูรายชื่อและข้อมูลผู้ป่วย", permission_name_en: "View patient" },
-                { permission: "patient:create", permission_name_th: "เพิ่มข้อมูลผู้ป่วยใหม่", permission_name_en: "Create patient" },
-                { permission: "patient:edit", permission_name_th: "แก้ไขข้อมูลผู้ป่วย", permission_name_en: "Edit patient" },
-                { permission: "patient:delete", permission_name_th: "ลบข้อมูลผู้ป่วย", permission_name_en: "Delete patient" }
+            "goods_receipt": [
+                { permission: "goods_receipt:read", permission_name_th: "ดูรายการใบรับสินค้าเข้าคลัง", permission_name_en: "View goods receipt" },
+                { permission: "goods_receipt:create", permission_name_th: "สร้างใบรับสินค้า (Draft)", permission_name_en: "Create goods receipt" },
+                { permission: "goods_receipt:submit", permission_name_th: "ยืนยันรับสินค้า (Submit → สร้าง Lot)", permission_name_en: "Submit goods receipt" },
+                { permission: "goods_receipt:cancel", permission_name_th: "ยกเลิกใบรับสินค้า", permission_name_en: "Cancel goods receipt" }
             ],
-            "appointment": [
-                { permission: "appointment:read", permission_name_th: "ดูตารางนัดหมาย", permission_name_en: "View appointments" },
-                { permission: "appointment:create", permission_name_th: "สร้างนัดหมายใหม่", permission_name_en: "Create appointment" }
+            "purchase_order": [
+                { permission: "purchase_order:read", permission_name_th: "ดูใบสั่งซื้อ", permission_name_en: "View purchase orders" },
+                { permission: "purchase_order:create", permission_name_th: "สร้างใบสั่งซื้อใหม่", permission_name_en: "Create purchase order" },
+                { permission: "purchase_order:approve", permission_name_th: "อนุมัติใบสั่งซื้อ", permission_name_en: "Approve purchase order" }
             ],
-            "queue": [
-                { permission: "queue:read", permission_name_th: "ดูคิวตรวจปัจจุบัน", permission_name_en: "View current queue" },
-                { permission: "queue:manage", permission_name_th: "จัดการคิว/เรียกคิว", permission_name_en: "Manage queue" }
+            "customer": [
+                { permission: "customer:read", permission_name_th: "ดูข้อมูลลูกค้า", permission_name_en: "View customer" },
+                { permission: "customer:edit", permission_name_th: "แก้ไขข้อมูลลูกค้า", permission_name_en: "Edit customer" },
+                { permission: "customer:delete", permission_name_th: "ลบข้อมูลลูกค้า", permission_name_en: "Delete customer" }
             ],
             "user_account": [
                 { permission: "user_account:read", permission_name_th: "ดูข้อมูลบัญชีผู้ใช้งาน", permission_name_en: "View user accounts" },
@@ -588,7 +593,7 @@
                     "page:view_dashboard", "page:view_users", "page:view_roles", "page:view_policies", "page:view_audit", "page:view_settings",
                     "component:widget_total_users", "component:widget_total_roles", "component:widget_active_policies", "component:widget_login_graph",
                     "component:btn_add_user", "component:btn_export_users",
-                    "patient:create", "patient:read"
+                    "goods_receipt:create", "goods_receipt:read"
                 ]
             },
             dashboard_limited: {
@@ -664,12 +669,12 @@
         ];
 
         const conditionKeys = [
-            { val: "patient.attending_doctor_id", label: "ID แพทย์เจ้าของไข้ (attending_doctor_id)" },
-            { val: "patient.current_ward", label: "วอร์ดของผู้ป่วย (current_ward)" },
-            { val: "consultation.consultant_id", label: "ID แพทย์ที่รับ Consult (consultant_id)" },
-            { val: "data.sensitivity_level", label: "ระดับความละเอียดอ่อนข้อมูล (sensitivity_level)" },
-            { val: "data.category", label: "หมวดหมู่โรค (category)" },
-            { val: "context.emergency_access", label: "สิทธิ์การเข้าถึงฉุกเฉิน (emergency_access)" },
+            { val: "customer.owner_id", label: "ID เจ้าของลูกค้า (owner_id)" },
+            { val: "warehouse.branch_id", label: "รหัสคลัง/สาขาของผู้ใช้งาน (branch_id)" },
+            { val: "goods_receipt.created_by", label: "ผู้บันทึกใบรับสินค้า (created_by)" },
+            { val: "purchase_order.total_amount", label: "มูลค่ารวมใบสั่งซื้อ (total_amount)" },
+            { val: "document.approval_limit", label: "วงเงินอนุมัติเอกสารของผู้ใช้ (approval_limit)" },
+            { val: "context.business_hours", label: "อยู่ในเวลาทำการหรือไม่ (business_hours)" },
             { val: "aws:CurrentTime", label: "เวลาที่ใช้งาน (CurrentTime)" },
             { val: "aws:SourceIp", label: "ไอพีแอดเดรส (SourceIp)" }
         ];
@@ -912,7 +917,7 @@
         // --- ฟังก์ชันสำหรับจัดการ Condition Builder ---
         function addConditionRow() {
             const id = `cond_${conditionCounter++}`;
-            conditionRows.push({ operator: 'StringEquals', key: 'patient.attending_doctor_id', value: '${user.id}', id: id });
+            conditionRows.push({ operator: 'StringEquals', key: 'customer.owner_id', value: '${user.id}', id: id });
             renderConditions();
         }
 

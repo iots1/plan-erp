@@ -54,7 +54,7 @@
               <span class="eyebrow" style="color:#2563EB">auth-bc · iam-bc · Security Foundation</span>
             </div>
             <h2 class="display text-2xl sm:text-3xl">Identity &amp; Access — Login · RBAC · Policy-Based Access (PBAC/ABAC)</h2>
-            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">รากฐานความปลอดภัย — พิสูจน์ตัวตน (JWT + refresh + Redis) และควบคุมสิทธิ์แบบ <b>Policy</b> (Effect · Resource · Action · Condition) ครอบทั้งฝั่ง <b>UI</b> และ <b>API</b> · อ้างอิงจาก prototype <span class="mono text-[12px]">user-management.html</span></p>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">รากฐานความปลอดภัย — พิสูจน์ตัวตน (JWT + refresh + Redis) และควบคุมสิทธิ์แบบ <b>Policy</b> (Effect · Resource · Action · Condition) ครอบทั้งฝั่ง <b>UI</b> และ <b>API</b> · อ้างอิงจาก prototype <a href="prototype/user-management.html" target="_blank" class="mono text-[12px]" style="color:#2563EB;text-decoration:underline">prototype/user-management.html</a> (mock data ปรับให้ตรงบริบท ERP แล้ว)</p>
           </div>
         </div>
 
@@ -166,14 +166,14 @@
             <table class="d">
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
-                <tr><td>policies.code</td><td><span style="color:#15803D">✓</span></td><td>รหัส policy เช่น <span class="mono text-[12px]">POL_DOCTOR_OWN_PATIENT</span></td></tr>
+                <tr><td>policies.code</td><td><span style="color:#15803D">✓</span></td><td>รหัส policy เช่น <span class="mono text-[12px]">POL_WAREHOUSE_GOODS_RECEIPT</span></td></tr>
                 <tr><td>policies.name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ policy 2 ภาษา</td></tr>
                 <tr><td>policies.is_active</td><td><span style="color:#15803D">✓</span></td><td>เปิด/ปิดใช้งาน</td></tr>
                 <tr><td>policy_statements.effect</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">allow</span> | <span class="mono text-[12px]">deny</span></td></tr>
                 <tr><td>policy_statements.plane</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">ui</span> | <span class="mono text-[12px]">api</span></td></tr>
                 <tr><td>statement_targets (service · resource)</td><td><span style="color:#15803D">✓</span></td><td>service + resource ที่ statement มีผล</td></tr>
                 <tr><td>statement_actions.permission_id</td><td><span style="color:#15803D">✓</span></td><td>อ้าง permission ที่อนุญาต/ปฏิเสธ</td></tr>
-                <tr><td>statement_conditions (operator · key · value)</td><td><span style="color:var(--muted)">–</span></td><td>เงื่อนไข ABAC — เช่น <span class="mono text-[12px]">StringEquals · attending_doctor_id · ${user.id}</span></td></tr>
+                <tr><td>statement_conditions (operator · key · value)</td><td><span style="color:var(--muted)">–</span></td><td>เงื่อนไข ABAC — เช่น <span class="mono text-[12px]">StringEquals · customer.owner_id · ${user.id}</span></td></tr>
               </tbody>
             </table>
           </div>
@@ -236,13 +236,14 @@
               <p><b style="color:var(--ink)">Policy Generator</b> — สร้าง statement: เลือก UI/API → Service → Resource → Actions → Conditions</p>
             </div>
           </div>
+          <div class="edge mb-4" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)"><div class="tag mb-1" style="color:#2563EB">ตัวอย่างที่ใช้งานได้จริง (สำหรับ dev)</div><p class="text-[13px]">ทั้ง 4 หน้าจอนี้มี prototype คลิกได้จริงที่ <a href="prototype/user-management.html" target="_blank" style="color:#2563EB;text-decoration:underline">prototype/user-management.html</a> — รวม mock JWT simulator (สลับ role ดูว่าเมนู/ปุ่มไหนหาย), ตาราง Users/Roles/Policies และ Policy Generator ที่ compile statement ออกมาเป็น JSON จริงตามรูปแบบใน §05</p></div>
           <div class="rulebox ok"><div class="rc mb-1">SUBMITTABLE-LIKE · REVOCATION</div><p class="text-[13.5px]">การเปลี่ยน role/policy ต้อง <b>ทำให้ session เดิม refresh สิทธิ์ใหม่</b> (เพิกถอน refresh token หรือ re-issue) เพื่อไม่ให้สิทธิ์เก่าค้างใน JWT · ทุกการแก้สิทธิ์บันทึก <span class="mono text-[12px]">security_logs</span></p></div>
         </div>
 
         <!-- 1.5 Policy Examples + Enforcement -->
         <div class="mb-12">
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">05</span><h3 class="text-xl font-semibold">Policy Examples &amp; Enforcement · ตัวอย่าง + การบังคับใช้</h3></div>
-          <p class="text-[13px] mb-5" style="color:var(--ink-soft)">รูปแบบ JSON ตรงกับผลลัพธ์ของ <b>Policy Generator</b> ใน prototype (compile condition เป็น <span class="mono text-[12px]">{ operator: { key: value } }</span>)</p>
+          <p class="text-[13px] mb-5" style="color:var(--ink-soft)">รูปแบบ JSON ตรงกับผลลัพธ์ของ <b>Policy Generator</b> ใน <a href="prototype/user-management.html" target="_blank" style="color:#2563EB;text-decoration:underline">prototype/user-management.html</a> (compile condition เป็น <span class="mono text-[12px]">{ operator: { key: value } }</span>) — ลองประกอบ statement เองในหน้า Policy Generator แล้วเทียบ Step 3 กับตัวอย่างด้านล่างได้เลย</p>
 
           <!-- UI policy -->
           <div class="card p-6 mb-5">
