@@ -1084,7 +1084,47 @@
         }
 
         function filterUsers() {}
-        function toggleModal(id) { document.getElementById(id).classList.toggle('hidden'); }
+
+        // เปิด/ปิด modal พร้อม fade + scale — ต้องสลับทั้ง hidden, opacity และ scale ของการ์ดด้านใน
+        // ไม่งั้น modal จะค้างที่ opacity-0 แต่ยังเป็น fixed inset-0 คลุมทั้งจอ บล็อกคลิกทุกอย่างแบบมองไม่เห็น
+        function toggleModal(id) {
+            const overlay = document.getElementById(id);
+            const card = overlay.querySelector(':scope > div');
+            const willOpen = overlay.classList.contains('hidden');
+
+            if (willOpen) {
+                overlay.classList.remove('hidden');
+                // ให้ browser paint สถานะ hidden ก่อน ค่อย trigger transition ไป opacity-100
+                requestAnimationFrame(() => {
+                    overlay.classList.remove('opacity-0');
+                    overlay.classList.add('opacity-100');
+                    card?.classList.remove('scale-95');
+                    card?.classList.add('scale-100');
+                });
+            } else {
+                overlay.classList.remove('opacity-100');
+                overlay.classList.add('opacity-0');
+                card?.classList.remove('scale-100');
+                card?.classList.add('scale-95');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+            }
+        }
+
+        function handleUserSubmit(e) {
+            e.preventDefault();
+            const username = document.getElementById('frmUsername').value.trim();
+            const roleId = document.getElementById('frmRole').value;
+
+            currentUsers.push({
+                id: `USR${String(currentUsers.length + 1).padStart(3, '0')}`,
+                username, full_name: username, employee_id: '-', department: '-',
+                warehouse: '-', email: '-', status: 'active', roles: [roleId]
+            });
+
+            renderUsersTable(currentUsers);
+            e.target.reset();
+            toggleModal('addUserModal');
+        }
         function handleRoleSubmit(e) {
             e.preventDefault();
             const id = document.getElementById('frmRoleId').value.trim().toUpperCase();
