@@ -755,6 +755,32 @@
             `).join('');
         }
 
+        // เปิดฟอร์มสร้าง Role ใหม่ — เคลียร์ input เดิม แล้ว render checkbox policy ให้เลือกผูกกับ role
+        function renderRoleForm(existingRole = null) {
+            document.getElementById('frmRoleId').value = existingRole?.id || '';
+            document.getElementById('frmRoleName').value = existingRole?.name || '';
+            renderRolePolicyCheckboxes(existingRole?.policies || []);
+        }
+
+        // การ์ด checkbox ให้เลือก policy ที่มีอยู่แล้วมาผูกกับ role (attach)
+        function renderRolePolicyCheckboxes(selectedIds = []) {
+            const container = document.getElementById('rolePoliciesContainer');
+            if (mockApiData.policies.length === 0) {
+                container.innerHTML = `<p class="text-sm text-slate-500 italic">ยังไม่มี Policy ในระบบ — ไปสร้างที่หน้า "นโยบายความปลอดภัย" ก่อน</p>`;
+                return;
+            }
+            container.innerHTML = mockApiData.policies.map(pol => `
+                <label class="flex items-start gap-3 p-4 bg-white border rounded-xl hover:border-blue-400 hover:bg-blue-50 cursor-pointer shadow-sm transition-colors">
+                    <input type="checkbox" name="rolePolicies" value="${pol.id}" ${selectedIds.includes(pol.id) ? 'checked' : ''} class="mt-1 w-4 h-4 rounded text-blue-600">
+                    <div class="flex-1 min-w-0">
+                        <span class="block text-sm font-bold text-slate-800">${pol.name}</span>
+                        <span class="block text-xs font-mono text-slate-500 truncate">${pol.id}</span>
+                        <span class="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${pol.effect === 'Allow' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${pol.effect}</span>
+                    </div>
+                </label>
+            `).join('');
+        }
+
         // ==========================================
         // Policy Generator Functions (The Core UI)
         // ==========================================
@@ -1059,7 +1085,23 @@
 
         function filterUsers() {}
         function toggleModal(id) { document.getElementById(id).classList.toggle('hidden'); }
-        function handleRoleSubmit(e) { e.preventDefault(); switchView('roles', document.getElementById('nav-roles')); }
+        function handleRoleSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('frmRoleId').value.trim().toUpperCase();
+            const name = document.getElementById('frmRoleName').value.trim();
+            const attachedPolicies = Array.from(document.querySelectorAll('input[name="rolePolicies"]:checked')).map(cb => cb.value);
+
+            const existing = mockApiData.roles.find(r => r.id === id);
+            if (existing) {
+                existing.name = name;
+                existing.policies = attachedPolicies;
+            } else {
+                mockApiData.roles.push({ id, name, description: '', userCount: 0, policies: attachedPolicies });
+            }
+
+            renderRolesTable();
+            switchView('roles', document.getElementById('nav-roles'));
+        }
     </script>
 </body>
 </html>
