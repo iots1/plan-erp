@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRS &middot; Phase 1 — Identity &amp; Access &middot; ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <erp-sidebar badge="P1" title="SRS &middot; Identity &amp; Access" subtitle="PHASE 1 &middot; AUTH &middot; IAM" width="280">
+    <nav slot="nav">
+      <a href="core-feature.html" class="navlink"><span class="n" style="color:var(--accent)">IA</span> Sitemap / Overview</a>
+      <a href="srs-p1.html" class="navlink"><span class="n" style="color:#2563EB">P1</span> Identity &amp; Access</a>
+      <a href="srs-p2.html" class="navlink"><span class="n" style="color:#7C3AED">P2</span> Master Data &amp; Storage</a>
+      <a href="srs-p3.html" class="navlink"><span class="n" style="color:var(--signal)">P3</span> Inventory Core</a>
+      <a href="srs-p4.html" class="navlink"><span class="n" style="color:var(--blueprint)">P4</span> Procurement &amp; Sales</a>
+      <a href="srs-p5.html" class="navlink"><span class="n" style="color:var(--accent)">P5</span> Finance</a>
+      <a href="srs-p6.html" class="navlink"><span class="n" style="color:#38BDF8">P6</span> Reporting (CQRS)</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <div class="navsub">ในเฟสนี้ประกอบด้วย</div>
+      <div class="navsub">1 · Business &amp; Roles</div>
+      <div class="navsub">2 · Access Model (RBAC→Policy)</div>
+      <div class="navsub">3 · Entities + Required Fields</div>
+      <div class="navsub">4 · Use Cases &amp; Flows</div>
+      <div class="navsub">5 · Policy Examples + Enforcement</div>
+      <div class="navsub">6 · ER Diagram</div>
+      <div class="navsub">7 · Dev Guide</div>
+      <div class="navsub">8 · Glossary</div>
+    </nav>
+    <div slot="footnote">NESTJS 11 · POSTGRESQL<br>JWT · REDIS · RABBITMQ</div>
+  </erp-sidebar>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+    <div class="max-w-[1000px] mx-auto px-6 sm:px-10 py-14 space-y-20">
+
+      <section id="p1" class="scroll-mt-6">
+        <div class="phase-band phase-grid mb-10" style="background:linear-gradient(135deg,rgba(37,99,235,.12),rgba(37,99,235,.04))">
+          <div class="p-7 sm:p-8">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="mono text-[13px] px-3 py-1 rounded-lg" style="background:rgba(37,99,235,.16);color:#2563EB;border:1px solid rgba(37,99,235,.3)">PHASE 1</span>
+              <span class="eyebrow" style="color:#2563EB">auth-bc · iam-bc · Security Foundation</span>
+            </div>
+            <h2 class="display text-2xl sm:text-3xl">Identity &amp; Access — Login · RBAC · Policy-Based Access (PBAC/ABAC)</h2>
+            <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">รากฐานความปลอดภัย — พิสูจน์ตัวตน (JWT + refresh + Redis) และควบคุมสิทธิ์แบบ <b>Policy</b> (Effect · Resource · Action · Condition) ครอบทั้งฝั่ง <b>UI</b> และ <b>API</b> · อ้างอิงจาก prototype <span class="mono text-[12px]">user-management.html</span></p>
+          </div>
+        </div>
+
+        <!-- 1.1 Business & Roles -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">01</span><h3 class="text-xl font-semibold">Business Overview &amp; Roles · ใครทำอะไร</h3></div>
+          <div class="grid sm:grid-cols-3 gap-4">
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:#2563EB">SECURITY ADMIN</div>
+              <div class="font-semibold mb-1.5">ผู้ดูแลความปลอดภัย</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">สร้าง Role / Policy (Policy Generator), แนบ policy เข้า role, กำหนดนโยบายรหัสผ่าน/บล็อกผู้ใช้</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:#2563EB">HR / USER ADMIN</div>
+              <div class="font-semibold mb-1.5">ฝ่ายบุคคล</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">สร้างบัญชีผู้ใช้ (พนักงาน), กำหนดแผนก และ <b>assign role</b> ให้ผู้ใช้</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:#2563EB">END USER</div>
+              <div class="font-semibold mb-1.5">ผู้ใช้งานระบบ</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">login เข้าระบบ 2 ภาษา · เห็นเมนู/ปุ่ม/หน้าจอเฉพาะที่มีสิทธิ์ (สิทธิ์มาจาก JWT)</p>
+            </div>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-4 mt-4">
+            <div class="card p-5"><div class="mono text-[11px] mb-2" style="color:#2563EB">auth-bc · db: auth</div><p class="text-[13px]" style="color:var(--ink-soft)">พิสูจน์ตัวตน — credentials, ออก/ตรวจ JWT + refresh, session ใน Redis, ประวัติ login, บล็อกผู้ใช้, security log</p></div>
+            <div class="card p-5"><div class="mono text-[11px] mb-2" style="color:#2563EB">iam-bc · db: iam</div><p class="text-[13px]" style="color:var(--ink-soft)">แหล่งความจริงของ <b>Users</b> · Roles · Policies · Permissions — เป็นเจ้าของสิทธิ์ทั้งหมด (RBAC + PBAC)</p></div>
+          </div>
+          <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> ทุกบริการหลัง gateway ต้อง <b>ตรวจสิทธิ์จาก iam</b> ก่อนทำงาน · ชื่อ role/permission ที่แสดงผลเก็บ 2 ภาษาแบบ flat column (<span class="mono text-[12px]">name_th/name_en</span>) และทุกตารางสืบทอด <span class="mono text-[12px]">BaseEntity</span> ตาม <a href="backend-convention.html" style="color:var(--accent);text-decoration:underline">Backend Conventions</a></div>
+        </div>
+
+        <!-- 1.2 Access Model -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">02</span><h3 class="text-xl font-semibold">Access Control Model · RBAC → Policy → Statement</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">ระบบใช้ <b>RBAC</b> (สิทธิ์ผ่านบทบาท) ต่อยอดด้วย <b>Policy-Based</b> (สิทธิ์เป็นเอกสาร statement แบบ AWS IAM) และรองรับ <b>ABAC</b> (เงื่อนไขตาม attribute) — Deny ชนะ Allow เสมอ</p>
+
+          <div class="card p-6 mb-6">
+            <div class="mono text-[11px] mb-4" style="color:#2563EB">การไล่สิทธิ์ (Resolution chain)</div>
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-3 text-[12.5px] mono">
+              <span class="pchip" style="background:rgba(37,99,235,.1);color:#2563EB;border:1px solid rgba(37,99,235,.28)">User</span>
+              <span style="color:var(--muted)">─ user_roles →</span>
+              <span class="pchip" style="background:rgba(37,99,235,.1);color:#2563EB;border:1px solid rgba(37,99,235,.28)">Role</span>
+              <span style="color:var(--muted)">─ role_policies →</span>
+              <span class="pchip" style="background:rgba(37,99,235,.1);color:#2563EB;border:1px solid rgba(37,99,235,.28)">Policy</span>
+              <span style="color:var(--muted)">→</span>
+              <span class="pchip" style="background:rgba(124,58,237,.1);color:#7C3AED;border:1px solid rgba(124,58,237,.28)">Statement[]</span>
+              <span style="color:var(--muted)">→</span>
+              <span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">Permission (resource:action)</span>
+            </div>
+            <p class="text-[12.5px] mt-4" style="color:var(--ink-soft)">ตอน login ระบบ <b>รวม (flatten)</b> ทุก statement ของทุก policy ในทุก role → ได้ชุด permission สุทธิ ใส่ลงใน <b>JWT</b> · ฝั่ง UI และ API ใช้ชุดนี้ตรวจสิทธิ์</p>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">กายวิภาคของ Statement · 1 กฎประกอบด้วย</h4>
+          <div class="card overflow-hidden mb-6">
+            <table class="d">
+              <thead><tr><th style="width:120px">ส่วน</th><th>ตัวอย่างค่า</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>effect</td><td><span class="mono text-[12px]">allow</span> | <span class="mono text-[12px]">deny</span></td><td>อนุญาต/ปฏิเสธ — <b>deny ชนะเสมอ</b> (deny-override)</td></tr>
+                <tr><td>service</td><td><span class="mono text-[12px]">frontend-ui</span> · <span class="mono text-[12px]">inventory-bc</span> · <span class="mono text-[12px]">system-admin</span></td><td>ระบบ/บริการเป้าหมาย (UI ใช้ implicit <span class="mono text-[12px]">frontend-ui</span>)</td></tr>
+                <tr><td>resource</td><td><span class="mono text-[12px]">goods_receipt</span> · <span class="mono text-[12px]">user_account</span> · <span class="mono text-[12px]">page_dashboard</span></td><td>ทรัพยากรที่ถูกเข้าถึง · <span class="mono text-[12px]">*</span> = ทั้งหมด</td></tr>
+                <tr><td>actions</td><td><span class="mono text-[12px]">goods_receipt:submit</span> · <span class="mono text-[12px]">page:view_users</span></td><td>การกระทำ (permission รูป <span class="mono text-[12px]">resource:action</span>)</td></tr>
+                <tr><td>conditions</td><td><span class="mono text-[12px]">{ StringEquals: { … } }</span></td><td>เงื่อนไข ABAC (optional) — จริงถึงจะมีผล</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="edge" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)"><div class="tag mb-1" style="color:#2563EB">UI plane</div><p class="text-[13px]">คุมสิ่งที่ผู้ใช้ <b>เห็น/กดได้</b> — <span class="mono text-[12px]">page:*</span> (เข้าหน้า) และ <span class="mono text-[12px]">component:*</span> (ปุ่ม/กล่อง/วิดเจ็ต)</p></div>
+            <div class="edge" style="background:rgba(220,90,22,.06);border-color:rgba(220,90,22,.22)"><div class="tag mb-1" style="color:var(--signal)">API plane</div><p class="text-[13px]">คุมสิ่งที่ผู้ใช้ <b>เรียก backend ได้</b> — <span class="mono text-[12px]">&lt;resource&gt;:&lt;action&gt;</span> เช่น <span class="mono text-[12px]">invoice:approve</span> ตรวจที่ NestJS Guard</p></div>
+          </div>
+        </div>
+
+        <!-- 1.3 Entities & Required Fields -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">03</span><h3 class="text-xl font-semibold">Entities &amp; Required Fields · โครงข้อมูล</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)"><span class="mono text-[12px]" style="color:#15803D">✓</span> = จำเป็น · <span class="mono text-[12px]" style="color:var(--muted)">–</span> = ไม่บังคับ · ฟิลด์ <span class="mono text-[12px]">id · created_at/by …</span> มาจาก <span class="mono text-[12px]">BaseEntity</span></p>
+
+          <h4 class="font-semibold mb-3 text-[14px]" style="color:#2563EB">iam-bc · db: iam</h4>
+
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#2563EB">users · บัญชีผู้ใช้ (source of truth)</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>username</td><td><span style="color:#15803D">✓</span></td><td>ชื่อผู้ใช้ (unique) — <span class="mono text-[12px]">uq_users_username</span></td></tr>
+                <tr><td>employee_id</td><td><span style="color:#15803D">✓</span></td><td>รหัสพนักงาน</td></tr>
+                <tr><td>full_name</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ-นามสกุล</td></tr>
+                <tr><td>email</td><td><span style="color:#15803D">✓</span></td><td>อีเมล (unique)</td></tr>
+                <tr><td>department</td><td><span style="color:var(--muted)">–</span></td><td>แผนก/สังกัด (ใช้ทำ condition ABAC ได้)</td></tr>
+                <tr><td>status</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">active</span> | <span class="mono text-[12px]">pending</span> | <span class="mono text-[12px]">suspended</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#2563EB">roles · บทบาท</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>code</td><td><span style="color:#15803D">✓</span></td><td>รหัสบทบาท เช่น <span class="mono text-[12px]">ROLE_WAREHOUSE_MANAGER</span> (unique)</td></tr>
+                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อบทบาท 2 ภาษา</td></tr>
+                <tr><td>description</td><td><span style="color:var(--muted)">–</span></td><td>คำอธิบาย</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)"><div class="tag mb-1" style="color:#2563EB">เชื่อม</div><p class="text-[13px]"><span class="mono text-[12px]">user_roles</span> (user↔role) · <span class="mono text-[12px]">role_policies</span> (role↔policy) — ผู้ใช้ 1 คนมีได้หลาย role</p></div>
+          </div>
+
+          <div class="card p-6 mb-5" style="border-left:3px solid #2563EB">
+            <div class="mono text-[12px] mb-3" style="color:#2563EB">policies · policy_statements · statement_conditions</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>policies.code</td><td><span style="color:#15803D">✓</span></td><td>รหัส policy เช่น <span class="mono text-[12px]">POL_DOCTOR_OWN_PATIENT</span></td></tr>
+                <tr><td>policies.name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ policy 2 ภาษา</td></tr>
+                <tr><td>policies.is_active</td><td><span style="color:#15803D">✓</span></td><td>เปิด/ปิดใช้งาน</td></tr>
+                <tr><td>policy_statements.effect</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">allow</span> | <span class="mono text-[12px]">deny</span></td></tr>
+                <tr><td>policy_statements.plane</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">ui</span> | <span class="mono text-[12px]">api</span></td></tr>
+                <tr><td>statement_targets (service · resource)</td><td><span style="color:#15803D">✓</span></td><td>service + resource ที่ statement มีผล</td></tr>
+                <tr><td>statement_actions.permission_id</td><td><span style="color:#15803D">✓</span></td><td>อ้าง permission ที่อนุญาต/ปฏิเสธ</td></tr>
+                <tr><td>statement_conditions (operator · key · value)</td><td><span style="color:var(--muted)">–</span></td><td>เงื่อนไข ABAC — เช่น <span class="mono text-[12px]">StringEquals · attending_doctor_id · ${user.id}</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card p-6 mb-8">
+            <div class="mono text-[12px] mb-3" style="color:#2563EB">permissions · แคตตาล็อกสิทธิ์ (i18n)</div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>permission</td><td><span style="color:#15803D">✓</span></td><td>รูป <span class="mono text-[12px]">resource:action</span> เช่น <span class="mono text-[12px]">goods_receipt:submit</span> (unique)</td></tr>
+                <tr><td>resource · action</td><td><span style="color:#15803D">✓</span></td><td>แยกส่วนไว้ query/จัดกลุ่ม</td></tr>
+                <tr><td>plane</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">ui</span> | <span class="mono text-[12px]">api</span></td></tr>
+                <tr><td>permission_name_th · permission_name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อที่แสดงในหน้า Policy Generator (2 ภาษา)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]" style="color:#2563EB">auth-bc · db: auth <span class="mono text-[11px]" style="color:var(--muted)">(อ้าง user_id ข้าม BC ด้วย UUID)</span></h4>
+          <div class="card p-6">
+            <table class="d">
+              <thead><tr><th>Table</th><th>ฟิลด์หลัก (required)</th><th>ใช้ทำอะไร</th></tr></thead>
+              <tbody>
+                <tr><td>credentials</td><td>user_id · username · password_hash · is_active</td><td>เก็บรหัสผ่าน (hash) แยกจากข้อมูลผู้ใช้</td></tr>
+                <tr><td>refresh_tokens</td><td>user_id · token_hash · expires_at · revoked_at</td><td>ต่ออายุ session · เพิกถอนได้</td></tr>
+                <tr><td>login_histories</td><td>user_id · ip_address · user_agent · is_success · logged_in_at</td><td>ประวัติเข้าใช้งาน (สำเร็จ/ล้มเหลว)</td></tr>
+                <tr><td>blocked_users</td><td>user_id · reason · blocked_until · blocked_by</td><td>ล็อกบัญชี (เช่น ใส่รหัสผิดเกินกำหนด)</td></tr>
+                <tr><td>security_logs</td><td>event_type · user_id · ip_address · detail · created_at</td><td>audit เชิงความปลอดภัย (เปลี่ยนรหัส, สิทธิ์)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 1.4 Use Cases & Flows -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">04</span><h3 class="text-xl font-semibold">Use Cases &amp; Flows · กระบวนการหลัก</h3></div>
+
+          <div class="grid lg:grid-cols-2 gap-6 mb-6">
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:#2563EB">UC-1.1 · LOGIN (JWT + Refresh + Redis)</div>
+              <div class="step"><span class="sn">1</span><p class="text-[13.5px]">ส่ง <span class="mono text-[12px]">username + password</span> → auth ตรวจกับ <span class="mono text-[12px]">credentials</span> (bcrypt/argon2)</p></div>
+              <div class="step"><span class="sn">2</span><p class="text-[13.5px]">iam รวม permission สุทธิของผู้ใช้ (ทุก role → policy → statement)</p></div>
+              <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ออก <b>access token</b> (อายุสั้น, มี permissions) + <b>refresh token</b> · เก็บ session ใน <b>Redis</b></p></div>
+              <div class="step"><span class="sn">4</span><p class="text-[13.5px]">บันทึก <span class="mono text-[12px]">login_histories</span> · ผิดเกินกำหนด → <span class="mono text-[12px]">blocked_users</span></p></div>
+            </div>
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:#2563EB">UC-1.2 · AUTHORIZATION (ทุก request)</div>
+              <div class="step"><span class="sn">1</span><p class="text-[13.5px]">Gateway/Guard ตรวจ access token (ลายเซ็น + หมดอายุ + session ใน Redis)</p></div>
+              <div class="step"><span class="sn">2</span><p class="text-[13.5px]">Guard ต้องการ <span class="mono text-[12px]">resource:action</span> ของ endpoint → เช็คกับ permissions ใน JWT</p></div>
+              <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ถ้ามี <b>condition</b> → ประเมินกับ context (เจ้าของข้อมูล/สาขา/เวลา/IP)</p></div>
+              <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>deny ชนะ allow</b> · ไม่ผ่าน → <span class="mono text-[12px]">403 Forbidden</span></p></div>
+            </div>
+          </div>
+
+          <div class="card p-6 mb-4">
+            <div class="mono text-[11px] mb-3" style="color:#2563EB">UC-1.3 · MANAGEMENT SCREENS (จาก prototype)</div>
+            <div class="grid sm:grid-cols-2 gap-x-8 gap-y-2.5 text-[13px]" style="color:var(--ink-soft)">
+              <p><b style="color:var(--ink)">Users</b> — สร้าง/แก้บัญชี, กำหนดแผนก, assign role (<span class="mono text-[12px]">user_account:assign_role</span>)</p>
+              <p><b style="color:var(--ink)">Roles</b> — สร้าง role, แนบ policies (attach)</p>
+              <p><b style="color:var(--ink)">Policies</b> — รายการนโยบายทั้งหมด</p>
+              <p><b style="color:var(--ink)">Policy Generator</b> — สร้าง statement: เลือก UI/API → Service → Resource → Actions → Conditions</p>
+            </div>
+          </div>
+          <div class="rulebox ok"><div class="rc mb-1">SUBMITTABLE-LIKE · REVOCATION</div><p class="text-[13.5px]">การเปลี่ยน role/policy ต้อง <b>ทำให้ session เดิม refresh สิทธิ์ใหม่</b> (เพิกถอน refresh token หรือ re-issue) เพื่อไม่ให้สิทธิ์เก่าค้างใน JWT · ทุกการแก้สิทธิ์บันทึก <span class="mono text-[12px]">security_logs</span></p></div>
+        </div>
+
+        <!-- 1.5 Policy Examples + Enforcement -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">05</span><h3 class="text-xl font-semibold">Policy Examples &amp; Enforcement · ตัวอย่าง + การบังคับใช้</h3></div>
+          <p class="text-[13px] mb-5" style="color:var(--ink-soft)">รูปแบบ JSON ตรงกับผลลัพธ์ของ <b>Policy Generator</b> ใน prototype (compile condition เป็น <span class="mono text-[12px]">{ operator: { key: value } }</span>)</p>
+
+          <!-- UI policy -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(37,99,235,.12);color:#2563EB;border:1px solid rgba(37,99,235,.3)">UI</span>
+              <span class="text-[14px] font-semibold">A · ผู้จัดการเข้าหน้าแดชบอร์ด (เห็นบางกล่อง)</span>
+            </div>
+            <pre class="code p-4">{
+  <span class="s">"code"</span>: <span class="s">"POL_MANAGER_DASHBOARD"</span>, <span class="s">"name_th"</span>: <span class="s">"ผู้จัดการ · แดชบอร์ด"</span>,
+  <span class="s">"statements"</span>: [{
+    <span class="s">"effect"</span>: <span class="s">"allow"</span>, <span class="s">"plane"</span>: <span class="s">"ui"</span>, <span class="s">"service"</span>: [<span class="s">"frontend-ui"</span>],
+    <span class="s">"resource"</span>: [<span class="s">"page_dashboard"</span>],
+    <span class="s">"actions"</span>: [<span class="s">"page:view_dashboard"</span>, <span class="s">"component:widget_total_users"</span>, <span class="s">"component:widget_total_roles"</span>]
+  }]
+}</pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">→ เห็นหน้า Dashboard + 2 กล่องสถิติ · <b>ไม่เห็น</b>กราฟ (ไม่มี <span class="mono text-[12px]">component:widget_login_graph</span>)</p>
+          </div>
+
+          <!-- API policy wildcard -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(220,90,22,.12);color:var(--signal);border:1px solid rgba(220,90,22,.3)">API</span>
+              <span class="text-[14px] font-semibold">B · แอดมินจัดการผู้ใช้ (assign role)</span>
+            </div>
+            <pre class="code p-4">{
+  <span class="s">"code"</span>: <span class="s">"POL_ADMIN_USER_MGMT"</span>,
+  <span class="s">"statements"</span>: [{
+    <span class="s">"effect"</span>: <span class="s">"allow"</span>, <span class="s">"plane"</span>: <span class="s">"api"</span>, <span class="s">"service"</span>: [<span class="s">"system-admin"</span>],
+    <span class="s">"resource"</span>: [<span class="s">"user_account"</span>],
+    <span class="s">"actions"</span>: [<span class="s">"user_account:read"</span>, <span class="s">"user_account:create"</span>, <span class="s">"user_account:assign_role"</span>]
+  }]
+}
+<span class="c">// เลือก "ทั้งหมด" ในหน้า Generator → resource: ["*"] (wildcard)</span></pre>
+          </div>
+
+          <!-- ABAC + Deny -->
+          <div class="card p-6 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(124,58,237,.12);color:#7C3AED;border:1px solid rgba(124,58,237,.3)">ABAC + DENY</span>
+              <span class="text-[14px] font-semibold">C · พนักงานขายเห็นเฉพาะลูกค้าของตน · ห้ามลบนอกเวลา</span>
+            </div>
+            <pre class="code p-4">{
+  <span class="s">"code"</span>: <span class="s">"POL_SALES_OWN_CUSTOMER"</span>,
+  <span class="s">"statements"</span>: [
+    { <span class="s">"effect"</span>: <span class="s">"allow"</span>, <span class="s">"plane"</span>: <span class="s">"api"</span>, <span class="s">"service"</span>: [<span class="s">"sales-bc"</span>],
+      <span class="s">"resource"</span>: [<span class="s">"customer"</span>], <span class="s">"actions"</span>: [<span class="s">"customer:read"</span>, <span class="s">"customer:edit"</span>],
+      <span class="s">"conditions"</span>: { <span class="s">"StringEquals"</span>: { <span class="s">"customer.owner_id"</span>: <span class="s">"${user.id}"</span> } } },   <span class="c">// เฉพาะลูกค้าของตัวเอง</span>
+    { <span class="s">"effect"</span>: <span class="s">"deny"</span>, <span class="s">"plane"</span>: <span class="s">"api"</span>, <span class="s">"service"</span>: [<span class="s">"sales-bc"</span>],
+      <span class="s">"resource"</span>: [<span class="s">"customer"</span>], <span class="s">"actions"</span>: [<span class="s">"customer:delete"</span>],
+      <span class="s">"conditions"</span>: { <span class="s">"DateGreaterThan"</span>: { <span class="s">"context.current_time"</span>: <span class="s">"18:00"</span> } } }        <span class="c">// ห้ามลบหลัง 18:00 (deny ชนะ)</span>
+  ]
+}</pre>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">การบังคับใช้ 2 ฝั่ง</h4>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-2" style="color:#2563EB">FRONTEND · data-permission</div>
+              <p class="text-[13px] mb-2" style="color:var(--ink-soft)">ทุกปุ่ม/เมนู/วิดเจ็ตแนบ <span class="mono text-[12px]">data-permission</span> — ถ้า JWT ไม่มีสิทธิ์ → ซ่อน (<span class="mono text-[12px]">no-permission</span>) · หมวดเมนูที่ไม่มีลูกที่มองเห็นจะถูกซ่อน · route guard กันเข้าหน้า</p>
+              <pre class="code p-3"><span class="k">&lt;button</span> data-permission=<span class="s">"component:btn_add_user"</span><span class="k">&gt;</span>
+  เพิ่มบุคลากร
+<span class="k">&lt;/button&gt;</span></pre>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-2" style="color:#2563EB">BACKEND · NestJS Guard</div>
+              <p class="text-[13px] mb-2" style="color:var(--ink-soft)">endpoint ประกาศ permission ที่ต้องมี · Guard เช็คกับ JWT + ประเมิน condition · deny-override</p>
+              <pre class="code p-3"><span class="d">@RequirePermission</span>(<span class="s">'goods_receipt:submit'</span>)
+<span class="d">@Post</span>(<span class="s">':id/submit'</span>)
+submit(<span class="d">@Param</span>(<span class="s">'id'</span>) id: <span class="t">string</span>) { … }</pre>
+            </div>
+          </div>
+          <div class="rulebox mt-4"><div class="rc mb-1">FRONTEND ≠ SECURITY</div><p class="text-[13.5px]">การซ่อนปุ่มฝั่ง UI เป็นเรื่อง <b>UX เท่านั้น</b> — <b>ทุก request ต้องถูกตรวจซ้ำที่ backend Guard เสมอ</b> (อย่าเชื่อ client)</p></div>
+        </div>
+
+        <!-- 1.6 ER Diagram -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">06</span><h3 class="text-xl font-semibold">ER Diagram · auth-bc + iam-bc</h3></div>
+          <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    USERS {
+        uuid id PK
+        string username UK
+        string employee_id
+        string full_name
+        string email UK
+        string department
+        string status "active/pending/suspended"
+    }
+    ROLES {
+        uuid id PK
+        string code UK "ROLE_*"
+        string name_th
+        string name_en
+        string description
+    }
+    POLICIES {
+        uuid id PK
+        string code UK "POL_*"
+        string name_th
+        string name_en
+        boolean is_active
+    }
+    POLICY_STATEMENTS {
+        uuid id PK
+        uuid policy_id FK
+        string effect "allow/deny"
+        string plane "ui/api"
+    }
+    STATEMENT_TARGETS {
+        uuid id PK
+        uuid statement_id FK
+        string service
+        string resource "or *"
+    }
+    STATEMENT_ACTIONS {
+        uuid id PK
+        uuid statement_id FK
+        uuid permission_id FK
+    }
+    STATEMENT_CONDITIONS {
+        uuid id PK
+        uuid statement_id FK
+        string operator "StringEquals/IpAddress"
+        string condition_key
+        string condition_value
+    }
+    PERMISSIONS {
+        uuid id PK
+        string permission UK "resource:action"
+        string resource
+        string action
+        string plane "ui/api"
+        string permission_name_th
+        string permission_name_en
+    }
+    USER_ROLES {
+        uuid id PK
+        uuid user_id FK
+        uuid role_id FK
+    }
+    ROLE_POLICIES {
+        uuid id PK
+        uuid role_id FK
+        uuid policy_id FK
+    }
+    CREDENTIALS {
+        uuid id PK
+        uuid user_id "ref iam.users"
+        string username UK
+        string password_hash
+        boolean is_active
+    }
+    REFRESH_TOKENS {
+        uuid id PK
+        uuid user_id
+        string token_hash
+        timestamp expires_at
+        timestamp revoked_at
+    }
+    BLOCKED_USERS {
+        uuid id PK
+        uuid user_id
+        string reason
+        timestamp blocked_until
+    }
+    USERS ||--o{ USER_ROLES : has
+    ROLES ||--o{ USER_ROLES : "assigned to"
+    ROLES ||--o{ ROLE_POLICIES : attaches
+    POLICIES ||--o{ ROLE_POLICIES : "attached to"
+    POLICIES ||--o{ POLICY_STATEMENTS : contains
+    POLICY_STATEMENTS ||--o{ STATEMENT_TARGETS : on
+    POLICY_STATEMENTS ||--o{ STATEMENT_ACTIONS : allows
+    POLICY_STATEMENTS ||--o{ STATEMENT_CONDITIONS : when
+    PERMISSIONS ||--o{ STATEMENT_ACTIONS : "referenced by"
+    USERS ||--o| CREDENTIALS : "auth (UUID)"
+    USERS ||--o{ REFRESH_TOKENS : has
+    USERS ||--o{ BLOCKED_USERS : "may be"
+</pre>
+          </div>
+          <p class="text-[12.5px] mt-2" style="color:var(--muted)">* <span class="mono">credentials · refresh_tokens · login_histories · blocked_users · security_logs</span> อยู่ใน <b>auth-bc</b> (db แยก) — อ้าง <span class="mono">user_id</span> ไปยัง iam ด้วย UUID เท่านั้น ไม่มี FK ข้ามฐานข้อมูล</p>
+        </div>
+
+        <!-- 1.7 Dev Guide -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">07</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · TOKEN + SESSION</div><p class="text-[13.5px]">access token อายุสั้น (เช่น 15 นาที) แนบทุก request · refresh token อายุยาวเก็บ <b>hash</b> ใน DB · session/blacklist ใน <b>Redis</b> · logout/เปลี่ยนสิทธิ์ = เพิกถอน refresh token</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · DENY-OVERRIDE</div><p class="text-[13.5px]">รวมสิทธิ์แบบ AWS IAM — ถ้ามี <span class="mono text-[12px]">deny</span> ตรงกับ resource:action ใด ๆ → <b>ปฏิเสธทันที</b> แม้จะมี allow · ไม่มี allow = ปฏิเสธโดยปริยาย (default deny)</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · CONDITION EVAL</div><p class="text-[13.5px]">ประเมิน condition ที่ backend กับ context จริง (<span class="mono text-[12px]">${user.id}</span>, <span class="mono text-[12px]">${user.department}</span>, IP, เวลา) · operator รองรับ StringEquals/StringLike/Numeric*/Date*/IpAddress</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · GUARD ทุก endpoint</div><p class="text-[13.5px]">ทุก endpoint ที่ไม่ public ต้องมี <span class="mono text-[12px]">@RequirePermission('resource:action')</span> · frontend <span class="mono text-[12px]">data-permission</span> เป็น UX เท่านั้น ห้ามใช้แทนการตรวจ backend</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PASSWORD</div><p class="text-[13.5px]">เก็บเฉพาะ <b>hash</b> (bcrypt/argon2) ไม่เก็บ plaintext · ใส่ผิดเกินกำหนด → เพิ่ม <span class="mono text-[12px]">blocked_users</span> · ทุกเหตุการณ์ลง <span class="mono text-[12px]">security_logs</span></p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · i18n + BASE ENTITY</div><p class="text-[13.5px]">ชื่อ role/policy/permission ที่แสดงผลเป็น flat column <span class="mono text-[12px]">*_th / *_en</span> ยุบเป็น object ตอน response · ทุกตารางสืบทอด <span class="mono text-[12px]">BaseEntity</span> (audit + soft-delete)</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · UUID + SOURCE OF TRUTH</div><p class="text-[13.5px]"><b>iam เป็นเจ้าของ users</b> · auth และบริการอื่นอ้าง <span class="mono text-[12px]">user_id</span> เป็น UUID · ห้าม FK ข้าม DB · เปลี่ยนสิทธิ์ยิง event ให้บริการ cache สิทธิ์ล้าง/รีเฟรช</p></div>
+          </div>
+        </div>
+
+        <!-- 1.8 Glossary -->
+        <div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">08</span><h3 class="text-xl font-semibold">Glossary · อภิธานศัพท์ IAM / Security</h3></div>
+          <div class="card overflow-hidden">
+            <table class="d">
+              <thead><tr><th style="width:200px">ศัพท์</th><th>ความหมาย</th></tr></thead>
+              <tbody>
+                <tr><td>Authentication (AuthN)</td><td>การพิสูจน์ตัวตน — "คุณคือใคร" (login ด้วยรหัสผ่าน)</td></tr>
+                <tr><td>Authorization (AuthZ)</td><td>การตรวจสิทธิ์ — "คุณทำอะไรได้บ้าง"</td></tr>
+                <tr><td>RBAC</td><td>Role-Based Access Control — ให้สิทธิ์ผ่านบทบาท (role)</td></tr>
+                <tr><td>PBAC</td><td>Policy-Based — สิทธิ์เป็นเอกสาร policy (หลาย statement) แบบ AWS IAM</td></tr>
+                <tr><td>ABAC</td><td>Attribute-Based — สิทธิ์ขึ้นกับ attribute/เงื่อนไข (เช่น เจ้าของข้อมูล · สาขา · เวลา)</td></tr>
+                <tr><td>Policy</td><td>ชุดกฎสิทธิ์ที่แนบเข้า role — ประกอบด้วยหลาย statement</td></tr>
+                <tr><td>Statement</td><td>กฎ 1 ข้อ = Effect + Service + Resource + Action + Condition</td></tr>
+                <tr><td>Effect</td><td>ผลของกฎ — <span class="mono text-[12px]">allow</span> หรือ <span class="mono text-[12px]">deny</span></td></tr>
+                <tr><td>Permission</td><td>สิทธิ์ย่อยรูป <span class="mono text-[12px]">resource:action</span> (เช่น <span class="mono text-[12px]">invoice:approve</span>)</td></tr>
+                <tr><td>Resource</td><td>ทรัพยากรที่ถูกเข้าถึง (goods_receipt · customer · page_dashboard)</td></tr>
+                <tr><td>Action</td><td>การกระทำต่อ resource (read · create · submit · delete)</td></tr>
+                <tr><td>Condition</td><td>เงื่อนไข ABAC = operator + key + value</td></tr>
+                <tr><td>Deny-override</td><td>ถ้ามี deny ตรงกัน → ปฏิเสธเสมอ แม้มี allow</td></tr>
+                <tr><td>Least Privilege</td><td>ให้สิทธิ์เท่าที่จำเป็น (default deny)</td></tr>
+                <tr><td>UI plane / API plane</td><td>สิทธิ์ฝั่งหน้าจอ (page/component) vs ฝั่ง API (resource/action)</td></tr>
+                <tr><td>JWT</td><td>JSON Web Token — token ที่มี claims (sub · roles · permissions · exp)</td></tr>
+                <tr><td>Claim</td><td>ข้อมูลภายใน JWT</td></tr>
+                <tr><td>Access / Refresh Token</td><td>token อายุสั้นแนบทุก request / token อายุยาวใช้ขอ access token ใหม่</td></tr>
+                <tr><td>Guard</td><td>ตัวดักตรวจสิทธิ์ฝั่ง backend (NestJS) ก่อนเข้า handler</td></tr>
+                <tr><td>Route Guard</td><td>ตัวดักฝั่ง frontend กันเข้าหน้าที่ไม่มีสิทธิ์</td></tr>
+                <tr><td>Session</td><td>สถานะการ login (เก็บใน Redis) — เพิกถอนได้</td></tr>
+                <tr><td>Wildcard (*)</td><td>ครอบทุก resource/action ในกลุ่มนั้น</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · SRS · PHASE 1 · IDENTITY &amp; ACCESS"
+        line2="AUTH · IAM · JWT · RBAC · PBAC · ABAC">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+    background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>
