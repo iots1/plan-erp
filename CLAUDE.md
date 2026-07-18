@@ -11,7 +11,7 @@ govern **every code example written into these docs** and the future backend imp
 **Files**
 - `index.html` — document index / landing.
 - `erp-architecture.html` — architecture & phased plan (Executive overview).
-- `core-feature.html` — SRS (Phase 3–6), includes the UC deep-dives.
+- `core-feature.html` — SRS (Phase 1–6), includes the UC deep-dives.
 - `i18n-guide.html` — bilingual (TH/EN) technical guide.
 - `backend-convention.html` — **backend naming / error / response / query conventions** (this reference, rendered).
 - `style.css` — the design system. `components.js` — vanilla Web Components (`<erp-docnav>`, `<erp-sidebar>`, `<erp-footer>`).

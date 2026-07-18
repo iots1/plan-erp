@@ -9,9 +9,10 @@ class ErpDocnav extends HTMLElement {
     const LINKS = [
       { href: 'index.html', label: '🏠 Home' },
       { href: 'erp-architecture.html', label: '📐 ERP Architecture' },
-      { href: 'core-feature.html', label: 'SRS · Phase 3–6' },
+      { href: 'core-feature.html', label: 'SRS · Phase 1–6' },
       { href: 'i18n-guide.html', label: 'i18n Guide (TH/EN)' },
       { href: 'backend-convention.html', label: 'Backend Conventions' },
+      { href: 'nextjs-permission-guide.html', label: 'Next.js Integration Guide' },
     ];
 
     // Active-state handling: read the current path and flag the matching link.

@@ -10,7 +10,7 @@
 |---|---|
 | [Index](https://iots1.github.io/plan-erp/index.html) | หน้ารวมลิงก์เอกสารทั้งหมด |
 | [ERP Architecture](https://iots1.github.io/plan-erp/erp-architecture.html) | Microservices DDD Design · Development Plan |
-| [Core Feature (SRS)](https://iots1.github.io/plan-erp/core-feature.html) | System Requirement Specification — Phase 3–6 |
+| [Core Feature (SRS)](https://iots1.github.io/plan-erp/core-feature.html) | System Requirement Specification — Phase 1–6 |
 | [i18n Guide](https://iots1.github.io/plan-erp/i18n-guide.html) | แนวทางการพัฒนาระบบ 2 ภาษา (TH/EN) |
 
 ## Local Development

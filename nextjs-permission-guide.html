@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Next.js Integration Guide — เพิ่ม Route ใหม่ + ตรวจสิทธิ์ (RBAC/PBAC) · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="N" title="Next.js Integration" subtitle="ROUTE ใหม่ · PERMISSION CHECK" width="280">
+    <nav slot="nav">
+      <a href="#overview"   class="navlink"><span class="n">01</span> ภาพรวม &amp; สิ่งที่ต้องรู้ก่อน</a>
+      <a href="#step1"      class="navlink"><span class="n">02</span> Step 1 · ประกาศ Permission</a>
+      <a href="#step2"      class="navlink"><span class="n">03</span> Step 2 · ผูกเข้า Policy → Role</a>
+      <a href="#step3"      class="navlink"><span class="n">04</span> Step 3 · Login + /auth/me</a>
+      <a href="#step4"      class="navlink"><span class="n">05</span> Step 4 · Auth Context + Hook</a>
+      <a href="#stale-session" class="navlink"><span class="n">06</span> Step 4.5 · สิทธิ์เปลี่ยนกลางคัน</a>
+      <a href="#step5"      class="navlink"><span class="n">07</span> Step 5 · สร้าง Route ใหม่</a>
+      <a href="#step6"      class="navlink"><span class="n">08</span> Step 6 · ซ่อน Component ย่อย</a>
+      <a href="#step7"      class="navlink"><span class="n">09</span> Step 7 · Backend Guard ต้องมีเสมอ</a>
+      <a href="#full-example" class="navlink"><span class="n">10</span> ตัวอย่างเต็ม · หน้า Reports</a>
+      <a href="#checklist"  class="navlink"><span class="n">11</span> Checklist สรุป</a>
+    </nav>
+    <div slot="footnote">
+      <a href="srs-p1.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ SRS · Phase 1 Identity &amp; Access</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[980px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="srs-p1.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ SRS · Phase 1 (Identity &amp; Access)
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Frontend Integration Guide · Next.js (แยก repo)</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          เพิ่ม Route ใหม่ใน Next.js<br>
+          <span class="text-[#7FE3DE]">พร้อมตรวจสิทธิ์ RBAC / PBAC</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          คู่มือ step-by-step สำหรับทีม Frontend ที่แยก repo (Next.js) — ตั้งแต่ประกาศ permission ใหม่,
+          login แล้วดึงสิทธิ์จริงจาก <span class="mono text-[13px] text-white">/auth/me</span>,
+          ไปจนถึงโค้ด <b class="text-white font-medium">Auth Context / Hook / Component Guard</b>
+          ที่ใช้ซ่อน-แสดง route และปุ่มตาม permission
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>App Router</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Bearer JWT</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>GET /auth/me</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>ui-permissions.manifest.json</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[980px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 OVERVIEW ========== -->
+      <section id="overview" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — ภาพรวม</div>
+        <h2 class="display text-3xl mb-6">สิ่งที่ต้องรู้ก่อนเริ่ม</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ระบบสิทธิ์เป็น RBAC → Policy → Statement (ดูรายละเอียดเต็มที่ <a href="srs-p1.html" class="underline" style="color:var(--accent)">SRS Phase 1</a>) —
+          Next.js ไม่ต้อง implement ตรรกะ resolve สิทธิ์เอง แค่เรียก API ที่ถูกต้องแล้วเชื่อผลลัพธ์ที่ backend ส่งกลับมา
+        </p>
+
+        <div class="card overflow-hidden mb-6">
+          <div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">01</div>
+              <h3 class="font-semibold mb-2 text-[15px]">JWT ไม่มี permissions แล้ว</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                หลัง refactor เรื่อง session (§10 ใน SRS P1) <b>permissions/roles ไม่ได้อยู่ใน JWT</b> อีกต่อไป —
+                ห้าม decode token ฝั่ง client เพื่อหาสิทธิ์ ต้องเรียก endpoint แทน
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">02</div>
+              <h3 class="font-semibold mb-2 text-[15px]">แหล่งสิทธิ์ที่ถูกต้อง</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                <span class="mono text-[12px]">GET /auth/v1/auth/me</span> คืน
+                <span class="mono text-[12px]">{ roles, permissions, … }</span> จาก session ฝั่ง server (Redis) — เป็นแหล่งความจริงเดียวที่ frontend ควรใช้
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">03</div>
+              <h3 class="font-semibold mb-2 text-[15px]">FE = UX เท่านั้น</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                ทุกอย่างที่ทำในหน้านี้ (ซ่อนปุ่ม/ซ่อน route) คือ UX — backend endpoint ทุกตัวยังต้องมี
+                <span class="mono text-[12px]">@RequirePermission()</span> ตรวจซ้ำเสมอ
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    participant NextJS as Next.js app
+    participant AuthBC as auth-bc
+    participant Redis as Redis · session:&lt;jti&gt;
+    participant API as protected BC API (เช่น iam-bc)
+
+    NextJS->>AuthBC: POST /auth/v1/auth/login { username, password }
+    AuthBC->>Redis: เขียน session:&lt;jti&gt; (roles + permissions)
+    AuthBC-->>NextJS: { access_token, refresh_token } (ไม่มี permissions ใน token)
+    NextJS->>AuthBC: GET /auth/v1/auth/me (Bearer access_token)
+    AuthBC->>Redis: อ่าน session:&lt;jti&gt;
+    AuthBC-->>NextJS: { roles, permissions, … }
+    Note over NextJS: เก็บใน Auth Context — ใช้ gate route/component
+    NextJS->>API: request จริง พร้อม Bearer access_token
+    Note over API: @RequirePermission ตรวจซ้ำที่ backend เสมอ
+</pre>
+        </div>
+        <p class="text-[12.5px] mt-2" style="color:var(--muted)">* ถ้า admin ถอนสิทธิ์กลางคัน (§10 Session Sync) — server มีผลทันที แต่ค่าที่ Next.js cache ไว้ตอน login จะไม่รู้เองจนกว่าจะ refetch <span class="mono">/auth/me</span> (ดูหมายเหตุใน Step 4)</p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 STEP 1 ========== -->
+      <section id="step1" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Step 1</div>
+        <h2 class="display text-3xl mb-6">ประกาศ Permission ใหม่ผ่าน Manifest</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ก่อนเขียนโค้ด Next.js สักบรรทัด ต้องประกาศ <span class="mono text-[13px]">page:*</span> /
+          <span class="mono text-[13px]">component:*</span> ที่หน้าใหม่จะใช้เข้า catalog ก่อน — เพราะ JSX ไม่เหลือ literal
+          string ให้ regex scan หลัง build (ต่างจากหน้า EJS ที่ scan <span class="mono text-[13px]">data-permission="..."</span> ได้ตรง ๆ)
+        </p>
+
+        <div class="rulebox mb-6"><div class="rc mb-1">ข้อจำกัด · ไฟล์ manifest ต้องอยู่ใน erp-api repo</div><p class="text-[13.5px]">script sync มองหาไฟล์ที่ <span class="mono text-[12px]">apps/&lt;service&gt;/ui-permissions.manifest.json</span> ภายใน <b>erp-api repo (backend monorepo)</b> เท่านั้น — ถ้า Next.js อยู่คนละ repo จริง ให้มีโฟลเดอร์บาง ๆ เช่น <span class="mono text-[12px]">apps/frontend-web/</span> ใน erp-api repo ไว้ host แค่ไฟล์นี้ไฟล์เดียว (โค้ด Next.js จริงยังอยู่ repo เดิม)</p></div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">apps/frontend-web/ui-permissions.manifest.json</div>
+        <div class="code p-5 mb-4">
+<pre>{
+  <span class="s">"pages"</span>: [
+    {
+      <span class="s">"permission"</span>: <span class="s">"page:view_reports"</span>,
+      <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"หน้ารายงาน"</span>, <span class="s">"en"</span>: <span class="s">"Reports page"</span> },
+      <span class="s">"components"</span>: [
+        { <span class="s">"permission"</span>: <span class="s">"component:btn_export_reports"</span>,
+          <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"ปุ่ม Export รายงาน"</span>, <span class="s">"en"</span>: <span class="s">"Export reports button"</span> } }
+      ]
+    }
+  ]
+}</pre>
+        </div>
+        <p class="text-[13px] mb-4" style="color:var(--ink-soft)">schema เต็ม: <span class="mono text-[12px]">libs/database/src/scripts/ui-permissions-manifest.schema.ts</span> — 1 page เก็บ component ย่อยไว้ข้างในได้หลายตัว</p>
+
+        <div class="card p-5">
+          <div class="mono text-[11px] mb-2" style="color:#2563EB">รันที่ backend repo</div>
+          <div class="code p-3"><pre><span class="c"># หลัง commit/merge manifest แล้ว รันที่ erp-api repo</span>
+npm run permissions:sync</pre></div>
+          <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">แถวใหม่เข้า <span class="mono text-[12px]">permissions</span> table เป็น <span class="mono text-[12px]">plane = 'ui'</span>, <span class="mono text-[12px]">is_manual = false</span> พร้อมชื่อ th/en ตรงจาก manifest ทันที</p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 STEP 2 ========== -->
+      <section id="step2" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — Step 2</div>
+        <h2 class="display text-3xl mb-6">ผูกสิทธิ์เข้า Policy → Role</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ขั้นตอนนี้ <b>ไม่ใช่งานของทีม Next.js</b> — permission ที่เพิ่งเข้า catalog จาก Step 1
+          ยังไม่มีผลกับใครเลยจนกว่า Security Admin จะไปแนบมันเข้า policy แล้วเอา policy ไป attach เข้า role
+          ผ่านหน้า Policy Generator (ดู SRS P1 §02 resolution chain / §09)
+        </p>
+        <div class="grid sm:grid-cols-3 gap-4">
+          <div class="role">
+            <div class="mono text-[11px] mb-1" style="color:#2563EB">1 · User</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">มี role (เช่น <span class="mono text-[12px]">ROLE_REPORT_VIEWER</span>)</p>
+          </div>
+          <div class="role">
+            <div class="mono text-[11px] mb-1" style="color:#2563EB">2 · Role → Policy</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">Security Admin แนบ policy ที่มี statement อนุญาต <span class="mono text-[12px]">page:view_reports</span> เข้า role นั้น</p>
+          </div>
+          <div class="role">
+            <div class="mono text-[11px] mb-1" style="color:#2563EB">3 · Login ครั้งถัดไป</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">session ใหม่ (หรือ sync ทันทีถ้าใช้ §10) มี <span class="mono text-[12px]">page:view_reports</span> อยู่ใน permissions แล้ว</p>
+          </div>
+        </div>
+        <div class="rulebox ok mt-5"><div class="rc mb-1">สรุปสั้น ๆ</div><p class="text-[13.5px]">"ประกาศ permission" (Step 1) ≠ "อนุญาตให้ใครใช้" (Step 2) — สองงานนี้แยกกันเสมอ และ Step 2 เป็นงานของ Security Admin ไม่ใช่ dev</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 STEP 3 ========== -->
+      <section id="step3" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — Step 3</div>
+        <h2 class="display text-3xl mb-6">Login แล้วดึงสิทธิ์จริงจาก /auth/me</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          Login คืนแค่ token — <b>ไม่มี</b> roles/permissions ติดมาด้วย (ย้ายไปอยู่ Redis session แล้ว) ต้องเรียก
+          <span class="mono text-[13px]">/auth/me</span> อีกครั้งเพื่อได้ชุดสิทธิ์จริงมาเก็บไว้ใช้ทั้งแอป
+        </p>
+
+        <div class="grid lg:grid-cols-2 gap-6 items-start mb-6">
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">POST /auth/v1/auth/login → response</div>
+            <div class="code p-5">
+<pre>{
+  <span class="s">"access_token"</span>: <span class="s">"eyJhbGciOi..."</span>,
+  <span class="s">"refresh_token"</span>: <span class="s">"3f9a1c..."</span>,
+  <span class="s">"token_type"</span>: <span class="s">"Bearer"</span>,
+  <span class="s">"expires_in"</span>: 900
+}
+<span class="c">// หมายเหตุ: /auth controller ไม่มี @ResourceType — เป็น raw JSON</span>
+<span class="c">// ไม่ใช่ JSON:API envelope (ต่างจาก /iam/v1/permissions ที่ห่อ data.attributes)</span></pre>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">GET /auth/v1/auth/me → response</div>
+            <div class="code p-5">
+<pre>{
+  <span class="s">"id"</span>: <span class="s">"00000000-…-000001"</span>,
+  <span class="s">"username"</span>: <span class="s">"superadmin"</span>,
+  <span class="s">"fullname"</span>: <span class="s">"Super Administrator"</span>,
+  <span class="s">"email"</span>: <span class="s">"superadmin@erp.local"</span>,
+  <span class="s">"roles"</span>: [<span class="s">"ROLE_SUPERADMIN"</span>],
+  <span class="s">"permissions"</span>: [<span class="s">"page:view_reports"</span>, <span class="c">/* … */</span>],
+  <span class="s">"jti"</span>: <span class="s">"1756b2eb-…"</span>
+}
+<span class="c">// นี่คือแหล่งสิทธิ์ที่ถูกต้องหนึ่งเดียว — ห้าม decode JWT เอง</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="rulebox"><div class="rc mb-1">RULE · เก็บ token ที่ฝั่ง client ให้เหมาะสม</div><p class="text-[13.5px]">endpoint ใช้ Bearer token ไม่ใช่ cookie — จะเก็บใน memory/<span class="mono text-[12px]">sessionStorage</span> ฝั่ง client component หรือทำ Route Handler เป็น BFF proxy ให้เก็บเป็น httpOnly cookie ก็ได้ ขึ้นกับ threat model ของทีม (ตัวอย่างในคู่มือนี้ใช้ <span class="mono text-[12px]">sessionStorage</span> เพื่อความง่ายในการอธิบาย logic การเช็คสิทธิ์เป็นหลัก)</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 STEP 4 ========== -->
+      <section id="step4" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Step 4</div>
+        <h2 class="display text-3xl mb-6">Auth Context + usePermission Hook</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ห่อทั้งแอปด้วย Context เดียวที่เก็บ session (รวม permissions) ไว้ในหน่วยความจำ แล้ว expose
+          <span class="mono text-[13px]">hasPermission()</span> ให้ component อื่นเรียกใช้ — เขียนครั้งเดียว ใช้ได้ทั้งแอป
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">lib/auth/auth-context.tsx</div>
+        <div class="code p-5 mb-6">
+<pre><span class="s">'use client'</span>;
+
+<span class="k">import</span> { createContext, useContext, useEffect, useMemo, useState } <span class="k">from</span> <span class="s">'react'</span>;
+<span class="k">import type</span> { ReactNode } <span class="k">from</span> <span class="s">'react'</span>;
+
+<span class="k">interface</span> <span class="t">IUserSession</span> {
+  id: <span class="t">string</span> | <span class="k">null</span>;
+  username: <span class="t">string</span> | <span class="k">null</span>;
+  fullname: <span class="t">string</span> | <span class="k">null</span>;
+  email: <span class="t">string</span> | <span class="k">null</span>;
+  roles: <span class="t">string</span>[];
+  permissions: <span class="t">string</span>[];
+  jti: <span class="t">string</span> | <span class="k">null</span>;
+}
+
+<span class="k">interface</span> <span class="t">IAuthContextValue</span> {
+  session: <span class="t">IUserSession</span> | <span class="k">null</span>;
+  isLoading: <span class="t">boolean</span>;
+  hasPermission: (permission: <span class="t">string</span>) =&gt; <span class="t">boolean</span>;
+  login: (username: <span class="t">string</span>, password: <span class="t">string</span>) =&gt; <span class="t">Promise</span>&lt;<span class="k">void</span>&gt;;
+  logout: () =&gt; <span class="t">Promise</span>&lt;<span class="k">void</span>&gt;;
+  <span class="c">// resync session (roles/permissions) จาก server — ดู §Step 4.5 เรื่อง stale cache</span>
+  refreshSession: () =&gt; <span class="t">Promise</span>&lt;<span class="t">IUserSession</span> | <span class="k">null</span>&gt;;
+}
+
+<span class="k">const</span> AuthContext = createContext&lt;<span class="t">IAuthContextValue</span> | <span class="k">null</span>&gt;(<span class="k">null</span>);
+
+<span class="c">// เช่น http://localhost:3001/auth/v1</span>
+<span class="k">const</span> AUTH_BASE = process.env.NEXT_PUBLIC_AUTH_API_URL<span class="k">!</span>;
+
+<span class="k">async function</span> fetchMe(accessToken: <span class="t">string</span>): <span class="t">Promise</span>&lt;<span class="t">IUserSession</span>&gt; {
+  <span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">`${AUTH_BASE}/auth/me`</span>, {
+    headers: { Authorization: <span class="s">`Bearer ${accessToken}`</span> },
+  });
+  <span class="k">if</span> (!res.ok) <span class="k">throw new</span> <span class="t">Error</span>(<span class="s">'session expired'</span>);
+  <span class="k">return</span> res.json(); <span class="c">// raw JSON — /auth controller ไม่มี @ResourceType</span>
+}
+
+<span class="k">export function</span> AuthProvider({ children }: { children: <span class="t">ReactNode</span> }) {
+  <span class="k">const</span> [session, setSession] = useState&lt;<span class="t">IUserSession</span> | <span class="k">null</span>&gt;(<span class="k">null</span>);
+  <span class="k">const</span> [isLoading, setIsLoading] = useState(<span class="k">true</span>);
+
+  useEffect(() =&gt; {
+    <span class="k">const</span> token = sessionStorage.getItem(<span class="s">'access_token'</span>);
+    <span class="k">if</span> (!token) { setIsLoading(<span class="k">false</span>); <span class="k">return</span>; }
+    fetchMe(token)
+      .then(setSession)
+      .catch(() =&gt; sessionStorage.removeItem(<span class="s">'access_token'</span>))
+      .finally(() =&gt; setIsLoading(<span class="k">false</span>));
+  }, []);
+
+  <span class="k">const</span> login = <span class="k">async</span> (username: <span class="t">string</span>, password: <span class="t">string</span>) =&gt; {
+    <span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">`${AUTH_BASE}/auth/login`</span>, {
+      method: <span class="s">'POST'</span>,
+      headers: { <span class="s">'Content-Type'</span>: <span class="s">'application/json'</span> },
+      body: <span class="t">JSON</span>.stringify({ username, password }),
+    });
+    <span class="k">if</span> (!res.ok) <span class="k">throw new</span> <span class="t">Error</span>(<span class="s">'invalid credentials'</span>);
+    <span class="k">const</span> { access_token, refresh_token } = <span class="k">await</span> res.json();
+    sessionStorage.setItem(<span class="s">'access_token'</span>, access_token);
+    sessionStorage.setItem(<span class="s">'refresh_token'</span>, refresh_token);
+    setSession(<span class="k">await</span> fetchMe(access_token));
+  };
+
+  <span class="k">const</span> logout = <span class="k">async</span> () =&gt; {
+    <span class="k">const</span> token = sessionStorage.getItem(<span class="s">'access_token'</span>);
+    <span class="k">if</span> (token) {
+      <span class="k">await</span> fetch(<span class="s">`${AUTH_BASE}/auth/logout`</span>, {
+        method: <span class="s">'POST'</span>,
+        headers: { Authorization: <span class="s">`Bearer ${token}`</span>, <span class="s">'Content-Type'</span>: <span class="s">'application/json'</span> },
+        body: <span class="t">JSON</span>.stringify({ refresh_token: sessionStorage.getItem(<span class="s">'refresh_token'</span>) }),
+      });
+    }
+    sessionStorage.clear();
+    setSession(<span class="k">null</span>);
+  };
+
+  <span class="c">// permissions มาจาก /auth/me เท่านั้น — ไม่ decode JWT เอง</span>
+  <span class="k">const</span> hasPermission = (permission: <span class="t">string</span>) =&gt;
+    session?.permissions.includes(permission) ?? <span class="k">false</span>;
+
+  <span class="c">// เรียกซ้ำเมื่อสงสัยว่าสิทธิ์เปลี่ยนกลางคัน (§Step 4.5) — ไม่ทำอะไรถ้ายังไม่ login</span>
+  <span class="k">const</span> refreshSession = <span class="k">async</span> (): <span class="t">Promise</span>&lt;<span class="t">IUserSession</span> | <span class="k">null</span>&gt; =&gt; {
+    <span class="k">const</span> token = sessionStorage.getItem(<span class="s">'access_token'</span>);
+    <span class="k">if</span> (!token) { setSession(<span class="k">null</span>); <span class="k">return null</span>; }
+    <span class="k">try</span> {
+      <span class="k">const</span> fresh = <span class="k">await</span> fetchMe(token);
+      setSession(fresh);
+      <span class="k">return</span> fresh;
+    } <span class="k">catch</span> {
+      sessionStorage.removeItem(<span class="s">'access_token'</span>);
+      setSession(<span class="k">null</span>);
+      <span class="k">return null</span>;
+    }
+  };
+
+  <span class="k">const</span> value = useMemo(
+    () =&gt; ({ session, isLoading, hasPermission, login, logout, refreshSession }),
+    [session, isLoading],
+  );
+
+  <span class="k">return</span> &lt;AuthContext.Provider value={value}&gt;{children}&lt;/AuthContext.Provider&gt;;
+}
+
+<span class="k">export function</span> useAuth(): <span class="t">IAuthContextValue</span> {
+  <span class="k">const</span> ctx = useContext(AuthContext);
+  <span class="k">if</span> (!ctx) <span class="k">throw new</span> <span class="t">Error</span>(<span class="s">'useAuth must be used inside &lt;AuthProvider&gt;'</span>);
+  <span class="k">return</span> ctx;
+}</pre>
+        </div>
+
+        <div class="rulebox"><div class="rc mb-1">RULE · Cache สิทธิ์ฝั่ง client เป็นสถานะ ณ ตอน login เท่านั้น</div><p class="text-[13.5px]">session ใน Context นี้เป็นแค่ snapshot ตอน login/refresh — ถ้า backend แก้ policy/role/permission กลางคันจะเกิดช่วงที่ client cache ไม่ตรงกับ server ดูวิธีจัดการเต็ม ๆ ที่ <a href="#stale-session" style="color:var(--accent);text-decoration:underline">Step 4.5 ด้านล่าง</a></p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 STEP 4.5 · STALE SESSION ========== -->
+      <section id="stale-session" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — Step 4.5</div>
+        <h2 class="display text-3xl mb-6">เมื่อ Backend แก้ Policy/Role/Permission กลางคัน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          คำถามที่พบบ่อย: "ฝั่ง Next.js เก็บ <span class="mono text-[13px]">permissions</span> ไว้ตอน login ครั้งแรก
+          ถ้า admin ไปแก้ policy/role/permission ทีหลัง ฝั่ง frontend จะเป็นยังไง" — คำตอบสั้น ๆ คือ
+          <b>server รู้ทันที (§10 Session Sync ของ SRS P1) แต่ client ที่ cache session ไว้ใน memory จะไม่รู้เอง</b>
+          จนกว่าจะ refetch — ส่วนนี้อธิบายช่วงที่ไม่ตรงกันนี้และวิธีจัดการ
+        </p>
+
+        <div class="diagram mb-6">
+<pre class="mermaid">
+sequenceDiagram
+    participant Admin as Security Admin
+    participant IamBC as iam-bc
+    participant Redis as Redis · session:&lt;jti&gt;
+    participant Tab as Next.js tab ที่เปิดค้างไว้
+
+    Note over Tab: 10:00 — login แล้ว cache permissions ไว้ใน Context (มี page:view_reports)
+    Admin->>IamBC: 10:05 — ถอด policy ออกจาก role ของ user นี้
+    IamBC->>Redis: SessionSyncService เขียนทับ session:&lt;jti&gt; ทันที (permissions ใหม่ไม่มี page:view_reports)
+    Note over Tab: 10:06 — Context ใน tab นี้ยังเป็นชุดเก่า (ไม่รู้ว่าเปลี่ยน) ปุ่ม/เมนูยังโชว์อยู่
+    Tab->>IamBC: user คลิกปุ่มที่ (จริง ๆ) ไม่มีสิทธิ์แล้ว
+    IamBC-->>Tab: 403 Forbidden (PermissionGuard เช็คจาก Redis สดใหม่)
+    Note over Tab: Global fetch wrapper เห็น 403 → เรียก refreshSession() ทันที
+    Tab->>IamBC: GET /auth/v1/auth/me
+    IamBC-->>Tab: permissions ชุดใหม่ (ไม่มี page:view_reports)
+    Note over Tab: Context อัปเดต → ปุ่ม/เมนูหายไปเองในการ render ถัดไป
+</pre>
+        </div>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th style="width:170px">สถานการณ์</th><th style="width:230px">สิ่งที่ user เห็นบน Next.js</th><th>สิ่งที่เกิดขึ้นจริงถ้ากด</th></tr></thead>
+            <tbody>
+              <tr><td>สิทธิ์ถูก<b>ถอน</b>กลางคัน</td><td>ปุ่ม/เมนู/หน้ายังโชว์อยู่ (cache เก่า)</td><td>เรียก API แล้วโดน <span class="mono text-[12px]">403</span> ทันที — server บล็อกจริง ไม่ใช่แค่ UI หลอก</td></tr>
+              <tr><td>สิทธิ์ถูก<b>เพิ่ม</b>ใหม่</td><td>ปุ่ม/เมนู/หน้าที่เพิ่งได้สิทธิ์ยังไม่โผล่</td><td>ไม่มี error — แค่ยังไม่เห็นของใหม่จนกว่าจะ refetch</td></tr>
+              <tr><td>logout/revoke session ทั้งหมด (admin force logout)</td><td>UI ยังค้างเหมือน login อยู่</td><td>เรียก API ใดก็ตามจะโดน <span class="mono text-[12px]">401</span> (session หายจาก Redis) ไม่ใช่ <span class="mono text-[12px]">403</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4 class="font-semibold mb-3 text-[14px]">3 ชั้นการจัดการ — เรียงจาก "ต้องมี" ไป "เสริมให้ UX ดีขึ้น"</h4>
+        <div class="grid sm:grid-cols-3 gap-4 mb-6">
+          <div class="role">
+            <div class="mono text-[11px] mb-1" style="color:#2563EB">1 · Reactive (ต้องมี)</div>
+            <div class="font-semibold mb-1.5 text-[14px]">Global 403 handler</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ทุก API call ผ่าน wrapper เดียว — เจอ <span class="mono text-[12px]">403</span> ปุ๊บ เรียก <span class="mono text-[12px]">refreshSession()</span> ทันที รับประกันว่า UI จะตรงกับ server เสมอภายใน 1 request หลังจากพลาดครั้งแรก</p>
+          </div>
+          <div class="role">
+            <div class="mono text-[11px] mb-1" style="color:#2563EB">2 · Periodic (แนะนำ)</div>
+            <div class="font-semibold mb-1.5 text-[14px]">Refetch on focus/interval</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)"><span class="mono text-[12px]">react-query</span>/<span class="mono text-[12px]">SWR</span> ตั้ง <span class="mono text-[12px]">refetchOnWindowFocus</span> + <span class="mono text-[12px]">refetchInterval</span> — ลดโอกาสที่ user จะเจอ 403 ตั้งแต่แรกโดยไม่ต้องรอ error</p>
+          </div>
+          <div class="role">
+            <div class="mono text-[11px] mb-1" style="color:#2563EB">3 · On-navigation (ทางเลือก)</div>
+            <div class="font-semibold mb-1.5 text-[14px]">Refetch เมื่อเปลี่ยนหน้า</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">เรียก <span class="mono text-[12px]">refreshSession()</span> ทุกครั้งก่อน <span class="mono text-[12px]">&lt;PermissionGate&gt;</span> ตรวจ requires ของหน้าใหม่ — จำกัดความ stale ไว้แค่ "ระหว่างอยู่หน้าเดิม" ไม่ลามข้ามหน้า</p>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">lib/api-client.ts · global fetch wrapper (ชั้นที่ 1 — ต้องมี)</div>
+        <div class="code p-5 mb-4">
+<pre><span class="s">'use client'</span>;
+
+<span class="k">import</span> { useCallback } <span class="k">from</span> <span class="s">'react'</span>;
+<span class="k">import</span> { useRouter } <span class="k">from</span> <span class="s">'next/navigation'</span>;
+<span class="k">import</span> { useAuth } <span class="k">from</span> <span class="s">'./auth/auth-context'</span>;
+
+<span class="k">interface</span> <span class="t">IApiErrorBody</span> {
+  status: { code: <span class="t">number</span>; message: <span class="t">string</span> };
+}
+
+<span class="k">export function</span> useApiClient() {
+  <span class="k">const</span> { refreshSession, logout } = useAuth();
+  <span class="k">const</span> router = useRouter();
+
+  <span class="k">const</span> request = useCallback(<span class="k">async</span> &lt;<span class="t">T</span>&gt;(url: <span class="t">string</span>, init: <span class="t">RequestInit</span> = {}): <span class="t">Promise</span>&lt;<span class="t">T</span>&gt; =&gt; {
+    <span class="k">const</span> token = sessionStorage.getItem(<span class="s">'access_token'</span>);
+    <span class="k">const</span> res = <span class="k">await</span> fetch(url, {
+      ...init,
+      headers: {
+        <span class="s">'Content-Type'</span>: <span class="s">'application/json'</span>,
+        ...(token ? { Authorization: <span class="s">`Bearer ${token}`</span> } : {}),
+        ...init.headers,
+      },
+    });
+
+    <span class="c">// session หายไปเลย (401) เช่น admin force-logout — ต้อง login ใหม่ ไม่ใช่แค่ refetch</span>
+    <span class="k">if</span> (res.status === 401) {
+      <span class="k">await</span> logout();
+      router.replace(<span class="s">'/login'</span>);
+      <span class="k">throw new</span> <span class="t">Error</span>(<span class="s">'unauthenticated'</span>);
+    }
+
+    <span class="c">// 403 = permission ถูกปฏิเสธ ณ ตอนนี้จริง (server เพิ่ง sync ล่าสุดแล้ว) —</span>
+    <span class="c">// resync ให้ Context ตรงกับ server ทันที ก่อนพาไปหน้า 403</span>
+    <span class="k">if</span> (res.status === 403) {
+      <span class="k">await</span> refreshSession();
+      <span class="k">const</span> body = (<span class="k">await</span> res.clone().json().catch(() =&gt; <span class="k">null</span>)) <span class="k">as</span> <span class="t">IApiErrorBody</span> | <span class="k">null</span>;
+      router.push(<span class="s">`/403?reason=${encodeURIComponent(body?.status.message ?? 'forbidden')}`</span>);
+      <span class="k">throw new</span> <span class="t">Error</span>(body?.status.message ?? <span class="s">'forbidden'</span>);
+    }
+
+    <span class="k">if</span> (!res.ok) <span class="k">throw new</span> <span class="t">Error</span>(<span class="s">`request failed: ${res.status}`</span>);
+    <span class="k">return</span> res.json();
+  }, [refreshSession, logout, router]);
+
+  <span class="k">return</span> { request };
+}</pre>
+        </div>
+        <p class="text-[13px] mb-6" style="color:var(--ink-soft)">รูปแบบ error body ด้านบน (<span class="mono text-[12px]">status.code</span>) มาจาก <span class="mono text-[12px]">AllExceptionsFilter</span> จริง — <span class="mono text-[12px]">ForbiddenException</span> ทั่วไปที่ <span class="mono text-[12px]">PermissionGuard</span> โยนจะได้ <span class="mono text-[12px]">status.code = 403</span> (เลขธรรมดา ไม่ใช่ 6 หลักแบบ <span class="mono text-[12px]">400001</span>/<span class="mono text-[12px]">400002</span> ที่สงวนไว้เฉพาะ ValidationException/InvalidParameterException)</p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ชั้นที่ 2 (เสริม) · refetch on focus/interval ด้วย react-query</div>
+        <div class="code p-5 mb-6">
+<pre><span class="k">import</span> { useQuery } <span class="k">from</span> <span class="s">'@tanstack/react-query'</span>;
+
+<span class="k">function</span> useSessionQuery(accessToken: <span class="t">string</span> | <span class="k">null</span>) {
+  <span class="k">return</span> useQuery({
+    queryKey: [<span class="s">'session'</span>, accessToken],
+    queryFn: () =&gt; fetchMe(accessToken<span class="k">!</span>),
+    enabled: !!accessToken,
+    refetchOnWindowFocus: <span class="k">true</span>,  <span class="c">// สลับกลับมาที่ tab ก็ resync</span>
+    refetchInterval: 60_000,      <span class="c">// สำรอง เผื่อไม่เคยสลับ tab เลย</span>
+  });
+}</pre>
+        </div>
+
+        <div class="rulebox ok"><div class="rc mb-1">RULE · ไม่ต้องเชื่อ client cache เพื่อความปลอดภัย เชื่อแค่เพื่อ UX</div><p class="text-[13.5px]">ไม่ว่าฝั่ง Next.js จะ refetch บ่อยแค่ไหน <span class="mono text-[12px]">PermissionGuard</span> ฝั่ง backend อ่านจาก Redis สดใหม่ทุก request อยู่แล้ว (§10 Session Sync) — 3 ชั้นด้านบนมีไว้แก้ปัญหา <b>UX ที่ปุ่ม/หน้าโชว์ผิด</b> ไม่ใช่ช่องโหว่ความปลอดภัยที่ต้องอุด</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 STEP 5 ========== -->
+      <section id="step5" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — Step 5</div>
+        <h2 class="display text-3xl mb-6">สร้าง Route ใหม่ + Page Guard</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          Component กลาง <span class="mono text-[13px]">&lt;PermissionGate&gt;</span> เช็ค 1 permission ระดับหน้า —
+          ไม่มีสิทธิ์ → เด้งไปหน้า 403 (หรือ login ถ้ายังไม่ได้ authenticate)
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">components/permission-gate.tsx</div>
+        <div class="code p-5 mb-6">
+<pre><span class="s">'use client'</span>;
+
+<span class="k">import</span> { useEffect } <span class="k">from</span> <span class="s">'react'</span>;
+<span class="k">import</span> { useRouter } <span class="k">from</span> <span class="s">'next/navigation'</span>;
+<span class="k">import</span> { useAuth } <span class="k">from</span> <span class="s">'@/lib/auth/auth-context'</span>;
+<span class="k">import type</span> { ReactNode } <span class="k">from</span> <span class="s">'react'</span>;
+
+<span class="k">export function</span> PermissionGate({
+  requires,
+  children,
+}: {
+  requires: <span class="t">string</span>;
+  children: <span class="t">ReactNode</span>;
+}) {
+  <span class="k">const</span> { session, isLoading, hasPermission } = useAuth();
+  <span class="k">const</span> router = useRouter();
+
+  useEffect(() =&gt; {
+    <span class="k">if</span> (isLoading) <span class="k">return</span>;
+    <span class="k">if</span> (!session) { router.replace(<span class="s">'/login'</span>); <span class="k">return</span>; }
+    <span class="k">if</span> (!hasPermission(requires)) { router.replace(<span class="s">'/403'</span>); }
+  }, [isLoading, session, requires]);
+
+  <span class="c">// กัน flash ของเนื้อหาก่อน redirect เสร็จ</span>
+  <span class="k">if</span> (isLoading || !session || !hasPermission(requires)) <span class="k">return null</span>;
+  <span class="k">return</span> &lt;&gt;{children}&lt;/&gt;;
+}</pre>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">app/reports/page.tsx · route ใหม่</div>
+        <div class="code p-5">
+<pre><span class="k">import</span> { PermissionGate } <span class="k">from</span> <span class="s">'@/components/permission-gate'</span>;
+
+<span class="k">export default function</span> ReportsPage() {
+  <span class="k">return</span> (
+    &lt;PermissionGate requires=<span class="s">"page:view_reports"</span>&gt;
+      &lt;h1&gt;รายงาน&lt;/h1&gt;
+      {<span class="c">/* เนื้อหาหน้า … */</span>}
+    &lt;/PermissionGate&gt;
+  );
+}</pre>
+        </div>
+
+        <div class="rulebox mt-5"><div class="rc mb-1">RULE · middleware.ts เช็คได้แค่ "login แล้วหรือยัง"</div><p class="text-[13.5px]">Edge middleware รันก่อนทุก request และไม่ควรยิง network call ไปเช็ค permission ทุกครั้ง (ช้า + เพิ่มโหลด auth-bc) — ให้ middleware เช็คแค่ "มี token ไหม" (redirect ไป <span class="mono text-[12px]">/login</span> ถ้าไม่มี) ส่วนการเช็ค <b>permission รายหน้า</b> ให้เป็นหน้าที่ของ <span class="mono text-[12px]">&lt;PermissionGate&gt;</span> ที่ทำงานหลัง Context โหลด session (จาก cache ใน memory ไม่ใช่ network call ใหม่ทุกครั้ง)</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 STEP 6 ========== -->
+      <section id="step6" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Step 6</div>
+        <h2 class="display text-3xl mb-6">ซ่อน/แสดง Component ย่อยด้วย &lt;Can&gt;</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ปุ่ม/วิดเจ็ตที่ต้องซ่อนเป็นรายชิ้น (ไม่ใช่ทั้งหน้า) ใช้ component เล็ก ๆ ตัวเดียวห่อไว้ — เทียบเท่ากับ
+          <span class="mono text-[13px]">data-permission</span> ฝั่ง EJS
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">components/can.tsx</div>
+        <div class="code p-5 mb-6">
+<pre><span class="s">'use client'</span>;
+
+<span class="k">import</span> { useAuth } <span class="k">from</span> <span class="s">'@/lib/auth/auth-context'</span>;
+<span class="k">import type</span> { ReactNode } <span class="k">from</span> <span class="s">'react'</span>;
+
+<span class="k">export function</span> Can({
+  permission,
+  children,
+  fallback = <span class="k">null</span>,
+}: {
+  permission: <span class="t">string</span>;
+  children: <span class="t">ReactNode</span>;
+  fallback?: <span class="t">ReactNode</span>;
+}) {
+  <span class="k">const</span> { hasPermission } = useAuth();
+  <span class="k">return</span> hasPermission(permission) ? &lt;&gt;{children}&lt;/&gt; : &lt;&gt;{fallback}&lt;/&gt;;
+}</pre>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ใช้งานจริงในหน้า Reports</div>
+        <div class="code p-5">
+<pre><span class="k">import</span> { Can } <span class="k">from</span> <span class="s">'@/components/can'</span>;
+
+&lt;Can permission=<span class="s">"component:btn_export_reports"</span>&gt;
+  &lt;button onClick={handleExport}&gt;Export&lt;/button&gt;
+&lt;/Can&gt;</pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 09 STEP 7 ========== -->
+      <section id="step7" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — Step 7</div>
+        <h2 class="display text-3xl mb-6">Backend Guard ยังต้องมีเสมอ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ขั้นตอนนี้ไม่ใช่งาน Next.js แต่เป็นสิ่งที่ทีม backend (BC ที่เป็นเจ้าของ endpoint จริง เช่น
+          <span class="mono text-[13px]">reports-bc</span>) ต้องทำคู่กันเสมอ — ไม่งั้น <span class="mono text-[13px]">&lt;PermissionGate&gt;</span>/<span class="mono text-[13px]">&lt;Can&gt;</span> ที่เพิ่งเขียนจะเป็นแค่ล็อกกระดาษ
+        </p>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="edge" style="background:rgba(220,90,22,.06);border-color:rgba(220,90,22,.22)"><div class="tag mb-1" style="color:var(--signal)">Next.js (UX เท่านั้น)</div><p class="text-[13px]"><span class="mono text-[12px]">&lt;PermissionGate&gt;</span> / <span class="mono text-[12px]">&lt;Can&gt;</span> ซ่อน route/ปุ่มจากผู้ใช้ที่ไม่ควรเห็น — แก้ query string/inspect element ผ่านได้ ไม่ใช่มาตรการความปลอดภัย</p></div>
+          <div class="edge" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)"><div class="tag mb-1" style="color:#2563EB">Backend Guard (Security จริง)</div><p class="text-[13px]"><span class="mono text-[12px]">@RequirePermission('report:view')</span> ที่ controller ของ endpoint จริง — <span class="mono text-[12px]">AuthGuard</span>/<span class="mono text-[12px]">PermissionGuard</span> ตรวจทุก request ไม่สนว่าเรียกจาก Next.js, EJS, curl หรือ Postman</p></div>
+        </div>
+        <div class="rulebox ok mt-5"><div class="rc mb-1">RULE · FRONTEND ≠ SECURITY (ครอบคลุมทุก frontend)</div><p class="text-[13.5px]">กฎนี้ (SRS P1 §05) ใช้กับทุก frontend เหมือนกันหมด ไม่ว่าจะเป็น EJS วันนี้หรือ Next.js — <b>ทุก request ต้องถูกตรวจซ้ำที่ backend Guard เสมอ</b></p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 10 FULL EXAMPLE ========== -->
+      <section id="full-example" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — ตัวอย่างเต็ม</div>
+        <h2 class="display text-3xl mb-6">เพิ่มหน้า "Reports" ตั้งแต่ต้นจนจบ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">รวม step 1–7 เป็น flow เดียว ใช้เป็น checklist เวลาเพิ่มหน้าใหม่จริง</p>
+
+        <div class="card p-6">
+          <div class="step"><span class="sn">1</span><p class="text-[13.5px]">เพิ่ม <span class="mono text-[12px]">page:view_reports</span> + <span class="mono text-[12px]">component:btn_export_reports</span> ใน <span class="mono text-[12px]">apps/frontend-web/ui-permissions.manifest.json</span> (erp-api repo) → PR → merge</p></div>
+          <div class="step"><span class="sn">2</span><p class="text-[13.5px]">รัน <span class="mono text-[12px]">npm run permissions:sync</span> ที่ erp-api repo → permission ใหม่เข้า catalog</p></div>
+          <div class="step"><span class="sn">3</span><p class="text-[13.5px]">แจ้ง Security Admin ให้เปิดหน้า Policy Generator → สร้าง/แก้ policy ให้มี statement อนุญาต 2 permission นี้ → attach เข้า role ที่ควรเห็นหน้ารายงาน</p></div>
+          <div class="step"><span class="sn">4</span><p class="text-[13.5px]">ฝั่ง Next.js: สร้าง <span class="mono text-[12px]">app/reports/page.tsx</span> ห่อด้วย <span class="mono text-[12px]">&lt;PermissionGate requires="page:view_reports"&gt;</span></p></div>
+          <div class="step"><span class="sn">5</span><p class="text-[13.5px]">ปุ่ม Export ในหน้านั้นห่อด้วย <span class="mono text-[12px]">&lt;Can permission="component:btn_export_reports"&gt;</span></p></div>
+          <div class="step"><span class="sn">6</span><p class="text-[13.5px]">แจ้งทีม backend ของ <span class="mono text-[12px]">reports-bc</span> ให้ endpoint จริง (เช่น <span class="mono text-[12px]">GET /reports</span>) มี <span class="mono text-[12px]">@RequirePermission('report:view', { th, en })</span> แล้วรัน <span class="mono text-[12px]">permissions:sync</span> ฝั่งนั้นด้วย (คนละ permission กับ <span class="mono text-[12px]">page:view_reports</span> — นี่คือ api-plane, ตัวนั้นคือ ui-plane)</p></div>
+          <div class="step"><span class="sn">7</span><p class="text-[13.5px]">ทดสอบด้วย user 2 แบบ: มี role ที่ได้ policy นี้ (ต้องเห็นหน้า+ปุ่ม) กับไม่มี (ต้องเด้ง 403 ทั้ง UI และโดน 403 จริงถ้ายิง API endpoint ตรง ๆ)</p></div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 11 CHECKLIST ========== -->
+      <section id="checklist" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">11 — สรุป</div>
+        <h2 class="display text-3xl mb-6">Checklist ก่อน merge Route ใหม่</h2>
+        <div class="card overflow-hidden">
+          <table class="d">
+            <thead><tr><th style="width:60px">#</th><th>รายการ</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>ประกาศ <span class="mono text-[12px]">page:*</span>/<span class="mono text-[12px]">component:*</span> ใน <span class="mono text-[12px]">ui-permissions.manifest.json</span> ที่ erp-api repo แล้ว</td></tr>
+              <tr><td>2</td><td>รัน <span class="mono text-[12px]">permissions:sync</span> แล้ว เห็นแถวใหม่ใน catalog (ไม่ใช่ placeholder — มีชื่อ th/en ตรงจาก manifest)</td></tr>
+              <tr><td>3</td><td>Security Admin attach permission เข้า policy → role ให้ user ที่ควรเห็นแล้ว</td></tr>
+              <tr><td>4</td><td>route ใหม่ห่อด้วย <span class="mono text-[12px]">&lt;PermissionGate requires="page:*"&gt;</span></td></tr>
+              <tr><td>5</td><td>ปุ่ม/วิดเจ็ตย่อยห่อด้วย <span class="mono text-[12px]">&lt;Can permission="component:*"&gt;</span> ตามจริง</td></tr>
+              <tr><td>6</td><td>ไม่มีจุดไหน decode JWT เพื่ออ่าน permissions เอง — ทุกจุดอ่านจาก session ใน Auth Context ที่มาจาก <span class="mono text-[12px]">/auth/me</span></td></tr>
+              <tr><td>7</td><td>endpoint backend จริงที่หน้านี้เรียก มี <span class="mono text-[12px]">@RequirePermission()</span> แล้ว (ตรวจกับทีม backend ของ BC นั้น)</td></tr>
+              <tr><td>8</td><td>ทดสอบ 403 จริงทั้ง 2 ชั้น: UI redirect และ API เรียกตรงด้วย token ที่ไม่มีสิทธิ์</td></tr>
+              <tr><td>9</td><td>API call ทุกจุดผ่าน global wrapper เดียว (<span class="mono text-[12px]">useApiClient</span>) ที่ resync <span class="mono text-[12px]">refreshSession()</span> เมื่อเจอ 403 — ไม่มี <span class="mono text-[12px]">fetch()</span> ลอย ๆ ที่ข้าม wrapper นี้</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="max-w-[980px] mx-auto px-6 sm:px-10">
+      <erp-footer
+        line1="ERP SYSTEM · FRONTEND INTEGRATION GUIDE · NEXT.JS"
+        line2="RBAC · PBAC · JWT · REDIS SESSION · APP ROUTER">
+      </erp-footer>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
