@@ -37,7 +37,10 @@
       <div class="navsub">5 · Policy Examples + Enforcement</div>
       <div class="navsub">6 · ER Diagram</div>
       <div class="navsub">7 · Dev Guide</div>
-      <div class="navsub">8 · Glossary</div>
+      <div class="navsub">8 · FE Routes &amp; Components</div>
+      <div class="navsub">9 · Permissions CRUD Page</div>
+      <div class="navsub">10 · Session Sync &amp; Revocation</div>
+      <div class="navsub">11 · Glossary</div>
     </nav>
     <div slot="footnote">NESTJS 11 · POSTGRESQL<br>JWT · REDIS · RABBITMQ</div>
   </erp-sidebar>
@@ -441,9 +444,247 @@ erDiagram
           </div>
         </div>
 
-        <!-- 1.8 Glossary -->
+        <!-- 1.8 Frontend Routes & Component Permission Map -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">08</span><h3 class="text-xl font-semibold">Frontend Routes &amp; Component Permission Map · สำหรับทีม FE</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">ทุกหน้าใน iam-view เป็น route แยกกัน (ไม่ใช่ SPA เดียวสลับ view ด้วย JS อีกต่อไป) — 1 หน้า = 1 <span class="mono text-[12px]">page:*</span> permission ที่คุมว่าเมนูฝั่งซ้ายจะแสดง/ซ่อน และแต่ละหน้ามี component ย่อย (ปุ่ม/วิดเจ็ต) ที่มี <span class="mono text-[12px]">component:*</span> permission ของตัวเองแยกต่างหาก — ใช้ตารางนี้เป็น reference เวลาจะเพิ่มหน้าใหม่หรือ component ใหม่ ไม่ว่าจะเป็น implementation ปัจจุบัน (EJS + vanilla JS) หรือ frontend อื่นในอนาคต (เช่น Next.js)</p>
+
+          <div class="card overflow-hidden mb-6">
+            <table class="d">
+              <thead><tr><th style="width:170px">หน้า (Page)</th><th style="width:190px">Route</th><th style="width:170px">Page permission</th><th>Component permissions ในหน้านั้น</th></tr></thead>
+              <tbody>
+                <tr><td>แดชบอร์ด</td><td><span class="mono text-[12px]">/views/dashboard</span></td><td><span class="mono text-[12px]">page:view_dashboard</span></td><td><span class="mono text-[12px]">component:widget_total_users</span> · <span class="mono text-[12px]">component:widget_total_roles</span> · <span class="mono text-[12px]">component:widget_active_policies</span> · <span class="mono text-[12px]">component:widget_login_graph</span></td></tr>
+                <tr><td>จัดการผู้ใช้งาน</td><td><span class="mono text-[12px]">/views/users</span></td><td><span class="mono text-[12px]">page:view_users</span></td><td><span class="mono text-[12px]">component:btn_add_user</span> · <span class="mono text-[12px]">component:btn_export_users</span></td></tr>
+                <tr><td>บทบาท (Roles)</td><td><span class="mono text-[12px]">/views/roles</span></td><td><span class="mono text-[12px]">page:view_roles</span></td><td><span class="mono text-[12px]">role:create</span> <span class="text-[11px]" style="color:var(--muted)">(ปุ่มสร้าง/แก้ไข role — ใช้ api-plane permission ตัวเดียวกับที่ Guard ฝั่ง backend ตรวจ ไม่ได้แยก component:* ใหม่)</span></td></tr>
+                <tr><td>นโยบายความปลอดภัย (Policies)</td><td><span class="mono text-[12px]">/views/policies</span></td><td><span class="mono text-[12px]">page:view_policies</span></td><td><span class="mono text-[12px]">policy:create</span> <span class="text-[11px]" style="color:var(--muted)">(เช่นเดียวกับ roles — reuse api-plane permission)</span></td></tr>
+                <tr><td>จัดการสิทธิ์ (Permissions)</td><td><span class="mono text-[12px]">/views/permissions</span></td><td><span class="mono text-[12px]">page:view_permissions</span></td><td><span class="mono text-[12px]">permission:create</span> · <span class="mono text-[12px]">permission:update</span> · <span class="mono text-[12px]">permission:delete</span> <span class="text-[11px]" style="color:var(--muted)">(ดูรายละเอียด CRUD guard ที่ §09)</span></td></tr>
+                <tr><td>ประวัติการเข้าใช้งาน (Login History)</td><td><span class="mono text-[12px]">/views/audit-logs</span></td><td><span class="mono text-[12px]">page:view_audit</span></td><td>— (read-only, ไม่มี component gate ย่อย)</td></tr>
+                <tr><td>ผู้ใช้งานที่ออนไลน์ (Active Sessions)</td><td><span class="mono text-[12px]">/views/sessions</span></td><td><span class="mono text-[12px]">page:view_sessions</span></td><td><span class="mono text-[12px]">session:revoke</span> <span class="text-[11px]" style="color:var(--muted)">(ปุ่ม Revoke ต่อแถว — ซ่อนถ้าไม่มีสิทธิ์นี้, ตรวจซ้ำที่ backend เสมอ)</span></td></tr>
+                <tr><td>ตั้งค่าระบบ</td><td><span class="mono text-[12px]">/views/system-setting</span></td><td><span class="mono text-[12px]">page:view_settings</span></td><td>— (ยังไม่มี component — placeholder รอ API)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4 mb-6">
+            <div class="edge" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)"><div class="tag mb-1" style="color:#2563EB">เพิ่มหน้าใหม่</div><p class="text-[13px]">ตั้งชื่อ permission <span class="mono text-[12px]">page:view_&lt;slug&gt;</span> ก่อนเสมอ · เมนู sidebar ใช้ permission นี้ซ่อน/แสดง item ทั้งก้อน (route guard ฝั่ง client ก็ redirect ออกถ้าไม่มีสิทธิ์นี้เช่นกัน — ดูตัวอย่างใน <span class="mono text-[12px]">apps/iam/public/pages/user-management/js/shell.service.js</span> ฟังก์ชัน <span class="mono text-[12px]">bootAdminPage()</span>)</p></div>
+            <div class="edge" style="background:rgba(220,90,22,.06);border-color:rgba(220,90,22,.22)"><div class="tag mb-1" style="color:var(--signal)">เพิ่ม component ใหม่ในหน้าเดิม</div><p class="text-[13px]">ตั้งชื่อ <span class="mono text-[12px]">component:&lt;slug&gt;</span> แล้วแนบ <span class="mono text-[12px]">data-permission="component:xxx"</span> ที่ element นั้น (หรือถ้าเป็นปุ่มที่ควบคุมการเรียก API อยู่แล้ว เช่น สร้าง role/policy จะ <b>reuse</b> permission ฝั่ง api-plane เดิมแทนก็ได้ ไม่จำเป็นต้องมี component:* คู่กันเสมอไป)</p></div>
+          </div>
+
+          <div class="card p-6 mb-6">
+            <div class="mono text-[11px] mb-3" style="color:#2563EB">SYNC · ทำให้ permission ใหม่เข้า catalog อัตโนมัติ</div>
+            <p class="text-[13px] mb-3" style="color:var(--ink-soft)">ไม่ต้อง insert/ลบแถวใน <span class="mono text-[12px]">permissions</span> เอง — รัน <span class="mono text-[12px]">npm run permissions:sync</span> แล้ว script จะ scan หา permission ให้ทั้ง 2 planes:</p>
+            <table class="d">
+              <thead><tr><th style="width:150px">Plane</th><th style="width:260px">Scan จากอะไร</th><th>ใช้เมื่อไหร่</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">api</span></td><td><span class="mono text-[12px]">@RequirePermission('resource:action', { th, en })</span> ใน <span class="mono text-[12px]">apps/&lt;service&gt;/src/**</span></td><td>ทุก endpoint backend — ชื่อ th/en เอาจาก decorator เสมอ</td></tr>
+                <tr><td><span class="mono text-[12px]">ui</span> (EJS/scannable)</td><td>สตริง <span class="mono text-[12px]">"page:*"</span> / <span class="mono text-[12px]">"component:*"</span> ใน <span class="mono text-[12px]">apps/&lt;service&gt;/views/**</span> + <span class="mono text-[12px]">apps/&lt;service&gt;/public/**</span> (ไม่ว่าจะเป็น literal <span class="mono text-[12px]">data-permission="..."</span> หรือ string ใน JS)</td><td>iam-view และหน้า EJS อื่น ๆ ในโปรเจกต์นี้</td></tr>
+                <tr><td><span class="mono text-[12px]">ui</span> (manifest)</td><td>ไฟล์ <span class="mono text-[12px]">apps/&lt;service&gt;/ui-permissions.manifest.json</span> — ดู schema เต็มที่ <span class="mono text-[12px]">libs/database/src/scripts/ui-permissions-manifest.schema.ts</span></td><td><b>ทีม FE (เช่น Next.js)</b> — JSX ไม่เหลือ literal string ให้ scan หลัง build จึงต้องประกาศ pages/components เป็น JSON ไว้ตรง ๆ แทน</td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">รูปแบบไฟล์ manifest — 1 หน้า (page) มีได้หลาย component ซ้อนอยู่ข้างใน ตรงกับโมเดลตารางด้านบนเป๊ะ:</p>
+            <pre class="code p-4">{
+  <span class="s">"pages"</span>: [
+    {
+      <span class="s">"permission"</span>: <span class="s">"page:view_sessions"</span>,
+      <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"หน้าผู้ใช้งานออนไลน์"</span>, <span class="s">"en"</span>: <span class="s">"Active sessions page"</span> },
+      <span class="s">"components"</span>: [
+        { <span class="s">"permission"</span>: <span class="s">"component:btn_revoke_session"</span>,
+          <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"ปุ่มเพิกถอนการเข้าใช้งาน"</span>, <span class="s">"en"</span>: <span class="s">"Revoke session button"</span> } }
+      ]
+    }
+  ]
+}</pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">manifest ให้ชื่อ <span class="mono text-[12px]">{ th, en }</span> มาตรง ๆ เหมือน decorator — sync จะเชื่อชื่อจาก manifest เสมอ (ทับของเดิมได้) ต่างจากการ scan <span class="mono text-[12px]">data-permission</span> ที่ไม่มีที่เก็บชื่อ จึงได้แค่ placeholder ครั้งแรกแล้วต้องมาแก้ในตารางเอง</p>
+          </div>
+
+          <div class="rulebox"><div class="rc mb-1">RULE · SIDEBAR = PAGE PERMISSION, ไม่ใช่ ROUTE PATH</div><p class="text-[13.5px]">ห้าม hardcode การซ่อนเมนูด้วย role/username — เช็คกับ <span class="mono text-[12px]">page:view_&lt;slug&gt;</span> ใน JWT เท่านั้น (เหมือนกันทั้ง EJS วันนี้และ Next.js ในอนาคต) เพื่อให้ Policy Generator ฝั่ง Security Admin ควบคุมเมนูได้โดยไม่ต้อง deploy โค้ดใหม่</p></div>
+        </div>
+
+        <!-- 1.9 Permissions Management Page -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">09</span><h3 class="text-xl font-semibold">Permissions Management Page · CRUD แคตตาล็อกสิทธิ์ + ความเชื่อมโยงกับ Policy</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">หน้าใหม่ <span class="mono text-[12px]">/views/permissions</span> (เมนู "จัดการสิทธิ์" ในกลุ่มการจัดการ, permission <span class="mono text-[12px]">page:view_permissions</span>) แสดงแคตตาล็อกสิทธิ์ทั้งหมด — ทั้ง <b>api</b> และ <b>ui</b> plane — ในตารางเดียว พร้อม CRUD สำหรับสิทธิ์ที่เพิ่มด้วยมือ ไม่ต้องเปิด DB มา insert/ลบเองอีกต่อไป</p>
+
+          <div class="card p-6 mb-6">
+            <div class="mono text-[11px] mb-4" style="color:#2563EB">is_manual · ตัวแบ่งว่าใครเป็นเจ้าของแถวนี้</div>
+            <p class="text-[13px] mb-4" style="color:var(--ink-soft)">คอลัมน์ใหม่ <span class="mono text-[12px]">permissions.is_manual</span> (boolean) บอกที่มาของแต่ละแถว — <span class="mono text-[12px]">permissions:sync</span> เขียนแถว <span class="mono text-[12px]">is_manual = false</span> เสมอและ<b>ไม่แตะ</b>แถว <span class="mono text-[12px]">is_manual = true</span> เลย (ทั้งตอน add/remove diff และตอน insert ชนกัน — ดู <span class="mono text-[12px]">syncPlane()</span> ใน <span class="mono text-[12px]">sync-permissions.script.ts</span>) ส่วนหน้า Permissions ก็เขียนแถวใหม่เป็น <span class="mono text-[12px]">is_manual = true</span> เสมอ — สองฝั่งไม่มีวันชนกัน</p>
+            <table class="d">
+              <thead><tr><th style="width:170px">การกระทำ</th><th style="width:150px">แถว synced (is_manual=false)</th><th>แถว manual (is_manual=true)</th></tr></thead>
+              <tbody>
+                <tr><td>Create</td><td colspan="2">สร้างได้ทาง manual เท่านั้น — ถูกบังคับ <span class="mono text-[12px]">plane: 'ui'</span> เสมอที่ backend (client ส่ง plane มาก็ถูกละเว้น) เพราะแถว <span class="mono text-[12px]">api</span> ที่ไม่มี <span class="mono text-[12px]">@RequirePermission()</span> จริงในโค้ดจะกลายเป็น "สิทธิ์ผี" — เลือกได้ใน Policy Generator แต่ไม่มี Guard ไหนตรวจจริง</td></tr>
+                <tr><td>แก้ชื่อ (th/en)</td><td style="color:#15803D">✓ แก้ได้เสมอ</td><td style="color:#15803D">✓ แก้ได้เสมอ</td></tr>
+                <tr><td>แก้ service/permission</td><td style="color:#B91C1C">✗ 403 Forbidden</td><td style="color:#15803D">✓ แก้ได้ (resource/action คำนวณใหม่จาก permission อัตโนมัติ)</td></tr>
+                <tr><td>Delete</td><td style="color:#B91C1C">✗ 400 Bad Request</td><td style="color:#15803D">✓ soft-delete ได้</td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] mt-4" style="color:var(--ink-soft)">Endpoint: <span class="mono text-[12px]">POST/PUT/DELETE /iam/v1/permissions</span> คุมด้วย <span class="mono text-[12px]">permission:create</span> / <span class="mono text-[12px]">permission:update</span> / <span class="mono text-[12px]">permission:delete</span> (auto-sync แล้ว, grant ให้ 2 policy มockup ผ่าน migration <span class="mono text-[12px]">SeedPermissionsPagePermissions</span>) — ดู <span class="mono text-[12px]">apps/iam/src/modules/permissions/services/permissions.service.ts</span> (<span class="mono text-[12px]">createManual/updateManual/removeManual</span>) สำหรับ business rule เต็ม</p>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">เชื่อมกับ Policy Generator อย่างไร</h4>
+          <div class="card p-6 mb-6">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]">Security Admin เพิ่มสิทธิ์ใหม่ที่หน้า Permissions — เช่น <span class="mono text-[12px]">page:view_reports</span> — <b>ก่อน</b>ที่หน้าเว็บจริงจะถูกสร้างด้วยซ้ำได้ (แค่ประกาศ vocabulary ไว้ล่วงหน้า)</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]">สิทธิ์ใหม่นี้ปรากฏทันทีในหน้า Policy Generator (Step 2 — dropdown Service/Resource + action checkboxes) เพราะทั้งสองหน้าอ่านจาก <span class="mono text-[12px]">GET /permissions</span> ตัวเดียวกัน</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ประกอบเป็น statement แล้วแนบเข้า policy → attach policy เข้า role → ผู้ใช้ที่มี role นั้นได้สิทธิ์ทันทีตอน login ครั้งถัดไป (ดู §02 resolution chain)</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]">ภายหลังทีม FE สร้างหน้า/ปุ่มจริงแล้วแปะ <span class="mono text-[12px]">data-permission="page:view_reports"</span> (หรือใส่ manifest ถ้าเป็น Next.js) — รอบ <span class="mono text-[12px]">permissions:sync</span> ถัดไปเจอ permission เดิมอยู่แล้ว ก็แค่ยืนยันซ้ำ ไม่สร้างซ้ำ ไม่รีเซ็ตชื่อ และแถวยังเป็น <span class="mono text-[12px]">is_manual = true</span> เหมือนเดิม — statement/policy ที่ผูกไว้ตั้งแต่ข้อ 3 ใช้งานได้เลยไม่ต้องแก้อะไร</p></div>
+          </div>
+
+          <div class="rulebox"><div class="rc mb-1">RULE · ห้าม CREATE/UPDATE ทำให้เกิดสิทธิ์ผี</div><p class="text-[13.5px]">หน้า Permissions ควบคุม<b>เฉพาะ catalog</b> (ตาราง <span class="mono text-[12px]">permissions</span>) — ไม่ได้ทำให้ endpoint ไหนถูกป้องกันขึ้นมาเองอัตโนมัติ ฝั่ง <span class="mono text-[12px]">api</span> plane ยังต้องมี <span class="mono text-[12px]">@RequirePermission()</span> จริงในโค้ดเสมอ (§07 RULE · GUARD ทุก endpoint) — เพราะงั้น Create ถึงบังคับ <span class="mono text-[12px]">plane: 'ui'</span> เท่านั้น และห้ามสร้าง <span class="mono text-[12px]">api</span> plane ทาง UI นี้โดยเด็ดขาด</p></div>
+
+          <h4 class="font-semibold mb-3 mt-8 text-[14px]">สำหรับทีม Frontend Next.js (แยก repo) · เข้ามาใช้งานอย่างไร</h4>
+          <p class="text-[13.5px] mb-5" style="color:var(--ink-soft)"><span class="mono text-[12px]">http://localhost:3002/iam/v1/views/permissions</span> เป็น route ของหน้า admin UI (EJS) ที่ผูกอยู่กับ iam-bc เอง — คืนค่าเป็น HTML shell (client JS ฝั่งนั้นค่อยเรียก REST API ต่อ) <b>ไม่ใช่</b> endpoint สำหรับ frontend ภายนอกมา consume ข้อมูล ถ้าทีม Next.js แยก repo จะทำหน้าจัดการสิทธิ์เวอร์ชันของตัวเอง ให้เรียก REST API ชุดเดียวกับที่หน้า EJS นี้เรียกอยู่เบื้องหลังโดยตรงแทน</p>
+
+          <div class="grid sm:grid-cols-2 gap-4 mb-6">
+            <div class="edge" style="background:rgba(220,90,22,.06);border-color:rgba(220,90,22,.22)"><div class="tag mb-1" style="color:var(--signal)">อย่าเรียก</div><p class="text-[13px]"><span class="mono text-[12px]">GET /iam/v1/views/permissions</span> — SSR page ของ iam-view เอง (<span class="mono text-[12px]">@Public() @Render(...)</span>) ไม่มี JSON ให้ consume และไม่ได้ตั้งใจให้ frontend อื่นเรียก</p></div>
+            <div class="edge" style="background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.3)"><div class="tag mb-1" style="color:#15803D">ให้เรียกแทน</div><p class="text-[13px]"><span class="mono text-[12px]">GET/POST/PUT/DELETE /iam/v1/permissions</span> (+ <span class="mono text-[12px]">GET /iam/v1/permissions/:id</span>) — REST API จริงที่คุมด้วย <span class="mono text-[12px]">permission:read/create/update/delete</span> ตามที่ระบุไว้ด้านบนในหัวข้อนี้</p></div>
+          </div>
+
+          <div class="card p-6 mb-6">
+            <div class="mono text-[11px] mb-3" style="color:#2563EB">AUTH + CORS</div>
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]">Next.js login ผ่าน <span class="mono text-[12px]">POST /auth/v1/auth/login</span> (auth-bc) เหมือน client อื่นทุกตัว — ได้ <span class="mono text-[12px]">access_token</span> มาแนบ <span class="mono text-[12px]">Authorization: Bearer &lt;token&gt;</span> ทุก request ไม่มี endpoint ลัดพิเศษสำหรับ frontend แยก repo</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]">Cross-origin เปิดไว้แล้วที่ระดับ bootstrap ของทุก BC (<span class="mono text-[12px]">app.enableCors()</span> ใน <span class="mono text-[12px]">libs/common/src/utils/bootstrap.util.ts</span>) ครอบทุก verb ที่ browser preflight (<span class="mono text-[12px]">PUT/PATCH/DELETE</span> รวมอยู่แล้ว ไม่ใช่แค่ default <span class="mono text-[12px]">GET/HEAD/POST</span> ของ <span class="mono text-[12px]">@fastify/cors</span>) — origin คุมด้วย env <span class="mono text-[12px]">CORS_ORIGIN</span> (default <span class="mono text-[12px]">*</span>) โปรดักชันควรตั้งเป็น origin จริงของ Next.js app แทน wildcard</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">endpoint ใช้ Bearer token ไม่ใช่ cookie — ฝั่ง <span class="mono text-[12px]">fetch()</span> ไม่ต้องเปิด <span class="mono text-[12px]">credentials: 'include'</span> จึงไม่ต้องยุ่งกับ SameSite/cookie cross-site เลย</p></div>
+          </div>
+
+          <div class="card p-6 mb-6" style="border-left:3px solid #2563EB">
+            <div class="mono text-[11px] mb-3" style="color:#2563EB">UI-plane permissions ของ Next.js เอง · ต้องประกาศผ่าน manifest เสมอ</div>
+            <p class="text-[13px] mb-4" style="color:var(--ink-soft)">JSX ไม่เหลือ literal <span class="mono text-[12px]">data-permission="..."</span> ให้ regex scan หลัง build (§08) — หน้า/ปุ่มของทีม Next.js จึงต้องประกาศผ่าน <span class="mono text-[12px]">ui-permissions.manifest.json</span> เท่านั้น ห้ามหวังให้ <span class="mono text-[12px]">permissions:sync</span> scan เจอเอง</p>
+            <div class="rulebox" style="margin:0 0 16px"><div class="rc mb-1">ข้อจำกัด · scan อ่านจากใน erp-api repo นี้เท่านั้น</div><p class="text-[13.5px]"><span class="mono text-[12px]">sync-permissions.script.ts</span> คำนวณ path จาก <span class="mono text-[12px]">__dirname</span> ของตัวมันเอง แล้วมองหาไฟล์ที่ <span class="mono text-[12px]">apps/&lt;service&gt;/ui-permissions.manifest.json</span> ภายใน<b> repo นี้เท่านั้น</b> — ตั้งค่าให้ชี้ออกไปนอก repo ไม่ได้ ถ้า Next.js อยู่คนละ repo จริง ทีมนั้นต้องมีโฟลเดอร์บาง ๆ <span class="mono text-[12px]">apps/&lt;next-service-slug&gt;/</span> ใน erp-api repo นี้ (มีแค่ไฟล์ manifest ไฟล์เดียวก็พอ ไม่ต้องมี <span class="mono text-[12px]">src/</span>) แล้ว publish/commit ไฟล์ manifest มาไว้ตรงนั้นทุกครั้งที่หน้า/ปุ่มเปลี่ยน (เช่นทำเป็น step ใน CI ของฝั่ง Next.js ที่เปิด PR มาที่ repo นี้อัตโนมัติ) — โค้ด Next.js จริงยังอยู่ repo เดิม ไม่ต้องย้ายทั้งแอปเข้ามา</p></div>
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]">สร้าง <span class="mono text-[12px]">apps/&lt;slug&gt;/ui-permissions.manifest.json</span> ระบุทุก <span class="mono text-[12px]">page:*</span> + <span class="mono text-[12px]">component:*</span> ของแอป ตาม schema ใน §08 (<span class="mono text-[12px]">libs/database/src/scripts/ui-permissions-manifest.schema.ts</span>)</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]">รัน <span class="mono text-[12px]">npm run permissions:sync</span> (ฝั่ง backend repo) → แถวใหม่เข้า catalog เป็น <span class="mono text-[12px]">plane = 'ui'</span>, <span class="mono text-[12px]">is_manual = false</span> พร้อมชื่อ th/en ตรงจาก manifest ทันที — ไม่ใช่แค่ placeholder เหมือนการ scan <span class="mono text-[12px]">data-permission</span></p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">permission ที่เพิ่งเข้า catalog <b>ยังไม่มีผล</b>จนกว่า Security Admin จะแนบเข้า policy → role ผ่าน Policy Generator (§02 resolution chain / §09 ข้อ 3) — มี entry ใน catalog แค่แปลว่า "เลือกได้ใน Policy Generator" ไม่ใช่ "อนุญาตแล้ว"</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]">Next.js เช็คสิทธิ์จาก JWT permissions ชุดเดียวกับทุก client (ไม่มี claim พิเศษแยกให้) — ทำเป็น hook เช่น <span class="mono text-[12px]">usePermission('page:view_reports')</span> แทน <span class="mono text-[12px]">data-permission</span> ก็ได้ ขอแค่ตรวจ permission string เดียวกัน และ<b>ยังต้องมี Guard ฝั่ง backend ตรวจซ้ำเสมอ</b> (§05 · FRONTEND ≠ SECURITY ครอบคลุมทุก frontend รวม Next.js ด้วย)</p></div>
+          </div>
+        </div>
+
+        <!-- 1.10 Session Sync & Revocation -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">10</span><h3 class="text-xl font-semibold">Session Sync &amp; Revocation · JWT ↔ Redis Session (Implemented)</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">ส่วนนี้บันทึกการ implement จริงที่แก้ปัญหา 2 ข้อจาก §07 RULE · UUID + SOURCE OF TRUTH ("เปลี่ยนสิทธิ์ยิง event ให้บริการ cache สิทธิ์ล้าง/รีเฟรช") — <b>(1)</b> JWT payload บวมขึ้นเรื่อย ๆ ตามจำนวน permission ที่ผู้ใช้มี และ <b>(2)</b> การถอนสิทธิ์ไม่มีผลจนกว่า access token จะหมดอายุ</p>
+
+          <div class="grid sm:grid-cols-2 gap-4 mb-6">
+            <div class="edge" style="background:rgba(220,90,22,.06);border-color:rgba(220,90,22,.22)"><div class="tag mb-1" style="color:var(--signal)">ปัญหาเดิม</div><p class="text-[13px]">permissions/roles/conditional_permissions ฝังอยู่ใน JWT claims ตั้งแต่ตอน login — token โตขึ้นเรื่อย ๆ ตามจำนวนสิทธิ์ (เสี่ยงชน header size limit ของ proxy บางตัว) และสิทธิ์ที่ฝังไปแล้ว<b>แก้ไม่ได้จนกว่า token หมดอายุ</b> (ปกติ 15 นาที)</p></div>
+            <div class="edge" style="background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.3)"><div class="tag mb-1" style="color:#15803D">แนวทางแก้</div><p class="text-[13px]">ย้าย permissions/roles ออกจาก JWT ไปเก็บใน <b>Redis session blob</b> (<span class="mono text-[12px]">session:&lt;jti&gt;</span>) ที่ auth-bc เขียนไว้ตั้งแต่ login — JWT เหลือแค่ claims ระบุตัวตน (คงที่ไม่ว่าจะมีกี่สิทธิ์) ส่วน iam-bc เขียนสิทธิ์ใหม่ทับ session เดิมได้ทันทีที่มีการเปลี่ยน role/policy โดยไม่ต้องบังคับ logout</p></div>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">JWT payload · ก่อน/หลัง</h4>
+          <div class="grid sm:grid-cols-2 gap-4 mb-6">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-2" style="color:var(--muted)">ก่อน — โตตามจำนวนสิทธิ์</div>
+              <pre class="code p-3">{
+  <span class="s">"sub"</span>: <span class="s">"00000000-…-000001"</span>,
+  <span class="s">"username"</span>: <span class="s">"superadmin"</span>,
+  <span class="s">"roles"</span>: [<span class="s">"ROLE_SUPERADMIN"</span>],
+  <span class="s">"permissions"</span>: [<span class="c">/* N รายการ — โตเรื่อย ๆ */</span>],
+  <span class="s">"conditional_permissions"</span>: [ … ],
+  <span class="s">"jti"</span>: <span class="s">"1756b2eb-…"</span>
+}</pre>
+            </div>
+            <div class="card p-5" style="border-left:3px solid #15803D">
+              <div class="mono text-[11px] mb-2" style="color:#15803D">หลัง — คงที่เสมอ</div>
+              <pre class="code p-3">{
+  <span class="s">"sub"</span>: <span class="s">"00000000-…-000001"</span>,
+  <span class="s">"username"</span>: <span class="s">"superadmin"</span>,
+  <span class="s">"fullname"</span>: <span class="s">"Super Administrator"</span>,
+  <span class="s">"email"</span>: <span class="s">"superadmin@erp.local"</span>,
+  <span class="s">"jti"</span>: <span class="s">"1756b2eb-…"</span>
+}
+<span class="c">// roles/permissions/conditional_permissions ย้ายไปอยู่ session:&lt;jti&gt; ใน Redis แทน</span></pre>
+            </div>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">Redis key contract · <span class="mono text-[12px]">SessionStoreService</span> (<span class="mono text-[12px]">libs/common</span>)</h4>
+          <div class="card overflow-hidden mb-6">
+            <table class="d">
+              <thead><tr><th style="width:210px">Key</th><th style="width:130px">ชนิด</th><th>เก็บอะไร · ใครเขียน/อ่าน</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">session:&lt;jti&gt;</span></td><td>STRING (JSON)</td><td>session blob เต็ม (<span class="mono text-[12px]">user_id · username · fullname · email · roles · permissions · conditional_permissions</span>) TTL = อายุ access token — auth-bc เขียนตอน login/refresh, ทุก BC อ่านผ่าน <span class="mono text-[12px]">AuthGuard</span>, iam-bc เขียนทับตอน sync สิทธิ์</td></tr>
+                <tr><td><span class="mono text-[12px]">user_sessions:&lt;user_id&gt;</span></td><td>SET (jti[])</td><td>ดัชนีย้อนกลับ — jti ทั้งหมดที่ user คนนี้ login ค้างอยู่ (หลายอุปกรณ์ได้) ไม่มี TTL ของตัวเอง (SET set สมาชิกหมดอายุทีละตัวไม่ได้) จึง prune แบบ lazy ทุกครั้งที่อ่าน — ใช้ตอบว่า "user นี้ login ค้างกี่ session" และเป็นทางเข้าเดียวของการ refresh/invalidate สิทธิ์แบบไม่ต้อง scan ทั้งระบบ</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">SessionSyncService (iam-bc) · จุดที่ trigger การ sync</h4>
+          <p class="text-[13px] mb-4" style="color:var(--ink-soft)">reuse <span class="mono text-[12px]">PermissionResolverService.resolveForUser()</span> logic เดียวกับตอน login (§02 resolution chain) แล้วดันเข้า Redis ทันทีหลัง DB commit — <b>best-effort</b>: ถ้า Redis ล่มระหว่าง sync จะ log error เท่านั้น ไม่ throw ย้อนกลับไปทำให้การแก้สิทธิ์ที่ DB commit สำเร็จแล้วกลายเป็น error (แค่ fallback กลับไปรอ token หมดอายุตามพฤติกรรมเดิม)</p>
+          <div class="card overflow-hidden mb-6">
+            <table class="d">
+              <thead><tr><th style="width:230px">Mutation จริง</th><th style="width:170px">Sync method</th><th>ผู้ใช้ที่ได้รับผลกระทบ</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">UsersService.assignRoles()</span></td><td><span class="mono text-[12px]">syncUser(user_id)</span></td><td>1 คน — user ที่ถูกเปลี่ยน role</td></tr>
+                <tr><td><span class="mono text-[12px]">RolesService.attachPolicies()</span></td><td><span class="mono text-[12px]">syncUsersByRole(role_id)</span></td><td>ทุกคนที่ถือ role นั้น (<span class="mono text-[12px]">user_roles</span> where role_id)</td></tr>
+                <tr><td><span class="mono text-[12px]">PoliciesService.setStatements()</span></td><td><span class="mono text-[12px]">syncUsersByPolicy(policy_id)</span></td><td>ทุกคนที่เชื่อมถึง policy ผ่าน <span class="mono text-[12px]">role_policies → user_roles</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="diagram mb-6">
+<pre class="mermaid">
+sequenceDiagram
+    participant SA as Security Admin
+    participant Roles as iam-bc · RolesService
+    participant DB as erp_iam (Postgres)
+    participant Sync as SessionSyncService
+    participant Redis as Redis · session store
+    participant User as ผู้ใช้ (browser)
+
+    SA->>Roles: PATCH ถอด policy ออกจาก role
+    Roles->>DB: attachPolicies() บันทึก
+    DB-->>Roles: commit สำเร็จ
+    Roles->>Sync: syncUsersByRole(role_id)
+    Sync->>DB: หา user_id ทุกคนที่ถือ role นี้
+    loop ทุก user ที่ได้รับผลกระทบ
+        Sync->>DB: resolveForUser(user_id)
+        Sync->>Redis: refreshPermissionsForUser(user_id, permissions ใหม่)
+        Redis-->>Sync: เขียนทับ session:&lt;jti&gt; ทุกอุปกรณ์ (คง TTL เดิม)
+    end
+    User->>Redis: request ถัดไป — AuthGuard อ่าน session:&lt;jti&gt;
+    Redis-->>User: permissions ชุดใหม่ (ไม่มีสิทธิ์ที่ถูกถอด) → 403 ทันที
+</pre>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">Case ประกอบ</h4>
+          <div class="grid lg:grid-cols-3 gap-4 mb-6">
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:#2563EB">CASE A · ถอนสิทธิ์กลางคัน</div>
+              <div class="step"><span class="sn">1</span><p class="text-[13px]">10:00 — พนักงาน A login ได้ <span class="mono text-[12px]">invoice:approve</span></p></div>
+              <div class="step"><span class="sn">2</span><p class="text-[13px]">10:05 — Admin ถอด role ที่มีสิทธิ์นี้ออกจากพนักงาน A</p></div>
+              <div class="step"><span class="sn">3</span><p class="text-[13px]"><b style="color:#B91C1C">ก่อนแก้:</b> ยังอนุมัติได้จนถึง 10:15 (รอ token หมดอายุ)</p></div>
+              <div class="step"><span class="sn">4</span><p class="text-[13px]"><b style="color:#15803D">หลังแก้:</b> request ถัดไปหลัง 10:05 โดน 403 ทันที — access token เดิม ไม่ต้อง login ใหม่</p></div>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:#2563EB">CASE B · หลายอุปกรณ์ + สงสัยว่าโดนขโมยบัญชี</div>
+              <div class="step"><span class="sn">1</span><p class="text-[13px]">พนักงาน B login ค้างทั้งที่ PC ออฟฟิศและมือถือ (2 jti ต่างกัน)</p></div>
+              <div class="step"><span class="sn">2</span><p class="text-[13px]">Security team เปิด <span class="mono text-[12px]">GET /auth/sessions/users/:user_id</span> เห็น <span class="mono text-[12px]">count: 2</span> พร้อมอายุ session ที่เหลือของแต่ละอุปกรณ์</p></div>
+              <div class="step"><span class="sn">3</span><p class="text-[13px]">สงสัยว่ารั่ว → เรียก <span class="mono text-[12px]">invalidateAllForUser()</span> ตัด session ทั้งสองอุปกรณ์พร้อมกันในคำสั่งเดียว (ไม่ต้องไล่ revoke ทีละ jti)</p></div>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] mb-3" style="color:#2563EB">CASE C · แก้ policy กระทบทีเดียวหลายคน</div>
+              <div class="step"><span class="sn">1</span><p class="text-[13px]">Security Admin แก้ <span class="mono text-[12px]">policy_statements</span> ของ <span class="mono text-[12px]">POL_WAREHOUSE_GOODS_RECEIPT</span> — ถอด <span class="mono text-[12px]">goods_receipt:submit</span> ออก</p></div>
+              <div class="step"><span class="sn">2</span><p class="text-[13px]"><span class="mono text-[12px]">syncUsersByPolicy()</span> ไล่จาก <span class="mono text-[12px]">role_policies → user_roles</span> หาทุกคนที่ role เชื่อมถึง policy นี้ — ไม่ใช่แค่ 1 คน</p></div>
+              <div class="step"><span class="sn">3</span><p class="text-[13px]">พนักงานคลังสินค้าทุกคนที่ถือ role นั้น หมดสิทธิ์กด "ยืนยันรับสินค้า" พร้อมกันในคำขอเดียวจาก Admin โดยไม่ต้อง logout ใครเลย</p></div>
+            </div>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">Endpoint ใหม่ · มองเห็น session ต่อ user</h4>
+          <div class="card p-5 mb-6">
+            <div class="mono text-[11px] mb-2" style="color:#2563EB">GET /auth/sessions/users/:user_id</div>
+            <p class="text-[13px] mb-3" style="color:var(--ink-soft)">คุมด้วย permission เดิม <span class="mono text-[12px]">session:read</span> — คืนจำนวน + รายชื่อ session ที่ user คนนั้น login ค้างอยู่ (ต่างจาก <span class="mono text-[12px]">GET /auth/sessions</span> เดิมที่ scan ทั้งระบบ อันนี้อ่านผ่าน <span class="mono text-[12px]">user_sessions:&lt;user_id&gt;</span> index โดยตรง)</p>
+            <pre class="code p-3">{
+  <span class="s">"user_id"</span>: <span class="s">"00000000-…-000001"</span>,
+  <span class="s">"count"</span>: <span class="c">2</span>,
+  <span class="s">"sessions"</span>: [
+    { <span class="s">"jti"</span>: <span class="s">"…"</span>, <span class="s">"ttl_seconds"</span>: <span class="c">612</span>, <span class="s">"expires_at"</span>: <span class="s">"…"</span> },
+    { <span class="s">"jti"</span>: <span class="s">"…"</span>, <span class="s">"ttl_seconds"</span>: <span class="c">203</span>, <span class="s">"expires_at"</span>: <span class="s">"…"</span> }
+  ]
+}</pre>
+          </div>
+
+          <div class="rulebox ok"><div class="rc mb-1">RULE · BEST-EFFORT, ไม่ใช่ TRANSACTIONAL</div><p class="text-[13.5px]">DB (Postgres) เป็น source of truth เสมอ — sync เข้า Redis เป็นแค่การเร่งผลให้เร็วขึ้น ถ้า Redis sync ล้มเหลว <b>ต้องไม่</b> roll back การเปลี่ยน role/policy ที่ DB commit ไปแล้ว แค่ fallback กลับไปมีผลตอน re-login/token หมดอายุตามเดิม (log error ไว้เพื่อ debug)</p></div>
+          <div class="rulebox"><div class="rc mb-1">RULE · เก็บ user_id ไว้ตอน revoke เพื่อ prune index</div><p class="text-[13.5px]"><span class="mono text-[12px]">SessionStoreService.revoke(jti)</span> ต้องอ่าน session ก่อนลบเสมอ เพื่อรู้ <span class="mono text-[12px]">user_id</span> แล้ว <span class="mono text-[12px]">SREM</span> ออกจาก <span class="mono text-[12px]">user_sessions:&lt;user_id&gt;</span> ด้วย — ไม่งั้น index จะค้าง jti ที่ตายแล้วไปเรื่อย ๆ</p></div>
+        </div>
+
+        <!-- 1.11 Glossary -->
         <div>
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">08</span><h3 class="text-xl font-semibold">Glossary · อภิธานศัพท์ IAM / Security</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">11</span><h3 class="text-xl font-semibold">Glossary · อภิธานศัพท์ IAM / Security</h3></div>
           <div class="card overflow-hidden">
             <table class="d">
               <thead><tr><th style="width:200px">ศัพท์</th><th>ความหมาย</th></tr></thead>
@@ -469,6 +710,8 @@ erDiagram
                 <tr><td>Guard</td><td>ตัวดักตรวจสิทธิ์ฝั่ง backend (NestJS) ก่อนเข้า handler</td></tr>
                 <tr><td>Route Guard</td><td>ตัวดักฝั่ง frontend กันเข้าหน้าที่ไม่มีสิทธิ์</td></tr>
                 <tr><td>Session</td><td>สถานะการ login (เก็บใน Redis) — เพิกถอนได้</td></tr>
+                <tr><td>Session Sync</td><td>การดันสิทธิ์ที่เปลี่ยนใหม่เข้า session ที่ยัง active ทันที แทนที่จะรอ token หมดอายุ (§10)</td></tr>
+                <tr><td>Reverse Index (user_sessions)</td><td>Redis SET ที่ผูก user_id → jti ทุกอุปกรณ์ที่ login ค้างอยู่ — ใช้ตอบ "login ค้างกี่ session" และเป็นทางเข้าของการ sync/invalidate</td></tr>
                 <tr><td>Wildcard (*)</td><td>ครอบทุก resource/action ในกลุ่มนั้น</td></tr>
               </tbody>
             </table>
