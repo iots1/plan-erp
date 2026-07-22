@@ -40,7 +40,8 @@
       <div class="navsub">8 · FE Routes &amp; Components</div>
       <div class="navsub">9 · Permissions CRUD Page</div>
       <div class="navsub">10 · Session Sync &amp; Revocation</div>
-      <div class="navsub">11 · Glossary</div>
+      <div class="navsub">11 · CSRF &amp; Cookie Auth</div>
+      <div class="navsub">12 · Glossary</div>
     </nav>
     <div slot="footnote">NESTJS 11 · POSTGRESQL<br>JWT · REDIS · RABBITMQ</div>
   </erp-sidebar>
@@ -434,7 +435,7 @@ erDiagram
         <div class="mb-12">
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">07</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
           <div class="space-y-3">
-            <div class="rulebox"><div class="rc mb-1">RULE · TOKEN + SESSION</div><p class="text-[13.5px]">access token อายุสั้น (เช่น 15 นาที) แนบทุก request · refresh token อายุยาวเก็บ <b>hash</b> ใน DB · session/blacklist ใน <b>Redis</b> · logout/เปลี่ยนสิทธิ์ = เพิกถอน refresh token</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · TOKEN + SESSION</div><p class="text-[13.5px]">access token อายุสั้น (เช่น 15 นาที) แนบทุก request · refresh token อายุยาวเก็บ <b>hash</b> ใน DB · session/blacklist ใน <b>Redis</b> · logout/เปลี่ยนสิทธิ์ = เพิกถอน refresh token · แนบ token ได้ 2 วิธี — <span class="mono text-[12px]">Authorization: Bearer</span> (API/Next.js client) หรือ <b>httpOnly cookie + CSRF double-submit</b> (browser admin UI) — รายละเอียดเต็มที่ <a href="#csrf-cookie-auth" style="color:var(--accent);text-decoration:underline">§11 CSRF &amp; Cookie Auth</a></p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · DENY-OVERRIDE</div><p class="text-[13.5px]">รวมสิทธิ์แบบ AWS IAM — ถ้ามี <span class="mono text-[12px]">deny</span> ตรงกับ resource:action ใด ๆ → <b>ปฏิเสธทันที</b> แม้จะมี allow · ไม่มี allow = ปฏิเสธโดยปริยาย (default deny)</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · CONDITION EVAL</div><p class="text-[13.5px]">ประเมิน condition ที่ backend กับ context จริง (<span class="mono text-[12px]">${user.id}</span>, <span class="mono text-[12px]">${user.department}</span>, IP, เวลา) · operator รองรับ StringEquals/StringLike/Numeric*/Date*/IpAddress</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · GUARD ทุก endpoint</div><p class="text-[13.5px]">ทุก endpoint ที่ไม่ public ต้องมี <span class="mono text-[12px]">@RequirePermission('resource:action')</span> · frontend <span class="mono text-[12px]">data-permission</span> เป็น UX เท่านั้น ห้ามใช้แทนการตรวจ backend</p></div>
@@ -541,8 +542,8 @@ erDiagram
           <div class="card p-6 mb-6">
             <div class="mono text-[11px] mb-3" style="color:#2563EB">AUTH + CORS</div>
             <div class="step"><span class="sn">1</span><p class="text-[13.5px]">Next.js login ผ่าน <span class="mono text-[12px]">POST /auth/v1/auth/login</span> (auth-bc) เหมือน client อื่นทุกตัว — ได้ <span class="mono text-[12px]">access_token</span> มาแนบ <span class="mono text-[12px]">Authorization: Bearer &lt;token&gt;</span> ทุก request ไม่มี endpoint ลัดพิเศษสำหรับ frontend แยก repo</p></div>
-            <div class="step"><span class="sn">2</span><p class="text-[13.5px]">Cross-origin เปิดไว้แล้วที่ระดับ bootstrap ของทุก BC (<span class="mono text-[12px]">app.enableCors()</span> ใน <span class="mono text-[12px]">libs/common/src/utils/bootstrap.util.ts</span>) ครอบทุก verb ที่ browser preflight (<span class="mono text-[12px]">PUT/PATCH/DELETE</span> รวมอยู่แล้ว ไม่ใช่แค่ default <span class="mono text-[12px]">GET/HEAD/POST</span> ของ <span class="mono text-[12px]">@fastify/cors</span>) — origin คุมด้วย env <span class="mono text-[12px]">CORS_ORIGIN</span> (default <span class="mono text-[12px]">*</span>) โปรดักชันควรตั้งเป็น origin จริงของ Next.js app แทน wildcard</p></div>
-            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">endpoint ใช้ Bearer token ไม่ใช่ cookie — ฝั่ง <span class="mono text-[12px]">fetch()</span> ไม่ต้องเปิด <span class="mono text-[12px]">credentials: 'include'</span> จึงไม่ต้องยุ่งกับ SameSite/cookie cross-site เลย</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]">Cross-origin เปิดไว้แล้วที่ระดับ bootstrap ของทุก BC (<span class="mono text-[12px]">app.enableCors()</span> ใน <span class="mono text-[12px]">libs/common/src/utils/bootstrap.util.ts</span>) ครอบทุก verb ที่ browser preflight (<span class="mono text-[12px]">PUT/PATCH/DELETE</span> รวมอยู่แล้ว ไม่ใช่แค่ default <span class="mono text-[12px]">GET/HEAD/POST</span> ของ <span class="mono text-[12px]">@fastify/cors</span>) — origin คุมด้วย env <span class="mono text-[12px]">CORS_ORIGIN</span> ซึ่ง<b>ห้ามเป็น wildcard <span class="mono text-[12px]">*</span></b> ในทุก deployment แล้ว (ทุก BC ตั้ง <span class="mono text-[12px]">credentials: true</span> เป็นค่าเริ่มต้นให้ cookie-based flow ของ iam-view — browser reject <span class="mono text-[12px]">*</span> + credentials เสมอ ไม่ว่า request ของคุณจะใช้ cookie จริงหรือไม่) — ตั้งเป็น origin จริงของ Next.js app (คั่นด้วย comma ได้ถ้ามีหลาย origin)</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">endpoint ใช้ Bearer token ไม่ใช่ cookie — ฝั่ง <span class="mono text-[12px]">fetch()</span> ไม่ต้องเปิด <span class="mono text-[12px]">credentials: 'include'</span> จึงไม่ต้องยุ่งกับ SameSite/cookie/CSRF cross-site เลย (ตรงข้ามกับ iam-view เอง ที่ใช้ httpOnly cookie + CSRF double-submit เพราะเป็น same-site กับ backend — ดู <a href="#csrf-cookie-auth" style="color:#2563EB;text-decoration:underline">§11 CSRF &amp; Cookie Auth</a> ถ้าทีมอยากเปลี่ยนไปทาง BFF/cookie แทน)</p></div>
           </div>
 
           <div class="card p-6 mb-6" style="border-left:3px solid #2563EB">
@@ -682,9 +683,113 @@ sequenceDiagram
           <div class="rulebox"><div class="rc mb-1">RULE · เก็บ user_id ไว้ตอน revoke เพื่อ prune index</div><p class="text-[13.5px]"><span class="mono text-[12px]">SessionStoreService.revoke(jti)</span> ต้องอ่าน session ก่อนลบเสมอ เพื่อรู้ <span class="mono text-[12px]">user_id</span> แล้ว <span class="mono text-[12px]">SREM</span> ออกจาก <span class="mono text-[12px]">user_sessions:&lt;user_id&gt;</span> ด้วย — ไม่งั้น index จะค้าง jti ที่ตายแล้วไปเรื่อย ๆ</p></div>
         </div>
 
-        <!-- 1.11 Glossary -->
+        <!-- 1.11 CSRF & Cookie-Based Browser Auth -->
+        <div id="csrf-cookie-auth" class="mb-12 scroll-mt-6">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">11</span><h3 class="text-xl font-semibold">CSRF &amp; Cookie-Based Browser Auth · Double-Submit Cookie (Implemented)</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">ส่วนนี้บันทึกการ implement จริงของ <b>iam-view</b> (admin UI แบบ EJS) ที่ย้ายจากเก็บ <span class="mono text-[12px]">access_token</span>/<span class="mono text-[12px]">refresh_token</span> ใน <span class="mono text-[12px]">localStorage</span> ไปเป็น <b>httpOnly cookie</b> — client อื่น (Next.js, Postman, service-to-service) ยังใช้ <span class="mono text-[12px]">Authorization: Bearer</span> แบบเดิมได้ทุกอย่าง ไม่กระทบ (§09 AUTH + CORS)</p>
+
+          <div class="grid sm:grid-cols-2 gap-4 mb-6">
+            <div class="edge" style="background:rgba(220,90,22,.06);border-color:rgba(220,90,22,.22)"><div class="tag mb-1" style="color:var(--signal)">ปัญหาเดิม</div><p class="text-[13px]"><span class="mono text-[12px]">localStorage</span> เข้าถึงได้จาก JavaScript ทุกตัวที่รันบนหน้านั้น — ถ้ามีช่องโหว่ XSS แม้แค่จุดเดียว ก็ขโมย <span class="mono text-[12px]">access_token</span>/<span class="mono text-[12px]">refresh_token</span> ออกไปได้ทันที (token theft)</p></div>
+            <div class="edge" style="background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.3)"><div class="tag mb-1" style="color:#15803D">แนวทางแก้</div><p class="text-[13px]">ย้าย token ไปเป็น <b>httpOnly cookie</b> (JS อ่านค่าไม่ได้เลย แม้จะมี XSS) — แต่ cookie ถูก browser แนบให้อัตโนมัติทุก request (ambient credential) จึงเปิดช่องโหว่ <b>CSRF</b> ใหม่แทน ต้องปิดคู่กันด้วย <b>double-submit cookie</b></p></div>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">Cookie ที่ auth-bc ตั้ง (<span class="mono text-[12px]">libs/common/src/utils/auth-cookie.util.ts</span>)</h4>
+          <div class="card overflow-hidden mb-6">
+            <table class="d">
+              <thead><tr><th style="width:150px">Cookie</th><th style="width:110px">httpOnly</th><th style="width:170px">Path</th><th>ใช้ทำอะไร</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">access_token</span></td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">/</span></td><td>ตัว JWT เดิม (self-signed อยู่แล้ว) — <span class="mono text-[12px]">AuthGuard</span> ทุก BC อ่านได้เพราะ Path กว้างสุด</td></tr>
+                <tr><td><span class="mono text-[12px]">refresh_token</span></td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">/&lt;AUTH_PREFIX_NAME&gt;/&lt;AUTH_PREFIX_VERSION&gt;</span> เช่น <span class="mono text-[12px]">/auth/v1</span></td><td>จำกัดให้ส่งกลับเฉพาะ route ของ auth-bc เอง (least privilege) — BC อื่นไม่มีวันเห็น cookie นี้</td></tr>
+                <tr><td><span class="mono text-[12px]">csrf_token</span></td><td><span style="color:#B91C1C">✗</span></td><td><span class="mono text-[12px]">/</span></td><td><b>ตั้งใจไม่ httpOnly</b> — client JS ต้องอ่านค่าได้เพื่อ echo กลับเป็น header <span class="mono text-[12px]">x-csrf-token</span> (นี่คือหัวใจของ double-submit pattern)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[12.5px] mb-6" style="color:var(--ink-soft)">ทั้ง 3 cookie ยังตั้ง <span class="mono text-[12px]">Secure</span> (คุมด้วย env <span class="mono text-[12px]">COOKIE_SECURE</span>, <span class="mono text-[12px]">false</span> เฉพาะ local HTTP dev) + <span class="mono text-[12px]">SameSite=Lax</span> + <span class="mono text-[12px]">Domain</span> (คุมด้วย <span class="mono text-[12px]">COOKIE_DOMAIN</span>, ปล่อยว่างให้ default เป็น host ตรง ๆ) — response body ของ <span class="mono text-[12px]">/auth/login</span>/<span class="mono text-[12px]">/auth/refresh</span> ยังคืน token ทั้งหมดเหมือนเดิมด้วย (รวม <span class="mono text-[12px]">csrf_token</span> ใหม่) เผื่อ client ที่ไม่ใช่ browser ต้องการอ่านตรง ๆ</p>
+
+          <div class="diagram mb-6">
+<pre class="mermaid">
+sequenceDiagram
+    participant Browser as iam-view (browser)
+    participant AuthBC as auth-bc
+    participant BC as BC ใด ๆ (เช่น iam-bc)
+
+    Browser->>AuthBC: POST /auth/v1/auth/login { username, password }
+    AuthBC-->>Browser: Set-Cookie access_token (httpOnly) + refresh_token (httpOnly) + csrf_token
+    Note over Browser: อ่าน csrf_token จาก document.cookie เก็บไว้ใน memory/localStorage (เฉพาะค่านี้ค่าเดียว)
+    Browser->>BC: PATCH /iam/v1/users/:id (credentials:'include' + header X-CSRF-Token)
+    Note over BC: AuthGuard อ่าน access_token จาก cookie แทน Authorization header
+    Note over BC: CsrfGuard — mutating + มี cookie csrf_token → ต้อง header ตรงกับ cookie เป๊ะ
+    alt header ตรงกับ cookie
+        BC-->>Browser: 200 OK
+    else header ไม่มี/ไม่ตรง (เช่น ถูกยิงข้าม-site แบบ CSRF)
+        BC-->>Browser: 403 Forbidden
+    end
+</pre>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">2 โหมดแนบ credential อยู่คู่กัน</h4>
+          <div class="card overflow-hidden mb-6">
+            <table class="d">
+              <thead><tr><th style="width:190px">โหมด</th><th style="width:220px">ใครใช้</th><th>CSRF ต้องกันไหม</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">Authorization: Bearer</span></td><td>Next.js (แยก repo) · Postman · service-to-service</td><td><b>ไม่ต้อง</b> — ไม่ใช่ ambient credential, browser ไม่แนบให้เองข้าม site</td></tr>
+                <tr><td>httpOnly cookie + <span class="mono text-[12px]">x-csrf-token</span></td><td>iam-view (EJS admin UI) — same-site กับ backend เสมอ (ผ่าน gateway เดียว <span class="mono text-[12px]">api.xxx.com/&lt;bc&gt;/v1/…</span>)</td><td><b>ต้อง</b> — cookie ถูกแนบอัตโนมัติทุก request รวมที่ยิงข้าม-site มา</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[12.5px] mb-6" style="color:var(--ink-soft)"><span class="mono text-[12px]">AuthGuard</span> (<span class="mono text-[12px]">libs/common/src/guards/auth.guard.ts</span>) เช็ค <span class="mono text-[12px]">Authorization: Bearer</span> ก่อนเสมอ แล้วค่อย fallback ไปอ่าน cookie <span class="mono text-[12px]">access_token</span> — client เดิมที่ส่ง Bearer header อยู่แล้วจึง<b>ไม่ต้องแก้อะไรเลย</b></p>
+
+          <h4 class="font-semibold mb-3 text-[14px]">ตัวอย่างที่จับต้องได้ · ถ้าไม่มี CSRF Guard จะโดนอะไร</h4>
+          <p class="text-[13.5px] mb-5" style="color:var(--ink-soft)">สมมติ <b>ปิด</b> <span class="mono text-[12px]">CsrfGuard</span> ไปชั่วคราว (หรือลืมเช็ค) — Security Admin ที่ login เข้า iam-view ค้างไว้อยู่ (cookie <span class="mono text-[12px]">access_token</span> ยังไม่หมดอายุ ยังไม่ได้ logout) โดนหลอกให้คลิกลิงก์ไปเว็บอื่น จะเกิดอะไรขึ้น:</p>
+
+          <div class="card p-6 mb-4">
+            <div class="mono text-[11px] mb-3" style="color:#B91C1C">ATTACK WALKTHROUGH · ยึด role ผ่าน CSRF (ถ้าไม่มี Guard)</div>
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]">แฮกเกอร์ทำเว็บปลอม <span class="mono text-[12px]">evil.com</span> — หน้าตาอาจดูเป็นบทความ/โปรโมชั่นธรรมดา แต่ซ่อน <span class="mono text-[12px]">&lt;form&gt;</span> ที่ตั้งให้ auto-submit ทันทีที่หน้าโหลด ยิงตรงไปที่ <span class="mono text-[12px]">POST /iam/v1/users/&lt;attacker_user_id&gt;/roles</span> (endpoint จริงของ iam-bc — ไม่ต้องเจาะระบบเรา แค่รู้ URL ก็พอ) พร้อมค่า <span class="mono text-[12px]">{ role_id: "&lt;ROLE_SUPERADMIN&gt;" }</span></p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]">ส่งลิงก์ <span class="mono text-[12px]">evil.com</span> ให้ Security Admin ทาง LINE/อีเมล/แชท (social engineering — ไม่เกี่ยวกับช่องโหว่ทางเทคนิคเลย)</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">Security Admin คลิกลิงก์ (แค่เปิดดู ไม่ได้กรอกอะไร) — browser โหลด <span class="mono text-[12px]">evil.com</span> แล้ว submit form ให้อัตโนมัติ</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>จุดสำคัญ:</b> แม้ request จะยิงมาจาก <span class="mono text-[12px]">evil.com</span> แต่ปลายทางคือ domain ของเรา — browser จึงแนบ cookie <span class="mono text-[12px]">access_token</span> ของ Security Admin ไปด้วย<b>โดยอัตโนมัติ</b> (นี่คือความหมายของ "ambient credential" — cookie ไม่สนใจว่าใครเป็นคนสั่งให้ยิง request แค่เห็นปลายทางตรงกับ domain ที่เคย set cookie ไว้ก็แนบให้)</p></div>
+            <div class="step"><span class="sn">5</span><p class="text-[13.5px]">iam-bc เห็น cookie <span class="mono text-[12px]">access_token</span> ที่ถูกต้อง (เป็น JWT จริงของ Security Admin) ผ่าน <span class="mono text-[12px]">AuthGuard</span> ปกติ — <b>ไม่มีทางรู้เลย</b>ว่า request นี้ไม่ได้มาจากการกดปุ่มจริงในหน้า iam-view แต่มาจากฟอร์มที่ซ่อนอยู่ในเว็บอื่น → สั่งเพิ่ม role <span class="mono text-[12px]">ROLE_SUPERADMIN</span> ให้บัญชีแฮกเกอร์สำเร็จ</p></div>
+            <div class="step"><span class="sn">6</span><p class="text-[13.5px]">แฮกเกอร์ login เข้าบัญชีตัวเอง (บัญชีธรรมดาที่สมัครไว้เอง) ตอนนี้กลายเป็น superadmin เต็มระบบ — โดย Security Admin ไม่รู้ตัวด้วยซ้ำว่าเพิ่งกดอะไรไป</p></div>
+          </div>
+
+          <div class="code p-4 mb-6">
+<pre><span class="c">&lt;!-- evil.com/index.html — หน้าเว็บปลอมของแฮกเกอร์ --&gt;</span>
+<span class="k">&lt;form</span> id=<span class="s">"csrf"</span> action=<span class="s">"https://api.xxx.com/iam/v1/users/ATTACKER_ID/roles"</span> method=<span class="s">"POST"</span><span class="k">&gt;</span>
+  <span class="k">&lt;input</span> type=<span class="s">"hidden"</span> name=<span class="s">"role_id"</span> value=<span class="s">"ROLE_SUPERADMIN"</span><span class="k">&gt;</span>
+<span class="k">&lt;/form&gt;</span>
+<span class="k">&lt;script&gt;</span>document.getElementById(<span class="s">'csrf'</span>).submit()<span class="k">&lt;/script&gt;</span>
+<span class="c">// ไม่ต้องมี Authorization header เลย — cookie access_token ของเหยื่อ</span>
+<span class="c">// ถูก browser แนบให้เองเพราะปลายทางตรงกับ domain ที่เคย login ไว้</span></pre>
+          </div>
+          <p class="text-[12.5px] mb-6" style="color:var(--muted)">* ตัวอย่าง <span class="mono text-[12px]">&lt;form&gt;</span> ข้างบนมีไว้อธิบายแนวคิด "ambient credential" ให้เห็นภาพง่ายที่สุด — endpoint จริงของเราคาดหวัง JSON body (<span class="mono text-[12px]">application/json</span>) ส่วน <span class="mono text-[12px]">&lt;form&gt;</span> ส่งได้แค่ <span class="mono text-[12px]">application/x-www-form-urlencoded</span> ซึ่งอาจโดน <span class="mono text-[12px]">ValidationPipe</span> ปฏิเสธไปเองก่อนถึง <span class="mono text-[12px]">CsrfGuard</span> ด้วยซ้ำ — แต่นั่น<b>ไม่ใช่การป้องกัน CSRF ที่ตั้งใจ</b> เป็นผลพลอยได้เท่านั้น แฮกเกอร์จริงจึงมักใช้ <span class="mono text-[12px]">fetch()</span> + JS แทน (คุม <span class="mono text-[12px]">Content-Type: application/json</span> เองได้) ซึ่งเป็นแถวที่ 2 ในตารางด้านล่าง — นี่คือเหตุผลที่ต้องมี <span class="mono text-[12px]">CsrfGuard</span> ตรวจอย่างชัดเจน ไม่พึ่งพฤติกรรม body parser ที่บังเอิญช่วยได้บาง endpoint</p>
+
+          <div class="rulebox mb-6" style="border-color:rgba(220,90,22,.35);background:rgba(220,90,22,.05)"><div class="rc mb-1" style="color:var(--signal)">เข้าใจผิดบ่อย · "มี CORS แล้วไง ก็ปลอดภัยแล้วนี่"</div><p class="text-[13.5px]"><b>ไม่จริง</b> — CORS คุมแค่ว่า <b>JavaScript ฝั่ง evil.com อ่าน response กลับมาได้ไหม</b> (เช่นอ่านค่า access_token ที่ตอบกลับ) แต่ <span class="mono text-[12px]">&lt;form&gt;</span> ธรรมดาไม่ได้ใช้ <span class="mono text-[12px]">fetch()</span>/JS เลยด้วยซ้ำ — เป็นกลไกพื้นฐานของ HTML ที่มีมาก่อน CORS จะเกิดขึ้นอีก จึง<b>ไม่ถูก CORS บล็อกเลยแม้แต่น้อย</b> แฮกเกอร์ไม่สนใจว่าจะอ่าน response ได้หรือไม่ (เป็น "blind write") แค่ต้องการให้ server <b>ทำตามคำสั่ง</b>ก็พอ — นี่คือเหตุผลที่ต้องมี <span class="mono text-[12px]">CsrfGuard</span> แยกต่างหาก ไม่ใช่พึ่ง CORS อย่างเดียว</p></div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">ทำไม CSRF Guard กันได้ · ทำ attack เดิมซ้ำอีกครั้ง (มี Guard แล้ว)</h4>
+          <div class="card overflow-hidden mb-6">
+            <table class="d">
+              <thead><tr><th style="width:230px">ขั้นตอนของ evil.com</th><th>ผลลัพธ์เมื่อมี CsrfGuard</th></tr></thead>
+              <tbody>
+                <tr><td>ยิง <span class="mono text-[12px]">&lt;form&gt;</span> ธรรมดา (แบบตัวอย่างข้างบน)</td><td><span class="mono text-[12px]">&lt;form&gt;</span> HTML มาตรฐาน<b>กำหนด custom header เองไม่ได้เลย</b> — ไม่มีทางแนบ <span class="mono text-[12px]">x-csrf-token</span> ไปด้วย → <span class="mono text-[12px]">CsrfGuard</span> ไม่เจอ header เลย → <span class="mono text-[12px]">403 Forbidden</span> ทันที</td></tr>
+                <tr><td>เปลี่ยนไปใช้ <span class="mono text-[12px]">fetch()</span> + JS แทน เพื่อพยายามแนบ header เอง</td><td>ต้องรู้ค่า <span class="mono text-[12px]">csrf_token</span> ก่อนถึงจะแนบถูก — แต่ cookie <span class="mono text-[12px]">csrf_token</span> ของเหยื่อถูกตั้งไว้ที่ domain ของเรา <span class="mono text-[12px]">document.cookie</span> จาก <span class="mono text-[12px]">evil.com</span> <b>อ่านคุกกี้ของ domain อื่นไม่ได้เลย</b> (บังคับโดย browser เอง ไม่ใช่ backend) → เดา/สุ่มค่า 256-bit ก็แทบเป็นไปไม่ได้ → header ไม่ตรงกับ cookie → <span class="mono text-[12px]">403 Forbidden</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="rulebox ok mb-6"><div class="rc mb-1">สรุปง่าย ๆ</div><p class="text-[13.5px]">CSRF token ไม่ได้ช่วยกัน "คนที่ไม่มี token" เข้าระบบ (นั่นเป็นหน้าที่ของ JWT/AuthGuard อยู่แล้ว) แต่ช่วยกัน "คนที่<b>มี</b> token ถูกต้อง (เพราะเป็นเหยื่อที่ login ค้างไว้) แต่ไม่ได้ตั้งใจสั่ง request นี้เอง" — เป็นการพิสูจน์ว่า request มาจาก <b>JavaScript ที่รันอยู่ในหน้าเว็บของเราจริง ๆ</b> ไม่ใช่จากที่อื่น</p></div>
+
+          <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · DOUBLE-SUBMIT ไม่ใช่ SERVER-SIDE LOOKUP</div><p class="text-[13.5px]"><span class="mono text-[12px]">CsrfGuard</span> (<span class="mono text-[12px]">libs/common/src/guards/csrf.guard.ts</span>) แค่เทียบ header กับ cookie ตรงกันไหม (timing-safe compare) — ไม่ query Redis/DB เพิ่ม เพราะความปลอดภัยของ pattern นี้อยู่ที่ <b>attacker เว็บอื่นอ่าน/ตั้ง cookie ของ origin เราไม่ได้เลย</b> (same-origin policy) ไม่ได้อยู่ที่การ verify ค่าย้อนกลับกับ server</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · เช็คจาก "มี cookie csrf_token ไหม" ไม่ใช่ "@Public() หรือเปล่า"</div><p class="text-[13.5px]"><span class="mono text-[12px]">POST /auth/refresh</span> เป็น <span class="mono text-[12px]">@Public()</span> (ไม่ต้องมี JWT ก็เรียกได้) แต่พอ <span class="mono text-[12px]">refresh_token</span> กลายเป็น cookie แล้ว มันก็ ambient เหมือนกัน — <span class="mono text-[12px]">CsrfGuard</span> จึงเช็คจาก<b>การมีอยู่ของ cookie</b> <span class="mono text-[12px]">csrf_token</span> โดยตรง ไม่ได้อิงกับ <span class="mono text-[12px]">@Public()</span>/มี JWT หรือไม่ ยกเว้นแค่ <span class="mono text-[12px]">POST /auth/login</span> ที่มี <span class="mono text-[12px]">@SkipCsrfCheck()</span> ชัดเจน (ยังไม่มี cookie ให้เช็คตอนนั้น — ป้องกันด้วย credential ในตัว body แทน)</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · CORS_ORIGIN ห้ามเป็น "*" เมื่อใช้ cookie</div><p class="text-[13.5px]">Browser reject การรวมกันของ <span class="mono text-[12px]">Access-Control-Allow-Origin: *</span> กับ request ที่ส่ง <span class="mono text-[12px]">credentials: 'include'</span> เสมอ — ทุก BC ตั้ง <span class="mono text-[12px]">credentials: true</span> ไว้เป็นค่าเริ่มต้นใน <span class="mono text-[12px]">bootstrap.util.ts</span> แล้ว ดังนั้น deployment ไหนก็ตามที่มี browser client ต้องตั้ง env <span class="mono text-[12px]">CORS_ORIGIN</span> เป็น origin จริง (คั่นด้วย comma ได้ถ้ามีหลาย origin) ไม่ใช่ wildcard</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · ไม่มี DB/Redis schema เปลี่ยน</div><p class="text-[13.5px]"><span class="mono text-[12px]">csrf_token</span> เป็นค่าสุ่ม 256-bit ที่ generate ใหม่ทุก login/refresh (<span class="mono text-[12px]">AuthService.issueTokens()</span>) — ไม่ได้เก็บลง Postgres หรือ Redis session เพิ่ม เพราะ pattern นี้ verify แค่ header ↔ cookie เท่านั้น (ดู RULE ด้านบน) จึง deploy ได้โดยไม่ต้อง migration</p></div>
+          </div>
+
+          <p class="text-[12.5px] mt-6" style="color:var(--muted)">Implementation: <span class="mono text-[12px]">libs/common/src/guards/csrf.guard.ts</span> · <span class="mono text-[12px]">libs/common/src/guards/auth.guard.ts</span> · <span class="mono text-[12px]">libs/common/src/utils/auth-cookie.util.ts</span> · <span class="mono text-[12px]">libs/common/src/decorators/skip-csrf-check.decorator.ts</span> · <span class="mono text-[12px]">apps/auth/src/modules/auth/controllers/auth.controller.ts</span> · client: <span class="mono text-[12px]">apps/iam/public/js/login.service.js</span> + <span class="mono text-[12px]">auth-guard.service.js</span></p>
+        </div>
+
+        <!-- 1.12 Glossary -->
         <div>
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">11</span><h3 class="text-xl font-semibold">Glossary · อภิธานศัพท์ IAM / Security</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">12</span><h3 class="text-xl font-semibold">Glossary · อภิธานศัพท์ IAM / Security</h3></div>
           <div class="card overflow-hidden">
             <table class="d">
               <thead><tr><th style="width:200px">ศัพท์</th><th>ความหมาย</th></tr></thead>
@@ -712,6 +817,10 @@ sequenceDiagram
                 <tr><td>Session</td><td>สถานะการ login (เก็บใน Redis) — เพิกถอนได้</td></tr>
                 <tr><td>Session Sync</td><td>การดันสิทธิ์ที่เปลี่ยนใหม่เข้า session ที่ยัง active ทันที แทนที่จะรอ token หมดอายุ (§10)</td></tr>
                 <tr><td>Reverse Index (user_sessions)</td><td>Redis SET ที่ผูก user_id → jti ทุกอุปกรณ์ที่ login ค้างอยู่ — ใช้ตอบ "login ค้างกี่ session" และเป็นทางเข้าของการ sync/invalidate</td></tr>
+                <tr><td>httpOnly Cookie</td><td>Cookie ที่ JavaScript อ่าน/เขียนไม่ได้เลย (เข้าถึงได้แค่ฝั่ง server ผ่าน HTTP header) — กัน XSS token theft (§11)</td></tr>
+                <tr><td>CSRF (Cross-Site Request Forgery)</td><td>เว็บอื่นหลอกให้ browser เหยื่อยิง request มาที่ backend เราพร้อม cookie ที่ browser แนบให้อัตโนมัติ (ambient credential)</td></tr>
+                <tr><td>Double-Submit Cookie</td><td>เทคนิคกัน CSRF — เทียบค่าใน cookie (JS อ่านได้) กับค่าใน request header ให้ตรงกัน เว็บอื่นทำไม่ได้เพราะอ่าน/ตั้ง cookie ข้าม origin ไม่ได้ (§11)</td></tr>
+                <tr><td>Ambient Credential</td><td>credential ที่ browser แนบให้ทุก request เองโดยอัตโนมัติ (เช่น cookie) ต่างจาก Bearer token ที่ต้องแนบเองทาง JS ทุกครั้ง</td></tr>
                 <tr><td>Wildcard (*)</td><td>ครอบทุก resource/action ในกลุ่มนั้น</td></tr>
               </tbody>
             </table>

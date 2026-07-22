@@ -215,11 +215,14 @@ npm run permissions:sync</pre></div>
 <pre>{
   <span class="s">"access_token"</span>: <span class="s">"eyJhbGciOi..."</span>,
   <span class="s">"refresh_token"</span>: <span class="s">"3f9a1c..."</span>,
+  <span class="s">"csrf_token"</span>: <span class="s">"9c2e7a..."</span>,
   <span class="s">"token_type"</span>: <span class="s">"Bearer"</span>,
   <span class="s">"expires_in"</span>: 900
 }
 <span class="c">// หมายเหตุ: /auth controller ไม่มี @ResourceType — เป็น raw JSON</span>
-<span class="c">// ไม่ใช่ JSON:API envelope (ต่างจาก /iam/v1/permissions ที่ห่อ data.attributes)</span></pre>
+<span class="c">// ไม่ใช่ JSON:API envelope (ต่างจาก /iam/v1/permissions ที่ห่อ data.attributes)</span>
+<span class="c">// csrf_token เป็นของใหม่ — ใช้เฉพาะ flow httpOnly cookie (ดู rulebox ด้านล่าง)</span>
+<span class="c">// ถ้าทำตามคู่มือนี้ (Bearer + sessionStorage) เพิกเฉยฟิลด์นี้ได้เลย ไม่กระทบอะไร</span></pre>
             </div>
           </div>
           <div>
@@ -240,6 +243,7 @@ npm run permissions:sync</pre></div>
         </div>
 
         <div class="rulebox"><div class="rc mb-1">RULE · เก็บ token ที่ฝั่ง client ให้เหมาะสม</div><p class="text-[13.5px]">endpoint ใช้ Bearer token ไม่ใช่ cookie — จะเก็บใน memory/<span class="mono text-[12px]">sessionStorage</span> ฝั่ง client component หรือทำ Route Handler เป็น BFF proxy ให้เก็บเป็น httpOnly cookie ก็ได้ ขึ้นกับ threat model ของทีม (ตัวอย่างในคู่มือนี้ใช้ <span class="mono text-[12px]">sessionStorage</span> เพื่อความง่ายในการอธิบาย logic การเช็คสิทธิ์เป็นหลัก)</p></div>
+        <div class="rulebox mt-3"><div class="rc mb-1">อ้างอิง · มี implementation จริงของฝั่ง httpOnly cookie แล้ว</div><p class="text-[13.5px]">ถ้าทีมเลือกทาง BFF/cookie แทน <span class="mono text-[12px]">sessionStorage</span> — iam-view (admin UI ของ erp-api เอง) implement แบบนี้อยู่แล้วจริง พร้อม CSRF double-submit cookie protection (เพราะ cookie ถูกแนบอัตโนมัติ ต่างจาก Bearer header) ดูโค้ดอ้างอิงและ sequence diagram เต็มที่ <a href="srs-p1.html#csrf-cookie-auth" style="color:#2563EB;text-decoration:underline">SRS P1 §11 CSRF &amp; Cookie Auth</a> — <span class="mono text-[12px]">access_token</span>/<span class="mono text-[12px]">csrf_token</span> ที่ auth-bc ส่งกลับตอน login/refresh ใช้ได้กับทั้ง 2 flow พร้อมกันโดยไม่ต้องเปลี่ยน backend</p></div>
       </section>
 
       <div class="rule my-14"></div>
