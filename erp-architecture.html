@@ -2,6 +2,10 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ERP Architecture — Microservices DDD Design · Development Plan</title>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -10,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
 </head>
 <body>
 
@@ -313,7 +318,7 @@
               ครบทั้ง Backend (NestJS) และ Frontend พร้อมตัวอย่างโค้ดจริง
             </p>
           </div>
-          <a href="i18n-guide.html" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--ink);color:#fff;border-color:var(--ink)">
+          <a href="i18n-guide.html" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--panel-dark);color:#fff;border-color:var(--panel-dark)">
             ดูเอกสารเทคนิค (i18n Guide) →
           </a>
         </div>
@@ -505,7 +510,7 @@
               และการคำนวณ COGS/กำไรต่อ Lot อยู่ในเอกสาร Developer Implementation Guide
             </p>
           </div>
-          <a href="core-feature.html#p3" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--ink);color:#fff;border-color:var(--ink)">
+          <a href="core-feature.html#p3" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--panel-dark);color:#fff;border-color:var(--panel-dark)">
             ดู Developer Guide →
           </a>
         </div>
@@ -566,7 +571,7 @@
                 transaction อยู่ในเอกสาร Developer Implementation Guide
               </p>
             </div>
-            <a href="core-feature.html#p3" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--ink);color:#fff;border-color:var(--ink)">
+            <a href="core-feature.html#p3" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--panel-dark);color:#fff;border-color:var(--panel-dark)">
               ดู Developer Guide →
             </a>
           </div>

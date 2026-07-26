@@ -2,6 +2,10 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRS &middot; Phase 2 — Master Data &amp; Storage &middot; ERP</title>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -11,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
 </head>
 <body>
 

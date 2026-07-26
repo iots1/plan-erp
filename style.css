@@ -14,11 +14,66 @@
   --signal-soft:#FCEEE4;
   --grid:rgba(255,255,255,.06);
 
+  /* Fixed dark navy — NEVER overridden in :root[data-theme="dark"]. Used for
+     panels that are permanently dark regardless of site theme (sidebar,
+     "dark pill" chips): these were originally written as `background:
+     var(--ink)`, which broke once --ink became a theme-flippable *text*
+     color and flipped near-white in dark mode while the white text sitting
+     on top of it stayed hardcoded. Same fixed navy as --ink's light-mode
+     value, kept as its own name so it can't drift when --ink's dark-mode
+     override changes. */
+  --panel-dark:#0E1726;
+
   /* aliases kept for legacy markup that references these names directly */
   --teal:var(--accent);
   --blue:var(--blueprint);
   --cyan:var(--accent-2);
 }
+
+/* ===== dark theme ===== */
+/* Only the surface/text variables invert. --blueprint-2 (hero/sidebar bands,
+   already dark navy in light mode) and --signal-soft (warning/highlight card
+   tint) are deliberately left unchanged: both already read correctly against
+   either page background, and a lot of older pages pair --signal-soft with a
+   hardcoded dark warm text color inline (not a var()) — inverting the tint
+   under that fixed text would break contrast on exactly the pages we can't
+   sweep in one pass. --blueprint and --accent get brighter dark-mode values
+   because (unlike --blueprint-2) they're frequently used as inline text/icon
+   color on the main content surface, where the light-mode values are too
+   dark to read against a dark surface. */
+:root[data-theme="dark"]{
+  --ink:#E7ECF5;
+  --ink-soft:#B7C2D6;
+  --muted:#8492A8;
+  --paper:#0A0E16;
+  --surface:#121826;
+  --line:#232D40;
+  --line-soft:#1A2333;
+  --blueprint:#5B8DFF;
+  --accent:#2DD4C7;
+  --accent-2:#3EE6D9;
+  --grid:rgba(255,255,255,.05);
+}
+
+/* mermaid's own theme (mermaid.initialize themeVariables) doesn't actually
+   pick up our CSS custom properties — it renders with light node fills
+   regardless of site theme. Keep the diagram card a fixed light surface in
+   dark mode too so the (always-light) diagram content stays readable instead
+   of floating as a white rectangle in a jarring way. */
+:root[data-theme="dark"] .diagram{ background:#F7F9FC; border-color:#D7E0EC; }
+
+/* theme toggle button — shared by erp-docnav (components.js) and index.html */
+.theme-toggle{
+  display:flex; align-items:center; justify-content:center;
+  width:28px; height:28px; border-radius:7px; flex-shrink:0;
+  color:var(--ink-soft); background:transparent; border:none; cursor:pointer; padding:0;
+  transition:background .15s ease,color .15s ease;
+}
+.theme-toggle:hover{ background:var(--line-soft); color:var(--ink); }
+.theme-toggle svg{ display:none; }
+.theme-toggle .i-moon{ display:block; }
+:root[data-theme="dark"] .theme-toggle .i-moon{ display:none; }
+:root[data-theme="dark"] .theme-toggle .i-sun{ display:block; }
 *{ -webkit-font-smoothing:antialiased; }
 html{ scroll-behavior:smooth; }
 body{
@@ -49,7 +104,7 @@ erp-footer:not(:defined) {
 erp-docnav:not(:defined) { display: block; height: 44px; }
 erp-sidebar:not(:defined) { display: none; }
 @media (min-width: 1024px) {
-  erp-sidebar:not(:defined) { display: block; width: 280px; min-height: calc(100vh - 44px); background: var(--ink); flex-shrink: 0; }
+  erp-sidebar:not(:defined) { display: block; width: 280px; min-height: calc(100vh - 44px); background: var(--panel-dark); flex-shrink: 0; }
 }
 erp-footer:not(:defined) { display: block; height: 84px; }
 
@@ -80,7 +135,7 @@ erp-footer:not(:defined) { display: block; height: 84px; }
   display: none; align-items: center; justify-content: center;
   position: fixed; top: 54px; left: 12px; z-index: 40;
   width: 32px; height: 32px; border-radius: 9px;
-  background: var(--ink); color: #9FB0C6; border: 1px solid rgba(255,255,255,.12);
+  background: var(--panel-dark); color: #9FB0C6; border: 1px solid rgba(255,255,255,.12);
   box-shadow: 0 4px 14px rgba(14,23,38,.25);
   cursor: pointer; transition: all .15s ease;
 }
@@ -91,7 +146,7 @@ erp-footer:not(:defined) { display: block; height: 84px; }
 }
 
 /* ===== sidebar nav ===== */
-.side{ background:var(--ink); }
+.side{ background:var(--panel-dark); }
 .navlink{
   display:flex; align-items:baseline; gap:12px;
   padding:7px 14px; border-radius:8px; color:#9FB0C6;
@@ -218,8 +273,8 @@ table.d tr:last-child td{ border-bottom:none; }
 .gantt-head .corner{ padding:10px 14px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); border-right:1px solid var(--line); }
 .gantt-months{ display:grid; grid-template-columns:repeat(6,1fr); }
 .gantt-months span{ padding:10px 8px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); border-left:1px solid var(--line-soft); text-align:center; }
-.phase-head-row{ display:grid; grid-template-columns:290px 1fr; background:#EEF2F8; border-bottom:1px solid var(--line); cursor:pointer; user-select:none; }
-.phase-head-row:hover{ background:#E6ECF5; }
+.phase-head-row{ display:grid; grid-template-columns:290px 1fr; background:var(--line-soft); border-bottom:1px solid var(--line); cursor:pointer; user-select:none; }
+.phase-head-row:hover{ background:var(--line); }
 .phase-head-row .p{ padding:8px 14px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.04em; font-weight:600; color:var(--ink); display:flex; align-items:center; gap:8px; }
 .phase-head-row .p::before{ content:'▾'; font-size:9px; color:var(--muted); display:inline-block; width:10px; transition:transform .15s ease; }
 .phase-head-row.collapsed .p::before{ transform:rotate(-90deg); }

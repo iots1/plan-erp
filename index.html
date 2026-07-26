@@ -2,6 +2,10 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ERP Development Plan — Document Index</title>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -9,12 +13,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="theme-toggle.js" defer></script>
 </head>
 <body>
 
 <div class="max-w-5xl mx-auto px-6 py-16 lg:py-24">
 
-  <div class="eyebrow text-[--accent]" style="color:var(--accent)">ERP Development Plan</div>
+  <div class="flex items-start justify-between gap-4">
+    <div class="eyebrow text-[--accent]" style="color:var(--accent)">ERP Development Plan</div>
+    <button type="button" class="theme-toggle" data-theme-toggle title="สลับธีมสว่าง/มืด" aria-label="สลับธีมสว่าง/มืด" aria-pressed="false">
+      <svg class="i-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>
+      <svg class="i-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
+  </div>
   <h1 class="display text-4xl lg:text-5xl mt-3 mb-4">เอกสารประกอบโครงการ</h1>
   <p class="text-[15px]" style="color:var(--muted); max-width:60ch">
     รวมเอกสารสถาปัตยกรรม ข้อกำหนดระบบ และแนวทางพัฒนาสำหรับโครงการ ERP — เลือกเอกสารด้านล่างเพื่ออ่านรายละเอียด
