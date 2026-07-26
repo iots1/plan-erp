@@ -13,6 +13,7 @@ class ErpDocnav extends HTMLElement {
       { href: 'i18n-guide.html', label: 'i18n Guide (TH/EN)' },
       { href: 'backend-convention.html', label: 'Backend Conventions' },
       { href: 'nextjs-permission-guide.html', label: 'Next.js Integration Guide' },
+      { href: 'observability-logging-guide.html', label: 'Observability (Tempo/Loki)' },
     ];
 
     // Active-state handling: read the current path and flag the matching link.

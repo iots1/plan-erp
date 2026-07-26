@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observability: Traces (Tempo) &amp; HTTP Access Logs (Loki) — Technical Guide · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="O" title="Observability" subtitle="TRACES (TEMPO) · LOGS (LOKI)" width="280">
+    <nav slot="nav">
+      <a href="#overview"    class="navlink"><span class="n">01</span> ภาพรวม · Push vs Pull</a>
+      <a href="#stack"       class="navlink"><span class="n">02</span> Docker Compose Stack</a>
+      <a href="#tracing"     class="navlink"><span class="n">03</span> Tracing → Tempo</a>
+      <a href="#logging"     class="navlink"><span class="n">04</span> HTTP Access Log → Loki</a>
+      <a href="#body-user"   class="navlink"><span class="n">05</span> body/user ใน log line</a>
+      <a href="#correlation" class="navlink"><span class="n">06</span> Trace ↔ Log Correlation</a>
+      <a href="#bugs"        class="navlink"><span class="n">07</span> บั๊กที่เจอและวิธีแก้</a>
+      <a href="#reference"   class="navlink"><span class="n">08</span> Env / Options Reference</a>
+    </nav>
+    <div slot="footnote">
+      <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="erp-architecture.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่เอกสารสถาปัตยกรรม (Executive Overview)
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Technical Implementation Guide</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Observability: Distributed Tracing &amp; HTTP Access Logging<br>
+          <span class="text-[#7FE3DE]">(OpenTelemetry → Tempo · pino-http → Loki)</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          สรุปการทำงานของ pipeline สังเกตการณ์ระบบ (Observability) 2 เส้นทางที่ <b class="text-white font-medium">รูปแบบต่างกันโดยตั้งใจ</b> —
+          Trace เป็นแบบ <span class="mono text-[13px]">push</span> ตรงจากแอปไปหา Collector ผ่านเครือข่าย
+          ส่วน HTTP Access Log เป็นแบบ <span class="mono text-[13px]">pull</span> คือเขียนลงไฟล์ แล้วให้ Alloy
+          บน server อ่าน (tail) ไฟล์นั้นเองอีกที ทั้งสองแบบมีเหตุผลทางสถาปัตยกรรมของมันเอง และมีข้อจำกัดที่ต่างกัน
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>OpenTelemetry NodeSDK</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Grafana Alloy</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>pino / pino-http / pino-roll</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Fastify Lifecycle Hooks</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 OVERVIEW ========== -->
+      <section id="overview" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — ภาพรวม</div>
+        <h2 class="display text-3xl mb-6">ทำไม Trace ทำงานได้จาก localhost แต่ Log ไม่ได้</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          คำถามที่พบบ่อยที่สุดตอนทดสอบ local: รัน service บนเครื่องตัวเองแล้วเห็น trace ขึ้นใน Tempo ทันที
+          แต่ไม่เห็น log ใน Loki เลย ทั้งที่ deploy โค้ดตัวเดียวกัน — สาเหตุคือทั้งสองระบบใช้ transport mechanism
+          คนละแบบกันโดยสิ้นเชิง ไม่ใช่บั๊ก
+        </p>
+
+        <div class="card overflow-hidden">
+          <div class="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+            <div class="p-6">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="evt evt-tcp">PUSH</span>
+                <h3 class="font-semibold text-[15px]">Trace (OpenTelemetry)</h3>
+              </div>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                แอป export span ผ่าน <b>OTLP gRPC</b> ตรงไปที่ <span class="mono text-[12px]">OTEL_EXPORTER_OTLP_ENDPOINT</span>
+                (server จริงที่ <span class="mono text-[12px]">172.16.0.220:4317</span>) — เป็น network call ออกไปจากเครื่องไหนก็ได้
+                ไม่ว่าจะ localhost หรือ production ตราบใดที่ต่อ endpoint นั้นถึง ก็เห็น trace ใน Tempo ทันที
+                <b>ไม่ต้องรัน Alloy บนเครื่องตัวเอง</b>
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="evt evt-listen">PULL</span>
+                <h3 class="font-semibold text-[15px]">HTTP Access Log (pino-http)</h3>
+              </div>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                แอปเขียน log เป็นไฟล์ JSON ที่ <span class="mono text-[12px]">logs/&lt;service&gt;/http/http.log</span>
+                บน<b>เครื่องที่รันแอปเองเท่านั้น</b> Alloy บน server จะเห็นเฉพาะไฟล์ที่ mount เข้าไปจาก
+                <span class="mono text-[12px]">/root/erp-api/logs</span> — โฟลเดอร์ <span class="mono text-[12px]">logs/</span>
+                บนเครื่อง local ของคุณ <b class="text-[var(--signal)]">มองไม่เห็นจาก Alloy บน server เลย</b>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rulebox mt-6">
+          <div class="rc mb-1">RULE</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ถ้าต้องการทดสอบ log pipeline แบบ end-to-end จาก local จริง ๆ ต้องรัน Alloy container บนเครื่องตัวเอง
+            mount โฟลเดอร์ <span class="mono text-[12px]">./logs</span> ของ repo เข้าไป แล้วชี้ output ไปที่ Loki บน server
+            (ดู §02) — ไม่มีทางเลี่ยงด้วยการแก้โค้ดฝั่งแอป เพราะสถาปัตยกรรมปัจจุบันเลือกใช้ pull-based file tailing
+            สำหรับ log โดยตั้งใจ (ไม่ใช่ push เหมือน trace)
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 STACK ========== -->
+      <section id="stack" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Observability Docker Compose Stack (Server)</div>
+        <h2 class="display text-3xl mb-6">Grafana Alloy · Tempo · Loki</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          stack สังเกตการณ์รันอยู่บน server (<span class="mono text-[13px]">172.16.0.220</span>) แยกต่างหากจาก repo
+          นี้ — ไฟล์ compose เต็มและ <span class="mono text-[13px]">config.alloy</span> ไม่ได้อยู่ใน repo
+          <span class="mono text-[13px]">erp-api</span> จึง<b>ตรวจสอบเนื้อหาที่แท้จริงจากที่นี่ไม่ได้โดยตรง</b>
+          ส่วนที่แสดงด้านล่างเป็น service definition ของ Alloy ที่ได้รับมา — ระบุไว้ชัดเจนว่าจุดไหนคือสิ่งที่ยืนยันได้จากโค้ดฝั่งแอป
+          และจุดไหนต้องไปเช็คที่ <span class="mono text-[13px]">config.alloy</span> บน server เอง
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">docker-compose.yml (ส่วน Alloy service — ตามที่ระบุจาก server)</div>
+        <div class="code p-5 mb-6">
+<pre><span class="t">alloy</span>:
+  <span class="k">image</span>: <span class="s">grafana/alloy:latest</span>
+  <span class="k">command</span>:
+    - run
+    - --server.http.listen-addr=0.0.0.0:12345
+    - /etc/alloy/config.alloy
+  <span class="k">volumes</span>:
+    - ./config.alloy:/etc/alloy/config.alloy
+    - /root/erp-api/logs:/var/log/erp-api:ro  <span class="c">## bind-mount แบบ read-only</span>
+  <span class="k">ports</span>:
+    - <span class="s">"4317:4317"</span> <span class="c"># OTLP gRPC — รับ Trace จากแอป</span>
+    - <span class="s">"4318:4318"</span> <span class="c"># OTLP HTTP — รับ Trace จากแอป</span>
+  <span class="k">depends_on</span>:
+    - tempo
+    - loki</pre>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ยืนยันได้จากโค้ดฝั่งแอป (repo นี้)</div>
+            <ul class="text-sm text-[var(--ink-soft)] leading-relaxed list-disc pl-4 space-y-1.5">
+              <li>แอป export trace ไปที่ <span class="mono text-[12px]">http://172.16.0.220:4317</span> (OTLP gRPC) — ตรงกับพอร์ตที่ Alloy เปิดรับ</li>
+              <li>แอปเขียน log ไฟล์ที่ <span class="mono text-[12px]">process.cwd()/logs/&lt;service&gt;/http/http.log</span> — สอดคล้องกับ host path <span class="mono text-[12px]">/root/erp-api/logs</span> ถ้า deploy โดยรันจาก <span class="mono text-[12px]">cwd = /root/erp-api</span></li>
+            </ul>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ต้องเช็คที่ server / config.alloy เอง</div>
+            <ul class="text-sm text-[var(--ink-soft)] leading-relaxed list-disc pl-4 space-y-1.5">
+              <li><span class="mono text-[12px]">loki.source.file</span> ใน <span class="mono text-[12px]">config.alloy</span> scrape path <span class="mono text-[12px]">/var/log/erp-api/**/*.log</span> แบบ recursive หรือไม่</li>
+              <li>service definition ของ <span class="mono text-[12px]">tempo</span> / <span class="mono text-[12px]">loki</span> เอง (port, storage, retention)</li>
+              <li>labels ที่ Alloy ใส่ให้แต่ละ log stream ตอน push เข้า Loki</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 TRACING ========== -->
+      <section id="tracing" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — Distributed Tracing → Tempo</div>
+        <h2 class="display text-3xl mb-6">OpenTelemetry NodeSDK</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <span class="mono text-[13px]">libs/common/src/tracing.ts</span> เริ่ม OpenTelemetry SDK
+          <b>ก่อน</b>โมดูลอื่นใดในแอป เพื่อให้ auto-instrumentation แพตช์ <span class="mono text-[13px]">http</span>/<span class="mono text-[13px]">pg</span>/<span class="mono text-[13px]">ioredis</span>/<span class="mono text-[13px]">amqplib</span>
+          ได้ก่อนที่โค้ดจริงจะ <span class="mono text-[13px]">require()</span> พวกมัน
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Import Order · apps/&lt;bc&gt;/src/main.ts → bootstrap.util.ts</div>
+        <div class="code p-5 mb-6">
+<pre><span class="c">// libs/common/src/utils/bootstrap.util.ts — บรรทัดแรกสุดของไฟล์</span>
+<span class="c">// MUST be first: starts the OpenTelemetry SDK before http/pg/nestjs are loaded</span>
+<span class="c">// so auto-instrumentation can patch them (see tracing.ts). Do not reorder.</span>
+<span class="k">import</span> <span class="s">'../tracing'</span>;
+
+<span class="k">import</span> { timingSafeEqual } <span class="k">from</span> <span class="s">'crypto'</span>;
+<span class="c">// ... imports อื่น ๆ ตามหลัง — ทุกตัวถูก instrument ทันเวลาแล้ว</span></pre>
+        </div>
+
+        <div class="rulebox mt-2 mb-8">
+          <div class="rc mb-1">ทำไมต้อง import ตรง path ไม่ผ่าน @lib/common barrel</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ถ้า import ผ่าน barrel (<span class="mono text-[12px]">@lib/common</span>) จะทำให้ export อื่นทั้งหมด
+            (decorators, DTOs, guards) ถูก evaluate ก่อน ซึ่งจะไป <span class="mono text-[12px]">require()</span>
+            dependency ของมันเองล่วงหน้า — สายเกินไปสำหรับ instrumentation hook ที่ต้องติดตั้งก่อน module อื่นถูกโหลด
+          </p>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">tracing.ts · การตั้งค่าหลัก</div>
+        <div class="code p-5 mb-6">
+<pre><span class="k">const</span> endpoint =
+  process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? <span class="s">'http://127.0.0.1:4317'</span>;
+
+otelSdk = <span class="k">new</span> <span class="t">NodeSDK</span>({
+  traceExporter: <span class="k">new</span> <span class="t">OTLPTraceExporter</span>({ url: endpoint }),
+  instrumentations: [getNodeAutoInstrumentations()],
+});
+
+otelSdk.start();</pre>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">service.name resolution</div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              1) <span class="mono text-[12px]">OTEL_SERVICE_NAME</span> ถ้าตั้งไว้ → 2) parse จาก entry path
+              <span class="mono text-[12px]">dist/apps/&lt;name&gt;/main.js</span> อัตโนมัติ (ไม่ต้อง config ต่อแอป) → 3) fallback <span class="mono text-[12px]">'erp-service'</span>
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">Fail-safe</div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              ทั้งบล็อกครอบด้วย <span class="mono text-[12px]">try/catch</span> — tracing พังไม่มีทางทำให้ service ทั้งตัวพังตาม
+              (<span class="mono text-[12px]">console.warn</span> แล้วปล่อยผ่าน)
+            </p>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">RPC (TCP/RMQ) Span Propagation — OtelRpcContextInterceptor</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-4 leading-[1.85]">
+          Guard/Interceptor ระดับ <span class="mono text-[13px]">APP_*</span> ทำงานเฉพาะฝั่ง HTTP —
+          <span class="mono text-[13px]">app.connectMicroservice()</span> ถูกสร้างด้วย
+          <span class="mono text-[13px]">ApplicationConfig</span> ใหม่ที่ว่างเปล่า (ตั้งใจ ไม่ inherit guard เพื่อไม่ให้ inter-service call ที่ไม่มี JWT ถูก reject)
+          จึงต้อง register interceptor นี้ตรงบน microservice instance เอง เพื่อเย็บ span tree ข้าม TCP/RMQ hop
+        </p>
+        <div class="code p-5 mb-6">
+<pre><span class="c">// libs/common/src/interceptors/otel-rpc-context.interceptor.ts</span>
+<span class="k">const</span> carrier = <span class="k">this</span>.extractCarrier(context); <span class="c">// W3C traceparent จาก _context.otel</span>
+<span class="k">const</span> parentContext = carrier
+  ? propagation.extract(<span class="t">ROOT_CONTEXT</span>, carrier)
+  : <span class="t">ROOT_CONTEXT</span>;
+
+<span class="k">const</span> span = trace.getTracer(<span class="s">'erp-rpc'</span>).startSpan(spanName, {}, parentContext);
+<span class="k">return</span> otelContext.with(trace.setSpan(parentContext, span), () =&gt; next.handle())
+  .pipe(<span class="c">/* catchError → span.recordException + setStatus(ERROR) */</span>
+        <span class="c">/* finalize → span.end() */</span>);</pre>
+        </div>
+        <p class="text-[12.5px] mb-8" style="color:var(--muted)">
+          ฝั่งผู้เรียก: <span class="mono text-[12px]">MicroserviceClientService.createCallContext()</span> ฝัง active span ปัจจุบันลงใน
+          <span class="mono text-[12px]">_context.otel</span> ก่อนยิง TCP/RMQ call — interceptor นี้ดึงกลับมาเปิด child span ต่อ
+          หลังจากนั้น pg/ioredis auto-instrumentation ที่แพตช์ไว้ตั้งแต่ <span class="mono text-[12px]">tracing.ts</span> จะแนบทุก query เป็น child span ให้เองอัตโนมัติ ผ่าน <span class="mono text-[12px]">AsyncLocalStorage</span> โดยไม่ต้องเขียนโค้ดต่อ handler เลย
+        </p>
+
+        <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    participant App as erp-api service (ตัวไหนก็ได้ — localhost หรือ server)
+    participant SDK as OpenTelemetry NodeSDK (tracing.ts)
+    participant Alloy as Grafana Alloy · :4317 (172.16.0.220)
+    participant Tempo as Tempo
+
+    Note over App,SDK: main.ts → bootstrap.util.ts บรรทัดแรก import '../tracing'<br/>ก่อน http/pg/nestjs ถูกโหลด
+    App->>SDK: NodeSDK.start()
+    SDK->>SDK: getNodeAutoInstrumentations() แพตช์ http/pg/ioredis/amqplib
+    Note over App: มี HTTP request หรือ RPC call เข้ามา
+    App->>SDK: span เริ่มต้น (root span หรือ child ผ่าน OtelRpcContextInterceptor)
+    SDK-->>Alloy: OTLP gRPC export (async, batch)
+    Alloy-->>Tempo: forward spans
+    Note over App: GracefulShutdownService.onApplicationShutdown()<br/>เรียก shutdownTracing() เป็นขั้นตอนสุดท้าย (หลัง app.close() drain เสร็จ)
+</pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 LOGGING ========== -->
+      <section id="logging" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — HTTP Access Logging → Loki</div>
+        <h2 class="display text-3xl mb-6">pino-http · pino-roll · Multi-Target Transport</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <span class="mono text-[13px]">libs/common/src/utils/logger/pino-http.config.ts</span> สร้าง connect-style
+          middleware ที่ register ผ่าน <span class="mono text-[13px]">app.use()</span> ใน
+          <span class="mono text-[13px]">bootstrap.util.ts</span> — แยกจาก Winston-based
+          <span class="mono text-[13px]">LogsService</span> (business log) โดยสิ้นเชิง นี่คือ log เฉพาะ HTTP access เท่านั้น
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">buildPinoLogger() · pino.transport() แบบ multi-target</div>
+        <div class="code p-5 mb-2">
+<pre><span class="k">const</span> transport = pino.transport({
+  targets: [
+    {
+      target: <span class="s">'pino-roll'</span>,      <span class="c">// เขียนไฟล์ + rotate รายวัน</span>
+      level: logLevel,
+      options: {
+        file: path.join(process.cwd(), logDir, <span class="s">'http.log'</span>),
+        frequency: rotateFrequency,     <span class="c">// 'daily'</span>
+        dateFormat,                     <span class="c">// 'yyyy-MM-dd'</span>
+        mkdir: <span class="k">true</span>,                     <span class="c">// สร้างโฟลเดอร์ให้เองถ้ายังไม่มี</span>
+        limit: { count: retentionDays }, <span class="c">// เก็บ 14 ไฟล์ล่าสุด</span>
+      },
+    },
+    {
+      target: <span class="s">'pino/file'</span>,       <span class="c">// เขียนออก stdout ด้วย (destination: 1)</span>
+      level: logLevel,
+      options: { destination: <span class="d">1</span> },
+    },
+  ],
+});</pre>
+        </div>
+        <p class="text-[12.5px] mb-8" style="color:var(--muted)">
+          <span class="mono text-[12px]">logDir</span> default มาจาก <span class="mono text-[12px]">serviceSlug(moduleName)</span>
+          — แปลงชื่อ root module (<span class="mono text-[12px]">IamModule</span>, <span class="mono text-[12px]">FinanceBcModule</span>)
+          เป็น kebab-case ให้ตรงกับชื่อโฟลเดอร์ <span class="mono text-[12px]">apps/&lt;slug&gt;</span> เป๊ะ
+          (<span class="mono text-[12px]">iam</span>, <span class="mono text-[12px]">finance-bc</span>) → แต่ละ BC ได้ไฟล์ log แยกกันเป็น
+          <span class="mono text-[12px]">logs/&lt;service&gt;/http/http.log</span> โดยไม่ชนกัน แม้ทุก BC จะรันจาก cwd เดียวกันบน server
+        </p>
+
+        <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    participant Client
+    participant Fastify as Fastify Hooks
+    participant PinoHttp as pino-http middleware
+    participant PinoRoll as pino-roll (worker thread · thread-stream)
+    participant Disk as logs/&lt;service&gt;/http/http.log
+    participant Alloy as Grafana Alloy (tail ไฟล์บน server)
+    participant Loki as Loki
+
+    Client->>Fastify: HTTP request
+    Fastify->>PinoHttp: 'onRequest' hook (middie) → pino-http middleware ทำงาน
+    Note over PinoHttp: logger.child({req}) — pino serialize req<br/>"แช่แข็ง" ค่า ณ จุดนี้ (headers เท่านั้น ยังไม่มี body/user)
+    Fastify->>Fastify: 'preValidation' — body ถูก parse แล้วคัดลอกไป request.raw.body
+    Fastify->>Fastify: 'preHandler'/handler — AuthGuard ตั้ง request.user
+    Fastify->>Fastify: 'onSend' — คัดลอก request.user ไป request.raw.user
+    Fastify-->>Client: ส่ง response กลับ
+    Note over PinoHttp: response finish → res() serializer รันสด<br/>อ่าน raw.req.body / raw.req.user ที่เพิ่งถูกคัดลอกไว้
+    PinoHttp->>PinoRoll: logger.info({req, res}) ผ่าน pino.transport()
+    PinoRoll->>Disk: เขียนบรรทัด JSON (numeric level, mkdir:true)
+    Note over Alloy,Disk: Alloy บน server mount logs/ เป็น read-only<br/>tail ไฟล์ผ่าน loki.source.file (config.alloy)
+    Alloy->>Loki: push log lines เข้า Loki
+</pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 BODY/USER ========== -->
+      <section id="body-user" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — จุดที่ซับซ้อนที่สุด</div>
+        <h2 class="display text-3xl mb-6">ทำไม request body / authenticated user ต้องอยู่ใน res(), ไม่ใช่ req()</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          นี่คือจุดที่ non-obvious ที่สุดของทั้งไฟล์ และเป็นสาเหตุที่ log เคยว่างเปล่ามาตลอด (ดู §07)
+          — pino ผูกค่า <span class="mono text-[13px]">req</span> เข้ากับ log line ผ่าน
+          <span class="mono text-[13px]">logger.child({ req })</span> ที่ทำงานตอน Fastify hook
+          <span class="mono text-[13px]">'onRequest'</span> ซึ่งเป็นจุดที่ <b>เร็วที่สุด</b> ใน request lifecycle —
+          เร็วกว่าทั้ง body parsing (เกิดที่ <span class="mono text-[13px]">preValidation</span>) และ
+          <span class="mono text-[13px]">AuthGuard</span> (ทำงานเป็นส่วนหนึ่งของ handler execution)
+        </p>
+
+        <div class="rulebox mt-2 mb-8">
+          <div class="rc mb-1">Pino Child Binding Gotcha</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <span class="mono text-[12px]">pino.child(bindings)</span> serialize ค่า bindings <b>ครั้งเดียวทันที</b> ตอนเรียก
+            ไม่ใช่ทุกครั้งที่ log บรรทัดใหม่ถูก emit — เขียนค่าใหม่ลง object เดิมหลังจากนั้น
+            <b>ไม่มีผลกับ log ที่ผูกไว้แล้ว</b> เพราะ pino จับ snapshot ไปแล้ว
+          </p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">req() serializer</div>
+            <h3 class="font-semibold mb-2 text-[15px]">Frozen ที่ 'onRequest'</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              เก็บได้แค่สิ่งที่มีอยู่แล้วตอนนั้นจริง ๆ — <span class="mono text-[12px]">method</span>,
+              <span class="mono text-[12px]">url</span>, <span class="mono text-[12px]">headers</span> เท่านั้น
+              (body ยังไม่ parse, user ยังไม่ login-check)
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">res() serializer</div>
+            <h3 class="font-semibold mb-2 text-[15px]">รันสดที่ response-finish</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              pino-http เรียก res serializer ใน <span class="mono text-[12px]">onResFinished</span>
+              (หลัง response จบแล้ว) — ถึงตอนนั้น body/user ถูก copy ไว้บน
+              <span class="mono text-[12px]">request.raw</span> แล้ว และ Node <span class="mono text-[12px]">ServerResponse.req</span>
+              ยังชี้กลับไปที่ IncomingMessage ตัวเดิมเสมอ จึงอ่านค่าสดได้จากตรงนี้
+            </p>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">bootstrap.util.ts · registerHttpLogging() — สองฮุคที่แก้ปัญหานี้</div>
+        <div class="code p-5 mb-6">
+<pre><span class="c">// (1) copy request.body → request.raw.body หลัง parse เสร็จ</span>
+app.getHttpAdapter().getInstance()
+  .addHook(<span class="s">'preValidation'</span>, (request, _reply, done) =&gt; {
+    <span class="k">if</span> (request.body !== <span class="k">undefined</span>) {
+      request.raw.body = request.body;
+    }
+    done();
+  });
+
+<span class="c">// (2) copy request.user → request.raw.user หลัง AuthGuard ตั้งค่าแล้ว</span>
+<span class="c">// (guard ทำงานเป็นส่วนหนึ่งของ handler — 'onSend' คือจุดแรกที่ชัวร์ว่ารันหลัง guard เสมอ)</span>
+app.getHttpAdapter().getInstance()
+  .addHook(<span class="s">'onSend'</span>, (request, _reply, payload, done) =&gt; {
+    <span class="k">const</span> user = request.user;
+    <span class="k">if</span> (user !== <span class="k">undefined</span>) {
+      request.raw.user = user;
+    }
+    done(<span class="k">null</span>, payload);
+  });</pre>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">pino-http.config.ts · res() serializer — จุดที่อ่านค่าจริง</div>
+        <div class="code p-5 mb-2">
+<pre>res(res) {
+  <span class="k">const</span> raw = res.raw ?? res;                       <span class="c">// ServerResponse จริง</span>
+  <span class="k">const</span> rawReq = raw.req;                          <span class="c">// ← ชี้กลับไป IncomingMessage เดิม</span>
+
+  <span class="k">if</span> (includeReqBody &amp;&amp; rawReq?.body !== <span class="k">undefined</span>) {
+    base.req_body = redactDeep(rawReq.body);        <span class="c">// ปลอดภัย: password ฯลฯ ถูก redact</span>
+  }
+
+  <span class="k">const</span> session = rawReq?.user?.user_session;
+  <span class="k">if</span> (session !== <span class="k">undefined</span>) {
+    base.user = { id: session.id, username: session.username, roles: session.roles };
+  }
+
+  <span class="c">// response body ก็ต้อง redact เช่นกัน — access_token/refresh_token/csrf_token</span>
+  <span class="k">return</span> { ...base, body: redactDeep(raw.locals?.responseBody) };
+}</pre>
+        </div>
+        <p class="text-[12.5px]" style="color:var(--muted)">
+          ผลลัพธ์: log line หนึ่งบรรทัดมี <span class="mono text-[12px]">req</span> (headers, method, url — เบา ไม่มี PII)
+          และ <span class="mono text-[12px]">res</span> ที่รวม <span class="mono text-[12px]">req_body</span>,
+          <span class="mono text-[12px]">user</span>, <span class="mono text-[12px]">body</span> เข้าไปด้วย — โครงสร้างต่างจาก
+          pino-http มาตรฐานเล็กน้อย แต่เป็นทางเดียวที่ข้อมูลจะไม่ถูก freeze เป็นค่าว่างตลอดไป
+        </p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 CORRELATION ========== -->
+      <section id="correlation" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — เชื่อม Trace กับ Log เข้าด้วยกัน</div>
+        <h2 class="display text-3xl mb-6">trace_id ร่วมกันระหว่าง Tempo และ Loki</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          erp-api ไม่มี header <span class="mono text-[13px]">x-trace-id</span> แบบ hand-roll — เพราะมี OpenTelemetry
+          span จริงวิ่งอยู่แล้ว (§03) จึงยืม trace ID จาก active span มาใช้เป็น <span class="mono text-[13px]">reqId</span>
+          ของ pino-http โดยตรง แล้ว rename เป็น <span class="mono text-[13px]">trace_id</span> ที่ระดับบนสุดของ log line
+        </p>
+        <div class="code p-5 mb-4">
+<pre>genReqId(req) {
+  <span class="k">const</span> traceId = trace.getActiveSpan()?.spanContext().traceId;
+  <span class="k">if</span> (traceId !== <span class="k">undefined</span>) <span class="k">return</span> traceId;      <span class="c">// ← ใช้ trace ID เดียวกับที่ Tempo เห็น</span>
+  <span class="k">return</span> req.headers[<span class="s">'x-trace-id'</span>] ?? crypto.randomUUID(); <span class="c">// fallback ถ้า tracing ปิดอยู่</span>
+}
+
+customAttributeKeys: { reqId: <span class="s">'trace_id'</span> }  <span class="c">// rename field ให้อ่านง่าย</span></pre>
+        </div>
+        <div class="rulebox ok">
+          <div class="rc mb-1">ประโยชน์</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ค้นด้วย <span class="mono text-[12px]">trace_id</span> เดียวกันใน Grafana จะเจอทั้ง span ใน Tempo และ
+            log line ใน Loki ของ request เดียวกัน — เชื่อมสอง pipeline ที่ transport ต่างกันโดยสิ้นเชิงเข้าด้วยกันได้ที่ query time
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 BUGS ========== -->
+      <section id="bugs" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — บั๊กที่เจอระหว่าง Implement และวิธีแก้</div>
+        <h2 class="display text-3xl mb-6">3 บั๊กเงียบ (Silent Failures) ที่ไม่มี error ให้เห็นเลย</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทั้งสามข้อนี้มีจุดร่วมกันคือ<b>ไม่มี exception หรือ error log ใด ๆ โผล่ขึ้นมาเลย</b> — โค้ด "รันผ่าน" ปกติทุกอย่าง
+          แต่ผลลัพธ์ผิด เป็นเหตุผลที่ควรบันทึกไว้ละเอียด กันคนถัดไปเจอปัญหาเดิม
+        </p>
+
+        <div class="space-y-6">
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">1</span>
+              <h3 class="font-semibold text-[15px]">Webpack bundle thread-stream ทั้งที่ nodeExternals ควร exclude</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> <span class="mono text-[12px]">MODULE_NOT_FOUND: dist/apps/iam/lib/worker.js</span> ตอน boot — service ตายทันที ทั้ง dev และ prod
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> <span class="mono text-[12px]">thread-stream</span> เป็น transitive dependency ของ
+              <span class="mono text-[12px]">pino</span> เท่านั้น ไม่มี top-level symlink ใน
+              <span class="mono text-[12px]">node_modules</span> ภายใต้ pnpm — <span class="mono text-[12px]">webpack-node-externals</span>
+              scan เจอแค่ dependency ตรงจึง bundle มันเข้าไปใน <span class="mono text-[12px]">main.js</span> โดยไม่ตั้งใจ
+              เมื่อถูก bundle, webpack เขียนทับ <span class="mono text-[12px]">__dirname</span> เป็น path ของ bundle output —
+              path ของ worker script ที่ thread-stream คำนวณเองจึงผิดไปเป็น <span class="mono text-[12px]">dist/apps/&lt;app&gt;/lib/worker.js</span>
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> เพิ่ม <span class="mono text-[12px]">{ 'thread-stream': 'commonjs thread-stream' }</span> เข้า
+              <span class="mono text-[12px]">externals</span> array ใน <span class="mono text-[12px]">webpack.config.js</span> ตรง ๆ
+            </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">2</span>
+              <h3 class="font-semibold text-[15px]">formatters.level เป็น string → pino.multistream ทิ้งทุกบรรทัด</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> ไฟล์ log ถูกสร้างปกติ (<span class="mono text-[12px]">mkdir:true</span> ทำงาน) แต่มีขนาด 0 byte ตลอด — ไม่มี error ที่ไหนเลย แม้จะ attach <span class="mono text-[12px]">transport.on('error', …)</span> ก็ไม่เจอ
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> เดิม <span class="mono text-[12px]">formatters.level: (label) =&gt; ({ level: label })</span>
+              เปลี่ยนค่า <span class="mono text-[12px]">level</span> เป็น string (<span class="mono text-[12px]">"info"</span>)
+              แทนตัวเลข (<span class="mono text-[12px]">30</span>) — เมื่อ <span class="mono text-[12px]">pino.transport()</span>
+              มีมากกว่า 1 target, pino worker (<span class="mono text-[12px]">pino/lib/worker.js</span>) จะ route แต่ละบรรทัดผ่าน
+              <span class="mono text-[12px]">pino.multistream</span> ซึ่งเทียบ <span class="mono text-[12px]">level &gt;= dest.level</span> —
+              <span class="mono text-[12px]">"info" &gt;= 20</span> เป็น <span class="mono text-[12px]">false</span> เสมอ (string เทียบกับ number) ทุกบรรทัดจึงถูกทิ้งให้ทุก target อย่างเงียบ ๆ
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> คืนค่า <span class="mono text-[12px]">level</span> ให้เป็นตัวเลขเหมือนเดิม
+              (<span class="mono text-[12px]">level: (label, number) =&gt; ({ level: number, level_label: label })</span>)
+              — ใส่ label เป็น field แยกต่างหาก (<span class="mono text-[12px]">level_label</span>) ให้ Grafana/Loki อ่านง่ายแทน
+            </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">3</span>
+              <h3 class="font-semibold text-[15px]">req.body / req.user ไม่เคยปรากฏใน log แม้ includeReqBody: true</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> log เขียนได้ปกติแล้ว (แก้บั๊ก #2 แล้ว) แต่ POST/PUT ไม่เคยมี field <span class="mono text-[12px]">body</span> เลย — ทั้งที่ code ดูเหมือนอ่านมันอยู่
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> อธิบายละเอียดใน §05 — root cause คือ pino <span class="mono text-[12px]">child()</span> bindings
+              ถูก serialize ครั้งเดียวตอน <span class="mono text-[12px]">'onRequest'</span> ซึ่งเร็วกว่าทั้ง body parsing และ AuthGuard
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> เพิ่ม <span class="mono text-[12px]">preValidation</span>/<span class="mono text-[12px]">onSend</span> hook
+              คัดลอกค่าไปที่ <span class="mono text-[12px]">request.raw</span> แล้วย้ายจุดอ่านไปที่ <span class="mono text-[12px]">res()</span>
+              serializer ซึ่งรันสดตอน response-finish (ดู §05 สำหรับโค้ดเต็ม) — พบบั๊ก response body ไม่ถูก redact ระหว่างตรวจสอบจุดนี้ด้วย (access_token/refresh_token/csrf_token หลุดเป็น plaintext) แก้พร้อมกันโดยเรียก <span class="mono text-[12px]">redactDeep()</span> กับ response body เช่นกัน
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 REFERENCE ========== -->
+      <section id="reference" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Reference</div>
+        <h2 class="display text-3xl mb-6">Environment Variables &amp; HttpLoggingOptions</h2>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Environment Variables</div>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>Variable</th><th>ใช้โดย</th><th>Default</th></tr></thead>
+              <tbody>
+                <tr><td>LOG_LEVEL</td><td>pino-http.config.ts (resolveLogLevel)</td><td>info</td></tr>
+                <tr><td>OTEL_TRACES_ENABLED</td><td>tracing.ts</td><td>enabled (ตั้ง "false" เพื่อปิด)</td></tr>
+                <tr><td>OTEL_SERVICE_NAME</td><td>tracing.ts</td><td>parse จาก entry path</td></tr>
+                <tr><td>OTEL_EXPORTER_OTLP_ENDPOINT</td><td>tracing.ts</td><td>http://127.0.0.1:4317</td></tr>
+                <tr><td>OTEL_NODE_DISABLED_INSTRUMENTATIONS</td><td>tracing.ts</td><td>fs</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">HttpLoggingOptions (bootstrapApplication({ httpLogging: … }))</div>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>Field</th><th>ความหมาย</th><th>Default</th></tr></thead>
+              <tbody>
+                <tr><td>enabled</td><td>เปิด/ปิด HTTP access logging ทั้งหมด</td><td>true</td></tr>
+                <tr><td>level</td><td>pino log level</td><td>'info' (หรือ LOG_LEVEL)</td></tr>
+                <tr><td>includeReqBody</td><td>ใส่ request body ใน log (res.req_body)</td><td>true</td></tr>
+                <tr><td>includeResBody</td><td>ใส่ response body ใน log (res.body)</td><td>true</td></tr>
+                <tr><td>bodyMaxBytes</td><td>ตัด response body เมื่อเกินขนาดนี้</td><td>32768</td></tr>
+                <tr><td>logDir</td><td>โฟลเดอร์เก็บไฟล์ log</td><td>logs/&lt;serviceSlug&gt;/http</td></tr>
+                <tr><td>rotateFrequency</td><td>ความถี่ rotate ของ pino-roll</td><td>'daily'</td></tr>
+                <tr><td>retentionDays</td><td>จำนวนไฟล์ล่าสุดที่เก็บไว้</td><td>14</td></tr>
+                <tr><td>dateFormat</td><td>date-fns format ต่อท้ายชื่อไฟล์ rotate</td><td>'yyyy-MM-dd'</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Redacted Keys (redactDeep — ทำงาน recursive ทุก key/depth)</div>
+        <div class="code p-5 mb-2">
+<pre>password, token, access_token, refresh_token, secret,
+authorization, cookie, csrf_token, x-csrf-token, x-access-token</pre>
+        </div>
+        <p class="text-[12.5px]" style="color:var(--muted)">
+          ครอบคลุมทั้ง request headers, request body, response body — ไม่ว่าคีย์นั้นจะซ้อนลึกแค่ไหนใน object ก็ถูก redact
+          ถ้าเพิ่ม field ที่มีข้อมูลอ่อนไหวใหม่ในอนาคต (เช่น OTP, PIN) ต้องเพิ่มชื่อ key เข้า
+          <span class="mono text-[12px]">SENSITIVE_KEYS</span> set ใน <span class="mono text-[12px]">pino-http.config.ts</span> เองด้วยมือ — ไม่ auto-detect
+        </p>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · TECHNICAL GUIDE · OBSERVABILITY"
+        line2="OpenTelemetry · Grafana Alloy · Tempo · Loki · pino / pino-http">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
