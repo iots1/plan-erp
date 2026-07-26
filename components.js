@@ -27,6 +27,12 @@ class ErpDocnav extends HTMLElement {
     const currentLink =
       ErpDocnav.LINKS.find((l) => isLinkCurrent(l.href)) ?? ErpDocnav.LINKS[0];
 
+    const items = ErpDocnav.LINKS.map(
+      (l) => `<a href="${l.href}" class="docnav-dd-item${isLinkCurrent(l.href) ? ' is-current' : ''}" role="menuitem">
+        <span class="ic">${l.icon}</span><span class="t">${l.label}</span>
+      </a>`,
+    ).join('');
+
     this.innerHTML = `
 <div class="docnav">
   <a href="index.html" class="docnav-home" title="หน้าแรก" aria-label="หน้าแรก">🏠</a>
@@ -35,60 +41,28 @@ class ErpDocnav extends HTMLElement {
     <span class="ic">${currentLink.icon}</span>
     <span class="lbl">${currentLink.label}</span>
   </div>
-  <div class="docnav-jump">
-    <button type="button" class="docnav-jump-btn" id="docnavJumpBtn" aria-haspopup="true" aria-expanded="false" aria-controls="docnavMenu">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-      <span class="lbl">ไปหน้าอื่น</span>
-      <span class="kbd">/</span>
+  <div class="docnav-dd">
+    <button type="button" class="docnav-dd-btn" id="docnavDdBtn" aria-haspopup="true" aria-expanded="false" aria-controls="docnavDdMenu">
+      <span class="lbl">เอกสารทั้งหมด</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
     </button>
-    <div class="docnav-menu" id="docnavMenu" hidden>
-      <input type="text" class="docnav-menu-search" placeholder="ค้นหาเอกสาร…" aria-label="ค้นหาเอกสาร" autocomplete="off">
-      <div class="docnav-menu-list"></div>
-    </div>
+    <div class="docnav-dd-menu" id="docnavDdMenu" hidden role="menu">${items}</div>
   </div>
 </div>`;
 
-    this.#setupJumpMenu(isLinkCurrent);
+    this.#setupDropdown();
   }
 
-  // "Jump to" popover: opens via button click or the '/' shortcut (when not
-  // typing elsewhere on the page), filters the page list as you type, and
-  // supports Arrow/Enter/Escape — a lightweight command-palette rather than
-  // cramming every page into the top bar as a breadcrumb.
-  #setupJumpMenu(isLinkCurrent) {
-    const btn = this.querySelector('#docnavJumpBtn');
-    const menu = this.querySelector('#docnavMenu');
-    const search = this.querySelector('.docnav-menu-search');
-    const list = this.querySelector('.docnav-menu-list');
-
-    const escapeHtml = (s) =>
-      s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-
-    const render = (query) => {
-      const q = query.trim().toLowerCase();
-      const items = ErpDocnav.LINKS.filter(
-        (l) => !q || l.label.toLowerCase().includes(q) || l.desc.toLowerCase().includes(q),
-      );
-      list.innerHTML = items.length
-        ? items
-            .map(
-              (l) => `<a href="${l.href}" class="docnav-menu-item${isLinkCurrent(l.href) ? ' is-current' : ''}">
-        <span class="ic">${l.icon}</span>
-        <span class="body"><span class="t">${l.label}</span><span class="d">${l.desc}</span></span>
-      </a>`,
-            )
-            .join('')
-        : `<div class="docnav-menu-empty">ไม่พบเอกสารที่ตรงกับ "${escapeHtml(query)}"</div>`;
-    };
+  // Single button → plain dropdown list of every page in LINKS. Click to
+  // toggle, click a link to navigate, click outside or Escape to close.
+  #setupDropdown() {
+    const btn = this.querySelector('#docnavDdBtn');
+    const menu = this.querySelector('#docnavDdMenu');
 
     const open = () => {
-      render('');
       menu.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
-      search.value = '';
-      search.focus();
     };
-
     const close = () => {
       menu.hidden = true;
       btn.setAttribute('aria-expanded', 'false');
@@ -96,48 +70,15 @@ class ErpDocnav extends HTMLElement {
 
     btn.addEventListener('click', () => (menu.hidden ? open() : close()));
 
-    search.addEventListener('input', () => render(search.value));
-
-    // Arrow-key navigation across the (real <a>) result items.
-    search.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        close();
-        btn.focus();
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        list.querySelector('.docnav-menu-item')?.focus();
-      }
-    });
-    list.addEventListener('keydown', (e) => {
-      const items = [...list.querySelectorAll('.docnav-menu-item')];
-      const i = items.indexOf(document.activeElement);
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        (items[i + 1] ?? items[0])?.focus();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        i <= 0 ? search.focus() : items[i - 1]?.focus();
-      } else if (e.key === 'Escape') {
-        close();
-        btn.focus();
-      }
-    });
-
     document.addEventListener('click', (e) => {
       if (!menu.hidden && !this.contains(e.target)) close();
     });
 
-    // Global '/' shortcut — skip when the user is already typing somewhere
-    // (an input/textarea/contenteditable, e.g. this same search box).
     document.addEventListener('keydown', (e) => {
-      if (e.key !== '/' || menu.hidden === false) return;
-      const active = document.activeElement;
-      const isTyping =
-        active &&
-        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
-      if (isTyping) return;
-      e.preventDefault();
-      open();
+      if (e.key === 'Escape' && !menu.hidden) {
+        close();
+        btn.focus();
+      }
     });
   }
 }
