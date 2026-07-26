@@ -24,7 +24,7 @@
 <div class="flex min-h-screen">
 
   <!-- ============ SIDEBAR ============ -->
-  <erp-sidebar badge="O" title="Observability" subtitle="TRACES (TEMPO) · LOGS (LOKI)" width="280">
+  <erp-sidebar badge="O" title="Observability" subtitle="TRACES (TEMPO) · LOGS (LOKI) · METRICS (PROMETHEUS)" width="280">
     <nav slot="nav">
       <a href="#overview"    class="navlink"><span class="n">01</span> ภาพรวม · Push vs Pull</a>
       <a href="#stack"       class="navlink"><span class="n">02</span> Docker Compose Stack</a>
@@ -32,8 +32,9 @@
       <a href="#logging"     class="navlink"><span class="n">04</span> HTTP Access Log → Loki</a>
       <a href="#body-user"   class="navlink"><span class="n">05</span> body/user ใน log line</a>
       <a href="#correlation" class="navlink"><span class="n">06</span> Trace ↔ Log Correlation</a>
-      <a href="#bugs"        class="navlink"><span class="n">07</span> บั๊กที่เจอและวิธีแก้</a>
-      <a href="#reference"   class="navlink"><span class="n">08</span> Env / Options Reference</a>
+      <a href="#metrics"     class="navlink"><span class="n">07</span> Metrics · Prometheus + Service Graph</a>
+      <a href="#bugs"        class="navlink"><span class="n">08</span> บั๊กที่เจอและวิธีแก้</a>
+      <a href="#reference"   class="navlink"><span class="n">09</span> Env / Options Reference</a>
     </nav>
     <div slot="footnote">
       <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
@@ -66,6 +67,7 @@
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Grafana Alloy</span>
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>pino / pino-http / pino-roll</span>
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Fastify Lifecycle Hooks</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Prometheus · Tempo Metrics-Generator</span>
         </div>
       </div>
     </header>
@@ -126,49 +128,67 @@
 
       <!-- ========== 02 STACK ========== -->
       <section id="stack" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">02 — Observability Docker Compose Stack (Server)</div>
-        <h2 class="display text-3xl mb-6">Grafana Alloy · Tempo · Loki</h2>
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Observability Docker Compose Stack</div>
+        <h2 class="display text-3xl mb-6">Grafana Alloy · Tempo · Loki · Prometheus · Grafana</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
-          stack สังเกตการณ์รันอยู่บน server (<span class="mono text-[13px]">172.16.0.220</span>) แยกต่างหากจาก repo
-          นี้ — ไฟล์ compose เต็มและ <span class="mono text-[13px]">config.alloy</span> ไม่ได้อยู่ใน repo
-          <span class="mono text-[13px]">erp-api</span> จึง<b>ตรวจสอบเนื้อหาที่แท้จริงจากที่นี่ไม่ได้โดยตรง</b>
-          ส่วนที่แสดงด้านล่างเป็น service definition ของ Alloy ที่ได้รับมา — ระบุไว้ชัดเจนว่าจุดไหนคือสิ่งที่ยืนยันได้จากโค้ดฝั่งแอป
-          และจุดไหนต้องไปเช็คที่ <span class="mono text-[13px]">config.alloy</span> บน server เอง
+          ทั้ง compose file เต็ม ๆ และไฟล์ config ของทุก service (<span class="mono text-[13px]">config.alloy</span>,
+          <span class="mono text-[13px]">tempo.yaml</span>, <span class="mono text-[13px]">loki-config.yaml</span>,
+          <span class="mono text-[13px]">prometheus.yml</span>, <span class="mono text-[13px]">grafana-datasources.yaml</span>)
+          อยู่ใน repo นี้แล้วที่ <span class="mono text-[13px]">infrastructure/observability/</span> — mirror ตรงกับที่รันจริงบน
+          server (<span class="mono text-[13px]">172.16.0.220</span>) ทุกบรรทัด ตรวจสอบ/แก้ config ได้ตรงนี้โดยไม่ต้อง ssh เข้า
+          server เลย (ดูวิธีรันที่ <span class="mono text-[13px]">infrastructure/README.md</span>) — สิ่งที่ต่างจาก repo
+          มีแค่ไฟล์ <span class="mono text-[13px]">.env</span>/ข้อมูลจริงใน volume ซึ่ง gitignored ไว้โดยตั้งใจ
+          (credentials/state ไม่ใช่ config). datastore ฝั่ง Postgres/Redis/RabbitMQ ก็ mirror ไว้แบบเดียวกันที่
+          <span class="mono text-[13px]">infrastructure/infra-erp/</span> — เป็น stack แยกอิสระจากกัน ไม่เกี่ยวกับหน้านี้โดยตรง
         </p>
 
-        <div class="eyebrow text-[var(--muted)] mb-3">docker-compose.yml (ส่วน Alloy service — ตามที่ระบุจาก server)</div>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>Service</th><th>Image</th><th>Port</th><th>บทบาท</th></tr></thead>
+              <tbody>
+                <tr><td>alloy</td><td>grafana/alloy:latest</td><td>4317 (OTLP gRPC) · 4318 (OTLP HTTP) · 12345 (self /metrics)</td><td>รับ trace จากแอป + tail HTTP access log + forward ทั้งคู่</td></tr>
+                <tr><td>tempo</td><td>grafana/tempo:latest</td><td>3200</td><td>เก็บ trace + metrics-generator (ดู §07)</td></tr>
+                <tr><td>loki</td><td>grafana/loki:latest</td><td>3100</td><td>เก็บ log</td></tr>
+                <tr><td>prometheus</td><td>prom/prometheus:latest</td><td>9090</td><td>เก็บ metric (scrape alloy + รับ remote_write จาก tempo)</td></tr>
+                <tr><td>grafana</td><td>grafana/grafana:latest</td><td>3000</td><td>แสดงผล — 3 datasource provision ให้อัตโนมัติ</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">infrastructure/observability/config.alloy — receiver + log tailing</div>
         <div class="code p-5 mb-6">
-<pre><span class="t">alloy</span>:
-  <span class="k">image</span>: <span class="s">grafana/alloy:latest</span>
-  <span class="k">command</span>:
-    - run
-    - --server.http.listen-addr=0.0.0.0:12345
-    - /etc/alloy/config.alloy
-  <span class="k">volumes</span>:
-    - ./config.alloy:/etc/alloy/config.alloy
-    - /root/erp-api/logs:/var/log/erp-api:ro  <span class="c">## bind-mount แบบ read-only</span>
-  <span class="k">ports</span>:
-    - <span class="s">"4317:4317"</span> <span class="c"># OTLP gRPC — รับ Trace จากแอป</span>
-    - <span class="s">"4318:4318"</span> <span class="c"># OTLP HTTP — รับ Trace จากแอป</span>
-  <span class="k">depends_on</span>:
-    - tempo
-    - loki</pre>
+<pre><span class="t">otelcol.receiver.otlp</span> <span class="s">"default"</span> {
+  <span class="k">grpc</span> { endpoint = <span class="s">"0.0.0.0:4317"</span> }
+  <span class="k">http</span> { endpoint = <span class="s">"0.0.0.0:4318"</span> }
+  <span class="k">output</span> { traces = [otelcol.exporter.otlp.tempo.input] }
+}
+
+<span class="c">// tail pino-http access log ต่อ service — เปรียบเทียบ path จริงใน §08 บั๊ก #4</span>
+<span class="t">local.file_match</span> <span class="s">"erp_api_http"</span> {
+  path_targets = [{
+    __path__     = <span class="s">"/var/log/erp-api/*/http/*.log"</span>,  <span class="c">// * ต่อ path segment — ต้องมีให้ครบ</span>
+    job          = <span class="s">"erp-api-http"</span>,
+    service_name = <span class="s">"erp-api"</span>,
+  }]
+}</pre>
         </div>
 
         <div class="grid sm:grid-cols-2 gap-5">
           <div class="card p-6">
             <div class="mono text-[11px] text-[var(--muted)] mb-2">ยืนยันได้จากโค้ดฝั่งแอป (repo นี้)</div>
             <ul class="text-sm text-[var(--ink-soft)] leading-relaxed list-disc pl-4 space-y-1.5">
-              <li>แอป export trace ไปที่ <span class="mono text-[12px]">http://172.16.0.220:4317</span> (OTLP gRPC) — ตรงกับพอร์ตที่ Alloy เปิดรับ</li>
-              <li>แอปเขียน log ไฟล์ที่ <span class="mono text-[12px]">process.cwd()/logs/&lt;service&gt;/http/http.log</span> — สอดคล้องกับ host path <span class="mono text-[12px]">/root/erp-api/logs</span> ถ้า deploy โดยรันจาก <span class="mono text-[12px]">cwd = /root/erp-api</span></li>
+              <li>แอป export trace ไปที่ <span class="mono text-[12px]">OTEL_EXPORTER_OTLP_ENDPOINT</span> (OTLP gRPC) — ตรงกับพอร์ต 4317 ที่ Alloy เปิดรับ</li>
+              <li>แอปเขียน log ไฟล์ที่ <span class="mono text-[12px]">process.cwd()/logs/&lt;service&gt;/http/http.log</span> — ตรงกับ bind-mount <span class="mono text-[12px]">${ERP_API_LOGS_DIR:-../../logs}:/var/log/erp-api:ro</span> ใน compose</li>
             </ul>
           </div>
           <div class="card p-6">
-            <div class="mono text-[11px] text-[var(--muted)] mb-2">ต้องเช็คที่ server / config.alloy เอง</div>
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">Gotcha ที่ต้องระวังตอนแก้ config ตรงนี้</div>
             <ul class="text-sm text-[var(--ink-soft)] leading-relaxed list-disc pl-4 space-y-1.5">
-              <li><span class="mono text-[12px]">loki.source.file</span> ใน <span class="mono text-[12px]">config.alloy</span> scrape path <span class="mono text-[12px]">/var/log/erp-api/**/*.log</span> แบบ recursive หรือไม่</li>
-              <li>service definition ของ <span class="mono text-[12px]">tempo</span> / <span class="mono text-[12px]">loki</span> เอง (port, storage, retention)</li>
-              <li>labels ที่ Alloy ใส่ให้แต่ละ log stream ตอน push เข้า Loki</li>
+              <li><span class="mono text-[12px]">local.file_match</span> glob ต้องมี <span class="mono text-[12px]">*</span> ครบทุก path segment ที่ logger สร้างจริง — ไม่ match แล้วเงียบ ไม่มี error (§08 บั๊ก #4)</li>
+              <li>prometheus ต้อง start ด้วย <span class="mono text-[12px]">--web.enable-remote-write-receiver</span> ไม่งั้น Tempo metrics-generator remote_write เข้าไม่ได้</li>
+              <li>แก้ <span class="mono text-[12px]">grafana-datasources.yaml</span> ต้อง bump <span class="mono text-[12px]">version:</span> ทุกครั้ง ไม่งั้น Grafana ไม่ apply ค่าใหม่ (§08 บั๊ก #5)</li>
             </ul>
           </div>
         </div>
@@ -359,7 +379,7 @@ sequenceDiagram
         <div class="eyebrow text-[var(--accent)] mb-3">05 — จุดที่ซับซ้อนที่สุด</div>
         <h2 class="display text-3xl mb-6">ทำไม request body / authenticated user ต้องอยู่ใน res(), ไม่ใช่ req()</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
-          นี่คือจุดที่ non-obvious ที่สุดของทั้งไฟล์ และเป็นสาเหตุที่ log เคยว่างเปล่ามาตลอด (ดู §07)
+          นี่คือจุดที่ non-obvious ที่สุดของทั้งไฟล์ และเป็นสาเหตุที่ log เคยว่างเปล่ามาตลอด (ดู §08)
           — pino ผูกค่า <span class="mono text-[13px]">req</span> เข้ากับ log line ผ่าน
           <span class="mono text-[13px]">logger.child({ req })</span> ที่ทำงานตอน Fastify hook
           <span class="mono text-[13px]">'onRequest'</span> ซึ่งเป็นจุดที่ <b>เร็วที่สุด</b> ใน request lifecycle —
@@ -479,12 +499,126 @@ customAttributeKeys: { reqId: <span class="s">'trace_id'</span> }  <span class="
 
       <div class="rule my-14"></div>
 
-      <!-- ========== 07 BUGS ========== -->
-      <section id="bugs" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">07 — บั๊กที่เจอระหว่าง Implement และวิธีแก้</div>
-        <h2 class="display text-3xl mb-6">3 บั๊กเงียบ (Silent Failures) ที่ไม่มี error ให้เห็นเลย</h2>
+      <!-- ========== 07 METRICS ========== -->
+      <section id="metrics" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — Metrics: Prometheus &amp; Tempo Metrics-Generator</div>
+        <h2 class="display text-3xl mb-6">สอง "แหล่งที่มา" ของ metrics ที่ต้องไม่สับสนกัน</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          ทั้งสามข้อนี้มีจุดร่วมกันคือ<b>ไม่มี exception หรือ error log ใด ๆ โผล่ขึ้นมาเลย</b> — โค้ด "รันผ่าน" ปกติทุกอย่าง
+          Metrics เป็น pipeline ที่สาม เพิ่มเข้ามาทีหลัง trace/log ทั้งสอง — ใช้ Prometheus เป็น storage
+          แต่ metrics ที่อยู่ใน Prometheus มาจาก<b>สองทางที่ต่างกันโดยสิ้นเชิง</b> ทั้งด้าน transport (pull vs push)
+          และความหมาย (สุขภาพของ collector เอง vs ค่าที่แปลงมาจาก trace จริงของแอป)
+        </p>
+
+        <div class="card overflow-hidden">
+          <div class="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+            <div class="p-6">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="evt evt-listen">PULL</span>
+                <h3 class="font-semibold text-[15px]">otelcol_* — สุขภาพของ Alloy เอง</h3>
+              </div>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                Prometheus scrape <span class="mono text-[12px]">alloy:12345/metrics</span> ทุก 15s (self-instrumentation
+                ที่ Alloy เปิดให้เองอัตโนมัติ ไม่ต้อง config เพิ่ม) ได้ <span class="mono text-[12px]">otelcol_receiver_accepted_spans_total</span>,
+                <span class="mono text-[12px]">otelcol_exporter_sent_spans_total</span>,
+                <span class="mono text-[12px]">process_cpu_seconds_total</span>,
+                <span class="mono text-[12px]">process_resident_memory_bytes</span> ฯลฯ — วัด<b>ตัว collector</b>
+                (รับ/ส่ง span สำเร็จกี่ตัว, ใช้ CPU/memory เท่าไหร่) ไม่เกี่ยวกับพฤติกรรมของแอปเลย
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="evt evt-tcp">PUSH</span>
+                <h3 class="font-semibold text-[15px]">traces_spanmetrics_* / traces_service_graph_*</h3>
+              </div>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                Tempo's <span class="mono text-[12px]">metrics_generator</span> แปลง<b>ทุก span ที่ ingest</b> เป็น RED
+                metrics (<span class="mono text-[12px]">traces_spanmetrics_calls_total</span>,
+                <span class="mono text-[12px]">traces_spanmetrics_latency_bucket</span>) และ service-graph edges
+                (<span class="mono text-[12px]">traces_service_graph_request_total</span>) แล้ว
+                <b>remote_write</b> (push) เข้า Prometheus เอง — นี่คือ metrics ของ<b>แอปจริง</b> (rate/error/duration
+                ต่อ service·operation, ใครเรียกใคร)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3 mt-8">tempo.yaml — เปิด metrics_generator</div>
+        <div class="code p-5 mb-6">
+<pre><span class="t">metrics_generator</span>:
+  <span class="k">registry</span>:
+    external_labels: { source: <span class="s">tempo</span> }
+  <span class="k">storage</span>:
+    path: /tmp/tempo/generator/wal
+    remote_write:
+      - url: <span class="s">http://prometheus:9090/api/v1/write</span>
+        send_exemplars: <span class="k">true</span>
+
+<span class="t">overrides</span>:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]  <span class="c">// เปิดทั้งสองตัว</span></pre>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">grafana-datasources.yaml — ผูก Tempo เข้ากับ Prometheus</div>
+        <div class="code p-5 mb-2">
+<pre><span class="c">## Tempo datasource jsonData</span>
+serviceMap:
+  datasourceUid: prometheus       <span class="c">// เปิดแท็บ "Service Graph" ใน Explore ให้อัตโนมัติ</span>
+tracesToMetrics:
+  datasourceUid: prometheus
+  tags: [{ key: <span class="s">service.name</span>, value: <span class="s">service</span> }]</pre>
+        </div>
+        <p class="text-[12.5px] mb-8" style="color:var(--muted)">
+          การ wire สองบรรทัดนี้คือสิ่งที่เปิด <b>Service Graph tab</b> (Explore → Tempo → Service Graph) และตาราง
+          RED metrics ต่อ operation ที่ขึ้นตอนดู trace ใดๆ — <b>ไม่ต้อง import dashboard ID ไหนเลย</b> ฟีเจอร์นี้ built-in
+          อยู่ใน Grafana เองแล้ว
+        </p>
+
+        <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    App["erp-api service"]
+    Alloy["Grafana Alloy"]
+    Tempo["Tempo<br/>(+ metrics_generator)"]
+    Loki[("Loki")]
+    Prom["Prometheus"]
+    Grafana{{"Grafana"}}
+
+    App -->|"OTLP :4317/:4318"| Alloy
+    Alloy -->|forward traces| Tempo
+    App -->|"write access log"| LogFile[("logs/&lt;svc&gt;/http/*.log")]
+    LogFile -->|"tail"| Alloy
+    Alloy -->|push logs| Loki
+
+    Tempo -->|"remote_write<br/>traces_spanmetrics_* / traces_service_graph_*"| Prom
+    Prom -->|"scrape /metrics<br/>otelcol_*"| Alloy
+
+    Grafana -->|"serviceMap /<br/>tracesToMetrics"| Tempo
+    Grafana --> Loki
+    Grafana --> Prom
+</pre>
+        </div>
+
+        <div class="rulebox mt-6">
+          <div class="rc mb-1">อย่าไล่หา Dashboard ID จาก grafana.com สำหรับ metrics พวกนี้</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ระหว่าง implement เคยลองหา dashboard สำเร็จรูปสำหรับ metrics เหล่านี้ — ID ที่เจอไม่ตรงกับ metric name
+            ของ stack นี้เลยสักตัว (ID 18309 เขียนไว้สำหรับ otelcol เวอร์ชันเก่าที่ไม่มี <span class="mono text-[12px]">_total</span>
+            suffix, ID 22784 คาดหวัง metrics ที่แอปต้อง export เองผ่าน OTel Metrics SDK ซึ่งเราไม่ได้ทำ,
+            ID 16120 ไม่เกี่ยวข้องเลยเพราะเป็น dashboard ของ Aerospike) — เส้นทางที่ถูกต้องคือ Service Graph tab
+            ใน Explore ตามที่ wire ไว้ด้านบน ไม่ใช่การ import dashboard จากภายนอก
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 BUGS ========== -->
+      <section id="bugs" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — บั๊กที่เจอระหว่าง Implement และวิธีแก้</div>
+        <h2 class="display text-3xl mb-6">5 บั๊กเงียบ (Silent Failures) ที่ไม่มี error ให้เห็นเลย</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทั้งห้าข้อนี้มีจุดร่วมกันคือ<b>ไม่มี exception หรือ error log ใด ๆ โผล่ขึ้นมาเลย</b> — โค้ด/config "รันผ่าน" ปกติทุกอย่าง
           แต่ผลลัพธ์ผิด เป็นเหตุผลที่ควรบันทึกไว้ละเอียด กันคนถัดไปเจอปัญหาเดิม
         </p>
 
@@ -552,6 +686,55 @@ customAttributeKeys: { reqId: <span class="s">'trace_id'</span> }  <span class="
               serializer ซึ่งรันสดตอน response-finish (ดู §05 สำหรับโค้ดเต็ม) — พบบั๊ก response body ไม่ถูก redact ระหว่างตรวจสอบจุดนี้ด้วย (access_token/refresh_token/csrf_token หลุดเป็น plaintext) แก้พร้อมกันโดยเรียก <span class="mono text-[12px]">redactDeep()</span> กับ response body เช่นกัน
             </p>
           </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">4</span>
+              <h3 class="font-semibold text-[15px]">Alloy log-tailing glob ตกหล่น path segment ที่เพิ่มมาใหม่ → Loki ว่างเปล่าไม่มี error</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> Alloy container รันปกติ ไม่มี error สักบรรทัดในล็อกของมัน แต่ query Loki ด้วย
+              <span class="mono text-[12px]">{job="erp-api-http"}</span> ไม่เจอ log แม้แต่บรรทัดเดียว ทั้งที่ไฟล์
+              log บน disk มีข้อมูลปกติ
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> commit ที่เพิ่ม per-service log directory (<span class="mono text-[12px]">logs/&lt;service&gt;/http/…</span>)
+              เปลี่ยนโครงสร้าง path ไปเพิ่มอีกหนึ่งชั้น แต่ <span class="mono text-[12px]">config.alloy</span>'s
+              <span class="mono text-[12px]">local.file_match</span> ยังตั้ง <span class="mono text-[12px]">__path__</span> เป็น
+              <span class="mono text-[12px]">/var/log/erp-api/http/*.log</span> (ไม่มีชั้น <span class="mono text-[12px]">&lt;service&gt;</span>)
+              — glob ไม่ match ไฟล์ไหนเลยสักไฟล์ Alloy แค่ "หาไฟล์ไม่เจอ" ซึ่งไม่ใช่ error สำหรับมัน จึงเงียบสนิท
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> เพิ่ม <span class="mono text-[12px]">*</span> อีกชั้นให้ตรงกับ path จริง —
+              <span class="mono text-[12px]">/var/log/erp-api/*/http/*.log</span> — กฎทั่วไป: glob path ต้องมี
+              <span class="mono text-[12px]">*</span> ครบทุก path segment ที่ logger สร้างจริง ไม่งั้น Alloy จะไม่แจ้งอะไรเลยเมื่อ
+              layout เปลี่ยนในอนาคต
+            </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">5</span>
+              <h3 class="font-semibold text-[15px]">Grafana provisioning ไม่ apply jsonData ใหม่ถ้าไม่ bump version</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> แก้ <span class="mono text-[12px]">grafana-datasources.yaml</span> เพิ่ม
+              <span class="mono text-[12px]">serviceMap</span>/<span class="mono text-[12px]">tracesToMetrics</span> ให้ Tempo
+              datasource แล้ว restart container ปกติ แต่ <span class="mono text-[12px]">GET /api/datasources/uid/tempo</span>
+              ยังคืน <span class="mono text-[12px]">jsonData: {}</span> เหมือนเดิมทุกประการ ไม่มี error ใน Grafana log เลย
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> Grafana's file-based datasource provisioning เทียบ <span class="mono text-[12px]">version:</span>
+              field ในไฟล์ YAML กับ version ที่บันทึกไว้ในฐานข้อมูลภายในของมันเอง — apply เนื้อหาใหม่เฉพาะตอน version
+              ในไฟล์<b>มากกว่า</b>ค่าที่บันทึกไว้เท่านั้น แก้ <span class="mono text-[12px]">jsonData</span> โดยลืมขยับ
+              <span class="mono text-[12px]">version: 1</span> เดิม จึงถูกมองว่า "ไม่มีอะไรเปลี่ยน" แล้วข้ามไปเงียบๆ
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> bump <span class="mono text-[12px]">version:</span> ขึ้นทุกครั้งที่แก้ datasource ใดๆ ใน
+              <span class="mono text-[12px]">grafana-datasources.yaml</span> ไม่ว่าจะเปลี่ยนอะไรก็ตาม — ไม่มี error ให้เตือน
+              ถ้าลืม
+            </p>
+          </div>
         </div>
       </section>
 
@@ -559,8 +742,13 @@ customAttributeKeys: { reqId: <span class="s">'trace_id'</span> }  <span class="
 
       <!-- ========== 08 REFERENCE ========== -->
       <section id="reference" class="section py-4 pb-20">
-        <div class="eyebrow text-[var(--accent)] mb-3">08 — Reference</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — Reference</div>
         <h2 class="display text-3xl mb-6">Environment Variables &amp; HttpLoggingOptions</h2>
+        <p class="text-[12.5px] mb-8" style="color:var(--muted)">
+          Config ของ stack สังเกตการณ์ทั้งหมด (Alloy/Tempo/Loki/Prometheus/Grafana) และ datastore
+          (Postgres/Redis/RabbitMQ) อยู่ที่ <span class="mono text-[12px]">infrastructure/</span> ใน repo นี้ — ตารางด้านล่าง
+          เป็น reference เฉพาะฝั่งแอป (ตัวแปร env + option ของ <span class="mono text-[12px]">bootstrapApplication()</span>)
+        </p>
 
         <div class="eyebrow text-[var(--muted)] mb-3">Environment Variables</div>
         <div class="card overflow-hidden mb-8">
