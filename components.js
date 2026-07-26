@@ -5,31 +5,140 @@
  */
 
 class ErpDocnav extends HTMLElement {
+  // Full catalog of docs pages. Kept here (not per-page) so every page's
+  // docnav — and the "jump to" search — always lists the same set.
+  static LINKS = [
+    { href: 'index.html', icon: '🏠', label: 'Home', desc: 'สารบัญเอกสารทั้งหมด' },
+    { href: 'erp-architecture.html', icon: '📐', label: 'ERP Architecture', desc: 'Microservices DDD Design · Development Plan' },
+    { href: 'core-feature.html', icon: '📋', label: 'SRS · Phase 1–6', desc: 'System Requirement Specification' },
+    { href: 'i18n-guide.html', icon: '🌐', label: 'i18n Guide (TH/EN)', desc: 'แนวทางพัฒนาระบบ 2 ภาษา' },
+    { href: 'backend-convention.html', icon: '⚙️', label: 'Backend Conventions', desc: 'Naming · JSON:API · Error · Query Params' },
+    { href: 'nextjs-permission-guide.html', icon: '🔐', label: 'Next.js Integration Guide', desc: 'Frontend Integration · Permission System' },
+    { href: 'observability-logging-guide.html', icon: '📊', label: 'Observability (Tempo/Loki)', desc: 'OpenTelemetry Traces · pino-http Logs' },
+  ];
+
   connectedCallback() {
-    const LINKS = [
-      { href: 'index.html', label: '🏠 Home' },
-      { href: 'erp-architecture.html', label: '📐 ERP Architecture' },
-      { href: 'core-feature.html', label: 'SRS · Phase 1–6' },
-      { href: 'i18n-guide.html', label: 'i18n Guide (TH/EN)' },
-      { href: 'backend-convention.html', label: 'Backend Conventions' },
-      { href: 'nextjs-permission-guide.html', label: 'Next.js Integration Guide' },
-      { href: 'observability-logging-guide.html', label: 'Observability (Tempo/Loki)' },
-    ];
-
-    // Active-state handling: read the current path and flag the matching link.
     const current = window.location.pathname.split('/').pop() || 'index.html';
+    // core-feature.html is the SRS hub; the per-phase pages (srs-p3.html …)
+    // live under it, so treat it as "current" while reading a phase too.
+    const isLinkCurrent = (href) =>
+      href === current || (href === 'core-feature.html' && /^srs-p\d/.test(current));
 
-    const links = LINKS.map((link, i) => {
-      // core-feature.html is the SRS hub; the per-phase pages (srs-p3.html …)
-      // live under it, so keep the SRS entry highlighted while reading a phase.
-      const isCurrent =
-        link.href === current ||
-        (link.href === 'core-feature.html' && /^srs-p\d/.test(current));
-      const sep = i > 0 ? '<span class="sep">/</span>' : '';
-      return `${sep}<a href="${link.href}"${isCurrent ? ' class="current"' : ''}>${link.label}</a>`;
-    }).join('\n  ');
+    const currentLink =
+      ErpDocnav.LINKS.find((l) => isLinkCurrent(l.href)) ?? ErpDocnav.LINKS[0];
 
-    this.innerHTML = `<div class="docnav">\n  ${links}\n</div>`;
+    this.innerHTML = `
+<div class="docnav">
+  <a href="index.html" class="docnav-home" title="หน้าแรก" aria-label="หน้าแรก">🏠</a>
+  <span class="docnav-divider"></span>
+  <div class="docnav-current">
+    <span class="ic">${currentLink.icon}</span>
+    <span class="lbl">${currentLink.label}</span>
+  </div>
+  <div class="docnav-jump">
+    <button type="button" class="docnav-jump-btn" id="docnavJumpBtn" aria-haspopup="true" aria-expanded="false" aria-controls="docnavMenu">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <span class="lbl">ไปหน้าอื่น</span>
+      <span class="kbd">/</span>
+    </button>
+    <div class="docnav-menu" id="docnavMenu" hidden>
+      <input type="text" class="docnav-menu-search" placeholder="ค้นหาเอกสาร…" aria-label="ค้นหาเอกสาร" autocomplete="off">
+      <div class="docnav-menu-list"></div>
+    </div>
+  </div>
+</div>`;
+
+    this.#setupJumpMenu(isLinkCurrent);
+  }
+
+  // "Jump to" popover: opens via button click or the '/' shortcut (when not
+  // typing elsewhere on the page), filters the page list as you type, and
+  // supports Arrow/Enter/Escape — a lightweight command-palette rather than
+  // cramming every page into the top bar as a breadcrumb.
+  #setupJumpMenu(isLinkCurrent) {
+    const btn = this.querySelector('#docnavJumpBtn');
+    const menu = this.querySelector('#docnavMenu');
+    const search = this.querySelector('.docnav-menu-search');
+    const list = this.querySelector('.docnav-menu-list');
+
+    const escapeHtml = (s) =>
+      s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+    const render = (query) => {
+      const q = query.trim().toLowerCase();
+      const items = ErpDocnav.LINKS.filter(
+        (l) => !q || l.label.toLowerCase().includes(q) || l.desc.toLowerCase().includes(q),
+      );
+      list.innerHTML = items.length
+        ? items
+            .map(
+              (l) => `<a href="${l.href}" class="docnav-menu-item${isLinkCurrent(l.href) ? ' is-current' : ''}">
+        <span class="ic">${l.icon}</span>
+        <span class="body"><span class="t">${l.label}</span><span class="d">${l.desc}</span></span>
+      </a>`,
+            )
+            .join('')
+        : `<div class="docnav-menu-empty">ไม่พบเอกสารที่ตรงกับ "${escapeHtml(query)}"</div>`;
+    };
+
+    const open = () => {
+      render('');
+      menu.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      search.value = '';
+      search.focus();
+    };
+
+    const close = () => {
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    };
+
+    btn.addEventListener('click', () => (menu.hidden ? open() : close()));
+
+    search.addEventListener('input', () => render(search.value));
+
+    // Arrow-key navigation across the (real <a>) result items.
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        close();
+        btn.focus();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        list.querySelector('.docnav-menu-item')?.focus();
+      }
+    });
+    list.addEventListener('keydown', (e) => {
+      const items = [...list.querySelectorAll('.docnav-menu-item')];
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        (items[i + 1] ?? items[0])?.focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        i <= 0 ? search.focus() : items[i - 1]?.focus();
+      } else if (e.key === 'Escape') {
+        close();
+        btn.focus();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!menu.hidden && !this.contains(e.target)) close();
+    });
+
+    // Global '/' shortcut — skip when the user is already typing somewhere
+    // (an input/textarea/contenteditable, e.g. this same search box).
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== '/' || menu.hidden === false) return;
+      const active = document.activeElement;
+      const isTyping =
+        active &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+      if (isTyping) return;
+      e.preventDefault();
+      open();
+    });
   }
 }
 
