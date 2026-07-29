@@ -705,27 +705,27 @@
 
         <!-- SUMMARY BAND -->
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-px rounded-xl overflow-hidden mb-8" style="background:var(--line)">
-          <div class="bg-white p-5">
+          <div class="p-5" style="background:var(--surface)">
             <div class="mono text-[11px] text-[var(--muted)]">TOTAL</div>
             <div class="display text-2xl mt-1">2,388<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
             <div class="text-[12px] text-[var(--muted)] mt-0.5">≈ 299 man-days</div>
           </div>
-          <div class="bg-white p-5">
+          <div class="p-5" style="background:var(--surface)">
             <div class="mono text-[11px]" style="color:var(--accent)">BACKEND</div>
             <div class="display text-2xl mt-1" style="color:var(--accent)">1,380<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
             <div class="text-[12px] text-[var(--muted)] mt-0.5">58% ของงาน</div>
           </div>
-          <div class="bg-white p-5">
+          <div class="p-5" style="background:var(--surface)">
             <div class="mono text-[11px]" style="color:#4F63C4">FRONTEND</div>
             <div class="display text-2xl mt-1" style="color:#4F63C4">1,008<span class="text-sm font-normal text-[var(--muted)]"> ชม.</span></div>
             <div class="text-[12px] text-[var(--muted)] mt-0.5">42% ของงาน</div>
           </div>
-          <div class="bg-white p-5">
+          <div class="p-5" style="background:var(--surface)">
             <div class="mono text-[11px] text-[var(--muted)]">DURATION</div>
             <div class="display text-2xl mt-1">~28<span class="text-sm font-normal text-[var(--muted)]"> สัปดาห์</span></div>
             <div class="text-[12px] text-[var(--muted)] mt-0.5">≈ 7 เดือน</div>
           </div>
-          <div class="bg-white p-5 col-span-2 sm:col-span-1">
+          <div class="p-5 col-span-2 sm:col-span-1" style="background:var(--surface)">
             <div class="mono text-[11px] text-[var(--muted)]">TEAM</div>
             <div class="display text-2xl mt-1">5<span class="text-sm font-normal text-[var(--muted)]"> คน</span></div>
             <div class="text-[12px] text-[var(--muted)] mt-0.5">2 BE · 2 FE · 1 QA/PM</div>
@@ -852,10 +852,10 @@
             <tbody>
               <tr><td class="mono">P0</td><td>Foundation · DevOps · UI kit</td><td class="text-right">100</td><td class="text-right">64</td><td class="text-right font-semibold">164</td><td class="text-right">W1–2</td></tr>
               <tr><td class="mono">P1</td><td>Auth &amp; IAM</td><td class="text-right">120</td><td class="text-right">88</td><td class="text-right font-semibold">208</td><td class="text-right">W3–5</td></tr>
-              <tr style="background:var(--signal-soft)"><td class="mono">P2</td><td>Master Data &amp; Storage <span class="text-[11px] text-[var(--muted)]">(+ Item Group/Attr/Brand/UOM)</span></td><td class="text-right">192</td><td class="text-right">192</td><td class="text-right font-semibold">384</td><td class="text-right">W5–9</td></tr>
-              <tr style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P3</td><td>Inventory · Lot · FIFO · Bundle <span class="text-[11px] text-[var(--muted)]">(+ Stock Entry/Settings/Ledger)</span></td><td class="text-right">288</td><td class="text-right">208</td><td class="text-right font-semibold text-[var(--signal)]">496</td><td class="text-right">W9–13</td></tr>
-              <tr style="background:var(--signal-soft)"><td class="mono">P4</td><td>Procurement &amp; Sales <span class="text-[11px] text-[var(--muted)]">(+ Pricing Rule/Taxes engine)</span></td><td class="text-right">208</td><td class="text-right">168</td><td class="text-right font-semibold">376</td><td class="text-right">W13–18</td></tr>
-              <tr style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P5</td><td>Finance · COGS &amp; P&amp;L <span class="text-[11px] text-[var(--muted)]">(+ GL/Payment/WHT)</span></td><td class="text-right">192</td><td class="text-right">120</td><td class="text-right font-semibold text-[var(--signal)]">312</td><td class="text-right">W18–22</td></tr>
+              <tr class="tr-tint" style="background:var(--signal-soft)"><td class="mono">P2</td><td>Master Data &amp; Storage <span class="text-[11px] text-[var(--muted)]">(+ Item Group/Attr/Brand/UOM)</span></td><td class="text-right">192</td><td class="text-right">192</td><td class="text-right font-semibold">384</td><td class="text-right">W5–9</td></tr>
+              <tr class="tr-tint" style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P3</td><td>Inventory · Lot · FIFO · Bundle <span class="text-[11px] text-[var(--muted)]">(+ Stock Entry/Settings/Ledger)</span></td><td class="text-right">288</td><td class="text-right">208</td><td class="text-right font-semibold text-[var(--signal)]">496</td><td class="text-right">W9–13</td></tr>
+              <tr class="tr-tint" style="background:var(--signal-soft)"><td class="mono">P4</td><td>Procurement &amp; Sales <span class="text-[11px] text-[var(--muted)]">(+ Pricing Rule/Taxes engine)</span></td><td class="text-right">208</td><td class="text-right">168</td><td class="text-right font-semibold">376</td><td class="text-right">W13–18</td></tr>
+              <tr class="tr-tint" style="background:var(--signal-soft)"><td class="mono text-[var(--signal)]">P5</td><td>Finance · COGS &amp; P&amp;L <span class="text-[11px] text-[var(--muted)]">(+ GL/Payment/WHT)</span></td><td class="text-right">192</td><td class="text-right">120</td><td class="text-right font-semibold text-[var(--signal)]">312</td><td class="text-right">W18–22</td></tr>
               <tr><td class="mono">P6</td><td>Reporting &amp; Analytics</td><td class="text-right">104</td><td class="text-right">120</td><td class="text-right font-semibold">224</td><td class="text-right">W22–25</td></tr>
               <tr><td class="mono">P7</td><td>Migration &amp; Cutover</td><td class="text-right">176</td><td class="text-right">48</td><td class="text-right font-semibold">224</td><td class="text-right">W25–28</td></tr>
               <tr style="background:#0E1726"><td class="mono text-white">รวม</td><td class="text-white">8 Phases · 62 tasks</td><td class="text-right font-semibold" style="color:#7FE3DE">1,380</td><td class="text-right font-semibold" style="color:#A9B6EC">1,008</td><td class="text-right font-bold text-white">2,388</td><td class="text-right text-white">~28 wk</td></tr>
