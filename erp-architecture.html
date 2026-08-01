@@ -29,10 +29,11 @@
       <a href="#architecture" class="navlink"><span class="n">02</span> พิมพ์เขียวสถาปัตยกรรม</a>
       <a href="#i18n"         class="navlink"><span class="n">03</span> กลยุทธ์ 2 ภาษา (i18n)</a>
       <a href="#contexts"     class="navlink"><span class="n">04</span> Bounded Contexts</a>
-      <a href="#fifo"         class="navlink"><span class="n">05</span> FIFO · Lot · กำไร/ขาดทุน</a>
-      <a href="#events"       class="navlink"><span class="n">06</span> Event Storming</a>
-      <a href="#roadmap"      class="navlink"><span class="n">07</span> แผนพัฒนาแบบเฟส</a>
-      <a href="#migration"    class="navlink"><span class="n">08</span> การย้ายระบบเดิม</a>
+      <a href="#admin-console" class="navlink"><span class="n">05</span> Admin Console &amp; Access Control</a>
+      <a href="#fifo"         class="navlink"><span class="n">06</span> FIFO · Lot · กำไร/ขาดทุน</a>
+      <a href="#events"       class="navlink"><span class="n">07</span> Event Storming</a>
+      <a href="#roadmap"      class="navlink"><span class="n">08</span> แผนพัฒนาแบบเฟส</a>
+      <a href="#migration"    class="navlink"><span class="n">09</span> การย้ายระบบเดิม</a>
     </nav>
     <div slot="footnote">
       MONOREPO · NX + PNPM<br>
@@ -126,15 +127,18 @@
 
         <!-- Context Map Diagram -->
         <div class="card p-6 sm:p-8 mb-8">
-          <div class="eyebrow text-[var(--muted)] mb-6">System Context Map · Database-per-Context</div>
+          <div class="eyebrow text-[var(--muted)] mb-6">System Context Map · Database-per-Context &amp; Supporting Infrastructure</div>
           <div class="overflow-x-auto">
-          <svg viewBox="0 0 920 560" class="w-full min-w-[760px]" font-family="IBM Plex Mono, monospace">
+          <svg viewBox="0 0 920 650" class="w-full min-w-[760px]" font-family="IBM Plex Mono, monospace">
             <defs>
               <marker id="arw" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
                 <path d="M0,0 L9,4.5 L0,9 z" fill="#0E7C86"/>
               </marker>
               <marker id="arwO" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
                 <path d="M0,0 L9,4.5 L0,9 z" fill="#DC5A16"/>
+              </marker>
+              <marker id="arwB" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                <path d="M0,0 L9,4.5 L0,9 z" fill="#0B3D91"/>
               </marker>
             </defs>
 
@@ -147,9 +151,9 @@
             <text x="460" y="124" fill="#fff" font-size="13" text-anchor="middle" font-weight="600">API Gateway (NestJS)</text>
 
             <!-- RabbitMQ bus -->
-            <rect x="120" y="470" width="680" height="46" rx="10" fill="#DC5A16"/>
-            <text x="460" y="493" fill="#fff" font-size="13" text-anchor="middle" font-weight="600">RabbitMQ — Event Bus (async pub/sub)</text>
-            <text x="460" y="508" fill="#FCE0CF" font-size="10.5" text-anchor="middle">Topic exchanges · domain events</text>
+            <rect x="120" y="566" width="680" height="46" rx="10" fill="#DC5A16"/>
+            <text x="460" y="589" fill="#fff" font-size="13" text-anchor="middle" font-weight="600">RabbitMQ — Event Bus (async pub/sub)</text>
+            <text x="460" y="604" fill="#FCE0CF" font-size="10.5" text-anchor="middle">Topic exchanges · domain events</text>
 
             <!-- BCs row -->
             <g font-size="12.5" font-weight="600" text-anchor="middle">
@@ -214,6 +218,25 @@
               </g>
             </g>
 
+            <!-- Supporting Infrastructure row (infra-erp docker-compose) -->
+            <g font-size="12.5" font-weight="600" text-anchor="middle">
+              <g>
+                <rect x="130" y="470" width="160" height="54" rx="10" fill="#fff" stroke="#0B3D91" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <text x="210" y="492" fill="#0E1726">Redis</text>
+                <text x="210" y="508" fill="#6B7A90" font-size="10" font-weight="400">Session · CSRF token</text>
+              </g>
+              <g>
+                <rect x="380" y="470" width="170" height="54" rx="10" fill="#fff" stroke="#0B3D91" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <text x="465" y="492" fill="#0E1726">Gotenberg</text>
+                <text x="465" y="508" fill="#6B7A90" font-size="10" font-weight="400">HTML → PDF (headless Chromium)</text>
+              </g>
+              <g>
+                <rect x="630" y="470" width="160" height="54" rx="10" fill="#fff" stroke="#0B3D91" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <text x="710" y="492" fill="#0E1726">MinIO (S3)</text>
+                <text x="710" y="508" fill="#6B7A90" font-size="10" font-weight="400">Objects · Presigned URL</text>
+              </g>
+            </g>
+
             <!-- gateway to BCs (TCP, sync) -->
             <g stroke="#0E7C86" stroke-width="1.4" fill="none" marker-end="url(#arw)" opacity="0.55">
               <path d="M420,142 L96,196"/>
@@ -224,21 +247,50 @@
             </g>
             <text x="250" y="168" fill="#0E7C86" font-size="10.5" text-anchor="middle">TCP · sync request/response</text>
 
+            <!-- BCs to infra services (sync calls) -->
+            <g stroke="#0B3D91" stroke-width="1.3" fill="none" marker-end="url(#arwB)" opacity="0.75">
+              <path d="M96,292 L205,468"/>
+              <path d="M501,428 L465,468"/>
+              <path d="M550,485 L661,430" stroke-dasharray="3 3"/>
+              <path d="M663,428 L710,468"/>
+            </g>
+            <text x="150" y="450" fill="#0B3D91" font-size="9" text-anchor="middle">session:&lt;jti&gt;</text>
+            <text x="490" y="450" fill="#0B3D91" font-size="9" text-anchor="middle">render PDF</text>
+            <text x="612" y="465" fill="#0B3D91" font-size="9" text-anchor="middle">hand off PDF</text>
+            <text x="705" y="450" fill="#0B3D91" font-size="9" text-anchor="middle">S3 API</text>
+
             <!-- BCs to bus (async) -->
             <g stroke="#DC5A16" stroke-width="1.4" fill="none" marker-end="url(#arwO)" opacity="0.65" stroke-dasharray="5 4">
-              <path d="M96,292  L200,466"/>
-              <path d="M420,264 L420,466"/>
-              <path d="M582,264 L560,466"/>
-              <path d="M744,264 L700,466"/>
-              <path d="M339,428 L360,466"/>
+              <path d="M96,292  L200,566"/>
+              <path d="M420,264 L420,566"/>
+              <path d="M582,264 L560,566"/>
+              <path d="M744,264 L700,566"/>
+              <path d="M339,428 L360,566"/>
             </g>
             <!-- report subscribes -->
             <g stroke="#DC5A16" stroke-width="1.4" fill="none" marker-end="url(#arwO)" opacity="0.65">
-              <path d="M501,466 L501,432"/>
+              <path d="M501,566 L501,432"/>
             </g>
-            <text x="640" y="452" fill="#DC5A16" font-size="10.5" text-anchor="middle">events (dashed) · publish/subscribe</text>
+            <text x="640" y="548" fill="#DC5A16" font-size="10.5" text-anchor="middle">events (dashed) · publish/subscribe</text>
           </svg>
           </div>
+          <div class="flex flex-wrap gap-4 mt-5 pt-5 text-[11.5px]" style="border-top:1px solid var(--line);color:var(--ink-soft)">
+            <span class="flex items-center gap-2"><span class="w-4 h-3 rounded-[3px]" style="border:1.5px solid #0E7C86"></span>Bounded Context</span>
+            <span class="flex items-center gap-2"><span class="w-4 h-3 rounded-[3px]" style="border:2px solid #DC5A16"></span>BC · Critical (Lot/COGS)</span>
+            <span class="flex items-center gap-2"><span class="w-4 h-3 rounded-[3px]" style="border:1.5px dashed #0B3D91"></span>Supporting Infrastructure</span>
+          </div>
+          <p class="text-[13px] mt-4 leading-relaxed" style="color:var(--ink-soft)">
+            ทุกกล่องในแผนภาพนี้มาจาก Docker Compose จริงใน <span class="mono text-[12px]">infrastructure/</span> — stack
+            <span class="mono text-[12px]">infra-erp/</span> (Postgres · Redis · RabbitMQ · MinIO · Gotenberg) คือ dependency ที่ทุก BC
+            ต้องพึ่งตอนรัน ส่วน <b>Redis</b> เก็บ session/CSRF token ที่ <span class="mono text-[12px]">auth</span> เขียนตอน login แต่
+            <b>ทุก BC อ่านผ่าน <span class="mono text-[12px]">AuthGuard</span> ที่มากับ <span class="mono text-[12px]">libs/common</span></b>
+            ไม่ใช่แค่ <span class="mono text-[12px]">auth</span> เอง (ไม่วาดลูกศรจากทุก BC เพื่อไม่ให้แผนภาพรก) — <b>Gotenberg</b> เป็น headless
+            Chromium ที่ <span class="mono text-[12px]">report-bc</span> เรียกแปลง EJS template เป็น PDF แล้วส่งต่อให้
+            <span class="mono text-[12px]">storage-bc</span> เก็บถาวรใน MinIO อีกที (ไม่ใช่ BC ใหม่ — เป็นแค่ renderer ไม่มีฐานข้อมูลของตัวเอง) ·
+            นอกจากนี้ยังมี stack <span class="mono text-[12px]">observability/</span> แยกต่างหาก (Grafana Alloy · Tempo · Loki ·
+            Prometheus · Grafana) รับ trace/log จากทุก BC แต่ไม่ได้อยู่ใน request path ธุรกิจโดยตรง จึงไม่ได้วาดในแผนภาพนี้ —
+            ดู <span class="mono text-[12px]">infrastructure/README.md</span> สำหรับรายละเอียด provisioning เต็ม
+          </p>
         </div>
 
         <div class="grid sm:grid-cols-2 gap-6">
@@ -449,9 +501,125 @@
 
       <div class="rule my-14"></div>
 
-      <!-- ========== 05 FIFO DEEP DIVE ========== -->
+      <!-- ========== 05 ADMIN CONSOLE & ACCESS CONTROL ========== -->
+      <section id="admin-console" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Admin Console &amp; Access Control</div>
+        <h2 class="display text-3xl sm:text-4xl mb-6">คอนโซลผู้ดูแลระบบ (IAM Admin Console) &amp; กลไกควบคุมสิทธิ์</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
+          นอกจาก JSON:API ที่ทุก client (Next.js, mobile, service อื่น) เรียกใช้ <span class="mono text-[13px]">iam-bc</span>
+          ยังเสิร์ฟ <b>เว็บแอดมินแยกต่างหาก</b> ด้วย NestJS-rendered EJS (ไม่มี framework ฝั่ง client) —
+          เจาะจงสำหรับ <b class="text-[var(--signal)]">Security Admin / Superadmin</b> ใช้จัดการแกนความปลอดภัยของทั้งระบบ
+          (ผู้ใช้ · บทบาท · policy · แคตตาล็อกสิทธิ์ · access key · session) โดยไม่ต้องพึ่ง frontend หลักเลย
+        </p>
+
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3"><span class="dot" style="background:var(--accent)"></span><h3 class="font-semibold text-[15px]">หน้าจอทั้งหมดใน Admin Console</h3></div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-3">เสิร์ฟจาก <span class="mono text-[12px]">apps/iam/views</span> ที่ path <span class="mono text-[12px]">/iam/v1/views/*</span> — 1 หน้า = 1 route แยก (ไม่ใช่ SPA):</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="chip">dashboard</span><span class="chip">users</span>
+              <span class="chip">roles</span><span class="chip">policies</span>
+              <span class="chip">permissions</span><span class="chip">permission-sync-logs</span>
+              <span class="chip">access-keys</span><span class="chip">sessions</span>
+              <span class="chip">audit-logs</span><span class="chip">print-templates</span>
+              <span class="chip">document-types</span><span class="chip">system-setting</span>
+            </div>
+          </div>
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3"><span class="dot" style="background:var(--signal)"></span><h3 class="font-semibold text-[15px]">SSR shell เปิดเผยได้ · ข้อมูลจริงยังถูกคุม</h3></div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              ทุก view controller เป็น <span class="mono text-[12px]">@Public()</span> — เสิร์ฟ HTML shell โดยไม่เช็ค session
+              ฝั่ง server (route กันเข้าหน้าเป็นแค่ client-side JS ที่ redirect ออกถ้าไม่มี <span class="mono text-[12px]">page:*</span>)
+              แต่ <b>ทุก request ที่ดึง/แก้ข้อมูลจริง</b> เป็นการเรียก JSON:API ปกติผ่าน httpOnly cookie
+              จึงยังผ่าน Guard chain เต็มรูปแบบเสมอ (ดูขวา) — SSR shell เองไม่มีข้อมูลลับฝังอยู่เลย
+            </p>
+          </div>
+        </div>
+
+        <h3 class="font-semibold text-lg mb-4">Auth Middleware · Guard Chain (เรียงตามลำดับจริงที่รันทุก request)</h3>
+        <div class="card overflow-hidden mb-8">
+          <table class="spec">
+            <thead><tr><th style="width:56px">ลำดับ</th><th style="width:150px">Guard</th><th>ทำอะไร</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">1</td><td class="mono text-[var(--accent)]">AuthGuard</td><td>ข้ามถ้า <span class="mono text-[12px]">@Public()</span> · อ่าน token จาก <span class="mono text-[12px]">Authorization: Bearer</span> ก่อน แล้ว fallback ไปคุกกี้ <span class="mono text-[12px]">access_token</span> · verify JWT (ลายเซ็น+หมดอายุ) แล้วเช็ค Redis session ซ้ำ (<span class="mono text-[12px]">session:&lt;jti&gt;</span>) — revoke/logout มีผลทันทีแม้ JWT ยังไม่หมดอายุ</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[var(--accent)]">AccessKeyGuard</td><td>no-op ยกเว้น route ติด <span class="mono text-[12px]">@UseAccessKey()</span> — auth แบบ HMAC signature (<span class="mono text-[12px]">X-Access-Key-Id/X-Timestamp/X-Signature</span>) สำหรับเรียกแบบ system-to-system แทน JWT ตรวจสอบผ่าน iam-bc + ล็อก key ชั่วคราวถ้าผิดซ้ำเกิน 5 ครั้ง/นาที</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[var(--signal)]">CsrfGuard</td><td>ข้าม GET/HEAD/OPTIONS และ route ที่ไม่มีคุกกี้ <span class="mono text-[12px]">csrf_token</span> — ถ้ามี ต้องมี header <span class="mono text-[12px]">x-csrf-token</span> ตรงกัน (double-submit) กันเว็บอื่นยิง request แทนผู้ใช้ที่ login ค้างไว้ผ่าน iam-view</td></tr>
+              <tr><td class="mono">4</td><td class="mono" style="color:#15803D">PermissionGuard</td><td>ต้องมี <span class="mono text-[12px]">@RequirePermission('resource:action')</span> เสมอ (<b>default-deny</b>) — เช็คจาก permission ที่ resolve ไว้ใน session ก่อน ถ้าเป็น conditional permission ถึงเรียก iam-bc ประเมิน ABAC condition แบบ live</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[12px] text-[var(--muted)] mb-9">ทั้ง 4 ตัวลงทะเบียนเป็น <span class="mono text-[12px]">APP_GUARD</span> ใน <span class="mono text-[12px]">libs/common/src/common.module.ts</span> ครอบทุก BC โดยอัตโนมัติ ไม่ต้องเปิดใช้ทีละบริการ</p>
+
+        <h3 class="font-semibold text-lg mb-4">Permission Sync · แคตตาล็อกสิทธิ์ไม่ hand-maintain</h3>
+        <p class="text-[var(--ink-soft)] text-[14px] max-w-3xl mb-6 leading-[1.8]">
+          <span class="mono text-[12px]">npm run permissions:sync</span> (หรือกดปุ่ม "Sync Permissions" ในหน้า Permissions ของ Admin Console)
+          สแกนหาสิทธิ์จาก 3 แหล่งพร้อมกัน แล้ว diff/apply เข้าตาราง <span class="mono text-[12px]">permissions</span> —
+          แถวที่หายไปจากโค้ด<b>ถูก soft-delete</b> (ไม่ลบจริง), ทุกรอบบันทึกประวัติเป็น <span class="mono text-[12px]">permission_sync_logs</span>
+        </p>
+        <div class="grid md:grid-cols-3 gap-5 mb-9">
+          <div class="card p-5">
+            <div class="mono text-[11px] text-[var(--accent)] mb-2">api plane</div>
+            <p class="text-[13px] text-[var(--ink-soft)] leading-relaxed">สแกน <span class="mono text-[12px]">@RequirePermission('resource:action', {th, en})</span> ทุกไฟล์ใน <span class="mono text-[12px]">apps/&lt;service&gt;/src/**</span></p>
+          </div>
+          <div class="card p-5">
+            <div class="mono text-[11px] text-[var(--accent)] mb-2">ui plane · attribute scan</div>
+            <p class="text-[13px] text-[var(--ink-soft)] leading-relaxed">สแกนสตริง <span class="mono text-[12px]">data-permission="page:*"</span> / <span class="mono text-[12px]">"component:*"</span> ใน <span class="mono text-[12px]">views/**</span> + <span class="mono text-[12px]">public/**</span> — ไม่มีที่เก็บชื่อ th/en จึงได้แค่ placeholder</p>
+          </div>
+          <div class="card p-5" style="border-color:#F0C9AF">
+            <div class="mono text-[11px] text-[var(--signal)] mb-2">ui plane · manifest</div>
+            <p class="text-[13px] text-[var(--ink-soft)] leading-relaxed">อ่าน <span class="mono text-[12px]">apps/&lt;service&gt;/ui-permissions.manifest.json</span> ถ้ามี — ให้ชื่อ th/en มาตรง ๆ จึง<b>ชนะ</b>ผลจาก attribute scan เสมอเมื่อ key ซ้ำกัน</p>
+          </div>
+        </div>
+
+        <h3 class="font-semibold text-lg mb-4">UI Permissions Manifest · ทำไม <span class="mono text-[16px]">frontend-web</span> ต้องมี</h3>
+        <div class="card p-6 sm:p-8 mb-8">
+          <p class="text-[14px] text-[var(--ink-soft)] leading-relaxed mb-4">
+            <span class="mono text-[13px]">apps/frontend-web/ui-permissions.manifest.json</span> ในปัจจุบันเป็น <b>โฟลเดอร์ placeholder</b>
+            มีแค่ไฟล์ manifest ไฟล์เดียว ไม่มีโค้ด NestJS จริง — ยืนแทนที่ frontend ในอนาคต (เช่น Next.js) ที่ JSX
+            compile ทิ้ง literal string <span class="mono text-[12px]">data-permission="..."</span> ไปหมดหลัง build ทำให้สแกนแบบ regex หาไม่เจอ
+            จึงต้องประกาศ <span class="mono text-[12px]">page:*</span> / <span class="mono text-[12px]">component:*</span> ล่วงหน้าเป็น JSON แทน
+          </p>
+          <pre class="code p-4">{
+  <span class="s">"pages"</span>: [
+    {
+      <span class="s">"permission"</span>: <span class="s">"page:view_dashboard"</span>,
+      <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"หน้าแดชบอร์ด"</span>, <span class="s">"en"</span>: <span class="s">"Dashboard page"</span> },
+      <span class="s">"components"</span>: [
+        { <span class="s">"permission"</span>: <span class="s">"component:btn_fiter_date"</span>,
+          <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"ปุ่ม กรองวันที่"</span>, <span class="s">"en"</span>: <span class="s">"Filter date button"</span> } }
+      ]
+    }
+  ]
+}</pre>
+          <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">
+            component ที่ซ้อนอยู่ใต้ page <b>สืบทอด resource ของ page นั้น</b> เสมอ (ไม่ใช่ resource ของตัวเอง) —
+            เพื่อให้ dropdown "หน้าจอ / Component Group (UI)" ในหน้า Policy Generator รวมสิทธิ์ของหน้า + component ย่อยไว้กลุ่มเดียวกัน
+            ต่างจาก <span class="mono text-[12px]">apps/iam</span> ที่มีทั้ง <span class="mono text-[12px]">data-permission</span> จริงใน EJS
+            <b>และ</b> manifest ของตัวเอง — สแกนทั้งคู่ แต่ manifest ชนะเมื่อ key ชนกัน
+          </p>
+        </div>
+
+        <!-- Technical link -->
+        <div class="card p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-2">Technical Deep Dive</div>
+            <h3 class="font-semibold text-lg mb-1.5">Guard Chain · Session Sync · CSRF · Permission Sync ฉบับเต็ม</h3>
+            <p class="text-sm text-[var(--ink-soft)] max-w-xl leading-relaxed">
+              รายละเอียดเชิงเทคนิคครบทุกกลไก (§07–§11) รวมตัวอย่าง attack walkthrough ของ CSRF และ sequence diagram
+              ของ session sync อยู่ในเอกสาร SRS Phase 1
+            </p>
+          </div>
+          <a href="srs-p1.html#csrf-cookie-auth" class="chip !px-5 !py-3 !text-sm font-medium shrink-0" style="background:var(--panel-dark);color:#fff;border-color:var(--panel-dark)">
+            ดู SRS Phase 1 →
+          </a>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 FIFO DEEP DIVE ========== -->
       <section id="fifo" class="section py-4">
-        <div class="eyebrow text-[var(--signal)] mb-3">05 — Critical Business Logic</div>
+        <div class="eyebrow text-[var(--signal)] mb-3">06 — Critical Business Logic</div>
         <h2 class="display text-3xl sm:text-4xl mb-4">Deep Dive: FIFO · Lot · กำไร/ขาดทุน</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
           นี่คือกฎธุรกิจที่ห้ามผิดพลาด <span class="mono text-[13px]">inventory-bc</span> และ
@@ -580,9 +748,9 @@
 
       <div class="rule my-14"></div>
 
-      <!-- ========== 06 EVENT STORMING ========== -->
+      <!-- ========== 07 EVENT STORMING ========== -->
       <section id="events" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">06 — Event Storming &amp; Integration</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — Event Storming &amp; Integration</div>
         <h2 class="display text-3xl sm:text-4xl mb-6">การสื่อสารระหว่างบริการ</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-10 leading-[1.85]">
           3 ตัวอย่างสำคัญของการไหลของเหตุการณ์ผ่าน RabbitMQ (เส้นประ = event)
@@ -691,9 +859,9 @@
 
       <div class="rule my-14"></div>
 
-      <!-- ========== 07 ROADMAP ========== -->
+      <!-- ========== 08 ROADMAP ========== -->
       <section id="roadmap" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">07 — Development Plan</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Development Plan</div>
         <h2 class="display text-3xl sm:text-4xl mb-4">แผนพัฒนาแบบเฟส · Task &amp; Man-hours</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           แตกงานทั้ง <b>Backend</b> และ <b>Frontend</b> เป็นงานย่อย พร้อมประมาณ Man-hours และ Duration
@@ -1119,9 +1287,9 @@
 
       <div class="rule my-14"></div>
 
-      <!-- ========== 08 MIGRATION ========== -->
+      <!-- ========== 09 MIGRATION ========== -->
       <section id="migration" class="section py-4 pb-20">
-        <div class="eyebrow text-[var(--accent)] mb-3">08 — Legacy Migration</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — Legacy Migration</div>
         <h2 class="display text-3xl sm:text-4xl mb-6">การย้ายระบบเดิม</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
           ใช้รูปแบบ <b>Strangler Fig</b> — รันระบบใหม่คู่ขนานกับระบบเดิม แล้วค่อย ๆ ย้ายทีละโมดูล

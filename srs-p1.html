@@ -92,6 +92,11 @@
             <div class="card p-5"><div class="mono text-[11px] mb-2" style="color:#2563EB">iam-bc · db: iam</div><p class="text-[13px]" style="color:var(--ink-soft)">แหล่งความจริงของ <b>Users</b> · Roles · Policies · Permissions — เป็นเจ้าของสิทธิ์ทั้งหมด (RBAC + PBAC)</p></div>
           </div>
           <div class="mt-4 card p-4 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">วัตถุประสงค์ของเฟส:</b> ทุกบริการหลัง gateway ต้อง <b>ตรวจสิทธิ์จาก iam</b> ก่อนทำงาน · ชื่อ role/permission ที่แสดงผลเก็บ 2 ภาษาแบบ flat column (<span class="mono text-[12px]">name_th/name_en</span>) และทุกตารางสืบทอด <span class="mono text-[12px]">BaseEntity</span> ตาม <a href="backend-convention.html" style="color:var(--accent);text-decoration:underline">Backend Conventions</a></div>
+
+          <div class="edge mt-4" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)">
+            <div class="tag mb-1" style="color:#2563EB">iam Admin Console · ระบบแยกต่างหากสำหรับ Security Admin/Superadmin เท่านั้น</div>
+            <p class="text-[13px]">นอกจาก JSON:API ที่ client อื่นเรียก <span class="mono text-[12px]">iam-bc</span> ยังเสิร์ฟเว็บแอดมิน NestJS-rendered EJS (ไม่มี SPA framework) แยกต่างหากที่ <span class="mono text-[12px]">/iam/v1/views/*</span> — เจาะจงให้ <b>Security Admin</b> ใช้จัดการแกนความปลอดภัยล้วน ๆ ไม่ได้มีไว้ให้ End User ทั่วไปเข้า: <span class="mono text-[12px]">dashboard · users · roles · policies · permissions · permission-sync-logs · access-keys · sessions · audit-logs · print-templates · document-types · system-setting</span> (รายละเอียด route/permission แต่ละหน้าดู §08) — โครงสร้างนี้เป็น reference implementation ให้ BC อื่นทำ admin UI ของตัวเองตามได้ ไม่ใช่จุดเดียวที่ทุกบริการต้องพึ่ง</p>
+          </div>
         </div>
 
         <!-- 1.2 Access Model -->
@@ -439,7 +444,23 @@ erDiagram
         <!-- 1.7 Dev Guide -->
         <div class="mb-12">
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(37,99,235,.14);color:#2563EB">07</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+
+          <h4 class="font-semibold mb-3 text-[14px]">Auth Middleware · Guard Chain (<span class="mono text-[12px]">APP_GUARD</span>, เรียงตามลำดับจริงที่รันทุก request ทุก BC)</h4>
+          <div class="card overflow-hidden mb-6">
+            <table class="d">
+              <thead><tr><th style="width:40px">#</th><th style="width:140px">Guard</th><th>ทำอะไร</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">1</td><td class="mono" style="color:#2563EB">AuthGuard</td><td>ข้ามถ้า <span class="mono text-[12px]">@Public()</span> หรือ route เป็น <span class="mono text-[12px]">@UseAccessKey()</span> (ปล่อยให้ guard ถัดไปตรวจแทน) · ไม่งั้นอ่าน token จาก <span class="mono text-[12px]">Authorization: Bearer</span> ก่อน แล้ว fallback คุกกี้ <span class="mono text-[12px]">access_token</span> · verify JWT แล้วเช็ค Redis session <span class="mono text-[12px]">session:&lt;jti&gt;</span> ซ้ำ (revoke มีผลทันทีแม้ token ไม่หมดอายุ) · ยังเช็ค <span class="mono text-[12px]">session.expired_at</span> (บัญชีหมดอายุ) ด้วย</td></tr>
+                <tr><td class="mono">2</td><td class="mono" style="color:#2563EB">AccessKeyGuard</td><td>no-op ยกเว้น route ติด <span class="mono text-[12px]">@UseAccessKey()</span> — ดู RULE · ACCESS KEY ด้านล่าง</td></tr>
+                <tr><td class="mono">3</td><td class="mono" style="color:var(--signal)">CsrfGuard</td><td>double-submit cookie check — รายละเอียดเต็มที่ <a href="#csrf-cookie-auth" style="color:var(--accent);text-decoration:underline">§11</a></td></tr>
+                <tr><td class="mono">4</td><td class="mono" style="color:#15803D">PermissionGuard</td><td>ต้องมี <span class="mono text-[12px]">@RequirePermission()</span> เสมอ (default-deny) เว้นแต่ <span class="mono text-[12px]">@SkipPermissionCheck()</span> — เช็ค <span class="mono text-[12px]">session.permissions</span> ก่อน แล้วค่อย fallback ไปประเมิน ABAC condition แบบ live กับ iam-bc ถ้าเป็น conditional permission</td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] p-4 pt-0" style="color:var(--muted)">ลงทะเบียนที่ <span class="mono text-[12px]">libs/common/src/common.module.ts</span> เป็น <span class="mono text-[12px]">{ provide: APP_GUARD, useClass: … }</span> 4 รายการตามลำดับนี้เป๊ะ — สลับลำดับจะกระทบพฤติกรรม (เช่น <span class="mono text-[12px]">CsrfGuard</span> ต้องรันหลัง <span class="mono text-[12px]">AuthGuard</span>/<span class="mono text-[12px]">AccessKeyGuard</span> ที่ populate <span class="mono text-[12px]">request.user</span> ไปแล้ว)</p>
+          </div>
+
           <div class="space-y-3">
+            <div class="rulebox"><div class="rc mb-1">RULE · ACCESS KEY (M2M AUTH)</div><p class="text-[13.5px]"><span class="mono text-[12px]">@UseAccessKey()</span> เปิดทางที่ 3 นอกเหนือจาก Bearer/cookie — HMAC signature scheme สำหรับ system-to-system หรือ webhook: header <span class="mono text-[12px]">X-Access-Key-Id</span> (รูป <span class="mono text-[12px]">AKIA&lt;16 ตัวอักษร&gt;</span>) + <span class="mono text-[12px]">X-Timestamp</span> (ต้องสดไม่เกิน 5 นาที) + <span class="mono text-[12px]">X-Signature</span> เทียบกับ <span class="mono text-[12px]">HMAC(method\npath\ntimestamp\nsha256(body))</span> ที่ iam-bc ตรวจให้ผ่าน TCP · <span class="mono text-[12px]">AccessKeyGuard</span> เป็นผู้ populate <span class="mono text-[12px]">request.user</span> เองแทน <span class="mono text-[12px]">AuthGuard</span> (permissions มาจาก grant ของ access key นั้น ไม่ใช่ user จริง) · ผิดติดต่อกันเกิน 5 ครั้งใน 60 วินาที → ล็อก key ชั่วคราว 15 นาทีใน Redis</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · TOKEN + SESSION</div><p class="text-[13.5px]">access token อายุสั้น (เช่น 15 นาที) แนบทุก request · refresh token อายุยาวเก็บ <b>hash</b> ใน DB · session/blacklist ใน <b>Redis</b> · logout/เปลี่ยนสิทธิ์ = เพิกถอน refresh token · แนบ token ได้ 2 วิธี — <span class="mono text-[12px]">Authorization: Bearer</span> (API/Next.js client) หรือ <b>httpOnly cookie + CSRF double-submit</b> (browser admin UI) — รายละเอียดเต็มที่ <a href="#csrf-cookie-auth" style="color:var(--accent);text-decoration:underline">§11 CSRF &amp; Cookie Auth</a></p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · DENY-OVERRIDE</div><p class="text-[13.5px]">รวมสิทธิ์แบบ AWS IAM — ถ้ามี <span class="mono text-[12px]">deny</span> ตรงกับ resource:action ใด ๆ → <b>ปฏิเสธทันที</b> แม้จะมี allow · ไม่มี allow = ปฏิเสธโดยปริยาย (default deny)</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · CONDITION EVAL</div><p class="text-[13.5px]">ประเมิน condition ที่ backend กับ context จริง (<span class="mono text-[12px]">${user.id}</span>, <span class="mono text-[12px]">${user.department}</span>, IP, เวลา) · operator รองรับ StringEquals/StringLike/Numeric*/Date*/IpAddress</p></div>
@@ -501,6 +522,7 @@ erDiagram
   ]
 }</pre>
             <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">manifest ให้ชื่อ <span class="mono text-[12px]">{ th, en }</span> มาตรง ๆ เหมือน decorator — sync จะเชื่อชื่อจาก manifest เสมอ (ทับของเดิมได้) ต่างจากการ scan <span class="mono text-[12px]">data-permission</span> ที่ไม่มีที่เก็บชื่อ จึงได้แค่ placeholder ครั้งแรกแล้วต้องมาแก้ในตารางเอง</p>
+            <div class="edge mt-4" style="background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.3)"><div class="tag mb-1" style="color:#15803D">ตัวอย่างจริงในโปรเจกต์นี้</div><p class="text-[13px]"><span class="mono text-[12px]">apps/frontend-web/ui-permissions.manifest.json</span> คือ placeholder จริง — โฟลเดอร์นั้นมีแค่ไฟล์นี้ไฟล์เดียว ไม่มี <span class="mono text-[12px]">src/</span>/NestJS app จริงอยู่เลย ยืนตำแหน่งแทน frontend ในอนาคต (เช่น Next.js) ที่ JSX ไม่เหลือ literal string ให้ scan (หน้า <span class="mono text-[12px]">page:view_reports</span> + <span class="mono text-[12px]">page:view_dashboard</span> คนละหน้ากับของ iam-view) — ส่วน <span class="mono text-[12px]">apps/iam/ui-permissions.manifest.json</span> คือกรณีมีทั้ง manifest และ <span class="mono text-[12px]">data-permission</span> จริงในไฟล์เดียวกัน (dashboard widgets) ให้เทียบดูว่า manifest ทับผลของการ scan attribute อย่างไร</p></div>
           </div>
 
           <div class="rulebox"><div class="rc mb-1">RULE · SIDEBAR = PAGE PERMISSION, ไม่ใช่ ROUTE PATH</div><p class="text-[13.5px]">ห้าม hardcode การซ่อนเมนูด้วย role/username — เช็คกับ <span class="mono text-[12px]">page:view_&lt;slug&gt;</span> ใน JWT เท่านั้น (เหมือนกันทั้ง EJS วันนี้และ Next.js ในอนาคต) เพื่อให้ Policy Generator ฝั่ง Security Admin ควบคุมเมนูได้โดยไม่ต้อง deploy โค้ดใหม่</p></div>
@@ -818,6 +840,7 @@ sequenceDiagram
                 <tr><td>Claim</td><td>ข้อมูลภายใน JWT</td></tr>
                 <tr><td>Access / Refresh Token</td><td>token อายุสั้นแนบทุก request / token อายุยาวใช้ขอ access token ใหม่</td></tr>
                 <tr><td>Guard</td><td>ตัวดักตรวจสิทธิ์ฝั่ง backend (NestJS) ก่อนเข้า handler</td></tr>
+                <tr><td>Access Key / HMAC Auth</td><td>วิธี auth แบบ system-to-system (<span class="mono text-[12px]">@UseAccessKey()</span>) ใช้ signature เข้ารหัสแทน JWT — ตรวจโดย <span class="mono text-[12px]">AccessKeyGuard</span> (§07)</td></tr>
                 <tr><td>Route Guard</td><td>ตัวดักฝั่ง frontend กันเข้าหน้าที่ไม่มีสิทธิ์</td></tr>
                 <tr><td>Session</td><td>สถานะการ login (เก็บใน Redis) — เพิกถอนได้</td></tr>
                 <tr><td>Session Sync</td><td>การดันสิทธิ์ที่เปลี่ยนใหม่เข้า session ที่ยัง active ทันที แทนที่จะรอ token หมดอายุ (§10)</td></tr>
