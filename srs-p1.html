@@ -210,7 +210,7 @@
             <table class="d">
               <thead><tr><th>Table</th><th>ฟิลด์หลัก (required)</th><th>ใช้ทำอะไร</th></tr></thead>
               <tbody>
-                <tr><td>credentials</td><td>user_id · username · password_hash · is_active</td><td>เก็บรหัสผ่าน (hash) แยกจากข้อมูลผู้ใช้</td></tr>
+                <tr><td>credentials</td><td>user_id · username · password_hash · is_active · <span class="mono text-[12px]">must_change_password</span></td><td>เก็บรหัสผ่าน (hash) แยกจากข้อมูลผู้ใช้ — <span class="mono text-[12px]">must_change_password</span> (boolean, default false) บังคับตั้งรหัสผ่านใหม่ในการ login ครั้งถัดไป</td></tr>
                 <tr><td>refresh_tokens</td><td>user_id · token_hash · expires_at · revoked_at</td><td>ต่ออายุ session · เพิกถอนได้</td></tr>
                 <tr><td>login_histories</td><td>user_id · ip_address · user_agent · is_success · logged_in_at</td><td>ประวัติเข้าใช้งาน (สำเร็จ/ล้มเหลว)</td></tr>
                 <tr><td>blocked_users</td><td>user_id · reason · blocked_until · blocked_by</td><td>ล็อกบัญชี (เช่น ใส่รหัสผิดเกินกำหนด)</td></tr>
@@ -239,6 +239,32 @@
               <div class="step"><span class="sn">3</span><p class="text-[13.5px]">ถ้ามี <b>condition</b> → ประเมินกับ context (เจ้าของข้อมูล/สาขา/เวลา/IP)</p></div>
               <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>deny ชนะ allow</b> · ไม่ผ่าน → <span class="mono text-[12px]">403 Forbidden</span></p></div>
             </div>
+          </div>
+
+          <div class="card p-6 mb-6">
+            <div class="mono text-[11px] mb-3" style="color:#2563EB">UC-1.4 · PASSWORD LIFECYCLE (Temp Password · Forced Change · Admin Reset)</div>
+            <p class="text-[13px] mb-4" style="color:var(--ink-soft)">บัญชีใหม่ไม่มีช่องกรอกรหัสผ่านตอนสร้าง — ระบบสุ่มให้เสมอ (ผู้ใช้ไม่มีทางรู้/เลือกรหัสผ่านตัวเองตั้งแต่ต้น) แล้วบังคับเปลี่ยนตั้งแต่ login ครั้งแรก เพื่อไม่ให้รหัสผ่านชั่วคราวที่ Admin เห็นแล้วกลายเป็นรหัสผ่านจริงที่ใช้ต่อเนื่อง</p>
+            <div class="grid lg:grid-cols-3 gap-4">
+              <div>
+                <div class="mono text-[11px] mb-2" style="color:#2563EB">A · สร้างผู้ใช้ใหม่</div>
+                <div class="step"><span class="sn">1</span><p class="text-[13px]">HR/User Admin กรอกฟอร์มผู้ใช้ — <b>ไม่มีช่องรหัสผ่าน</b></p></div>
+                <div class="step"><span class="sn">2</span><p class="text-[13px]">iam สร้าง user แล้วสั่ง auth (ข้าม BC ผ่าน RMQ) สุ่มรหัสผ่าน + สร้าง <span class="mono text-[12px]">credentials</span> แถวใหม่ พร้อม <span class="mono text-[12px]">must_change_password = true</span></p></div>
+                <div class="step"><span class="sn">3</span><p class="text-[13px]">รหัสผ่านที่สุ่มมาแสดง<b>ครั้งเดียว</b>ใน response ของ create (ไม่ persist ที่ iam, เรียกซ้ำไม่ได้อีก) — Admin คัดลอกส่งให้ผู้ใช้เอง</p></div>
+              </div>
+              <div>
+                <div class="mono text-[11px] mb-2" style="color:#2563EB">B · Login ครั้งแรก (บังคับตั้งรหัสใหม่)</div>
+                <div class="step"><span class="sn">1</span><p class="text-[13px]">Login ด้วยรหัสผ่านชั่วคราว → auth ออก token ได้ตามปกติ แต่ตอบ <span class="mono text-[12px]">must_change_password: true</span> ในทั้ง response และ session ใน Redis</p></div>
+                <div class="step"><span class="sn">2</span><p class="text-[13px]"><b>AuthGuard บล็อกทุก endpoint</b> (403 <span class="mono text-[12px]">MUST_CHANGE_PASSWORD</span>) ยกเว้น <span class="mono text-[12px]">POST /auth/change-password</span> · <span class="mono text-[12px]">POST /auth/logout</span> · <span class="mono text-[12px]">GET /auth/me</span> — เช็คนี้ต้องมาก่อน <span class="mono text-[12px]">PermissionGuard</span> เสมอ (แม้ user จะยังไม่มี role/permission ใด ๆ เลยก็ต้องเข้าเปลี่ยนรหัสผ่านได้)</p></div>
+                <div class="step"><span class="sn">3</span><p class="text-[13px]">ตั้งรหัสใหม่สำเร็จ → ล้าง <span class="mono text-[12px]">must_change_password</span> ทั้งที่ DB และทุก active session ของ user คนนั้นทันที (ไม่ต้อง logout/login ใหม่)</p></div>
+              </div>
+              <div>
+                <div class="mono text-[11px] mb-2" style="color:#2563EB">C · Admin รีเซ็ตรหัสผ่าน</div>
+                <div class="step"><span class="sn">1</span><p class="text-[13px]">Security/User Admin กด "รีเซ็ตรหัสผ่าน" ที่แถวผู้ใช้ในหน้า Users (<span class="mono text-[12px]">user_account:reset_password</span>)</p></div>
+                <div class="step"><span class="sn">2</span><p class="text-[13px]">เหมือน flow A — สุ่มรหัสผ่านใหม่ทับของเดิม ตั้ง <span class="mono text-[12px]">must_change_password = true</span> เสมอ และบังคับ session ที่ active ค้างอยู่ให้ต้องเปลี่ยนรหัสทันที (เผื่อผู้ใช้ยัง login ค้างอยู่ตอนโดนรีเซ็ต)</p></div>
+                <div class="step"><span class="sn">3</span><p class="text-[13px]">ใช้ได้ทั้งกรณีลืมรหัสผ่านและกรณีสงสัยว่ารั่ว — ไม่ต้องรู้รหัสผ่านเดิมเลย (ต่างจาก self-service change ใน B ที่ต้องกรอกรหัสผ่านปัจจุบัน)</p></div>
+              </div>
+            </div>
+            <div class="rulebox mt-4"><div class="rc mb-1">RULE · CLIENT ต้องเช็คลำดับเดียวกับ SERVER</div><p class="text-[13.5px]"><span class="mono text-[12px]">bootAdminPage()</span> (<span class="mono text-[12px]">apps/iam/public/pages/user-management/js/shell.service.js</span>) ต้องเช็ค <span class="mono text-[12px]">must_change_password</span> <b>ก่อน</b> เช็ค <span class="mono text-[12px]">pagePermission</span> เสมอ — ถ้าสลับลำดับ ผู้ใช้ใหม่ที่ยังไม่มี role (จึงไม่มี <span class="mono text-[12px]">page:view_dashboard</span>) จะโดน redirect ไปหน้า dashboard ซึ่งเช็คสิทธิ์ไม่ผ่านซ้ำอีก วนลูป redirect ไม่รู้จบ แถมยังไปไม่ถึงหน้าต่างตั้งรหัสผ่านใหม่เลย</p></div>
           </div>
 
           <div class="card p-6 mb-4">
@@ -410,6 +436,7 @@ erDiagram
         string username UK
         string password_hash
         boolean is_active
+        boolean must_change_password "default false"
     }
     REFRESH_TOKENS {
         uuid id PK
@@ -450,7 +477,7 @@ erDiagram
             <table class="d">
               <thead><tr><th style="width:40px">#</th><th style="width:140px">Guard</th><th>ทำอะไร</th></tr></thead>
               <tbody>
-                <tr><td class="mono">1</td><td class="mono" style="color:#2563EB">AuthGuard</td><td>ข้ามถ้า <span class="mono text-[12px]">@Public()</span> หรือ route เป็น <span class="mono text-[12px]">@UseAccessKey()</span> (ปล่อยให้ guard ถัดไปตรวจแทน) · ไม่งั้นอ่าน token จาก <span class="mono text-[12px]">Authorization: Bearer</span> ก่อน แล้ว fallback คุกกี้ <span class="mono text-[12px]">access_token</span> · verify JWT แล้วเช็ค Redis session <span class="mono text-[12px]">session:&lt;jti&gt;</span> ซ้ำ (revoke มีผลทันทีแม้ token ไม่หมดอายุ) · ยังเช็ค <span class="mono text-[12px]">session.expired_at</span> (บัญชีหมดอายุ) ด้วย</td></tr>
+                <tr><td class="mono">1</td><td class="mono" style="color:#2563EB">AuthGuard</td><td>ข้ามถ้า <span class="mono text-[12px]">@Public()</span> หรือ route เป็น <span class="mono text-[12px]">@UseAccessKey()</span> (ปล่อยให้ guard ถัดไปตรวจแทน) · ไม่งั้นอ่าน token จาก <span class="mono text-[12px]">Authorization: Bearer</span> ก่อน แล้ว fallback คุกกี้ <span class="mono text-[12px]">access_token</span> · verify JWT แล้วเช็ค Redis session <span class="mono text-[12px]">session:&lt;jti&gt;</span> ซ้ำ (revoke มีผลทันทีแม้ token ไม่หมดอายุ) · ยังเช็ค <span class="mono text-[12px]">session.expired_at</span> (บัญชีหมดอายุ) ด้วย · ถ้า <span class="mono text-[12px]">session.must_change_password</span> เป็น true จะ<b>ปฏิเสธทุก route ทันที</b> (403 <span class="mono text-[12px]">MUST_CHANGE_PASSWORD</span>) ยกเว้น route ที่ติด <span class="mono text-[12px]">@SkipPasswordChangeCheck()</span> — เช็คนี้มาก่อน <span class="mono text-[12px]">PermissionGuard</span> เสมอ (ดู UC-1.4 §04)</td></tr>
                 <tr><td class="mono">2</td><td class="mono" style="color:#2563EB">AccessKeyGuard</td><td>no-op ยกเว้น route ติด <span class="mono text-[12px]">@UseAccessKey()</span> — ดู RULE · ACCESS KEY ด้านล่าง</td></tr>
                 <tr><td class="mono">3</td><td class="mono" style="color:var(--signal)">CsrfGuard</td><td>double-submit cookie check — รายละเอียดเต็มที่ <a href="#csrf-cookie-auth" style="color:var(--accent);text-decoration:underline">§11</a></td></tr>
                 <tr><td class="mono">4</td><td class="mono" style="color:#15803D">PermissionGuard</td><td>ต้องมี <span class="mono text-[12px]">@RequirePermission()</span> เสมอ (default-deny) เว้นแต่ <span class="mono text-[12px]">@SkipPermissionCheck()</span> — เช็ค <span class="mono text-[12px]">session.permissions</span> ก่อน แล้วค่อย fallback ไปประเมิน ABAC condition แบบ live กับ iam-bc ถ้าเป็น conditional permission</td></tr>
@@ -465,7 +492,7 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · DENY-OVERRIDE</div><p class="text-[13.5px]">รวมสิทธิ์แบบ AWS IAM — ถ้ามี <span class="mono text-[12px]">deny</span> ตรงกับ resource:action ใด ๆ → <b>ปฏิเสธทันที</b> แม้จะมี allow · ไม่มี allow = ปฏิเสธโดยปริยาย (default deny)</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · CONDITION EVAL</div><p class="text-[13.5px]">ประเมิน condition ที่ backend กับ context จริง (<span class="mono text-[12px]">${user.id}</span>, <span class="mono text-[12px]">${user.department}</span>, IP, เวลา) · operator รองรับ StringEquals/StringLike/Numeric*/Date*/IpAddress</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · GUARD ทุก endpoint</div><p class="text-[13.5px]">ทุก endpoint ที่ไม่ public ต้องมี <span class="mono text-[12px]">@RequirePermission('resource:action')</span> · frontend <span class="mono text-[12px]">data-permission</span> เป็น UX เท่านั้น ห้ามใช้แทนการตรวจ backend</p></div>
-            <div class="rulebox"><div class="rc mb-1">RULE · PASSWORD</div><p class="text-[13.5px]">เก็บเฉพาะ <b>hash</b> (bcrypt/argon2) ไม่เก็บ plaintext · ใส่ผิดเกินกำหนด → เพิ่ม <span class="mono text-[12px]">blocked_users</span> · ทุกเหตุการณ์ลง <span class="mono text-[12px]">security_logs</span></p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PASSWORD</div><p class="text-[13.5px]">เก็บเฉพาะ <b>hash</b> (bcrypt/argon2) ไม่เก็บ plaintext · ใส่ผิดเกินกำหนด → เพิ่ม <span class="mono text-[12px]">blocked_users</span> · ทุกเหตุการณ์ลง <span class="mono text-[12px]">security_logs</span> · รหัสผ่านชั่วคราว (สร้างผู้ใช้ใหม่/admin รีเซ็ต) ไม่มีทางถูกเลือกเอง — ระบบสุ่มให้เสมอและบังคับเปลี่ยนตั้งแต่ login ครั้งแรกด้วย <span class="mono text-[12px]">must_change_password</span> (ดู UC-1.4 §04)</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · i18n + BASE ENTITY</div><p class="text-[13.5px]">ชื่อ role/policy/permission ที่แสดงผลเป็น flat column <span class="mono text-[12px]">*_th / *_en</span> ยุบเป็น object ตอน response · ทุกตารางสืบทอด <span class="mono text-[12px]">BaseEntity</span> (audit + soft-delete)</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · UUID + SOURCE OF TRUTH</div><p class="text-[13.5px]"><b>iam เป็นเจ้าของ users</b> · auth และบริการอื่นอ้าง <span class="mono text-[12px]">user_id</span> เป็น UUID · ห้าม FK ข้าม DB · เปลี่ยนสิทธิ์ยิง event ให้บริการ cache สิทธิ์ล้าง/รีเฟรช</p></div>
           </div>
@@ -481,7 +508,7 @@ erDiagram
               <thead><tr><th style="width:170px">หน้า (Page)</th><th style="width:190px">Route</th><th style="width:170px">Page permission</th><th>Component permissions ในหน้านั้น</th></tr></thead>
               <tbody>
                 <tr><td>แดชบอร์ด</td><td><span class="mono text-[12px]">/views/dashboard</span></td><td><span class="mono text-[12px]">page:view_dashboard</span></td><td><span class="mono text-[12px]">component:widget_total_users</span> · <span class="mono text-[12px]">component:widget_total_roles</span> · <span class="mono text-[12px]">component:widget_active_policies</span> · <span class="mono text-[12px]">component:widget_login_graph</span></td></tr>
-                <tr><td>จัดการผู้ใช้งาน</td><td><span class="mono text-[12px]">/views/users</span></td><td><span class="mono text-[12px]">page:view_users</span></td><td><span class="mono text-[12px]">component:btn_add_user</span> · <span class="mono text-[12px]">component:btn_export_users</span></td></tr>
+                <tr><td>จัดการผู้ใช้งาน</td><td><span class="mono text-[12px]">/views/users</span> · <span class="mono text-[12px]">/views/users/new</span> · <span class="mono text-[12px]">/views/users/:id/edit</span></td><td><span class="mono text-[12px]">page:view_users</span></td><td><span class="mono text-[12px]">component:btn_add_user</span> · <span class="mono text-[12px]">component:btn_export_users</span> · <span class="mono text-[12px]">user_account:reset_password</span> <span class="text-[11px]" style="color:var(--muted)">(ปุ่มรีเซ็ตรหัสผ่านต่อแถว — reuse api-plane permission เหมือน roles/policies)</span></td></tr>
                 <tr><td>บทบาท (Roles)</td><td><span class="mono text-[12px]">/views/roles</span></td><td><span class="mono text-[12px]">page:view_roles</span></td><td><span class="mono text-[12px]">role:create</span> <span class="text-[11px]" style="color:var(--muted)">(ปุ่มสร้าง/แก้ไข role — ใช้ api-plane permission ตัวเดียวกับที่ Guard ฝั่ง backend ตรวจ ไม่ได้แยก component:* ใหม่)</span></td></tr>
                 <tr><td>นโยบายความปลอดภัย (Policies)</td><td><span class="mono text-[12px]">/views/policies</span></td><td><span class="mono text-[12px]">page:view_policies</span></td><td><span class="mono text-[12px]">policy:create</span> <span class="text-[11px]" style="color:var(--muted)">(เช่นเดียวกับ roles — reuse api-plane permission)</span></td></tr>
                 <tr><td>จัดการสิทธิ์ (Permissions)</td><td><span class="mono text-[12px]">/views/permissions</span></td><td><span class="mono text-[12px]">page:view_permissions</span></td><td><span class="mono text-[12px]">permission:create</span> · <span class="mono text-[12px]">permission:update</span> · <span class="mono text-[12px]">permission:delete</span> <span class="text-[11px]" style="color:var(--muted)">(ดูรายละเอียด CRUD guard ที่ §09)</span></td></tr>
@@ -850,6 +877,7 @@ sequenceDiagram
                 <tr><td>Double-Submit Cookie</td><td>เทคนิคกัน CSRF — เทียบค่าใน cookie (JS อ่านได้) กับค่าใน request header ให้ตรงกัน เว็บอื่นทำไม่ได้เพราะอ่าน/ตั้ง cookie ข้าม origin ไม่ได้ (§11)</td></tr>
                 <tr><td>Ambient Credential</td><td>credential ที่ browser แนบให้ทุก request เองโดยอัตโนมัติ (เช่น cookie) ต่างจาก Bearer token ที่ต้องแนบเองทาง JS ทุกครั้ง</td></tr>
                 <tr><td>Wildcard (*)</td><td>ครอบทุก resource/action ในกลุ่มนั้น</td></tr>
+                <tr><td>must_change_password</td><td>flag บน <span class="mono text-[12px]">credentials</span> (+ session ใน Redis) บังคับให้ผู้ใช้ตั้งรหัสผ่านใหม่ก่อนใช้งานส่วนอื่นได้ — ตั้งเป็น true เสมอตอนสร้างบัญชีใหม่และตอน admin รีเซ็ตรหัสผ่าน (§04 UC-1.4)</td></tr>
               </tbody>
             </table>
           </div>
