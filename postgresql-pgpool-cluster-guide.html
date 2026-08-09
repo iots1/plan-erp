@@ -33,11 +33,12 @@
       <a href="#config"       class="navlink"><span class="n">05</span> Config ทุกบรรทัด</a>
       <a href="#quorum"       class="navlink"><span class="n">06</span> Watchdog Quorum &amp; VIP</a>
       <a href="#testing"      class="navlink"><span class="n">07</span> ทดสอบ Step-by-Step</a>
-      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 22 ข้อ</a>
+      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 24 ข้อ</a>
       <a href="#verified"     class="navlink"><span class="n">09</span> ผลทดสอบจริง (Verified)</a>
-      <a href="#monitoring"   class="navlink"><span class="n">10</span> Grafana Observability</a>
-      <a href="#status"       class="navlink"><span class="n">11</span> สถานะปัจจุบัน</a>
-      <a href="#reference"    class="navlink"><span class="n">12</span> Reference · Flags/Env</a>
+      <a href="#incident"     class="navlink"><span class="n">10</span> Accident Playbook · Primary ตายจริง</a>
+      <a href="#monitoring"   class="navlink"><span class="n">11</span> Grafana Observability</a>
+      <a href="#status"       class="navlink"><span class="n">12</span> สถานะปัจจุบัน</a>
+      <a href="#reference"    class="navlink"><span class="n">13</span> Reference · Flags/Env</a>
     </nav>
     <div slot="footnote">
       <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
@@ -61,7 +62,7 @@
         </h1>
         <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
           บันทึกการติดตั้งจริงตั้งแต่ 0 พร้อม config ทุกบรรทัด, แผนภาพสถาปัตยกรรม, กลไก watchdog quorum/VIP failover,
-          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">22 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
+          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">24 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
           ผลการทดสอบ kill-test จริงบน production servers, และการเชื่อม Prometheus/Grafana เข้ามา observe cluster —
           ทุกอย่างในเอกสารนี้ <b class="text-white font-medium">ถูกรันจริงและ verify แล้วบน OVH vRack production</b>
           ไม่ใช่ทฤษฎี
@@ -132,7 +133,7 @@
           <div class="card p-6" style="border-left:3px solid var(--signal)">
             <div class="eyebrow text-[var(--signal)] mb-3">✗ สิ่งที่ไม่ได้ (Known Gaps)</div>
             <ul class="space-y-2.5 text-[13.5px]" style="color:var(--ink-soft)">
-              <li class="flex gap-2.5"><span style="color:var(--signal)">✗</span><span><b>ไม่ promote replica เป็น primary อัตโนมัติ</b> ถ้า primary ตายจริง — pgpool routing แค่รอบๆ backend ที่ตายสำหรับ read เท่านั้น primary ตายต้อง <span class="mono text-[12px]">pg_promote()</span> ด้วยมือ (<b>gap ที่เหลืออยู่ตัวเดียวใน stack นี้</b>)</span></li>
+              <li class="flex gap-2.5"><span style="color:var(--signal)">✗</span><span><b>ไม่ promote replica เป็น primary อัตโนมัติ</b> ถ้า primary ตายจริง — pgpool routing แค่รอบๆ backend ที่ตายสำหรับ read เท่านั้น primary ตายต้อง <span class="mono text-[12px]">pg_promote()</span> ด้วยมือ (<b>gap ที่เหลืออยู่ตัวเดียวใน stack นี้</b> — ยืนยันด้วย incident จริงแล้ว ดู §10)</span></li>
               <li class="flex gap-2.5"><span style="color:var(--signal)">✗</span><span><b>ไม่ป้องกัน connection ใหม่คนละตัว</b> อ่านทันทีหลังจาก connection อื่น write เสร็จ — ข้อจำกัดโดยธรรมชาติของ async streaming replication ไม่ใช่สิ่งที่ session-pinning ปิดได้</span></li>
               <li class="flex gap-2.5"><span style="color:var(--signal)">✗</span><span><b>2-node cluster ทนไม่ได้เลย</b> (0 node loss) เว้นแต่เปิด half-votes ซึ่งแลกกับ split-brain risk — ดู §06</span></li>
             </ul>
@@ -785,6 +786,10 @@ AUTH_DB_PORT=5432</pre>
                 <tr><td>DB role <span class="mono text-[12px]">exporter_svc</span></td><td>—</td><td>สร้างบน primary เท่านั้น + <span class="mono text-[12px]">GRANT pg_monitor</span> (built-in role ที่ให้สิทธิ์อ่าน <span class="mono text-[12px]">pg_stat_*</span> ทั้งหมดโดยไม่ต้องเป็น superuser) — replicate ไป replica เอง</td></tr>
                 <tr><td>/etc/systemd/system/<br>{node,postgres,pgpool2}_exporter.service</td><td>—</td><td>unit ของแต่ละ exporter</td></tr>
                 <tr><td>system users</td><td>nologin</td><td>สร้าง <span class="mono text-[12px]">node_exporter</span>, <span class="mono text-[12px]">postgres_exporter</span>, <span class="mono text-[12px]">pgpool_exporter</span></td></tr>
+                <tr><td>/var/lib/node_exporter/<br>textfile_collector/</td><td>0755</td><td>ทุก role — dir ที่ node_exporter อ่าน metric เพิ่มเติมจากไฟล์ (ยังว่างเปล่ายกเว้น role=pgpool)</td></tr>
+                <tr><td>/usr/local/bin/<br>pgpool-watchdog-exporter.sh</td><td>0755</td><td>เฉพาะ <span class="mono text-[12px]">--role=pgpool</span> — generate โดย script เอง เขียน <span class="mono text-[12px]">pgpool_watchdog_*</span> gauges ลง textfile_collector ทุก 15 วิ (§10)</td></tr>
+                <tr><td>/etc/systemd/system/<br>pgpool-watchdog-exporter.{service,timer}</td><td>—</td><td>เฉพาะ pgpool — timer เรียก service ทุก 15 วิ</td></tr>
+                <tr><td>pgpool <span class="mono text-[12px]">pool_passwd</span></td><td>—</td><td>เฉพาะ pgpool — ลงทะเบียน <span class="mono text-[12px]">exporter_svc</span> ให้เองผ่าน <span class="mono text-[12px]">pg_enc</span> (เดิมเป็นขั้นตอนมือ — ดู §10)</td></tr>
               </tbody>
             </table>
           </div>
@@ -1501,7 +1506,7 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
 
       <section id="bugs" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">08 — บั๊กที่เจอระหว่าง Implement</div>
-        <h2 class="display text-3xl mb-6">22 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
+        <h2 class="display text-3xl mb-6">24 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           บันทึกไว้ให้ครบเพื่อกันคนถัดไป (หรือตัวเราเองตอน re-provision) เจอปัญหาเดิมซ้ำแบบช้าๆ — ทั้งหมดถูกแก้ฝังอยู่ใน
           <span class="mono text-[13px]">install-postgresql.sh</span>/<span class="mono text-[13px]">install-pgpool.sh</span>
@@ -1662,6 +1667,29 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
           </div>
         </div>
 
+        <div class="eyebrow text-[var(--muted)] mb-3">Post-Incident Rebuild — เจอตอน primary ตายจริงแล้ว rebuild cluster (#23–24, ดู §10)</div>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th style="width:36px">#</th><th>อาการ</th><th>สาเหตุ</th><th>วิธีแก้</th></tr></thead>
+              <tbody>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>23</td>
+                  <td><span class="mono text-[11.5px]">pg_basebackup</span> โคลนข้อมูลสำเร็จครบ (100%) แต่ <span class="mono text-[11.5px]">systemctl start postgresql@18-main</span> fail ทันทีหลังจากนั้นด้วย <span class="mono text-[11.5px]">Job ... failed because the service did not take the steps required</span></td>
+                  <td><span class="mono text-[11.5px]">configure_replica()</span> สร้าง <span class="mono text-[11.5px]">$DATA_DIR</span> ใหม่ด้วย <span class="mono text-[11.5px]">install -d -o postgres -g postgres</span> โดยไม่ใส่ <span class="mono text-[11.5px]">-m 0700</span> — ได้ permission default 0755 (group/world readable) PostgreSQL 18 ปฏิเสธ start ทันทีด้วย <span class="mono text-[11.5px]">data directory has group or world access</span> (log อยู่ใน journalctl ไม่ใช่ output ของ script เอง เลยดูเหมือน clone มีปัญหา ทั้งที่ clone ผ่านสมบูรณ์)</td>
+                  <td>เพิ่ม <span class="mono text-[11.5px]">-m 0700</span> ให้ <span class="mono text-[11.5px]">install -d</span> — แก้แล้วใน script เวอร์ชันปัจจุบัน</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>24</td>
+                  <td>rebuild replica ครบ + <span class="mono text-[11.5px]">pg_stat_replication</span> เขียว 100% แล้ว แต่ query ผ่าน VIP <b>ค้างไม่ตอบเลย</b> (ไม่ error ไม่ timeout สั้นๆ แค่แขวนเฉยๆ)</td>
+                  <td><span class="mono text-[11.5px]">pcp_attach_node</span> ทำแค่ node ที่เป็น primary เดิม (node ที่ crash) — แต่ตอน primary ตายจริง (ไม่ใช่แค่ pgpool node ตาย) pgpool มาร์ค <b>sticky DOWN พร้อมกันทั้ง node เดิมและ node ที่กลายเป็น primary ใหม่</b> (เพราะตอนที่ยัง down อยู่ pgpool มองไม่เห็น primary ตัวไหนเลยสักตัว) ต่างจากบั๊ก #14/#20 เดิมที่เป็น sticky-down ของ node เดียว — ทำให้เหลือ backend ที่ pgpool มองว่า "up" จริงไม่ครบพอจะ route connection</td>
+                  <td>เช็ค <span class="mono text-[11.5px]">pcp_node_info -n &lt;id&gt; -v</span> <b>ทุก node</b> ไม่ใช่แค่ node ที่เพิ่งตาย หลัง primary-death incident — <span class="mono text-[11.5px]">Status Name: down</span> ที่ขัดกับ <span class="mono text-[11.5px]">Backend Status Name: up</span> คือสัญญาณต้อง <span class="mono text-[11.5px]">pcp_attach_node</span> node นั้น ไม่ว่าจะเป็น node ไหนก็ตาม</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="rulebox ok">
           <div class="rc mb-1">รูปแบบร่วมของบั๊ก #15–18</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
@@ -1787,9 +1815,232 @@ sequenceDiagram
 
       <div class="rule my-14"></div>
 
+      <!-- ========== 10 INCIDENT / ACCIDENT PLAYBOOK ========== -->
+      <section id="incident" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — Accident Playbook</div>
+        <h2 class="display text-3xl mb-6">เคสจริง: Primary (ppm) ตายจริง → Manual Promote → Rebuild Cluster</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <span class="mono text-[13px]">2026-08-09</span> — ทดสอบ <span class="mono text-[13px]">stop</span>
+          PostgreSQL บน <span class="mono text-[13px]">ovh-ppm</span> (primary จริง ไม่ใช่แค่ pgpool node) เพื่อดูว่า
+          replica จะถูก promote ขึ้นมาแทนอัตโนมัติไหม — คำตอบคือ<b>ไม่</b> ตรงตาม Known Gap ที่ระบุไว้ตั้งแต่ §01:
+          Pgpool-II ไม่มี concept ของ automatic PostgreSQL failover ในตัว มันจัดการแค่ VIP/pgpool-layer เท่านั้น
+          ผู้ดูแล promote <span class="mono text-[13px]">ppr1</span> เป็น primary ด้วยมือ แล้วต้อง rebuild ส่วนที่เหลือของ
+          cluster เอง — บันทึกนี้คือ runbook จริงที่ใช้กู้คืน พร้อม output จริงและบั๊กที่เจอเพิ่มระหว่างทาง (#23–24 ใน §08)
+        </p>
+
+        <div class="rulebox mb-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">อันตรายที่เจอจริง: split-brain window ตอน ppm ฟื้นขึ้นมาเอง</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            หลัง <span class="mono text-[12px]">ppr1</span> ถูก promote แล้ว เครื่อง <span class="mono text-[12px]">ppm</span>
+            เดิมก็ boot กลับมาเองพร้อมยัง<b>คิดว่าตัวเองเป็น primary อยู่</b> (<span class="mono text-[12px]">pg_is_in_recovery() = f</span>)
+            — pgpool ไม่ demote node ที่กลับมาให้อัตโนมัติ ผลคือมี PostgreSQL instance สองตัวที่เชื่อว่าตัวเองเป็น primary
+            พร้อมกันจริงๆ ถ้ามีการเขียนตรงเข้า ppm (ข้าม VIP) ข้อมูลจะแยก timeline ถาวร กู้คืนไม่ได้ —
+            <b>ขั้นแรกสุดของการกู้คืนเสมอคือ stop node เดิมทันทีก่อนทำอย่างอื่น</b> ไม่ใช่รอตัดสินใจ topology ให้เสร็จก่อน
+          </p>
+        </div>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+    participant Op as ผู้ดูแล
+    participant PPM as ppm (primary เดิม)
+    participant PPR1 as ppr1 (จะ promote)
+    participant PPR2 as ppr2
+    participant PP as pgpool cluster / VIP
+
+    Op->>PPM: systemctl stop postgresql (ทดสอบ)
+    PP--xPPM: health check ล้มเหลว
+    Op->>PPR1: pg_promote()
+    Note over PPR1: pg_is_in_recovery() = f (primary ใหม่)
+    Note over PPR2: ยัง primary_conninfo ชี้ ppm เดิม — sync หยุดนิ่ง
+    PPM-->>PPM: boot กลับมาเอง (นอกแผน)
+    Note over PPM: ยังคิดว่าตัวเองเป็น primary — SPLIT-BRAIN WINDOW
+    Op->>PPM: stop ทันที (กันเขียนซ้ำ)
+    Op->>PPR1: install-postgresql.sh --mode=primary (เติม hba+slot ให้ครบ ไม่ wipe)
+    Op->>PPM: install-postgresql.sh --mode=replica --force (wipe + re-clone จาก ppr1)
+    Op->>PPR2: install-postgresql.sh --mode=replica --force (wipe + re-clone จาก ppr1)
+    PPR1--)PPM: streaming replication ใหม่
+    PPR1--)PPR2: streaming replication ใหม่
+    Op->>PP: pcp_attach_node ทุก node (ไม่ใช่แค่ node ที่ตาย — บั๊ก #24)
+    PP-->>Op: show pool_nodes: ppr1=primary, ppm/ppr2=standby, ทั้งหมด up
+</pre>
+        </div>
+
+        <!-- STEP I1 -->
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">หยุด node เดิมทันที — ก่อนตัดสินใจอะไรทั้งนั้น</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">ไม่ต้องรอเลือก topology สุดท้ายก่อน — นี่คือ action เดียวที่ต้องทำทันทีเสมอเพื่อกัน split-brain ลุกลาม</p>
+          <div class="code p-5">
+<pre>ssh ovh-ppm <span class="s">"sudo systemctl stop postgresql@18-main"</span></pre>
+          </div>
+        </div>
+
+        <!-- STEP I2 -->
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">เลือก topology สุดท้าย แล้วตั้ง replica ที่ promote แล้วให้เป็น primary อย่างเป็นทางการ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            สองทางเลือก: (a) ยอมรับ node ที่ promote ไปแล้วเป็น primary ถาวร — เสี่ยงน้อยสุด ใช้เวลาน้อยสุด (แนะนำ)
+            หรือ (b) วางแผน switchover กลับไปที่ node เดิมภายหลัง (ต้องทำ 2 รอบ เสี่ยงกว่า) — เคสนี้เลือก (a)<br>
+            node ที่ promote แล้ว (<span class="mono text-[12px]">ppr1</span>) ยังไม่มี pg_hba/slot สำหรับให้ node อื่น stream
+            ออกจากมัน (มันถูกติดตั้งมาเป็น <span class="mono text-[12px]">--mode=replica</span> ตั้งแต่แรก) — รัน
+            <span class="mono text-[12px]">--mode=primary</span> ซ้ำเพื่อเติมส่วนที่ขาด <b>ไม่ wipe ข้อมูลใดๆ</b>
+            (idempotent ตามที่ระบุไว้ใน §03)
+          </p>
+          <div class="code p-5">
+<pre>scp scripts/install-postgresql.sh ovh-ppr1:/tmp/
+ssh -t ovh-ppr1 <span class="s">"sudo /tmp/install-postgresql.sh --mode=primary \
+  --allowed-cidrs=172.16.0.0/24 \
+  --app-cidrs=172.16.0.0/24 \
+  --replication-slot=ppm_slot,ppr2_slot"</span>
+
+<span class="c"># เก็บรหัส replication ใหม่ที่ script generate ให้ ไปใช้ clone ต่อ</span>
+REPL_PW=$(ssh -t ovh-ppr1 <span class="s">"sudo cat /root/.pg_replication/replicator.password"</span> | tail -1 | tr -d <span class="s">'\r\n'</span>)
+[ <span class="s">"${#REPL_PW}"</span> -eq 24 ] &amp;&amp; <span class="k">echo</span> ok || <span class="k">echo</span> <span class="s">"ABORT: captured ${#REPL_PW} chars, expected 24"</span></pre>
+          </div>
+          <div class="edge mt-3">
+            <div class="tag mb-1">การ capture รหัสผ่าน SSH -t เสี่ยงพังเงียบๆ — ตรวจความยาวก่อนใช้เสมอ</div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">ssh -t</span> ต้องมี pty เพื่อให้ <span class="mono text-[12px]">sudo</span>
+              prompt รหัสได้ แต่ pty เดียวกันนั้นทำให้ <span class="mono text-[12px]">$(...)</span> capture ปน prompt
+              text/control character เข้ากับผลลัพธ์จริงได้ — รหัส 24 ตัวอักษรที่ generate ด้วย
+              <span class="mono text-[12px]">generate_password()</span> กลายเป็นค่าที่ผิดแบบไม่มี error ให้เห็น แล้วไปพังตอน
+              <span class="mono text-[12px]">pg_basebackup</span> ด้วย <span class="mono text-[12px]">FATAL: password authentication failed</span>
+              ที่ดูเหมือนรหัสผิดทั้งที่จริงคือ capture พัง เช็คความยาวก่อน (หรือ copy ด้วยมือ) เสมอ
+            </p>
+          </div>
+        </div>
+
+        <!-- STEP I3 -->
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">Wipe + re-clone node เดิมและ replica ที่เหลือ ให้เป็น replica ของ primary ใหม่</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ข้อมูลบน <span class="mono text-[12px]">ppm</span> เดิม diverge จาก timeline ใหม่ที่เกิดตอน promote แล้ว
+            <b>ใช้ต่อไม่ได้</b> — ส่วน <span class="mono text-[12px]">ppr2</span> ยังชี้ <span class="mono text-[12px]">primary_conninfo</span>
+            ไปที่ ppm เดิมและไม่มี slot บน primary ใหม่ wipe + re-clone ทั้งคู่จาก <span class="mono text-[12px]">ppr1</span>
+            ปลอดภัยกว่าลอง repoint เฉยๆ (ตัด edge case เรื่อง WAL segment ที่อาจถูก recycle ไปแล้ว)
+          </p>
+          <div class="code p-5">
+<pre>scp scripts/install-postgresql.sh ovh-ppm:/tmp/
+ssh -t ovh-ppm <span class="s">"sudo /tmp/install-postgresql.sh --mode=replica \
+  --primary-host=172.16.0.222 --repl-password='$REPL_PW' \
+  --replication-slot=ppm_slot \
+  --app-cidrs=172.16.0.0/24 --force"</span>
+
+scp scripts/install-postgresql.sh ovh-ppr2:/tmp/
+ssh -t ovh-ppr2 <span class="s">"sudo /tmp/install-postgresql.sh --mode=replica \
+  --primary-host=172.16.0.222 --repl-password='$REPL_PW' \
+  --replication-slot=ppr2_slot \
+  --app-cidrs=172.16.0.0/24 --force"</span></pre>
+          </div>
+          <div class="edge mt-3" style="border-color:var(--signal)">
+            <div class="tag mb-1" style="color:var(--signal)">เจอจริง (บั๊ก #23): clone สำเร็จ 100% แต่ service start ไม่ขึ้น</div>
+            <p class="text-[13px]">
+              ทั้งสอง re-clone จบด้วย <span class="mono text-[12px]">88843/88843 kB (100%)</span> ปกติ แต่
+              <span class="mono text-[12px]">Job for postgresql@18-main.service failed because the service did not take
+              the steps required</span> — สาเหตุคือ data directory ที่สร้างใหม่ได้ permission 0755 (default ของ
+              <span class="mono text-[12px]">install -d</span> ไม่มี <span class="mono text-[12px]">-m</span>) แทนที่จะเป็น
+              0700 ที่ PG18 บังคับ แก้ไม่ต้อง re-clone ใหม่:
+            </p>
+            <div class="code p-4 mt-3">
+<pre>ssh ovh-ppm <span class="s">"sudo chmod 700 /var/lib/postgresql/18/main &amp;&amp; sudo systemctl start postgresql@18-main"</span>
+ssh ovh-ppr2 <span class="s">"sudo chmod 700 /var/lib/postgresql/18/main &amp;&amp; sudo systemctl start postgresql@18-main"</span></pre>
+            </div>
+            <p class="text-[13px] mt-2">
+              <span class="mono text-[13px]">install-postgresql.sh</span> เวอร์ชันปัจจุบันแก้แล้ว (<span class="mono text-[12px]">install -d -m 0700 ...</span>) — รันใหม่จะไม่เจอปัญหานี้อีก
+            </p>
+          </div>
+        </div>
+
+        <!-- STEP I4 -->
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยืนยัน replication กลับมาครบก่อนแตะ pgpool</h3>
+          <div class="code p-5 mb-3">
+<pre>ssh ovh-ppr1 <span class="s">"sudo -u postgres psql -c \"SELECT application_name, client_addr, state, sync_state, replay_lag FROM pg_stat_replication;\""</span></pre>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ผลจริงที่ได้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              2 แถว (172.16.0.221 = ppm, 172.16.0.223 = ppr2) ทั้งคู่ <span class="mono text-[12px]">state=streaming</span>,
+              <span class="mono text-[12px]">sync_state=async</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- STEP I5 -->
+        <div class="step">
+          <span class="sn">5</span>
+          <h3 class="font-semibold text-[16px] mb-2">Re-attach ทุก backend ใน pgpool — ไม่ใช่แค่ node ที่ตาย</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">หา node ที่ถือ VIP อยู่ก่อน แล้วยิง <span class="mono text-[12px]">pcp_attach_node</span> จากที่นั่น</p>
+          <div class="code p-5 mb-3">
+<pre><span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
+  <span class="k">echo</span> -n <span class="s">"$h: "</span><span class="k">;</span> ssh <span class="s">"$h"</span> <span class="s">"ip -4 addr show | grep -c 172.16.0.226"</span>
+<span class="k">done</span>
+<span class="c"># → ovh-pgpool2: 1 (leader)</span>
+
+ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+  pcp_node_info -h localhost -p 9898 -U pgpool_admin -w -n 0 -v"</span></pre>
+          </div>
+          <div class="edge mt-3" style="border-color:var(--signal)">
+            <div class="tag mb-1" style="color:var(--signal)">เจอจริง (บั๊ก #24): sticky-DOWN ค้างพร้อมกัน 2 node ไม่ใช่แค่ node ที่ตาย</div>
+            <p class="text-[13px]">
+              เช็คแค่ node0 (ppm, node ที่ crash) แล้ว attach คิดว่าจบ — แต่ตรวจ node1/node2 ด้วยพบว่า
+              <span class="mono text-[12px]">Status Name: down</span> ค้างอยู่ทั้งคู่เช่นกัน ทั้งที่
+              <span class="mono text-[12px]">Backend Status Name: up</span> และ role ถูกต้อง เหตุผล: ตอนช่วง primary ตายจริง
+              pgpool มองไม่เห็น primary ตัวไหนเลยสักตัว (ไม่ใช่แค่ node เดิม) เลย mark down พร้อมกันทั้งคู่ — connection ผ่าน
+              VIP เลย<b>ค้างเฉยๆ ไม่ error ไม่ timeout สั้นๆ</b> เพราะ pgpool routing ไม่มี backend ที่ใช้ได้จริงสักตัว ต้อง
+              attach ให้ครบทั้ง 3:
+            </p>
+            <div class="code p-4 mt-3">
+<pre><span class="k">for</span> n <span class="k">in</span> 0 1 2<span class="k">;</span> <span class="k">do</span>
+  ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+    pcp_attach_node -h localhost -p 9898 -U pgpool_admin -w -n $n"</span>
+<span class="k">done</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP I6 -->
+        <div class="step">
+          <span class="sn">6</span>
+          <h3 class="font-semibold text-[16px] mb-2">ผลลัพธ์สุดท้าย — verified</h3>
+          <div class="card overflow-hidden mb-4">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>Node</th><th>Host</th><th>Status</th><th>Backend Status</th><th>Role</th></tr></thead>
+                <tbody>
+                  <tr><td>0</td><td>ppm · 172.16.0.221</td><td>up</td><td>up</td><td>standby</td></tr>
+                  <tr><td>1</td><td>ppr1 · 172.16.0.222</td><td>up</td><td>up</td><td><b>primary</b></td></tr>
+                  <tr><td>2</td><td>ppr2 · 172.16.0.223</td><td>up</td><td>up</td><td>standby</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="text-[13px] mb-3" style="color:var(--ink-soft)">
+            หลัง re-attach ครบ VIP กลับมาตอบ query ปกติทันที (ก่อนหน้านี้ค้างเฉยๆ ตามบั๊ก #24) — ยืนยันด้วย
+            <span class="mono text-[12px]">psql -h 172.16.0.226 ...</span> จาก client ภายนอก
+          </p>
+        </div>
+
+        <div class="rulebox mt-8">
+          <div class="rc mb-1">สิ่งที่เคสนี้ยืนยัน — และยังไม่แก้</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ยืนยัน Known Gap ใน §01/§11 ตรงตามที่เขียนไว้เป๊ะ: PostgreSQL primary failover <b>ไม่</b>อัตโนมัติ ต้องมีคน
+            ตัดสินใจ promote และรัน rebuild runbook นี้ด้วยมือเสมอ (ทั้งกระบวนการใช้เวลาหลายนาที ไม่ใช่วินาทีแบบ VIP
+            failover ที่ §07 T9/§09 Test 2) — ถ้าต้องการปิด gap นี้จริง ต้องเพิ่ม tool แยกมาคุมชั้น PostgreSQL replication
+            โดยเฉพาะ (เช่น Patroni หรือ repmgr) ซึ่งอยู่นอก scope ของ Pgpool-II เอง
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
       <!-- ========== 08 MONITORING ========== -->
       <section id="monitoring" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">10 — Grafana Observability</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">11 — Grafana Observability</div>
         <h2 class="display text-3xl mb-6">Prometheus Exporters ทุก Host → Grafana Dashboard เดียว</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           <span class="mono text-[13px]">scripts/install-monitoring-exporters.sh</span> (pattern เดียวกับสอง script
@@ -1846,27 +2097,29 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
         </div>
 
         <div class="rulebox mb-6">
-          <div class="rc mb-1">2 ขั้นตอนที่ต้องทำมือเสมอ (script ไม่ทำให้อัตโนมัติ)</div>
-          <ol class="text-[13.5px] space-y-2 pl-5 list-decimal" style="color:var(--ink-soft)">
-            <li>
-              <b>pg_hba.conf</b> บน ppm/ppr1/ppr2 มีแค่ rule สำหรับ user <span class="mono text-[12px]">postgres</span>
-              (จาก <span class="mono text-[12px]">install-postgresql.sh --app-cidrs</span>) — pgpool ต่อ backend
-              <i>ในนาม</i> <span class="mono text-[12px]">exporter_svc</span> ต้องมี rule ของตัวเอง:
-              <span class="mono text-[12px]">host all exporter_svc 172.16.0.0/24 scram-sha-256</span> แล้ว
-              <span class="mono text-[12px]">systemctl reload postgresql@18-main</span>
-            </li>
-            <li>
-              <b>pool_passwd</b> บนทุก pgpool node — pgpool auth เข้า backend ด้วยสำเนา AES ของรหัสผ่านตัวเอง
-              (ดูบั๊ก #9) ดังนั้น <span class="mono text-[12px]">exporter_svc</span> ต้องผ่าน treatment เดียวกับที่
-              <span class="mono text-[12px]">postgres</span> ได้ตอน install-pgpool.sh รันครั้งแรก:
-              <span class="mono text-[12px]">pg_enc -k /etc/pgpool2/.pgpoolkey -m -u exporter_svc -f /etc/pgpool2/pgpool.conf "$EXPPW"</span>
-              — เป็น <b>per-node state</b> ต้องทำซ้ำทุก pgpool node ใหม่ที่เพิ่มเข้ามา
-            </li>
-          </ol>
-          <p class="text-[13.5px] mt-3" style="color:var(--ink-soft)">
-            ข้ามขั้นตอนที่สองแล้ว <span class="mono text-[12px]">pgpool2_exporter</span> จะติด retry loop log
-            <span class="mono text-[12px]">failed to authenticate with backend using SCRAM</span> ไม่มีวันจบ —
-            <span class="mono text-[12px]">node_exporter</span> ทำงานปกติทันทีเลยบัง gap นี้ได้ง่ายมาก
+          <div class="rc mb-1">1 ขั้นตอนที่ยังต้องทำมือ (script ไม่ทำให้อัตโนมัติ)</div>
+          <p class="text-[13.5px]" style="color:var(--ink-soft)">
+            <b>pg_hba.conf</b> บน ppm/ppr1/ppr2 มีแค่ rule สำหรับ user <span class="mono text-[12px]">postgres</span>
+            (จาก <span class="mono text-[12px]">install-postgresql.sh --app-cidrs</span>) — pgpool ต่อ backend
+            <i>ในนาม</i> <span class="mono text-[12px]">exporter_svc</span> ต้องมี rule ของตัวเอง:
+            <span class="mono text-[12px]">host all exporter_svc 172.16.0.0/24 scram-sha-256</span> แล้ว
+            <span class="mono text-[12px]">systemctl reload postgresql@18-main</span> — ยังต้อง SSH ไปแก้คนละ host
+            (PostgreSQL) จาก host ที่รันสคริปต์นี้อยู่ (pgpool) จึงไม่ automate ให้
+          </p>
+        </div>
+
+        <div class="rulebox ok mb-6">
+          <div class="rc mb-1">pool_passwd — เดิมต้องทำมือ ตอนนี้ automate แล้ว</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            pgpool auth เข้า backend ด้วยสำเนา AES ของรหัสผ่านตัวเอง (ดูบั๊ก #9) ดังนั้น
+            <span class="mono text-[12px]">exporter_svc</span> ต้องผ่าน treatment เดียวกับที่
+            <span class="mono text-[12px]">postgres</span> ได้ตอน <span class="mono text-[12px]">install-pgpool.sh</span>
+            รันครั้งแรก — เดิมเป็นขั้นตอนมือแยกต่างหาก (ทำให้ครั้งก่อนหน้า pgpool3 ติด retry loop log
+            <span class="mono text-[12px]">failed to authenticate with backend using SCRAM</span> ไม่มีวันจบ เพราะ
+            <span class="mono text-[12px]">node_exporter</span> ทำงานปกติทันทีจนบัง gap นี้ได้ง่ายมาก) ตอนนี้
+            <span class="mono text-[12px]">install-monitoring-exporters.sh --role=pgpool</span> เรียก
+            <span class="mono text-[12px]">pg_enc</span> ให้เองอัตโนมัติทันทีหลัง <span class="mono text-[12px]">ensure_monitoring_role</span>
+            — ไม่ต้องทำมืออีกต่อไป แม้เป็น pgpool node ใหม่ที่เพิ่งเพิ่มเข้ามาก็ตาม
           </p>
         </div>
 
@@ -1884,10 +2137,96 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
           </p>
         </div>
 
+        <div class="eyebrow text-[var(--muted)] mb-4">Watchdog Leader/Quorum — แยกดูทีละ pgpool node ไม่ใช่แค่ cluster เฉลี่ย</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          <span class="mono text-[13px]">pgpool2_exporter</span> รัน SQL <span class="mono text-[13px]">SHOW</span>
+          ต่อ pgpool ในเครื่องเท่านั้น — <b>ไม่มี PCP client อยู่ในตัวเลย</b> จึงไม่มี metric อะไรเกี่ยวกับ watchdog
+          state เลยสักตัว: node ไหนเป็น LEADER ตอนนี้, node นี้เห็น quorum อยู่ไหม, เห็น member ที่ยังมีชีวิตกี่ตัว —
+          บน cluster หลาย node "ใครคือ leader ตอนนี้" คือข้อมูลระดับ per-node ที่สำคัญที่สุด และไม่มี metric
+          upstream ให้เลย
+        </p>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          <span class="mono text-[13px]">install-monitoring-exporters.sh --role=pgpool</span> ปิดช่องว่างนี้ด้วย
+          node_exporter <b>textfile collector</b> ตัวเล็กๆ — สคริปต์ที่ generate ไว้
+          (<span class="mono text-[13px]">/usr/local/bin/pgpool-watchdog-exporter.sh</span>) รันทุก 15 วินาทีผ่าน
+          systemd timer เรียก <span class="mono text-[13px]">pcp_watchdog_info -v</span> (คำสั่งเดียวกับที่ใช้ทั้งเอกสารนี้)
+          แล้วเขียนเป็น gauge ลง
+          <span class="mono text-[13px]">/var/lib/node_exporter/textfile_collector/pgpool_watchdog.prom</span> ให้
+          node_exporter เสิร์ฟผ่าน <span class="mono text-[13px]">:9100</span> เดิม — ไม่ต้องเปิดพอร์ตใหม่ ไม่ต้องเพิ่ม
+          scrape target ใน <span class="mono text-[13px]">prometheus.yml</span> เลย
+        </p>
+
+        <div class="card overflow-hidden mb-6">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>Metric</th><th>ความหมาย</th></tr></thead>
+              <tbody>
+                <tr><td>pgpool_watchdog_is_leader</td><td>1 ถ้า pgpool node <b>นี้</b> เป็น watchdog leader ตอนนี้ ไม่งั้น 0</td></tr>
+                <tr><td>pgpool_watchdog_quorum_exist</td><td>1 ถ้า node นี้เห็นว่า cluster มี quorum ตอนนี้</td></tr>
+                <tr><td>pgpool_watchdog_member_nodes</td><td>จำนวน member ที่ยังมีชีวิตที่ node นี้เห็น (รวมตัวเอง)</td></tr>
+                <tr><td>pgpool_watchdog_nodes_required_for_quorum</td><td>จำนวน node ที่ต้องมีชีวิตเพื่อให้ quorum (มุมมองจาก node นี้)</td></tr>
+                <tr><td>pgpool_watchdog_scrape_success</td><td>0 ถ้าเรียก pcp_watchdog_info ไม่สำเร็จเอง (เช่น .pcppass ผิด)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox mb-6">
+          <div class="rc mb-1">บั๊กที่จับได้ก่อน deploy — parse ผิดจะทำให้ is_leader เป็น 0 ตลอดทุก node</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            วิธี parse แบบไร้เดียงสา (<span class="mono text-[12px]">awk -F': *'</span> ตัดทุกจุดที่เจอ colon) ผิด —
+            บรรทัด <span class="mono text-[12px]">Leader Node Name</span> มี<b>ค่า</b>ที่มี colon อยู่ในตัวเองด้วย
+            (<span class="mono text-[12px]">172.16.0.119:5432 Linux pgpool2</span>) ทำให้
+            <span class="mono text-[12px]">-F': *'</span> ตัดค่าที่จับได้เหลือแค่ IP ตัดชื่อ hostname ทิ้งไปเงียบๆ —
+            ซึ่ง <span class="mono text-[12px]">grep -qw</span> ที่เช็ค leader ต้องใช้ชื่อ hostname นั้นเทียบ ทำให้
+            <span class="mono text-[12px]">pgpool_watchdog_is_leader</span> จะอ่านเป็น 0 <b>ทุก node ตลอดเวลา</b>
+            ถ้าไม่จับได้ — เจอจากการทดสอบ parser กับ output จริงของ <span class="mono text-[12px]">pcp_watchdog_info -v</span>
+            ทั้งกรณี node ที่เป็น leader และ standby ก่อน deploy จริง แก้ด้วย
+            <span class="mono text-[12px]">sed -n 's/^Leader Node Name *: *//p'</span> (anchor ที่ key ตรงๆ ไม่ใช่ตัด
+            colon ทุกจุด)
+          </p>
+        </div>
+
+        <div class="rulebox ok mb-8">
+          <div class="rc mb-1">ยืนยันจริงบน production (2026-08-09)</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <span class="mono text-[12px]">curl :9100/metrics | grep pgpool_watchdog_is_leader</span> บนทั้ง 3 node
+            ได้ค่า <span class="mono text-[12px]">1</span> เจอที่เดียวเท่านั้น (pgpool2 — leader จริงตอนนั้น) ที่เหลือ
+            <span class="mono text-[12px]">0</span> ทั้งคู่ ตรงกับ <span class="mono text-[12px]">ip addr show | grep &lt;VIP&gt;</span>
+            ที่เช็คแยกอิสระกันเป๊ะ
+          </p>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-4">Panel ที่แก้ระหว่างเพิ่ม per-node visibility</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ตอน audit dashboard เดิมว่า "แยกแต่ละ node ได้ไหม" เจอปัญหาจริง 2 จุด ไม่เกี่ยวกับ metric ใหม่เลย:
+        </p>
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">"Pgpool backends healthy (both nodes' view)"</div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              ชื่อ panel ค้างมาจากตอน cluster มี 2 pgpool node (ตอนนี้มี 3) และ query
+              <span class="mono text-[12px]">avg(pgpool2_backend_used)</span> เฉลี่ยรวมทุก node บัง node ที่เห็นไม่ตรงกับตัวอื่น
+              — เปลี่ยนชื่อให้ชัดว่าเป็นค่าเฉลี่ยทั้ง cluster เท่านั้น ส่วนแยกราย node ไปดูที่แถว Watchdog ด้านบนแทน
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">"Backend status by node (1=up)"</div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              query เดิมคือ <span class="mono text-[12px]">pgpool2_backend_by_process_used_ratio</span> ซึ่ง
+              <b>ไม่ใช่</b> backend up/down เลย — เป็น connection-pool utilization ต่อ worker process
+              (label แค่ <span class="mono text-[12px]">pool_pid</span>) ชื่อ panel ไม่ตรงกับ metric ที่วาดมาตลอด
+              เปลี่ยนเป็น <span class="mono text-[12px]">pgpool2_pool_nodes_status{hostname,port,role}</span> +
+              legend <span class="mono text-[12px]">{{instance}} → {{hostname}} ({{role}})</span> ทำให้เห็นครบ
+              9 เส้น (3 pgpool instance × 3 backend) แยกกันชัด ไม่ใช่ทับกันเหลือ 3
+            </p>
+          </div>
+        </div>
+
         <div class="eyebrow text-[var(--muted)] mb-4">Grafana Dashboard · uid <span class="mono text-[13px]">pg-pgpool-cluster</span></div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
           <span class="mono text-[13px]">infrastructure/observability/grafana-dashboards/postgresql-pgpool-cluster.json</span>
-          — provision อัตโนมัติผ่าน <span class="mono text-[13px]">grafana-dashboards.yaml</span> แบ่งเป็น 4 แถว รวม 15 panel:
+          — provision อัตโนมัติผ่าน <span class="mono text-[13px]">grafana-dashboards.yaml</span> แบ่งเป็น 5 แถว รวม 18 panel:
         </p>
 
         <div class="grid sm:grid-cols-2 gap-5 mb-8">
@@ -1895,15 +2234,22 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             <div class="eyebrow text-[var(--accent)] mb-3">Cluster Overview</div>
             <ul class="text-sm space-y-1.5" style="color:var(--ink-soft)">
               <li>• PostgreSQL backends up (stat)</li>
-              <li>• Pgpool backends healthy — จาก node ทั้งสองมุมมอง (stat)</li>
+              <li>• Pgpool backends healthy — cluster avg ทุก pgpool node (stat)</li>
               <li>• Current PostgreSQL primary (stat)</li>
               <li>• Max replication lag (stat)</li>
+            </ul>
+          </div>
+          <div class="card p-6" style="border-left:3px solid var(--accent)">
+            <div class="eyebrow text-[var(--accent)] mb-3">Watchdog · Leader / Quorum (per node) <span class="mono text-[10px]" style="color:var(--signal)">ใหม่</span></div>
+            <ul class="text-sm space-y-1.5" style="color:var(--ink-soft)">
+              <li>• Watchdog leader per pgpool node (state-timeline)</li>
+              <li>• Watchdog quorum &amp; alive members ต่อ node's own view (timeseries)</li>
             </ul>
           </div>
           <div class="card p-6">
             <div class="eyebrow text-[var(--accent)] mb-3">Pgpool-II — Routing &amp; Pool</div>
             <ul class="text-sm space-y-1.5" style="color:var(--ink-soft)">
-              <li>• Backend status by node (1=up) (timeseries)</li>
+              <li>• Backend status by node, per pgpool instance (1=up) (timeseries) <span class="mono text-[10px]" style="color:var(--signal)">แก้ metric ผิด</span></li>
               <li>• Frontend connections used (timeseries)</li>
               <li>• Query mix — SELECT/INSERT/UPDATE/DELETE rate (timeseries)</li>
               <li>• In-memory query cache hit ratio (timeseries)</li>
@@ -1929,13 +2275,36 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
           </div>
         </div>
 
-        <div class="rulebox">
+        <div class="rulebox mb-6">
           <div class="rc mb-1">สถานะ verify (2026-08-09)</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
             Exporter ติดตั้งและยืนยันครบทั้ง 6 host — Prometheus เห็น <b>13 targets</b> ทั้งหมด
-            <span class="mono text-[12px]">health: up</span> (ก่อน pgpool3 เข้ามามี 11) dashboard render ข้อมูลจริง:
-            <span class="mono text-[12px]">sum(pg_up)=3</span>, <span class="mono text-[12px]">avg(pgpool2_backend_used)=3</span>,
-            <span class="mono text-[12px]">pg_replication_is_replica</span> แสดง ppm=0/replica=1 ถูกต้อง
+            <span class="mono text-[12px]">health: up</span> · deploy watchdog textfile collector ให้ทั้ง 3 pgpool
+            node แล้ว — <span class="mono text-[12px]">pgpool_watchdog_is_leader</span> ยืนยันตรงกับ VIP จริง (§09) ·
+            panel <span class="mono text-[12px]">Backend status by node</span> แก้จาก metric ผิดเป็น
+            <span class="mono text-[12px]">pgpool2_pool_nodes_status</span> แล้ว
+          </p>
+        </div>
+
+        <div class="rulebox">
+          <div class="rc mb-1">Incident จริงที่เจอระหว่างทำงานนี้ (2026-08-09) — ไม่เกี่ยวกับ monitoring เลย</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ระหว่างทดสอบ monitoring เจอว่า <span class="mono text-[12px]">postgresql@18-main</span> บน ppm
+            <span class="mono text-[12px]">inactive</span> — journalctl ยืนยันเป็นการ <span class="mono text-[12px]">systemctl stop</span>
+            ตั้งใจ (authenticated เป็น <span class="mono text-[12px]">unix-user:ppm</span> ผ่าน polkit) ไม่ใช่ crash —
+            operator กำลังทดสอบ manual failover จริง: promote <b>ppr1</b> เป็น primary แล้วชี้ทั้ง ppm/ppr2 กลับไป
+            stream จากมันแทน ผลลัพธ์ตรวจแล้ว: <span class="mono text-[12px]">pg_is_in_recovery()</span> ให้
+            ppm=t/ppr1=f/ppr2=t (primary เดียว ไม่มี split-brain) และ <b>pgpool ไม่ต้อง reconfigure อะไรเลย</b> —
+            <span class="mono text-[12px]">show pool_nodes</span> ผ่าน VIP รายงาน 172.16.0.222 (ppr1) เป็น
+            <span class="mono text-[12px]">role=primary</span> เองทันทีผ่าน <span class="mono text-[12px]">sr_check</span>/<span class="mono text-[12px]">pg_is_in_recovery()</span>
+            ที่มีอยู่แล้ว — คือ payoff ของสถาปัตยกรรมนี้พอดี (§01: pgpool ไม่ hardcode ว่าใครคือ primary) error ของ
+            pgpool3 exporter ที่ไล่อยู่ตอนนั้น (<span class="mono text-[12px]">getsockopt() failed</span> ต่อ
+            172.16.0.221) เป็น<b>อาการ</b>จาก ppm ล่ม ไม่ใช่บั๊กจาก monitoring ที่เพิ่งเพิ่ม — ยืนยันจากการดูมันหายเองพอ
+            ppm กลับมาเป็น replica แล้ว <b>primary ที่ live อยู่ตอนเขียนเอกสารนี้คือ ppr1 ไม่ใช่ ppm</b> — เตือนความจำว่า
+            "primary" เป็น role ที่ย้ายได้ ไม่ใช่ identity คงที่ ทุก diagram/คำสั่งใน §02–§03 ที่พูดถึง "ppm (primary)"
+            คือ topology ตอนเริ่ม setup ไม่ใช่การการันตีว่า live จริงตอนนี้เป็นแบบนั้น — เช็ค
+            <span class="mono text-[12px]">pg_is_in_recovery()</span> หรือ <span class="mono text-[12px]">show pool_nodes</span>
+            เสมอ อย่าเดาจากชื่อ host
           </p>
         </div>
       </section>
@@ -1944,7 +2313,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
 
       <!-- ========== 09 STATUS ========== -->
       <section id="status" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">11 — สถานะปัจจุบัน</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">12 — สถานะปัจจุบัน</div>
         <h2 class="display text-3xl mb-6">Status Checklist — Live-Verified 2026-08-09</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           ทุกข้อด้านล่างตรวจสอบจริงผ่าน SSH + <span class="mono text-[13px]">psql</span>/<span class="mono text-[13px]">show pool_nodes</span>
@@ -1962,8 +2331,8 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><span class="mono text-[12px]">arping</span> ผิด package แก้แล้ว (บั๊ก #21, เจอจากการ audit script เอง — <span class="mono text-[12px]">show pool_nodes</span> ดูปกติมาตลอด) <span class="mono text-[12px]">if_up_cmd</span> fail เงียบๆ ทุก escalation ที่ผ่านมา (7/7) เปลี่ยนไปใช้ <span class="mono text-[12px]">iputils-arping</span> ทั้ง 3 node แล้ว ยืนยันด้วย kill-test จริง — <span class="mono text-[12px]">journalctl</span> ขึ้น <span class="mono text-[12px]">'if_up_cmd' returned with success</span></span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Repo <span class="mono text-[12px]">.env</span> (local checkout) — <span class="mono text-[12px]">*_DB_HOST</span> ทั้งหมดชี้ 172.16.0.224 (pgpool1 <b>ตรง</b> ยังไม่ใช่ VIP — จุดเดียวที่ยัง SPOF)</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>ย้าย <span class="mono text-[12px]">.env</span> ทั้ง repo และ ovh-dev ไปที่ VIP (172.16.0.226) — <b>ตอนนี้ทำได้แล้ว</b> เพราะ VIP live + ทดสอบ failover แล้ว เป็นขั้นเดียวที่เหลือกว่าจะได้ HA จริง</span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><span class="mono text-[12px]">ovh-dev</span> <span class="mono text-[12px]">.env</span> (server จริงที่ pm2 คุมอยู่) — ยังชี้ 172.16.0.221 (ppm ตรง) ข้าม pgpool ไปเลย ต้องเปลี่ยน host + <span class="mono text-[12px]">pm2 delete all && pm2 start ecosystem.config.js</span></span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>PostgreSQL primary failover อัตโนมัติ — ยังไม่มี (primary ตายต้อง <span class="mono text-[12px]">pg_promote()</span> มือ) — <b>เป็น single point of failure ตัวเดียวที่เหลืออยู่ใน stack นี้</b></span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><span class="mono text-[12px]">ovh-dev</span> <span class="mono text-[12px]">.env</span> (server จริงที่ pm2 คุมอยู่) — ยังชี้ 172.16.0.221 (ppm ตรง) ข้าม pgpool ไปเลย ต้องเปลี่ยน host + <span class="mono text-[12px]">pm2 delete all && pm2 start ecosystem.config.js</span> — <b style="color:var(--signal)">เร่งด่วนกว่าที่เขียนไว้เดิม</b>: หลัง incident ใน §10 (2026-08-09) 172.16.0.221 ไม่ใช่ primary แล้ว เป็น <span class="mono text-[12px]">ppr1</span> (172.16.0.222) แทน — ถ้า .env นี้ยังไม่แก้ ทุก write จาก ovh-dev กำลังยิงตรงเข้า standby อยู่</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>PostgreSQL primary failover อัตโนมัติ — ยังไม่มี (primary ตายต้อง <span class="mono text-[12px]">pg_promote()</span> มือ) — <b>เป็น single point of failure ตัวเดียวที่เหลืออยู่ใน stack นี้</b> ยืนยันด้วย incident จริงแล้วใน §10 (primary ตายจริง 2026-08-09, กู้คืนสำเร็จแต่ใช้เวลาหลายนาทีและต้องมีคนตัดสินใจทุกขั้น)</span></div>
           </div>
         </div>
       </section>
@@ -1972,7 +2341,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
 
       <!-- ========== 10 REFERENCE ========== -->
       <section id="reference" class="section py-4 pb-20">
-        <div class="eyebrow text-[var(--accent)] mb-3">12 — Reference</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">13 — Reference</div>
         <h2 class="display text-3xl mb-6">Full Flag Reference — ทั้งสาม Script</h2>
         <p class="text-[12.5px] mb-8" style="color:var(--muted)">
           ทั้งสามสคริปต์อยู่ที่ <span class="mono text-[12px]">scripts/</span> ในrepo นี้ — ใช้ <span class="mono text-[12px]">--help</span> เพื่อดู reference สดจากตัว script เสมอ (อาจอัปเดตหลังเอกสารนี้)
