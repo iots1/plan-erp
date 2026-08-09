@@ -33,7 +33,7 @@
       <a href="#config"       class="navlink"><span class="n">05</span> Config ทุกบรรทัด</a>
       <a href="#quorum"       class="navlink"><span class="n">06</span> Watchdog Quorum &amp; VIP</a>
       <a href="#testing"      class="navlink"><span class="n">07</span> ทดสอบ Step-by-Step</a>
-      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 24 ข้อ</a>
+      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 36 ข้อ</a>
       <a href="#verified"     class="navlink"><span class="n">09</span> ผลทดสอบจริง (Verified)</a>
       <a href="#incident"     class="navlink"><span class="n">10</span> Accident Playbook · Primary ตายจริง</a>
       <a href="#autofailover" class="navlink"><span class="n">11</span> Automatic Failover · repmgr</a>
@@ -63,7 +63,7 @@
         </h1>
         <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
           บันทึกการติดตั้งจริงตั้งแต่ 0 พร้อม config ทุกบรรทัด, แผนภาพสถาปัตยกรรม, กลไก watchdog quorum/VIP failover,
-          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">24 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
+          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">36 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
           ผลการทดสอบ kill-test จริงบน production servers, และการเชื่อม Prometheus/Grafana เข้ามา observe cluster —
           ทุกอย่างในเอกสารนี้ <b class="text-white font-medium">ถูกรันจริงและ verify แล้วบน OVH vRack production</b>
           ไม่ใช่ทฤษฎี
@@ -129,12 +129,12 @@
               <li class="flex gap-2.5"><span style="color:var(--accent)">✓</span><span><b>Write correctness</b> — ตรวจ primary จริงตลอดเวลา (<span class="mono text-[12px]">pg_is_in_recovery()</span>) ไม่พึ่ง config แบบ hardcode</span></li>
               <li class="flex gap-2.5"><span style="color:var(--accent)">✓</span><span><b>Read-after-write ถูกต้องบน connection เดียวกัน</b> — <span class="mono text-[12px]">disable_load_balance_on_write='always'</span> ปักหมุด connection ไปที่ primary ทั้ง session หลัง write ครั้งแรก</span></li>
               <li class="flex gap-2.5"><span style="color:var(--accent)">✓</span><span><b>Client-side HA</b> — VIP ย้าย node เองผ่าน watchdog + gratuitous ARP โดยแอปไม่ต้องรู้เรื่อง</span></li>
+              <li class="flex gap-2.5"><span style="color:var(--accent)">✓</span><span><b>PostgreSQL primary failover อัตโนมัติ</b> — <span class="mono text-[12px]">repmgr</span> + <span class="mono text-[12px]">repmgrd</span> (§11) promote standby เองเมื่อ primary ตายจริง วัดเวลาได้จริง <b>29 วินาที</b> จาก kill ถึง promote สำเร็จ โดยไม่มีคนแตะคำสั่ง (§11 Step 4) — ปิด gap เดียวที่เหลือจาก pgpool-only stack</span></li>
             </ul>
           </div>
           <div class="card p-6" style="border-left:3px solid var(--signal)">
             <div class="eyebrow text-[var(--signal)] mb-3">✗ สิ่งที่ไม่ได้ (Known Gaps)</div>
             <ul class="space-y-2.5 text-[13.5px]" style="color:var(--ink-soft)">
-              <li class="flex gap-2.5"><span style="color:var(--signal)">✗</span><span><b>ไม่ promote replica เป็น primary อัตโนมัติ</b> ถ้า primary ตายจริง — pgpool routing แค่รอบๆ backend ที่ตายสำหรับ read เท่านั้น primary ตายต้อง <span class="mono text-[12px]">pg_promote()</span> ด้วยมือ (<b>gap ที่เหลืออยู่ตัวเดียวใน stack นี้</b> — ยืนยันด้วย incident จริงแล้ว ดู §10)</span></li>
               <li class="flex gap-2.5"><span style="color:var(--signal)">✗</span><span><b>ไม่ป้องกัน connection ใหม่คนละตัว</b> อ่านทันทีหลังจาก connection อื่น write เสร็จ — ข้อจำกัดโดยธรรมชาติของ async streaming replication ไม่ใช่สิ่งที่ session-pinning ปิดได้</span></li>
               <li class="flex gap-2.5"><span style="color:var(--signal)">✗</span><span><b>2-node cluster ทนไม่ได้เลย</b> (0 node loss) เว้นแต่เปิด half-votes ซึ่งแลกกับ split-brain risk — ดู §06</span></li>
             </ul>
@@ -1507,7 +1507,7 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
 
       <section id="bugs" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">08 — บั๊กที่เจอระหว่าง Implement</div>
-        <h2 class="display text-3xl mb-6">24 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
+        <h2 class="display text-3xl mb-6">36 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           บันทึกไว้ให้ครบเพื่อกันคนถัดไป (หรือตัวเราเองตอน re-provision) เจอปัญหาเดิมซ้ำแบบช้าๆ — ทั้งหมดถูกแก้ฝังอยู่ใน
           <span class="mono text-[13px]">install-postgresql.sh</span>/<span class="mono text-[13px]">install-pgpool.sh</span>
@@ -1689,6 +1689,98 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">repmgr Automatic Failover Implementation — เจอตอน deploy จริงบน production (#25–36, ดู §11)</div>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th style="width:36px">#</th><th>อาการ</th><th>สาเหตุ</th><th>วิธีแก้</th></tr></thead>
+              <tbody>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>25</td>
+                  <td><span class="mono text-[11.5px]">systemctl status repmgrd</span> ขึ้น <span class="mono text-[11.5px]">active (exited)</span> ปกติทุกอย่าง แต่ <span class="mono text-[11.5px]">ps aux | grep repmgrd</span> ไม่มี process อยู่จริงเลย</td>
+                  <td><span class="mono text-[11.5px]">shared_preload_libraries</span> ไม่มี <span class="mono text-[11.5px]">repmgr</span> — repmgrd ต่อ DB ไม่ได้ (<span class="mono text-[11.5px]">unable to write to shared memory</span>) แล้ว terminate ทันที LSB init script กลืน error นี้เงียบๆ ไม่ propagate ไปที่ systemd</td>
+                  <td>ตั้ง <span class="mono text-[11.5px]">shared_preload_libraries = repmgr</span> ผ่าน <span class="mono text-[11.5px]">pg_conftool</span> + restart PostgreSQL ก่อน enable repmgrd เสมอ</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>26</td>
+                  <td><span class="mono text-[11.5px]">repmgr standby register</span> สำเร็จแต่ขึ้น <span class="mono text-[11.5px]">WARNING: node not found in "pg_stat_replication"</span> ทั้งที่ query <span class="mono text-[11.5px]">pg_stat_replication</span> ตรงๆ ก็เห็น replica ต่ออยู่ปกติ</td>
+                  <td>Debian ตั้ง <span class="mono text-[11.5px]">cluster_name</span> default เป็น <span class="mono text-[11.5px]">18/main</span> เหมือนกันทุก node — ค่านี้กลายเป็น <span class="mono text-[11.5px]">application_name</span> ของ walreceiver โดยอัตโนมัติเมื่อไม่ได้ระบุใน <span class="mono text-[11.5px]">primary_conninfo</span> ทำให้ replica ทุกตัวหน้าตาเหมือนกันหมดใน <span class="mono text-[11.5px]">pg_stat_replication</span> repmgr แยกไม่ออกว่าแถวไหนคือ node ไหน</td>
+                  <td>ตั้ง <span class="mono text-[11.5px]">cluster_name</span> ให้ตรงกับ repmgr <span class="mono text-[11.5px]">node_name</span> ของแต่ละเครื่อง (ต้อง restart — เป็น postmaster-context parameter)</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>27</td>
+                  <td><span class="mono text-[11.5px]">systemctl restart repmgrd</span> ไม่มี error เลยสักครั้ง แต่ log/process ไม่เคยขึ้นจริง — เหมือนบั๊ก #25 แต่คนละสาเหตุ</td>
+                  <td>Debian's repmgrd เป็น LSB init script ที่อ่าน <span class="mono text-[11.5px]">/etc/default/repmgrd</span> ซึ่ง default <span class="mono text-[11.5px]">REPMGRD_ENABLED=no</span> และไม่ได้ตั้ง <span class="mono text-[11.5px]">REPMGRD_CONF</span> เลย — script เจอค่านี้แล้ว <span class="mono text-[11.5px]">exit 0</span> ทันทีตั้งแต่ต้นโดยไม่แตะ repmgrd binary เลยสักครั้ง</td>
+                  <td>เขียน <span class="mono text-[11.5px]">/etc/default/repmgrd</span> ตั้ง <span class="mono text-[11.5px]">REPMGRD_ENABLED=yes</span> + <span class="mono text-[11.5px]">REPMGRD_CONF=/etc/repmgr.conf</span> ก่อน enable เสมอ — ยืนยันด้วย <span class="mono text-[11.5px]">ps aux</span> ไม่ใช่แค่ <span class="mono text-[11.5px]">systemctl status</span></td>
+                </tr>
+                <tr>
+                  <td>28</td>
+                  <td><span class="mono text-[11.5px]">repmgr standby follow</span>/<span class="mono text-[11.5px]">node rejoin</span> fail ด้วย <span class="mono text-[11.5px]">fe_sendauth: no password supplied</span> เชื่อมไปที่ node ตัวเอง ทั้งที่ conninfo ใน repmgr.conf มี password อยู่ครบ</td>
+                  <td>บาง operation ภายในของ repmgr (local-node check ตอน follow, pg_rewind) สร้าง connection string ของตัวเองแยกจาก conninfo ที่ตั้งไว้ ต้องพึ่ง <span class="mono text-[11.5px]">.pgpass</span> แทน</td>
+                  <td>เขียน <span class="mono text-[11.5px]">/var/lib/postgresql/.pgpass</span> รูปแบบ <span class="mono text-[11.5px]">*:*:*:repmgr:PASSWORD</span> — <b>ต้อง 5 field</b> (host:port:db:user:pass) เขียนแค่ 4 field จะเลื่อน field ผิดตำแหน่งเงียบๆ (username กลายเป็น password ตัวจริงหายไปเลย) ไม่มี error ให้เห็นจนกว่าจะลอง auth จริง</td>
+                </tr>
+                <tr>
+                  <td>29</td>
+                  <td><span class="mono text-[11.5px]">repmgr node rejoin</span> fail ด้วย <span class="mono text-[11.5px]">pg_rewind: not found</span> (<span class="mono text-[11.5px]">sh: 1: pg_rewind: not found</span>)</td>
+                  <td>repmgr เรียก <span class="mono text-[11.5px]">pg_ctl</span>/<span class="mono text-[11.5px]">pg_rewind</span> ด้วยชื่อเปล่าๆ อาศัย <span class="mono text-[11.5px]">$PATH</span> — <span class="mono text-[11.5px]">$PATH</span> ของ user postgres ไม่มี <span class="mono text-[11.5px]">/usr/lib/postgresql/18/bin</span> เลย</td>
+                  <td>ตั้ง <span class="mono text-[11.5px]">pg_bindir='/usr/lib/postgresql/18/bin'</span> ใน repmgr.conf (ต้อง quote — ใส่แบบไม่ quote path ที่มี <span class="mono text-[11.5px]">/</span> จะ syntax error)</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>30</td>
+                  <td>แก้ #29 แล้ว <span class="mono text-[11.5px]">pg_rewind</span> เจอตัวเองแล้ว แต่ยัง fail ด้วย <span class="mono text-[11.5px]">could not access the server configuration file ".../postgresql.conf": No such file or directory</span></td>
+                  <td>Debian เก็บ config จริงที่ <span class="mono text-[11.5px]">/etc/postgresql/18/main/</span> แยกจาก data directory (<span class="mono text-[11.5px]">/var/lib/postgresql/18/main/</span>) โดยสิ้นเชิง — <span class="mono text-[11.5px]">pg_rewind</span> เรียก <span class="mono text-[11.5px]">postgres --single -D &lt;datadir&gt;</span> ภายในเพื่อทำ crash recovery ซึ่งมองหา <span class="mono text-[11.5px]">postgresql.conf</span> ในตำแหน่งเดิมตาม PostgreSQL ทั่วไป (ไม่รู้จัก Debian layout) — เช่นเดียวกับ bare <span class="mono text-[11.5px]">pg_ctl start</span> ที่ก็พังด้วยสาเหตุเดียวกัน (จบด้วย <span class="mono text-[11.5px]">server shut down because of recovery target settings</span> อย่างงงๆ)</td>
+                  <td>สอง fix ประกอบกัน: (1) symlink <span class="mono text-[11.5px]">postgresql.conf</span>/<span class="mono text-[11.5px]">pg_hba.conf</span>/<span class="mono text-[11.5px]">pg_ident.conf</span>/<span class="mono text-[11.5px]">conf.d</span> เข้าไปใน data directory ให้ <span class="mono text-[11.5px]">pg_rewind</span>'s single-user-mode หาเจอ (pg_basebackup ข้าม symlink ตอน clone เฉยๆ ไม่ error — สร้างใหม่ทุกครั้งที่รัน install-repmgr.sh) (2) ตั้ง <span class="mono text-[11.5px]">service_start_command</span>/<span class="mono text-[11.5px]">stop</span>/<span class="mono text-[11.5px]">restart</span>/<span class="mono text-[11.5px]">reload_command</span> ใน repmgr.conf ให้ผ่าน <span class="mono text-[11.5px]">pg_ctlcluster 18 main ...</span> แทน bare <span class="mono text-[11.5px]">pg_ctl</span> สำหรับ start/stop/restart ปกติ (pg_rewind เองยังต้องพึ่ง symlink อยู่ดี เพราะมันไม่ผ่าน service_*_command)</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>31</td>
+                  <td>Event hook (สำหรับ auto pcp_attach_node) fail ด้วย <span class="mono text-[11.5px]">pcp_attach_node: command not found</span> ทุกครั้ง</td>
+                  <td><span class="mono text-[11.5px]">pcp_attach_node</span> เป็นส่วนหนึ่งของ package <span class="mono text-[11.5px]">pgpool2</span> เต็มตัว ไม่มี slim client-only package บน Ubuntu — เครื่อง PostgreSQL (ที่ event hook รันอยู่) ไม่เคยติดตั้ง pgpool2 เลย</td>
+                  <td>ติดตั้ง <span class="mono text-[11.5px]">pgpool2</span> บนเครื่อง PostgreSQL ทุกตัวเพื่อเอาแค่ client binary แล้ว <span class="mono text-[11.5px]">systemctl disable --now pgpool2</span> ทันที (กัน service ของมันแย่ง port 5432 กับ PostgreSQL จริงบนเครื่องเดียวกัน)</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>32</td>
+                  <td>แก้ #31 แล้ว event hook รันได้แต่ <span class="mono text-[11.5px]">pcp_attach_node -h &lt;pgpool-host&gt;</span> จากเครื่อง PostgreSQL ไป pgpool node ที่<b>ไม่ใช่</b>ตัวที่เคยรัน install-pgpool.sh ตัวแรก fail ด้วย <span class="mono text-[11.5px]">authentication failed for user "pgpool_admin"</span> — ยืนยันแล้วว่า .pcppass ตรงกับไฟล์บนดิสก์เป๊ะ</td>
+                  <td><span class="mono text-[11.5px]">install-pgpool.sh</span> generate รหัส pcp admin <b>แยกกันเองทุก node</b> ตอนรันครั้งแรก เหมือน <span class="mono text-[11.5px]">wd_authkey</span> — ต่างกันตรงที่ wd_authkey ต้อง sync กันไม่งั้น watchdog join กันไม่ได้ (fail แบบเห็นชัด) แต่ pcp password ไม่ sync ก็ไม่มีอาการอะไรเลยตราบใดที่เรียกแบบ <span class="mono text-[12px]">-h localhost</span> ในเครื่องตัวเอง (ตามที่ script ทุกจุดในเอกสารนี้ทำมาตลอด §07/§08/§10) — เพิ่งมาเจอตอน event hook ต้องเรียก<b>ข้ามเครื่อง</b>เป็นครั้งแรก</td>
+                  <td>เลือกรหัสใดรหัสหนึ่งเป็นค่ากลาง แล้วเขียน md5 hash เดียวกันลง <span class="mono text-[11.5px]">/etc/pgpool2/pcp.conf</span> ทุก pgpool node (<span class="mono text-[12px]">echo "pgpool_admin:$(echo -n PASSWORD | md5sum | cut -d' ' -f1)"</span>) แล้ว restart <span class="mono text-[11.5px]">pgpool2</span> — restart node ที่ถือ VIP อยู่<b>เป็นตัวสุดท้าย</b></td>
+                </tr>
+                <tr>
+                  <td>33</td>
+                  <td>Event hook รันแล้ว log ขึ้น <span class="mono text-[11.5px]">postgres is not in the sudoers file</span> ทุกบรรทัด แล้ว fallback เป็น <span class="mono text-[11.5px]">command not found</span></td>
+                  <td>Hook script เขียน <span class="mono text-[11.5px]">sudo -u postgres pcp_attach_node ...</span> ทั้งที่ repmgrd (ผู้เรียก hook นี้) รันเป็น user postgres อยู่แล้ว (ผ่าน <span class="mono text-[11.5px]">start-stop-daemon --chuid postgres</span>) — postgres พยายาม sudo หาตัวเอง แต่ไม่มีสิทธิ์ sudo เลย</td>
+                  <td>ตัด <span class="mono text-[11.5px]">sudo -u postgres</span> ออกจาก hook script — เรียก <span class="mono text-[11.5px]">pcp_attach_node</span> ตรงๆ</td>
+                </tr>
+                <tr>
+                  <td>34</td>
+                  <td>Standby ที่เพิ่งสั่ง <span class="mono text-[11.5px]">follow</span> primary ใหม่ fail ด้วย <span class="mono text-[11.5px]">could not start WAL streaming: ERROR: replication slot "xxx_slot" does not exist</span></td>
+                  <td>Primary ใหม่ (เพิ่ง promote จาก standby) ไม่เคยมี physical replication slot สำหรับ standby ที่เหลือเลย — slot ถูกสร้างไว้แต่เดิมบน primary <b>ตัวเก่า</b>เท่านั้น (ตอน setup ครั้งแรกผ่าน <span class="mono text-[12px]">install-postgresql.sh --mode=primary --replication-slot=...</span>) การ promote ผ่าน repmgr ไม่สร้าง slot ให้อัตโนมัติเว้นแต่ตั้งค่าไว้</td>
+                  <td>ตั้ง <span class="mono text-[11.5px]">use_replication_slots=1</span> ใน repmgr.conf — repmgr จะสร้าง/ลบ slot ให้เองทุกครั้งที่มีการ promote/follow ต่อจากนี้ไป (ไม่ต้องสร้างมือซ้ำอีก)</td>
+                </tr>
+                <tr>
+                  <td>35</td>
+                  <td><span class="mono text-[11.5px]">repmgr primary register</span> fail ทันที: <span class="mono text-[11.5px]">syntax error in file "/etc/repmgr.conf" line 16, near token ","</span></td>
+                  <td><span class="mono text-[11.5px]">event_notifications=standby_promote,standby_follow</span> เขียนไม่ quote — comma กลาง value ที่ไม่ quote ถูก parser ตีความเป็นตัวคั่น token ไม่ใช่ list</td>
+                  <td>quote ทั้ง value: <span class="mono text-[11.5px]">event_notifications='standby_promote,standby_follow'</span></td>
+                </tr>
+                <tr>
+                  <td>36</td>
+                  <td><span class="mono text-[11.5px]">repmgr primary register</span> fail ด้วย <span class="mono text-[11.5px]">FATAL: password authentication failed for user "repmgr"</span> เชื่อมกับตัวเองผ่าน conninfo ที่เพิ่งเขียนสดๆ</td>
+                  <td>เขียน <span class="mono text-[11.5px]">conninfo</span> ตอนแรกไม่มี <span class="mono text-[11.5px]">password=</span> เลย — repmgr เชื่อมด้วย conninfo ตรงๆ (ไม่ผ่าน .pgpass) สำหรับ operation ส่วนใหญ่ (register, monitor loop) ต่างจากบั๊ก #28 ที่เป็นเฉพาะบาง operation เท่านั้น</td>
+                  <td>ฝัง <span class="mono text-[11.5px]">password=${REPMGR_PASSWORD}</span> เข้าไปใน conninfo string โดยตรง ไม่ต้อง quote ซ้อนเพราะรหัสที่ generate ไว้เป็นตัวอักษร/ตัวเลขล้วน — <span class="mono text-[11.5px]">chmod 640 root:postgres</span> ไฟล์นี้เพราะมี plaintext password อยู่</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">รูปแบบร่วมของบั๊ก #25–36: ทุกอย่าง "เคยทำงานได้" ในบริบทเดิม พังเฉพาะบริบทใหม่</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            #25/#27 พังแบบเงียบสนิท (exit 0, "active") เพราะ Debian's LSB init wrapper กลืน error — เช็คด้วย <span class="mono text-[12px]">ps aux</span> เสมอ อย่าเชื่อ <span class="mono text-[12px]">systemctl status</span> อย่างเดียว
+            · #29/#30 พังเพราะ repmgr เขียนมาสำหรับ upstream PostgreSQL layout (config รวมกับ data) ไม่ใช่ Debian's split layout — สอง bug นี้จะไม่มีทางเจอถ้าทดสอบบน RHEL/vanilla PostgreSQL build
+            · #32 คือตัวอย่างชัดเจนที่สุดของ "ใช้งานได้ตลอดในบริบทเดิม (local -h localhost) พังทันทีที่ขยับไปบริบทใหม่ (remote)" — เหมือนบั๊ก #16 (VIP) และ #21 (arping) ใน §08 เดิม รูปแบบเดียวกันเป๊ะ: ไม่มีใคร kill-test บริบทที่ยังไม่เคยถูกใช้จริงมาก่อน
+          </p>
         </div>
 
         <div class="rulebox ok">
@@ -2097,13 +2189,53 @@ ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pg
             primary จริงแล้ว rejoin เป็น standby ให้ถูกต้อง — ไม่ใช่ hard fencing (STONITH) แบบเต็มรูป แต่ปิดช่องโหว่หลักที่
             เจอจริงได้
           </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-3">
+            <b style="color:var(--signal)">เจอจริงอีกเคส (2026-08-09):</b> <span class="mono text-[12px]">systemctl disable</span>
+            กัน<b>เฉพาะ</b> auto-start ตอน reboot — ไม่ได้กันคนสั่ง <span class="mono text-[12px]">systemctl start
+            postgresql@18-main</span> ตรงๆ ด้วยมือ ถ้ามีคนทำแบบนี้กับ node ที่เพิ่ง stop จาก primary ตัวเดิม (ไม่ผ่าน
+            <span class="mono text-[12px]">repmgr node rejoin</span>) มันจะ start กลับมาเป็น primary อิสระทันที
+            (<span class="mono text-[12px]">pg_role=primary</span> ใน <span class="mono text-[12px]">show pool_nodes</span>)
+            แม้จะมี primary ตัวใหม่ที่ repmgr promote ไปแล้วอยู่ก่อน — split-brain window แบบเดียวกับ §10 เป๊ะ เกิดจากคน
+            ไม่ใช่จาก reboot คราวนี้ <b>กฎเหล็ก: ห้าม <span class="mono text-[12px]">systemctl start</span>
+            postgresql บน node ที่เพิ่งตายหรือเพิ่ง stop โดยเด็ดขาด ใช้ <span class="mono text-[12px]">repmgr node
+            rejoin -d '...' --force-rewind</span> เท่านั้นเสมอ</b> (คำสั่งเต็มอยู่ใน warning ตอนติดตั้งข้างบน)
+          </p>
+        </div>
+
+        <div class="rulebox ok mb-8">
+          <div class="rc mb-1">Verified · 2026-08-10 — deploy จริงบน production ครบ 3 node + kill-test จริงผ่าน</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            รันจริงครั้งแรกเจอบั๊กใหม่ 12 ข้อรวด (#25–36 ใน §08 — ทุกข้อ deploy-time bug ที่เจอเฉพาะตอนย้ายจาก "ทดสอบใน
+            บริบทเดิม" ไปสู่ "ใช้งานจริงข้าม node") ทั้งหมดถูกแก้ฝังอยู่ใน <span class="mono text-[13px]">install-repmgr.sh</span>
+            เวอร์ชันปัจจุบันแล้ว — ทำตาม 4 ขั้นด้านล่างจะไม่เจอปัญหาเดิมซ้ำ ผลจริงที่วัดได้: <b>kill primary → replica ใหม่
+            promote สำเร็จภายใน 29 วินาที</b> โดยไม่มีคนแตะคำสั่งสักบรรทัดเดียว (ดู Step 4)
+          </p>
+        </div>
+
+        <!-- STEP F0 -->
+        <div class="step">
+          <span class="sn">0</span>
+          <h3 class="font-semibold text-[16px] mb-2">Sync รหัส PCP admin ให้เหมือนกันทุก pgpool node ก่อน (บั๊ก #32)</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">install-pgpool.sh</span> generate รหัสนี้แยกกันเองทุก node ตอนรันครั้งแรก — ถ้าไม่เคย sync มาก่อน (ปกติจะไม่เคย เพราะไม่มีอาการอะไรจนกว่าจะมีใครเรียกข้ามเครื่อง) event hook ใน Step 1–2 จะ auth fail แบบงงๆ
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># เลือก node ไหนก็ได้เป็นค่ากลาง เช่น pgpool1</span>
+PCP_PW=$(ssh -t pgpool1 <span class="s">"sudo cat /root/.pgpool/pcp.password"</span> | tail -1 | tr -d <span class="s">'\r\n'</span>)
+HASH=$(echo -n <span class="s">"$PCP_PW"</span> | md5sum | cut -d<span class="s">' '</span> -f1)
+
+<span class="c"># sync ไปทุก node ที่เหลือ — restart node ที่ถือ VIP อยู่เป็นตัวสุดท้าย</span>
+<span class="k">for</span> h <span class="k">in</span> pgpool2 pgpool3<span class="k">;</span> <span class="k">do</span>
+  ssh <span class="s">"$h"</span> <span class="s">"echo 'pgpool_admin:$HASH' | sudo tee /etc/pgpool2/pcp.conf && sudo systemctl restart pgpool2"</span>
+<span class="k">done</span></pre>
+          </div>
         </div>
 
         <!-- STEP F1 -->
         <div class="step">
           <span class="sn">1</span>
           <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง repmgr บน primary ก่อน</h3>
-          <p class="text-sm mb-3" style="color:var(--ink-soft)">รันบน node ที่เป็น primary จริง ณ ตอนนี้ (ไม่จำเป็นต้องเป็น node ที่เคย "แรก" ตั้งแต่ setup)</p>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">รันบน node ที่เป็น primary จริง ณ ตอนนี้ (ไม่จำเป็นต้องเป็น node ที่เคย "แรก" ตั้งแต่ setup) — สคริปต์จะติดตั้ง <span class="mono text-[12px]">postgresql-18-repmgr</span> + <span class="mono text-[12px]">pgpool2</span> (client tools เท่านั้น) เอง, ตั้ง <span class="mono text-[12px]">shared_preload_libraries</span>/<span class="mono text-[12px]">cluster_name</span>, restart PostgreSQL หนึ่งครั้ง แล้ว enable repmgrd</p>
           <div class="code p-5">
 <pre>PGPOOL_HOSTS=172.16.0.224,172.16.0.119,172.16.0.120
 PCP_PW=<span class="s">'&lt;pcp admin password จาก install-pgpool.sh&gt;'</span>
@@ -2156,7 +2288,7 @@ ssh -t &lt;standby-host&gt; <span class="s">"sudo /tmp/install-repmgr.sh --role=
         <div class="step">
           <span class="sn">4</span>
           <h3 class="font-semibold text-[16px] mb-2">Kill-test จริง — ทำซ้ำ §10 แบบไม่ต้องมีคนกดคำสั่งเองสักบรรทัด</h3>
-          <p class="text-sm mb-3" style="color:var(--ink-soft)">ห้ามข้าม เหตุผลเดียวกับ §07 T9 — "ดูเหมือนใช้งานได้" ไม่เท่ากับพิสูจน์แล้ว</p>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">ห้ามข้าม เหตุผลเดียวกับ §07 T9 — "ดูเหมือนใช้งานได้" ไม่เท่ากับพิสูจน์แล้ว (การรันจริงครั้งแรกในเอกสารนี้ก็ผ่าน T1–T3 มาหมดแล้วเช่นกัน แล้วมาเจอบั๊ก #25–36 ตรง kill-test นี้เท่านั้น)</p>
           <div class="code p-5 mb-3">
 <pre><span class="c"># หยุด primary แรง ๆ (จำลอง crash จริง ไม่ใช่ graceful stop)</span>
 ssh &lt;primary-host&gt; <span class="s">"sudo systemctl kill -s SIGKILL postgresql@18-main"</span>
@@ -2165,20 +2297,31 @@ ssh &lt;primary-host&gt; <span class="s">"sudo systemctl kill -s SIGKILL postgre
 ssh &lt;standby-host&gt; <span class="s">"sudo tail -f /var/log/postgresql/repmgrd.log"</span></pre>
           </div>
           <div class="rulebox ok">
-            <div class="rc mb-1">ผลที่ต้องเห็น</div>
+            <div class="rc mb-1">ผลจริงที่วัดได้ (2026-08-10, หลังแก้บั๊ก #25–36 ครบแล้ว)</div>
             <p class="text-[13.5px]" style="color:var(--ink-soft)">
-              standby priority สูงสุด promote เองภายใน <span class="mono text-[12px]">reconnect_attempts × reconnect_interval</span>
-              วินาที (default 6×5=30 วิ) · standby ที่เหลือ follow อัตโนมัติ · <span class="mono text-[12px]">/var/log/repmgr-pgpool-reattach.log</span>
-              โชว์ <span class="mono text-[12px]">pcp_attach_node</span> รันครบทุก id ทุก pgpool host · <span class="mono text-[12px]">show pool_nodes</span>
-              ผ่าน VIP เขียวหมดโดยไม่มีใครแตะ pgpool เลย
+              <span class="mono text-[12px]">SIGKILL</span> ส่งเวลา 17:19:36 UTC · repmgrd log ขึ้น
+              <span class="mono text-[12px]">PQPING_NO_RESPONSE</span> 3 รอบ (17:19:48/53/58) แล้ว
+              <span class="mono text-[12px]">switching to primary monitoring mode</span> +
+              <span class="mono text-[12px]">monitoring cluster primary "ppm"</span> เวลา 17:20:05 —
+              <b>รวม 29 วินาทีเป๊ะ จาก kill ถึง promote สำเร็จ</b> โดยไม่มีคนแตะคำสั่งสักบรรทัด · standby ที่เหลือ follow
+              อัตโนมัติตามมา · event hook รัน <span class="mono text-[12px]">pcp_attach_node</span> ครบทุก id ทุก pgpool
+              host เอง (verify ได้จาก <span class="mono text-[12px]">/var/log/repmgr-pgpool-reattach.log</span>) ·
+              <span class="mono text-[12px]">show pool_nodes</span> ผ่าน VIP กลับมาเขียวหมดโดยไม่มีใครแตะ pgpool เลย
             </p>
           </div>
-          <div class="edge mt-3">
-            <div class="tag mb-1">แล้วต้องรัน install-postgresql.sh --mode=replica --force ที่ node เดิมอีกไหม</div>
+          <div class="edge mt-3" style="border-color:var(--signal)">
+            <div class="tag mb-1" style="color:var(--signal)">เจอจริง: node ที่ถูก SIGKILL (ไม่ใช่ node ที่ promote) อาจ pg_rewind ไม่ผ่านเลยก็ได้</div>
             <p class="text-[13px]">
-              ไม่ต้อง — <span class="mono text-[12px]">repmgr node rejoin</span> (ดู warning ด้านบน) ใช้
-              <span class="mono text-[12px]">pg_rewind</span> ภายใน แทนที่จะ wipe+re-clone เต็ม แก้กรณีทั่วไปได้เร็วกว่ามาก
-              re-clone เต็มยังจำเป็นเฉพาะกรณี node หายไปนานเกิน WAL retention เท่านั้น
+              ppr2 (standby ตัวที่ยังไม่ตาย แค่หลุด connection) ใช้ <span class="mono text-[12px]">follow</span>/pg_rewind
+              สำเร็จปกติ — แต่ node ที่โดน SIGKILL ตรงๆ (ppr1 ในเคสจริง) รัน
+              <span class="mono text-[12px]">repmgr node rejoin --force-rewind</span> แล้วเจอ
+              <span class="mono text-[12px]">pg_rewind: error: file "pg_ident.conf" is of different type in source and
+              target</span> — เกิดจาก symlink ที่บั๊ก #30 สร้างไว้ (จำเป็นสำหรับ pg_rewind's crash-recovery step เอง)
+              กลับไปชนกับการเทียบไฟล์ของ pg_rewind ระหว่าง source/target ตอน rewind entry-point นี้โดยเฉพาะ ยังไม่มี fix
+              ที่สะอาดกว่านี้ — <b>fallback ที่ใช้ได้จริงคือกลับไป wipe+re-clone เต็มแบบ §10</b>
+              (<span class="mono text-[12px]">install-postgresql.sh --mode=replica --force</span>) ซึ่งใช้เวลานานกว่า
+              แต่ทำสำเร็จแน่นอน — <span class="mono text-[12px]">node rejoin</span> ยังคุ้มค่าให้ลองก่อนเสมอ (เร็วกว่ามากถ้า
+              สำเร็จ) แค่ต้องเตรียมใจ fallback นี้ไว้ ไม่ใช่ทางเดียวที่ใช้ได้เสมอไปตามที่เขียนไว้เดิม
             </p>
           </div>
         </div>
@@ -2480,7 +2623,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Repo <span class="mono text-[12px]">.env</span> (local checkout) — <span class="mono text-[12px]">*_DB_HOST</span> ทั้งหมดชี้ 172.16.0.224 (pgpool1 <b>ตรง</b> ยังไม่ใช่ VIP — จุดเดียวที่ยัง SPOF)</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>ย้าย <span class="mono text-[12px]">.env</span> ทั้ง repo และ ovh-dev ไปที่ VIP (172.16.0.226) — <b>ตอนนี้ทำได้แล้ว</b> เพราะ VIP live + ทดสอบ failover แล้ว เป็นขั้นเดียวที่เหลือกว่าจะได้ HA จริง</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><span class="mono text-[12px]">ovh-dev</span> <span class="mono text-[12px]">.env</span> (server จริงที่ pm2 คุมอยู่) — ยังชี้ 172.16.0.221 (ppm ตรง) ข้าม pgpool ไปเลย ต้องเปลี่ยน host + <span class="mono text-[12px]">pm2 delete all && pm2 start ecosystem.config.js</span> — <b style="color:var(--signal)">เร่งด่วนกว่าที่เขียนไว้เดิม</b>: หลัง incident ใน §10 (2026-08-09) 172.16.0.221 ไม่ใช่ primary แล้ว เป็น <span class="mono text-[12px]">ppr1</span> (172.16.0.222) แทน — ถ้า .env นี้ยังไม่แก้ ทุก write จาก ovh-dev กำลังยิงตรงเข้า standby อยู่</span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>PostgreSQL primary failover อัตโนมัติ — เขียน <span class="mono text-[12px]">scripts/install-repmgr.sh</span> + design ไว้แล้ว (§11) หลัง incident จริงใน §10 (primary ตายจริง 2026-08-09) แต่<b>ยังไม่ deploy บน production</b> — ตอนนี้ primary ตายยังคงต้อง <span class="mono text-[12px]">pg_promote()</span> มือตาม runbook §10 จนกว่าจะรัน §11 บนทุก node จริงและผ่าน kill-test (§11 Step F4)</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>PostgreSQL primary failover อัตโนมัติ — <span class="mono text-[12px]">scripts/install-repmgr.sh</span> deploy ครบ 3 node จริงแล้ว (2026-08-10) ผ่าน kill-test จริง (§11 Step 4, <b>29 วินาที</b> จาก kill ถึง promote) หลัง incident จริงใน §10 (primary ตายจริง 2026-08-09) เจอบั๊กใหม่ 12 ข้อระหว่าง deploy (#25–36 ใน §08) แก้ครบและฝังอยู่ใน script แล้ว — <b>gap เดิมที่เหลืออยู่ตัวเดียวใน stack นี้ปิดแล้ว</b></span></div>
           </div>
         </div>
       </section>
