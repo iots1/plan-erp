@@ -36,9 +36,10 @@
       <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 24 ข้อ</a>
       <a href="#verified"     class="navlink"><span class="n">09</span> ผลทดสอบจริง (Verified)</a>
       <a href="#incident"     class="navlink"><span class="n">10</span> Accident Playbook · Primary ตายจริง</a>
-      <a href="#monitoring"   class="navlink"><span class="n">11</span> Grafana Observability</a>
-      <a href="#status"       class="navlink"><span class="n">12</span> สถานะปัจจุบัน</a>
-      <a href="#reference"    class="navlink"><span class="n">13</span> Reference · Flags/Env</a>
+      <a href="#autofailover" class="navlink"><span class="n">11</span> Automatic Failover · repmgr</a>
+      <a href="#monitoring"   class="navlink"><span class="n">12</span> Grafana Observability</a>
+      <a href="#status"       class="navlink"><span class="n">13</span> สถานะปัจจุบัน</a>
+      <a href="#reference"    class="navlink"><span class="n">14</span> Reference · Flags/Env</a>
     </nav>
     <div slot="footnote">
       <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
@@ -787,9 +788,9 @@ AUTH_DB_PORT=5432</pre>
                 <tr><td>/etc/systemd/system/<br>{node,postgres,pgpool2}_exporter.service</td><td>—</td><td>unit ของแต่ละ exporter</td></tr>
                 <tr><td>system users</td><td>nologin</td><td>สร้าง <span class="mono text-[12px]">node_exporter</span>, <span class="mono text-[12px]">postgres_exporter</span>, <span class="mono text-[12px]">pgpool_exporter</span></td></tr>
                 <tr><td>/var/lib/node_exporter/<br>textfile_collector/</td><td>0755</td><td>ทุก role — dir ที่ node_exporter อ่าน metric เพิ่มเติมจากไฟล์ (ยังว่างเปล่ายกเว้น role=pgpool)</td></tr>
-                <tr><td>/usr/local/bin/<br>pgpool-watchdog-exporter.sh</td><td>0755</td><td>เฉพาะ <span class="mono text-[12px]">--role=pgpool</span> — generate โดย script เอง เขียน <span class="mono text-[12px]">pgpool_watchdog_*</span> gauges ลง textfile_collector ทุก 15 วิ (§10)</td></tr>
+                <tr><td>/usr/local/bin/<br>pgpool-watchdog-exporter.sh</td><td>0755</td><td>เฉพาะ <span class="mono text-[12px]">--role=pgpool</span> — generate โดย script เอง เขียน <span class="mono text-[12px]">pgpool_watchdog_*</span> gauges ลง textfile_collector ทุก 15 วิ (§12)</td></tr>
                 <tr><td>/etc/systemd/system/<br>pgpool-watchdog-exporter.{service,timer}</td><td>—</td><td>เฉพาะ pgpool — timer เรียก service ทุก 15 วิ</td></tr>
-                <tr><td>pgpool <span class="mono text-[12px]">pool_passwd</span></td><td>—</td><td>เฉพาะ pgpool — ลงทะเบียน <span class="mono text-[12px]">exporter_svc</span> ให้เองผ่าน <span class="mono text-[12px]">pg_enc</span> (เดิมเป็นขั้นตอนมือ — ดู §10)</td></tr>
+                <tr><td>pgpool <span class="mono text-[12px]">pool_passwd</span></td><td>—</td><td>เฉพาะ pgpool — ลงทะเบียน <span class="mono text-[12px]">exporter_svc</span> ให้เองผ่าน <span class="mono text-[12px]">pg_enc</span> (เดิมเป็นขั้นตอนมือ — ดู §12)</td></tr>
               </tbody>
             </table>
           </div>
@@ -1485,7 +1486,7 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
               ทุก endpoint คืน metric · <b>9719 ได้ 0 บรรทัด</b> = <span class="mono text-[12px]">exporter_svc</span>
               ยังไม่ได้ลงทะเบียนใน <span class="mono text-[12px]">pool_passwd</span> ของ node นั้น ตรวจด้วย
               <span class="mono text-[12px]">journalctl -u pgpool2_exporter</span> จะเจอ
-              <span class="mono text-[12px]">failed to authenticate with backend using SCRAM</span> วน retry (ดู §10)
+              <span class="mono text-[12px]">failed to authenticate with backend using SCRAM</span> วน retry (ดู §12)
             </p>
           </div>
         </div>
@@ -2026,13 +2027,160 @@ ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pg
         </div>
 
         <div class="rulebox mt-8">
-          <div class="rc mb-1">สิ่งที่เคสนี้ยืนยัน — และยังไม่แก้</div>
+          <div class="rc mb-1">สิ่งที่เคสนี้ยืนยัน — และยังไม่แก้ (ตอนเขียนบันทึกนี้)</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
-            ยืนยัน Known Gap ใน §01/§11 ตรงตามที่เขียนไว้เป๊ะ: PostgreSQL primary failover <b>ไม่</b>อัตโนมัติ ต้องมีคน
+            ยืนยัน Known Gap ใน §01/§13 ตรงตามที่เขียนไว้เป๊ะ: PostgreSQL primary failover <b>ไม่</b>อัตโนมัติ ต้องมีคน
             ตัดสินใจ promote และรัน rebuild runbook นี้ด้วยมือเสมอ (ทั้งกระบวนการใช้เวลาหลายนาที ไม่ใช่วินาทีแบบ VIP
-            failover ที่ §07 T9/§09 Test 2) — ถ้าต้องการปิด gap นี้จริง ต้องเพิ่ม tool แยกมาคุมชั้น PostgreSQL replication
-            โดยเฉพาะ (เช่น Patroni หรือ repmgr) ซึ่งอยู่นอก scope ของ Pgpool-II เอง
+            failover ที่ §07 T9/§09 Test 2) — เพิ่ม tool แยกมาคุมชั้น PostgreSQL replication โดยเฉพาะเพื่อปิด gap นี้แล้ว
+            ดู §11 (repmgr)
           </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 11 AUTOMATIC FAILOVER (REPMGR) ========== -->
+      <section id="autofailover" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">11 — Automatic Failover</div>
+        <h2 class="display text-3xl mb-6">ปิด Known Gap สุดท้าย: repmgr คุมชั้น PostgreSQL Replication โดยเฉพาะ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          §10 พิสูจน์แล้วว่า Pgpool-II ยอมรับ primary ใหม่ได้เองทันทีที่<i>มีใครสักคนหรือสักอย่าง</i> promote ให้
+          (ไม่ต้องแก้ pgpool config เลยแม้แต่บรรทัดเดียว) — <span class="mono text-[13px]">repmgr</span> คือ tool ที่มา
+          เป็น "ใครสักอย่าง" นั้นแทนคน: monitor primary ผ่าน <span class="mono text-[13px]">repmgrd</span> daemon บนทุก
+          node, ตัดสินใจ + สั่ง <span class="mono text-[13px]">pg_promote()</span> เองเมื่อ primary หายจริง, สั่ง standby
+          ที่เหลือ <span class="mono text-[13px]">follow</span> primary ใหม่อัตโนมัติ — แล้วรัน event hook ที่ปิดบั๊ก #24
+          ไปพร้อมกันในตัว (<span class="mono text-[13px]">pcp_attach_node</span> ทุก backend ทุก pgpool host อัตโนมัติ
+          หลัง promote/follow) Script: <span class="mono text-[13px]">scripts/install-repmgr.sh</span>
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-4">ทำไมเลือก repmgr ไม่ใช่ Patroni</div>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th></th><th>repmgr (เลือกใช้)</th><th>Patroni</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>ผลกระทบต่อ stack ปัจจุบัน</td>
+                  <td>น้อย — เก็บ pgpool ไว้ทำ pooling/VIP/routing เหมือนเดิมทั้งหมด, เก็บ <span class="mono text-[11.5px]">install-postgresql.sh</span>/<span class="mono text-[11.5px]">pg_conftool</span> ไว้คุม config ตามเดิม</td>
+                  <td>มาก — ปกติเข้ามาเป็นเจ้าของ <span class="mono text-[11.5px]">postgresql.conf</span> เอง (ชนกับ script ที่มีอยู่) และมักต้องเปลี่ยนจาก pgpool ไปใช้ HAProxy + PgBouncer แทน</td>
+                </tr>
+                <tr>
+                  <td>Component เพิ่ม</td>
+                  <td><span class="mono text-[11.5px]">repmgrd</span> บนทุก PG node เท่านั้น</td>
+                  <td>etcd/Consul cluster แยก (ขั้นต่ำ 3 node) + Patroni บนทุก PG node</td>
+                </tr>
+                <tr>
+                  <td>ความแม่นยำการตัดสินใจ failover</td>
+                  <td>Witness-based health check — เร็ว ติดตั้งง่าย แต่เสี่ยง false-positive มากกว่าตอน network partition</td>
+                  <td>DCS consensus จริง (เหมือน raft) — กัน split-brain แน่นหนากว่า เป็นมาตรฐาน cloud-native</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="text-[13px] mb-8" style="color:var(--ink-soft)">
+          สรุป: topology ปัจจุบัน (native streaming replication + pgpool dynamic primary detection) เข้ากับ repmgr โดยตรง
+          ไม่ต้อง rebuild อะไรที่มีอยู่แล้ว — ถ้าในอนาคตความเสี่ยง false-positive ของ witness-based failover กลายเป็น
+          ปัญหาจริง (เช่น network partition บ่อยจน repmgr promote ผิดจังหวะ) ค่อยพิจารณาย้ายไป Patroni เป็น major
+          re-architecture แยกต่างหาก
+        </p>
+
+        <div class="rulebox mb-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">สิ่งที่ repmgr ไม่ได้ปิดให้ฟรีๆ: node เดิมต้อง rejoin ผ่าน repmgr เท่านั้น ห้าม auto-start เอง</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            รากปัญหาจริงของ §10 คือ ppm reboot เองแล้ว systemd สั่ง start PostgreSQL ให้ทันทีโดยไม่มีใครถามก่อนว่า
+            "ตอนนี้ยังควรเป็น primary อยู่ไหม" — <span class="mono text-[13px]">repmgrd</span> ทำงานอยู่ไม่ได้แปลว่าปัญหานี้
+            หายไปเอง เพราะ <b>systemd ไม่รอ repmgrd ตัดสินใจก่อน start</b> <span class="mono text-[13px]">install-repmgr.sh</span>
+            จึงปิด boot auto-start ของ <span class="mono text-[13px]">postgresql@18-main</span> ทุก node
+            (<span class="mono text-[12px]">systemctl disable</span>) บังคับให้ node ที่ reboot กลับมาต้อง
+            <span class="mono text-[13px]">repmgr node rejoin</span> ก่อนเสมอ ซึ่งเช็คกับ cluster ที่เหลือก่อนว่าใครเป็น
+            primary จริงแล้ว rejoin เป็น standby ให้ถูกต้อง — ไม่ใช่ hard fencing (STONITH) แบบเต็มรูป แต่ปิดช่องโหว่หลักที่
+            เจอจริงได้
+          </p>
+        </div>
+
+        <!-- STEP F1 -->
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง repmgr บน primary ก่อน</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">รันบน node ที่เป็น primary จริง ณ ตอนนี้ (ไม่จำเป็นต้องเป็น node ที่เคย "แรก" ตั้งแต่ setup)</p>
+          <div class="code p-5">
+<pre>PGPOOL_HOSTS=172.16.0.224,172.16.0.119,172.16.0.120
+PCP_PW=<span class="s">'&lt;pcp admin password จาก install-pgpool.sh&gt;'</span>
+
+scp scripts/install-repmgr.sh &lt;primary-host&gt;:/tmp/
+ssh -t &lt;primary-host&gt; <span class="s">"sudo /tmp/install-repmgr.sh --role=primary \
+  --node-id=1 --node-name=&lt;primary-hostname&gt; \
+  --conninfo-host=&lt;primary-ip&gt; --allowed-cidrs=172.16.0.0/24 \
+  --pgpool-hosts=$PGPOOL_HOSTS --pgpool-pcp-password='$PCP_PW'"</span></pre>
+          </div>
+        </div>
+
+        <!-- STEP F2 -->
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ติดตั้งบนทุก standby — ตามด้วย <span class="mono text-[13px]">--upstream-node-id</span> ที่ถูกต้อง</h3>
+          <div class="code p-5">
+<pre>REPMGR_PW=$(ssh &lt;primary-host&gt; <span class="s">"sudo cat /root/.repmgr/repmgr.password"</span> | tail -1 | tr -d <span class="s">'\r\n'</span>)
+
+scp scripts/install-repmgr.sh &lt;standby-host&gt;:/tmp/
+ssh -t &lt;standby-host&gt; <span class="s">"sudo /tmp/install-repmgr.sh --role=standby \
+  --node-id=2 --node-name=&lt;standby-hostname&gt; --upstream-node-id=1 \
+  --repmgr-password='$REPMGR_PW' \
+  --conninfo-host=&lt;standby-ip&gt; --allowed-cidrs=172.16.0.0/24 \
+  --pgpool-hosts=$PGPOOL_HOSTS --pgpool-pcp-password='$PCP_PW'"</span>
+
+<span class="c"># ทำซ้ำให้ standby ตัวที่สอง ด้วย --node-id=3 เป็นต้น</span></pre>
+          </div>
+        </div>
+
+        <!-- STEP F3 -->
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยืนยัน cluster topology ที่ repmgr เห็น</h3>
+          <div class="code p-5 mb-3">
+<pre>sudo -u postgres /usr/lib/postgresql/18/bin/repmgr -f /etc/repmgr.conf cluster show</pre>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ผลที่ต้องเห็น</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              1 แถว <span class="mono text-[12px]">* primary | running</span> ที่เหลือ
+              <span class="mono text-[12px]">standby | running</span> ทุกแถว <span class="mono text-[12px]">Upstream</span>
+              ชี้ primary ถูกต้อง — ต่างจาก <span class="mono text-[12px]">show pool_nodes</span> (มุมมองของ pgpool) ตัวนี้
+              คือมุมมองของ repmgr เอง เช็คทั้งคู่แยกกันเสมอ
+            </p>
+          </div>
+        </div>
+
+        <!-- STEP F4 -->
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">Kill-test จริง — ทำซ้ำ §10 แบบไม่ต้องมีคนกดคำสั่งเองสักบรรทัด</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">ห้ามข้าม เหตุผลเดียวกับ §07 T9 — "ดูเหมือนใช้งานได้" ไม่เท่ากับพิสูจน์แล้ว</p>
+          <div class="code p-5 mb-3">
+<pre><span class="c"># หยุด primary แรง ๆ (จำลอง crash จริง ไม่ใช่ graceful stop)</span>
+ssh &lt;primary-host&gt; <span class="s">"sudo systemctl kill -s SIGKILL postgresql@18-main"</span>
+
+<span class="c"># จับเวลา แล้วดู repmgrd log บน standby ตัวที่ priority สูงสุด</span>
+ssh &lt;standby-host&gt; <span class="s">"sudo tail -f /var/log/postgresql/repmgrd.log"</span></pre>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ผลที่ต้องเห็น</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              standby priority สูงสุด promote เองภายใน <span class="mono text-[12px]">reconnect_attempts × reconnect_interval</span>
+              วินาที (default 6×5=30 วิ) · standby ที่เหลือ follow อัตโนมัติ · <span class="mono text-[12px]">/var/log/repmgr-pgpool-reattach.log</span>
+              โชว์ <span class="mono text-[12px]">pcp_attach_node</span> รันครบทุก id ทุก pgpool host · <span class="mono text-[12px]">show pool_nodes</span>
+              ผ่าน VIP เขียวหมดโดยไม่มีใครแตะ pgpool เลย
+            </p>
+          </div>
+          <div class="edge mt-3">
+            <div class="tag mb-1">แล้วต้องรัน install-postgresql.sh --mode=replica --force ที่ node เดิมอีกไหม</div>
+            <p class="text-[13px]">
+              ไม่ต้อง — <span class="mono text-[12px]">repmgr node rejoin</span> (ดู warning ด้านบน) ใช้
+              <span class="mono text-[12px]">pg_rewind</span> ภายใน แทนที่จะ wipe+re-clone เต็ม แก้กรณีทั่วไปได้เร็วกว่ามาก
+              re-clone เต็มยังจำเป็นเฉพาะกรณี node หายไปนานเกิน WAL retention เท่านั้น
+            </p>
+          </div>
         </div>
       </section>
 
@@ -2040,7 +2188,7 @@ ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pg
 
       <!-- ========== 08 MONITORING ========== -->
       <section id="monitoring" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">11 — Grafana Observability</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">12 — Grafana Observability</div>
         <h2 class="display text-3xl mb-6">Prometheus Exporters ทุก Host → Grafana Dashboard เดียว</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           <span class="mono text-[13px]">scripts/install-monitoring-exporters.sh</span> (pattern เดียวกับสอง script
@@ -2313,7 +2461,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
 
       <!-- ========== 09 STATUS ========== -->
       <section id="status" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">12 — สถานะปัจจุบัน</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">13 — สถานะปัจจุบัน</div>
         <h2 class="display text-3xl mb-6">Status Checklist — Live-Verified 2026-08-09</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           ทุกข้อด้านล่างตรวจสอบจริงผ่าน SSH + <span class="mono text-[13px]">psql</span>/<span class="mono text-[13px]">show pool_nodes</span>
@@ -2332,7 +2480,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Repo <span class="mono text-[12px]">.env</span> (local checkout) — <span class="mono text-[12px]">*_DB_HOST</span> ทั้งหมดชี้ 172.16.0.224 (pgpool1 <b>ตรง</b> ยังไม่ใช่ VIP — จุดเดียวที่ยัง SPOF)</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>ย้าย <span class="mono text-[12px]">.env</span> ทั้ง repo และ ovh-dev ไปที่ VIP (172.16.0.226) — <b>ตอนนี้ทำได้แล้ว</b> เพราะ VIP live + ทดสอบ failover แล้ว เป็นขั้นเดียวที่เหลือกว่าจะได้ HA จริง</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><span class="mono text-[12px]">ovh-dev</span> <span class="mono text-[12px]">.env</span> (server จริงที่ pm2 คุมอยู่) — ยังชี้ 172.16.0.221 (ppm ตรง) ข้าม pgpool ไปเลย ต้องเปลี่ยน host + <span class="mono text-[12px]">pm2 delete all && pm2 start ecosystem.config.js</span> — <b style="color:var(--signal)">เร่งด่วนกว่าที่เขียนไว้เดิม</b>: หลัง incident ใน §10 (2026-08-09) 172.16.0.221 ไม่ใช่ primary แล้ว เป็น <span class="mono text-[12px]">ppr1</span> (172.16.0.222) แทน — ถ้า .env นี้ยังไม่แก้ ทุก write จาก ovh-dev กำลังยิงตรงเข้า standby อยู่</span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>PostgreSQL primary failover อัตโนมัติ — ยังไม่มี (primary ตายต้อง <span class="mono text-[12px]">pg_promote()</span> มือ) — <b>เป็น single point of failure ตัวเดียวที่เหลืออยู่ใน stack นี้</b> ยืนยันด้วย incident จริงแล้วใน §10 (primary ตายจริง 2026-08-09, กู้คืนสำเร็จแต่ใช้เวลาหลายนาทีและต้องมีคนตัดสินใจทุกขั้น)</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>PostgreSQL primary failover อัตโนมัติ — เขียน <span class="mono text-[12px]">scripts/install-repmgr.sh</span> + design ไว้แล้ว (§11) หลัง incident จริงใน §10 (primary ตายจริง 2026-08-09) แต่<b>ยังไม่ deploy บน production</b> — ตอนนี้ primary ตายยังคงต้อง <span class="mono text-[12px]">pg_promote()</span> มือตาม runbook §10 จนกว่าจะรัน §11 บนทุก node จริงและผ่าน kill-test (§11 Step F4)</span></div>
           </div>
         </div>
       </section>
@@ -2341,7 +2489,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
 
       <!-- ========== 10 REFERENCE ========== -->
       <section id="reference" class="section py-4 pb-20">
-        <div class="eyebrow text-[var(--accent)] mb-3">13 — Reference</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">14 — Reference</div>
         <h2 class="display text-3xl mb-6">Full Flag Reference — ทั้งสาม Script</h2>
         <p class="text-[12.5px] mb-8" style="color:var(--muted)">
           ทั้งสามสคริปต์อยู่ที่ <span class="mono text-[12px]">scripts/</span> ในrepo นี้ — ใช้ <span class="mono text-[12px]">--help</span> เพื่อดู reference สดจากตัว script เสมอ (อาจอัปเดตหลังเอกสารนี้)
