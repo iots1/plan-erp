@@ -33,7 +33,7 @@
       <a href="#config"       class="navlink"><span class="n">05</span> Config ทุกบรรทัด</a>
       <a href="#quorum"       class="navlink"><span class="n">06</span> Watchdog Quorum &amp; VIP</a>
       <a href="#testing"      class="navlink"><span class="n">07</span> ทดสอบ Step-by-Step</a>
-      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 20 ข้อ</a>
+      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 22 ข้อ</a>
       <a href="#verified"     class="navlink"><span class="n">09</span> ผลทดสอบจริง (Verified)</a>
       <a href="#monitoring"   class="navlink"><span class="n">10</span> Grafana Observability</a>
       <a href="#status"       class="navlink"><span class="n">11</span> สถานะปัจจุบัน</a>
@@ -61,7 +61,7 @@
         </h1>
         <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
           บันทึกการติดตั้งจริงตั้งแต่ 0 พร้อม config ทุกบรรทัด, แผนภาพสถาปัตยกรรม, กลไก watchdog quorum/VIP failover,
-          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">20 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
+          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">22 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
           ผลการทดสอบ kill-test จริงบน production servers, และการเชื่อม Prometheus/Grafana เข้ามา observe cluster —
           ทุกอย่างในเอกสารนี้ <b class="text-white font-medium">ถูกรันจริงและ verify แล้วบน OVH vRack production</b>
           ไม่ใช่ทฤษฎี
@@ -1015,6 +1015,8 @@ pid_file_name = <span class="s">'/var/run/postgresql/pgpool.pid'</span>   <span 
                 <tr><td>auto_failback /<br>auto_failback_interval</td><td>on / 10</td><td>backend ที่ฟื้นจาก health-check fail กลับเข้า rotation เองอัตโนมัติ ไม่งั้นค้าง DOWN ตลอดกาลจนกว่าจะ <span class="mono text-[12px]">pcp_attach_node</span> มือ (บั๊ก #14, #20)</td></tr>
                 <tr><td>delegate_IP</td><td>&lt;VIP&gt; <span class="mono text-[10px]" style="color:var(--signal)">(capital IP!)</span></td><td>lowercase <span class="mono text-[12px]">delegate_ip</span> ถูกเมินเงียบๆ — VIP ไม่มีวันขึ้น (บั๊ก #16)</td></tr>
                 <tr><td>if_cmd_path /<br>arping_path</td><td>'/usr/bin'</td><td>resolve token แรกของคำสั่ง VIP ซึ่งคือ <span class="mono text-[12px]">sudo</span> — ต้องชี้ path ของ sudo ไม่ใช่ของ ip/arping (บั๊ก #17)</td></tr>
+                <tr><td>arping_cmd</td><td>/usr/bin/arping</td><td>ต้องเป็น <span class="mono text-[12px]">iputils-arping</span> ไม่ใช่ package <span class="mono text-[12px]">arping</span> เฉยๆ (คนละโปรแกรม conflict กันที่ dpkg) — ติดตั้งผิดตัว <span class="mono text-[12px]">if_up_cmd</span> จะ fail ทุกครั้งแบบเงียบสนิท (บั๊ก #21)</td></tr>
+                <tr><td>vip-prefix</td><td>auto-detect (fallback /24)</td><td>อ่านจาก CIDR จริงของ IP ตัวเองบน <span class="mono text-[12px]">--vip-iface</span> แทนที่จะ hardcode /24 — สำคัญบน subnet ที่ไม่ใช่ /24</td></tr>
                 <tr><td>enable_consensus_with_half_votes</td><td>derived จากจำนวน --nodes</td><td>on สำหรับ cluster จำนวนคู่ (ไม่งั้น failover ไม่เกิดเลย), off สำหรับคี่ (majority จริง ไม่มี split-brain) — ดู §06</td></tr>
                 <tr><td>enable_pool_hba +<br>pool_hba.conf</td><td>on, generate จาก --app-cidrs</td><td>โมเดล access control แบบ CIDR เดียวกับ PostgreSQL layer</td></tr>
                 <tr><td>.pcppass</td><td>เขียนใน home ของ pgpool service user</td><td><span class="mono text-[12px]">/var/lib/postgresql</span> ไม่ใช่ <span class="mono text-[12px]">/root</span> — ทุก pcp_* command อ่านจากตรงนี้ (บั๊ก #19)</td></tr>
@@ -1337,6 +1339,15 @@ ip -4 addr show | grep 172.16.0.226</pre>
               node อื่นไม่มี · <b>เจอมากกว่า 1 เครื่อง = split-brain</b> (เกิดได้เฉพาะตอน half-votes เปิดบน cluster เลขคู่)
             </p>
           </div>
+          <div class="edge mt-3">
+            <div class="tag mb-1">ยังไม่พอ — VIP ขึ้นได้จาก ip addr add อย่างเดียว แม้ arping จะ fail</div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">ip addr add</span> กับ <span class="mono text-[12px]">arping</span> เป็นคนละคำสั่งใน escalation chain — เช็คแยกด้วย
+              <span class="mono text-[12px]">sudo journalctl -u pgpool2 --no-pager | grep -E "if_up_cmd|if_down_cmd"</span>
+              ต้องเห็น <span class="mono text-[12px]">'if_up_cmd' returned with success</span> ไม่ใช่ <span class="mono text-[12px]">'if_up_cmd' failed</span>
+              — ถ้า fail ทุกครั้งทั้งที่ T7 ผ่าน คือ package <span class="mono text-[12px]">arping</span> ผิดตัว (บั๊ก #21)
+            </p>
+          </div>
         </div>
 
         <!-- T8 -->
@@ -1361,7 +1372,7 @@ psql -h 172.16.0.226 -p 5432 -U postgres -d postgres -c <span class="s">'select 
         <div class="step">
           <span class="sn">T9</span>
           <h3 class="font-semibold text-[16px] mb-1">Kill-test: ฆ่า leader แล้ว VIP ต้องย้าย</h3>
-          <p class="text-[13px] mb-3" style="color:var(--muted)"><b>เพื่ออะไร:</b> <b>ขั้นที่สำคัญที่สุดและห้ามข้าม</b> — บั๊ก #16/#17/#18 ทั้งหมด "ดูปกติดี" ผ่าน T1–T8 ได้หมด แล้วมาโผล่ตรงนี้ที่เดียว</p>
+          <p class="text-[13px] mb-3" style="color:var(--muted)"><b>เพื่ออะไร:</b> <b>ขั้นที่สำคัญที่สุดและห้ามข้าม</b> — บั๊ก #16/#17/#18/#21 ทั้งหมด "ดูปกติดี" ผ่าน T1–T8 ได้หมด แล้วมาโผล่ตรงนี้ที่เดียว (บั๊ก #21 โผล่แค่ใน journalctl เท่านั้น — VIP ยังย้ายและตอบได้ตามปกติ)</p>
           <div class="code p-5 mb-3">
 <pre><span class="c"># 1) หยุด node ที่ถือ VIP อยู่</span>
 ssh &lt;leader&gt; <span class="s">"sudo systemctl stop pgpool2"</span>
@@ -1490,7 +1501,7 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
 
       <section id="bugs" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">08 — บั๊กที่เจอระหว่าง Implement</div>
-        <h2 class="display text-3xl mb-6">20 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
+        <h2 class="display text-3xl mb-6">22 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           บันทึกไว้ให้ครบเพื่อกันคนถัดไป (หรือตัวเราเองตอน re-provision) เจอปัญหาเดิมซ้ำแบบช้าๆ — ทั้งหมดถูกแก้ฝังอยู่ใน
           <span class="mono text-[13px]">install-postgresql.sh</span>/<span class="mono text-[13px]">install-pgpool.sh</span>
@@ -1634,6 +1645,18 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
                   <td>sticky-DOWN แบบเดียวกับ #14 — node ที่ start ระหว่าง backend unreachable บันทึกเป็น DOWN auto_failback ไม่เคลียร์ในเคสนี้</td>
                   <td><span class="mono text-[11.5px]">pcp_attach_node</span> บน leader ปัจจุบัน — เช็ค show pool_nodes เสมอหลังทดสอบ failover</td>
                 </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>21</td>
+                  <td><b>VIP ขึ้นปกติดี, <span class="mono text-[11.5px]">show pool_nodes</span> เขียวหมด</b> — แต่ <span class="mono text-[11.5px]">journalctl</span> ทุก escalation ขึ้น <span class="mono text-[11.5px]">'if_up_cmd' failed</span> / <span class="mono text-[11.5px]">failed to acquire delegate IP</span> — เจอ 7/7 ครั้งที่ผ่านมา ไม่ใช่จาก user-facing symptom แต่จากการไล่โค้ดเอง</td>
+                  <td><span class="mono text-[11.5px]">apt-get install arping</span> บน Ubuntu 24.04 ลง Thomas Habets ARPing 2.24 ไม่ใช่ iputils flavor ที่ <span class="mono text-[11.5px]">arping_cmd</span> เขียนไว้ (flag <span class="mono text-[11.5px]">-U -I</span> เหมือนกันทั้งคู่ ทำให้ดูเหมือนถูก) แต่ Habets <span class="mono text-[11.5px]">-U</span> ยังรอ reply แบบ ping แล้ว exit 1 ตอน timeout — gratuitous self-announce ไม่มีใคร reply กลับ จึง fail ทุกครั้ง ส่วน <span class="mono text-[11.5px]">ip addr add</span> เป็นคนละคำสั่ง สำเร็จไปแล้วก่อนหน้า VIP เลยดูปกติทุกอย่าง</td>
+                  <td>เปลี่ยนไปใช้ <span class="mono text-[11.5px]">iputils-arping</span> — conflict กับ <span class="mono text-[11.5px]">arping</span> ที่ dpkg level ต้องถอนตัวเดิมก่อน และติดตั้งที่ <span class="mono text-[11.5px]">/usr/bin/arping</span> ไม่ใช่ <span class="mono text-[11.5px]">/usr/sbin/</span> (ต้องแก้ <span class="mono text-[11.5px]">arping_cmd</span> + sudoers grant ทั้งคู่) ยืนยันด้วย kill-test จริงแล้ว — <span class="mono text-[11.5px]">journalctl</span> ขึ้น <span class="mono text-[11.5px]">'if_up_cmd' returned with success</span></td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>22</td>
+                  <td><span class="mono text-[11.5px]">install-postgresql.sh --mode=replica</span> ไม่มี <span class="mono text-[11.5px]">--repl-password</span> และไม่มีไฟล์รหัส cache — <b>generate รหัสสุ่มแล้วรันต่อ</b> ก่อน <span class="mono text-[11.5px]">pg_basebackup</span> fail ด้วย auth error ที่งงว่าสาเหตุอะไร</td>
+                  <td><span class="mono text-[11.5px]">resolve_repl_password()</span> เขียนไว้สำหรับ primary (generate ใหม่ถูกต้อง) แต่ใช้ซ้ำกับ replica ด้วย — replica ไม่มีอะไรให้ generate รหัสให้เลย เพราะ role + รหัสจริงมีอยู่แล้วบน primary รหัสที่ generate ใหม่ไม่มีทางตรงกัน</td>
+                  <td>เพิ่มเงื่อนไข <span class="mono text-[11.5px]">$MODE = "replica"</span> ให้ <span class="mono text-[11.5px]">die</span> พร้อมบอกคำสั่งดึงรหัสจาก primary แทนที่จะ generate มั่วแล้วรันต่อ</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -1726,6 +1749,25 @@ sequenceDiagram
             <b style="color:var(--accent)">คำตอบคือไม่บล็อก</b> — VIP ย้ายระหว่าง node ได้จริงในทั้งสองรอบทดสอบ และตอบ
             query จาก client นอก subnet ได้ตลอดช่วง failover ยืนยันแล้วว่า anti-spoofing ที่บาง cloud provider ทำกับ
             gratuitous ARP <b>ไม่ใช่ปัญหาบน infrastructure นี้</b>
+          </p>
+        </div>
+
+        <div class="card p-6 mb-8">
+          <div class="chip mb-3"><span class="dot" style="background:var(--signal)"></span>Round 3 · หลังแก้บั๊ก #21 (arping ผิด package)</div>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            Round 1–2 ด้านบน "ผ่าน" ในแง่ที่ VIP ย้ายจริงและยังตอบต่อ — แต่ทั้งสองรอบไม่ได้เช็ค
+            <span class="mono text-[12px]">journalctl</span> ดู exit status ของ <span class="mono text-[12px]">if_up_cmd</span>
+            เอง จึงไม่รู้ว่าจริงๆ แล้ว <span class="mono text-[12px]">arping</span> fail เงียบๆ ทุกครั้งมาตลอด
+            (<span class="mono text-[12px]">ip addr add</span> อย่างเดียวก็เพียงพอให้ VIP ทำงาน "ดูเหมือน" ปกติ) —
+            เจอจากการ audit script เอง ไม่ใช่จาก test ไหนล้ม
+          </p>
+          <ol class="text-sm space-y-1.5 pl-5 list-decimal" style="color:var(--ink-soft)">
+            <li>หยุด pgpool1 (VIP holder) → VIP ย้ายไป pgpool2, <span class="mono text-[12px]">select 1</span> จาก client ภายนอกตอบต่อเนื่อง — พฤติกรรมที่สังเกตได้เหมือน Round 1–2 ทุกอย่าง</li>
+            <li><b style="color:var(--accent)">รอบนี้</b> <span class="mono text-[12px]">journalctl -u pgpool2</span> บน leader ใหม่ขึ้น <span class="mono text-[12px]">'if_up_cmd' returned with success</span> / <span class="mono text-[12px]">successfully acquired the delegate IP</span> — ยืนยันคำสั่งจริงที่ pgpool รัน ไม่ใช่แค่ผลลัพธ์ปลายทาง</li>
+            <li>Restart pgpool1 → rejoin เป็น STANDBY, quorum ปกติ, backend ทั้ง 3 ตัว up/up</li>
+          </ol>
+          <p class="text-[12.5px] mt-3" style="color:var(--muted)">
+            บทเรียน: <span class="mono text-[12px]">ip addr add</span> กับ <span class="mono text-[12px]">arping</span> เป็นคนละคำสั่งใน escalation chain เดียวกัน pgpool log แยก exit status ของแต่ละตัว — เช็คแค่ผลลัพธ์ปลายทาง (VIP ขึ้น, ตอบได้) ไม่พอ ต้องเช็ค <span class="mono text-[12px]">journalctl</span> หา <span class="mono text-[12px]">if_up_cmd</span>/<span class="mono text-[12px]">if_down_cmd</span> โดยตรง
           </p>
         </div>
 
@@ -1917,6 +1959,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>pgpool3 (node 2, 172.16.0.120) — ติดตั้งและ join แล้ว ทำให้ cluster เป็น <b>odd-sized</b> — <span class="mono text-[12px]">enable_consensus_with_half_votes</span> กลับเป็น off เอง ปิดความเสี่ยง split-brain</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Watchdog quorum / VIP escalation — <span class="mono text-[12px]">QUORUM EXIST</span>, ทั้ง 3 node MEMBER, <span class="mono text-[12px]">Nodes required for quorum: 2</span>, VIP live</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Real failover test — ผ่านบน OVH vRack นี้จริง; gratuitous ARP ไม่ถูกบล็อก</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><span class="mono text-[12px]">arping</span> ผิด package แก้แล้ว (บั๊ก #21, เจอจากการ audit script เอง — <span class="mono text-[12px]">show pool_nodes</span> ดูปกติมาตลอด) <span class="mono text-[12px]">if_up_cmd</span> fail เงียบๆ ทุก escalation ที่ผ่านมา (7/7) เปลี่ยนไปใช้ <span class="mono text-[12px]">iputils-arping</span> ทั้ง 3 node แล้ว ยืนยันด้วย kill-test จริง — <span class="mono text-[12px]">journalctl</span> ขึ้น <span class="mono text-[12px]">'if_up_cmd' returned with success</span></span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Repo <span class="mono text-[12px]">.env</span> (local checkout) — <span class="mono text-[12px]">*_DB_HOST</span> ทั้งหมดชี้ 172.16.0.224 (pgpool1 <b>ตรง</b> ยังไม่ใช่ VIP — จุดเดียวที่ยัง SPOF)</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>ย้าย <span class="mono text-[12px]">.env</span> ทั้ง repo และ ovh-dev ไปที่ VIP (172.16.0.226) — <b>ตอนนี้ทำได้แล้ว</b> เพราะ VIP live + ทดสอบ failover แล้ว เป็นขั้นเดียวที่เหลือกว่าจะได้ HA จริง</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><span class="mono text-[12px]">ovh-dev</span> <span class="mono text-[12px]">.env</span> (server จริงที่ pm2 คุมอยู่) — ยังชี้ 172.16.0.221 (ppm ตรง) ข้าม pgpool ไปเลย ต้องเปลี่ยน host + <span class="mono text-[12px]">pm2 delete all && pm2 start ecosystem.config.js</span></span></div>
