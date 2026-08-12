@@ -16,14 +16,18 @@ class ErpDocnav extends HTMLElement {
     { href: 'nextjs-permission-guide.html', icon: '🔐', label: 'Next.js Integration Guide', desc: 'Frontend Integration · Permission System' },
     { href: 'observability-logging-guide.html', icon: '📊', label: 'Observability (Tempo/Loki)', desc: 'OpenTelemetry Traces · pino-http Logs' },
     { href: 'postgresql-pgpool-cluster-guide.html', icon: '🔌', label: 'Connection Pooling (Pgpool-II)', desc: 'HA Cluster Setup · Watchdog Failover · Grafana' },
+    { href: 'runbook.html', icon: '🚨', label: 'Runbook', desc: 'Incident Response · Symptom → Diagnosis → Fix → Verify' },
   ];
 
   connectedCallback() {
     const current = window.location.pathname.split('/').pop() || 'index.html';
     // core-feature.html is the SRS hub; the per-phase pages (srs-p3.html …)
     // live under it, so treat it as "current" while reading a phase too.
+    // Same pattern for runbook.html + runbook-*.html topic pages.
     const isLinkCurrent = (href) =>
-      href === current || (href === 'core-feature.html' && /^srs-p\d/.test(current));
+      href === current ||
+      (href === 'core-feature.html' && /^srs-p\d/.test(current)) ||
+      (href === 'runbook.html' && /^runbook-/.test(current));
 
     const currentLink =
       ErpDocnav.LINKS.find((l) => isLinkCurrent(l.href)) ?? ErpDocnav.LINKS[0];

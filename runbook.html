@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Runbook — คู่มือรับมือเหตุการณ์ฉุกเฉิน · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="R" title="Runbook" subtitle="INCIDENT RESPONSE · ON-CALL" width="280">
+    <nav slot="nav">
+      <a href="#what"     class="navlink"><span class="n">01</span> Runbook คืออะไร</a>
+      <a href="#template"  class="navlink"><span class="n">02</span> โครงสร้างมาตรฐาน</a>
+      <a href="#library"  class="navlink"><span class="n">03</span> รายการ Runbook</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <div class="navsub">Database / Infra</div>
+      <a href="runbook-pgpool-nodes-down.html" class="navlink"><span class="n" style="color:var(--signal)">01</span> Pgpool: All Backend Nodes Down</a>
+    </nav>
+    <div slot="footnote">
+      <a href="postgresql-pgpool-cluster-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ Pgpool-II Cluster Guide (Setup/Deep-dive)</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="index.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่สารบัญเอกสาร
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Incident Response</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Runbook —<br>
+          <span class="text-[#7FE3DE]">คู่มือรับมือเหตุการณ์ฉุกเฉิน</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          เอกสารชุดนี้ตอบคำถามเดียวเท่านั้น: <span class="text-white font-medium">"เจออาการนี้ ตอนนี้ต้องทำอะไรบ้าง"</span>
+          — สั้น ตรงเป้า ทำตามได้ทันทีตอน production มีปัญหา ไม่ใช่เอกสารสถาปัตยกรรมหรือคู่มือ setup
+          (เอกสารพวกนั้นอยู่ใน <a href="index.html" class="underline decoration-dotted" style="color:#7FE3DE">สารบัญหลัก</a>)
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Symptom → Diagnosis → Fix → Verify</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Copy-paste Commands</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 WHAT ========== -->
+      <section id="what" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — Runbook คืออะไร</div>
+        <h2 class="display text-3xl mb-6">ต่างจากเอกสารอื่นในไซต์นี้อย่างไร</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ไซต์นี้มีเอกสารสามชั้นที่ตอบคนละคำถาม — สับสนกันบ่อยเวลาเกิดเหตุจริงเพราะเปิดผิดเอกสารแล้วเสียเวลา
+        </p>
+
+        <div class="card overflow-hidden">
+          <div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">GUIDE (เช่น postgresql-pgpool-cluster-guide.html)</div>
+              <h3 class="font-semibold mb-2 text-[15px]">"ระบบนี้ทำงานยังไง / setup ยังไง"</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                อ่านตอนออกแบบ/ติดตั้งระบบ — ลึก ครบ มี rationale และ known-gap ทุกจุด อ่านทั้งฉบับใช้เวลาเป็นชั่วโมง
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">INCIDENT LOG (ในตัว guide เอง §accident/§bugs)</div>
+              <h3 class="font-semibold mb-2 text-[15px]">"ครั้งที่แล้วเกิดอะไรขึ้น เราแก้ยังไง"</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                บันทึกประวัติศาสตร์แบบละเอียด พร้อม output จริงและบั๊กที่เจอระหว่างทาง — มีบริบทเยอะ อ่านเข้าใจทั้งเรื่องแต่ไม่ได้ออกแบบมาให้ไล่ทำตามเร็วๆ
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">RUNBOOK (หน้านี้ + เอกสารย่อย)</div>
+              <h3 class="font-semibold mb-2 text-[15px]">"ตอนนี้ทำอะไร ตามลำดับ"</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                กลั่นจาก guide + incident log ให้เหลือแค่คำสั่งที่ต้องรัน เรียงเป็นขั้นตอน อ่านจบใน 2–3 นาทีตอนมือไม้สั่นเพราะ prod ล่ม
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 TEMPLATE ========== -->
+      <section id="template" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — โครงสร้างมาตรฐาน</div>
+        <h2 class="display text-3xl mb-6">ทุก Runbook ในชุดนี้ต้องมี 6 หัวข้อนี้เรียงตามลำดับ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เขียน Runbook ใหม่ให้ copy shell ของ <span class="mono text-[13px]">runbook-pgpool-nodes-down.html</span>
+          แล้วแทนเนื้อหา — อย่าออกแบบโครงใหม่ เพื่อให้คนอ่านคุ้นเคยว่าข้อมูลที่ต้องการอยู่ตรงไหนเสมอไม่ว่าจะเป็นเรื่องอะไร
+        </p>
+
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div class="step" style="margin:0">
+            <span class="sn">1</span>
+            <h3 class="font-semibold text-[16px] mb-2">อาการ (Symptom)</h3>
+            <p class="text-sm" style="color:var(--ink-soft)">error message / log line ที่เห็นจริงๆ แบบ copy มาตรงๆ ไม่ paraphrase — ใช้ค้นหา/แม็ตช์เหตุการณ์ได้ทันที</p>
+          </div>
+          <div class="step" style="margin:0">
+            <span class="sn">2</span>
+            <h3 class="font-semibold text-[16px] mb-2">ผลกระทบ (Impact)</h3>
+            <p class="text-sm" style="color:var(--ink-soft)">อะไรพังบ้าง ระดับความรุนแรงแค่ไหน ต้องรีบแค่ไหน — ช่วยตัดสินใจว่าควร escalate หรือรอได้</p>
+          </div>
+          <div class="step" style="margin:0">
+            <span class="sn">3</span>
+            <h3 class="font-semibold text-[16px] mb-2">วินิจฉัย (Diagnosis)</h3>
+            <p class="text-sm" style="color:var(--ink-soft)">คำสั่งที่ใช้ยืนยันว่าใช่เคสนี้จริง ก่อนเริ่มแก้ — กันแก้ผิดจุดตอนตื่นตกใจ</p>
+          </div>
+          <div class="step" style="margin:0">
+            <span class="sn">4</span>
+            <h3 class="font-semibold text-[16px] mb-2">สาเหตุ (Root Cause)</h3>
+            <p class="text-sm" style="color:var(--ink-soft)">อธิบายสั้นๆ ว่าทำไมถึงเกิด — พอให้เข้าใจว่าทำไม fix ข้อ 5 ถึงใช้ได้ ไม่ต้องลึกเท่า guide</p>
+          </div>
+          <div class="step" style="margin:0">
+            <span class="sn">5</span>
+            <h3 class="font-semibold text-[16px] mb-2">การแก้ไข (Fix)</h3>
+            <p class="text-sm" style="color:var(--ink-soft)">คำสั่ง copy-paste ได้ตรงๆ เรียงตามลำดับที่ต้องรันจริง</p>
+          </div>
+          <div class="step" style="margin:0">
+            <span class="sn">6</span>
+            <h3 class="font-semibold text-[16px] mb-2">ยืนยัน + ป้องกัน (Verify / Prevent)</h3>
+            <p class="text-sm" style="color:var(--ink-soft)">เช็คยังไงว่าหายจริง + ลิงก์ไปเอกสารเชิงลึก/mitigation ระยะยาวถ้ามี</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 LIBRARY ========== -->
+      <section id="library" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — รายการ Runbook</div>
+        <h2 class="display text-3xl mb-6">Database / Infrastructure</h2>
+        <div class="grid sm:grid-cols-2 gap-5">
+          <a href="runbook-pgpool-nodes-down.html" class="bc-card block p-6 no-underline">
+            <div class="chip mb-4"><span class="dot" style="background:var(--signal)"></span>PGPOOL · DATABASE</div>
+            <h3 class="text-lg font-semibold mb-2" style="color:var(--ink)">Pgpool: All Backend Nodes Down</h3>
+            <p class="text-sm" style="color:var(--muted)">
+              App ทุกตัว connect DB ไม่ได้ (<span class="mono text-[12px]">pgpool is not accepting any new connections</span>)
+              ทั้งที่ PostgreSQL/repmgr จริงปกติ
+            </p>
+          </a>
+        </div>
+        <p class="mt-8 text-[13.5px]" style="color:var(--muted)">
+          ยังไม่มี runbook สำหรับหมวดอื่น (RabbitMQ jam, MinIO/storage, IAM permission sync ฯลฯ) — เพิ่มเข้ามาเมื่อเจอเหตุการณ์จริงและอยากกันไม่ให้ทีมเสียเวลาซ้ำ
+        </p>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · RUNBOOK · INCIDENT RESPONSE"
+        line2="Symptom → Diagnosis → Fix → Verify">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>

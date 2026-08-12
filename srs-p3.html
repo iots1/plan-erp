@@ -166,6 +166,29 @@
               <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">over_receipt_allowance</div><p class="text-[13px]">% ที่ยอมให้รับ/ส่งเกินจำนวนในเอกสารอ้างอิง (เช่น รับเกิน PO ได้ 5%)</p></div>
             </div>
           </div>
+
+          <h4 class="font-semibold mt-8 mb-3 text-[15px]">Pricing &amp; Multi-Supplier · ราคาสินค้า &amp; ผู้จัดซื้อหลายราย</h4>
+          <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)">ตารางย่อยของ Item master ที่เก็บ <b>ราคาซื้อ/ขาย</b> และ <b>ผู้จัดซื้อที่ส่งมอบสินค้านี้ได้</b> (หลายรายต่อสินค้า) — field เต็มอยู่ที่ <a href="srs-p2.html#p2" style="color:var(--signal);text-decoration:underline">P2 · Master Data</a>, ที่นี่สรุปเฉพาะมุมที่กระทบ inventory-bc dev</p>
+          <div class="grid sm:grid-cols-3 gap-4 mb-6">
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">PRICE_LISTS</div>
+              <div class="font-semibold mb-1.5">รายการราคา</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">"ราคาซื้อมาตรฐาน"/"ราคาขายมาตรฐาน" — กำหนด <span class="mono text-[12px]">currency</span> + ทิศทาง <span class="mono text-[12px]">is_buying/is_selling</span> (อย่างน้อยหนึ่งต้อง true)</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">ITEM_PRICES</div>
+              <div class="font-semibold mb-1.5">ราคาต่อสินค้า</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">แถวราคาจริงต่อ product×price_list×uom ระบุ <span class="mono text-[12px]">supplier_id</span>/<span class="mono text-[12px]">batch_no</span>/ช่วงวันที่มีผลได้ — <b>ไม่ใช่</b> ต้นทุน Lot (<span class="mono text-[12px]">import_cost</span> ยังคงมาจาก Goods Receipt เท่านั้น) และ<b>ไม่มีคอลัมน์ currency</b> ของตัวเอง (ใช้ของ price list เจ้าของเสมอ)</p>
+            </div>
+            <div class="role">
+              <div class="mono text-[11px] mb-1" style="color:var(--signal)">ITEM_SUPPLIERS</div>
+              <div class="font-semibold mb-1.5">ผู้จัดซื้อของสินค้า</div>
+              <p class="text-[13px]" style="color:var(--ink-soft)">Junction หลายผู้จัดซื้อต่อสินค้า (แทนที่ <span class="mono text-[12px]">products.supplier_id</span> เดิมที่รองรับรายเดียว) — มี <span class="mono text-[12px]">is_default</span> เลือกผู้จัดซื้อหลัก</p>
+            </div>
+          </div>
+          <div class="edge mb-2" style="background:rgba(220,90,22,.06);border-color:rgba(220,90,22,.22)"><div class="tag mb-1" style="color:var(--signal)">Cross-BC · ไม่มี FK</div><p class="text-[13px]"><span class="mono text-[12px]">supplier_id</span> บน <span class="mono text-[12px]">item_prices</span>/<span class="mono text-[12px]">item_suppliers</span> อ้าง <span class="mono text-[12px]">suppliers.id</span> (supplier-bc) แบบเดียวกับที่ <span class="mono text-[12px]">lots.supplier_id</span> ทำอยู่แล้วใน section 04 — validate ผ่าน TCP <span class="mono text-[12px]">getSupplierById</span> ก่อนบันทึกทุกครั้ง ไม่มี FK ให้ Postgres จับ</p></div>
+          <div class="edge mb-2"><div class="tag mb-1">อย่าสับสนกับ uom_conversion_factors</div><p class="text-[13px]"><span class="mono text-[12px]">item_prices.packing_unit</span> (จำนวนขั้นต่ำที่ต้องซื้อ/ขายต่อครั้ง เช่น "1 ลัง = 48 ซอง" บนใบราคา) กับ <span class="mono text-[12px]">uom_conversion_factors.conversion_factor</span> (อัตราแปลงหน่วยเพื่อคำนวณ stock UOM ตอนบันทึกสต็อกจริง) เป็น<b>คนละหน้าที่กัน</b> แม้ตัวเลขมักตรงกัน — <span class="mono text-[12px]">packing_unit</span> เป็นแค่ข้อจำกัดตอนตั้งราคา/สั่งซื้อ ไม่ใช้คำนวณ available_qty ห้าม derive อันใดอันหนึ่งจากอีกอันโดยไม่ตรวจสอบ</p></div>
+          <p class="text-[12.5px] mt-3" style="color:var(--muted)">ตัวอย่างการใช้งานจริงข้ามประเภทธุรกิจ (ค้าปลีก/ค้าส่ง/ร้านขายยา/โรงงานผลิต) ดูที่ <a href="srs-p2.html#p2" style="color:var(--signal);text-decoration:underline">P2 · หัวข้อ "ตัวอย่างการใช้งานจริงตามประเภทธุรกิจ"</a></p>
         </div>
 
         <!-- 3.3 Use Cases & Data Entry -->
@@ -429,6 +452,34 @@ erDiagram
         uuid product_id FK
         int alert_qty
     }
+    PRICE_LISTS {
+        uuid id PK
+        string name_th
+        string name_en
+        string currency "ISO 4217"
+        boolean is_buying
+        boolean is_selling
+        boolean is_active
+    }
+    ITEM_PRICES {
+        uuid id PK
+        uuid product_id FK
+        uuid price_list_id FK
+        uuid uom_id FK
+        uuid supplier_id "ref supplier-bc, nullable"
+        string batch_no
+        decimal rate
+        decimal packing_unit "qty per uom, 0=unset"
+        date valid_from
+        date valid_upto
+    }
+    ITEM_SUPPLIERS {
+        uuid id PK
+        uuid product_id FK
+        uuid supplier_id "ref supplier-bc"
+        string supplier_part_number
+        boolean is_default
+    }
     ITEM_GROUPS ||--o{ ITEM_GROUPS : "parent of"
     WAREHOUSES ||--o{ WAREHOUSES : "parent of"
     ITEM_GROUPS ||--o{ PRODUCTS : classifies
@@ -452,6 +503,10 @@ erDiagram
     LOTS ||--o{ STOCK_ENTRY_ITEMS : "moves / repacks"
     WAREHOUSES ||--o{ STOCK_ENTRIES : "from / to"
     PRODUCTS ||--o| REORDER_LEVELS : has
+    PRODUCTS ||--o{ ITEM_PRICES : "priced in"
+    PRICE_LISTS ||--o{ ITEM_PRICES : contains
+    UOMS ||--o{ ITEM_PRICES : "quoted per"
+    PRODUCTS ||--o{ ITEM_SUPPLIERS : "supplied via"
 </pre>
           </div>
         </div>
@@ -477,6 +532,7 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · SUBMITTABLE DOCUMENTS</div><p class="text-[13.5px]">เอกสารเคลื่อนไหวสต็อกทุกใบ (GRN, Delivery, Stock Entry, Reconciliation) เป็น <b>submittable</b>: <span class="mono text-[12px]">DRAFT → SUBMITTED → CANCELLED</span> · สต็อกจะเคลื่อน (post ledger) เฉพาะตอน <b>submit</b> เท่านั้น · การ cancel ต้อง <b>reverse movement</b> ที่โพสต์ไว้ ไม่ใช่ลบทิ้ง · draft แก้ได้อิสระโดยไม่กระทบสต็อก</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · OUTBOX / IDEMPOTENCY</div><p class="text-[13.5px]">ส่ง event <b>หลัง commit</b> ด้วย Outbox pattern และ consumer ต้อง idempotent (เก็บ processed event id) กัน event ซ้ำจาก RabbitMQ</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · UUID ONLY</div><p class="text-[13.5px]">อ้างอิงข้าม BC ด้วย UUID เท่านั้น · ห้าม Foreign Key ข้ามฐานข้อมูล · <span class="mono text-[12px]">available_qty</span> ใช้ CHECK constraint ≥ 0</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · PRICE ≠ COST</div><p class="text-[13.5px]"><span class="mono text-[12px]">item_prices.rate</span> (ราคาซื้อ/ขายที่ตั้งไว้ล่วงหน้า) กับ <span class="mono text-[12px]">lots.import_cost</span> (ต้นทุนจริงที่รับเข้า) เป็นคนละแนวคิด — ห้าม service ใดอ่าน <span class="mono text-[12px]">item_prices</span> มาคำนวณ COGS แทน <span class="mono text-[12px]">stock_movements.unit_cost</span> (ดู RULE · COST SNAPSHOT ด้านบน)</p></div>
           </div>
         </div>
 

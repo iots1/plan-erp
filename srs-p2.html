@@ -204,6 +204,20 @@
             <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ส่งต่อ inventory</div><p class="text-[13px]">Goods Receipt ปลายทางต้องเป็น <b>leaf</b> (<span class="mono text-[12px]">is_group=false</span>, <span class="mono text-[12px]">type=stock</span>)</p></div>
           </div>
 
+          <!-- SUPPLIER GROUP -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">supplier_groups · กลุ่มผู้จัดซื้อ <span class="mono text-[11px]" style="color:var(--muted)">(supplier-bc)</span></div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อกลุ่ม (ไทย)</td></tr>
+                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อกลุ่ม (อังกฤษ) — unique</td></tr>
+                <tr><td>is_active</td><td><span style="color:var(--muted)">–</span></td><td>เปิดใช้งาน (ค่าเริ่มต้น true)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4"><div class="tag mb-1">flat list ไม่ใช่ tree</div><p class="text-[13px]">ต่างจาก <span class="mono text-[12px]">item_groups</span>/<span class="mono text-[12px]">warehouses</span> — กลุ่มผู้จัดซื้อไม่มีลำดับชั้น ใช้กรอง/จัดหมวดเฉย ๆ</p></div>
+          </div>
+
           <!-- SUPPLIER -->
           <div class="card p-6 mb-5">
             <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
@@ -219,9 +233,147 @@
                 <tr><td>tax_id</td><td><span style="color:#15803D">✓</span></td><td>เลขประจำตัวผู้เสียภาษี (ใช้ต่อใน finance-bc)</td></tr>
                 <tr><td>contact_phone · address</td><td><span style="color:var(--muted)">–</span></td><td>ข้อมูลติดต่อ</td></tr>
                 <tr><td>credit_terms</td><td><span style="color:var(--muted)">–</span></td><td>เงื่อนไขเครดิต (วัน) — ใช้ตอนตั้งหนี้ AP</td></tr>
+                <tr><td>supplier_type</td><td><span style="color:var(--muted)">–</span></td><td><span class="mono text-[12px]">company</span> | <span class="mono text-[12px]">individual</span> — ค่าเริ่มต้น company</td></tr>
+                <tr><td>supplier_group_id</td><td><span style="color:var(--muted)">–</span></td><td>กลุ่มผู้จัดซื้อ (ref supplier_groups)</td></tr>
+                <tr><td>country</td><td><span style="color:var(--muted)">–</span></td><td>ประเทศ (ISO 3166-1 alpha-2 เช่น TH)</td></tr>
+                <tr><td>alias · billing_currency</td><td><span style="color:var(--muted)">–</span></td><td>ชื่อย่อ · สกุลเงินที่วางบิล (ISO 4217)</td></tr>
+                <tr><td>default_price_list_id</td><td><span style="color:var(--muted)">–</span></td><td>รายการราคาซื้อเริ่มต้น (ref inventory-bc <span class="mono text-[12px]">price_lists</span> · UUID ข้าม BC)</td></tr>
+                <tr><td>payment_terms_template</td><td><span style="color:var(--muted)">–</span></td><td>เงื่อนไขการชำระเงิน (ข้อความอิสระในรอบนี้)</td></tr>
+                <tr><td>is_active</td><td><span style="color:var(--muted)">–</span></td><td>เปิดใช้งาน (ค่าเริ่มต้น true)</td></tr>
               </tbody>
             </table>
             <div class="edge mt-4"><div class="tag mb-1">ขอบเขต</div><p class="text-[13px]"><b>supplier-bc เป็นเจ้าของ</b> · inventory/finance อ้างด้วย <span class="mono text-[12px]">supplier_id</span> (UUID) เท่านั้น ไม่ join ข้าม DB</p></div>
+            <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ตัดขอบเขตรอบนี้</div><p class="text-[13px]">Company Bank Account (รอ finance-bc) และ Tax Withholding Category/Group ยังไม่ออกแบบในรอบนี้ — <span class="mono text-[12px]">tax_id</span> เดิมมีอยู่แล้วเพียงพอสำหรับ AP เบื้องต้น</p></div>
+          </div>
+
+          <!-- PRICE LIST -->
+          <div class="card p-6 mb-5" style="border-left:3px solid #7C3AED">
+            <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div class="mono text-[12px]" style="color:#7C3AED">price_lists · รายการราคา <span class="mono text-[11px]" style="color:var(--muted)">(inventory-bc)</span></div>
+              <span class="chip"><span class="dot" style="background:#7C3AED"></span>เช่น "ราคาซื้อมาตรฐาน" / "ราคาขายมาตรฐาน"</span>
+            </div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อรายการราคา — unique ที่ name_en</td></tr>
+                <tr><td>currency</td><td><span style="color:#15803D">✓</span></td><td>สกุลเงินของ<b>ทั้งรายการราคา</b> (ISO 4217 เช่น THB) — <b>เจ้าของสกุลเงินหนึ่งเดียว</b>, ไม่เก็บซ้ำที่ item_prices</td></tr>
+                <tr><td>is_buying · is_selling</td><td><span style="color:#15803D">✓</span></td><td>ทิศทางการใช้งาน — <b>อย่างน้อยหนึ่งต้อง true</b> (DB CHECK)</td></tr>
+                <tr><td>is_active</td><td><span style="color:var(--muted)">–</span></td><td>เปิดใช้งาน (ค่าเริ่มต้น true)</td></tr>
+                <tr><td>description_th · _en</td><td><span style="color:var(--muted)">–</span></td><td>คำอธิบายเพิ่มเติม</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">Header/Line pattern (standard)</div><p class="text-[13px]">ตรงกับทุกระบบหลัก (ERPNext Price List, Odoo pricelist, Dynamics 365 BC Price List Header, NetSuite Price Level) — <b>currency อยู่ที่ header เท่านั้น</b> ไม่ปล่อยให้ line (item_prices) override ต่างสกุลเงินภายใน price list เดียวกัน ป้องกันการรวมยอด/เทียบราคาผิดพลาด</p></div>
+            <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">Validate ที่ service ไม่ใช่ DB</div><p class="text-[13px]">DB CHECK constraint (23514) <b>ไม่ถูก map</b> โดย PostgresErrorMapper (ตกไปเป็น 500) — ต้องเช็ค <span class="mono text-[12px]">is_buying/is_selling</span> ในชั้น DTO/service ก่อน insert เสมอ</p></div>
+          </div>
+
+          <!-- ITEM PRICE -->
+          <div class="card p-6 mb-5" style="border-left:3px solid #7C3AED">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">item_prices · ราคาต่อสินค้า <span class="mono text-[11px]" style="color:var(--muted)">(inventory-bc)</span></div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>product_id · price_list_id · uom_id</td><td><span style="color:#15803D">✓</span></td><td>สินค้า / รายการราคา / หน่วยนับที่ตั้งราคา</td></tr>
+                <tr><td>rate</td><td><span style="color:#15803D">✓</span></td><td>ราคาต่อหน่วย — สกุลเงินตาม <span class="mono text-[12px]">price_lists.currency</span> เสมอ (ไม่มีคอลัมน์ currency ซ้ำที่นี่)</td></tr>
+                <tr><td>packing_unit</td><td><span style="color:var(--muted)">–</span></td><td>จำนวนที่ต้องซื้อ/ขายต่อหน่วย uom_id (0 = ไม่บังคับ) เช่น 1 กล่อง ต้องซื้อขั้นต่ำ 12 ชิ้น</td></tr>
+                <tr><td>supplier_id</td><td><span style="color:var(--muted)">–</span></td><td>ผู้จัดซื้อ — มีความหมายเฉพาะ buying price list (ref supplier-bc · UUID)</td></tr>
+                <tr><td>batch_no</td><td><span style="color:var(--muted)">–</span></td><td>ตั้งราคาเฉพาะล็อต/แบทช์</td></tr>
+                <tr><td>valid_from · valid_upto</td><td><span style="color:var(--muted)">–</span></td><td>ช่วงวันที่มีผล — upto ว่าง = ไม่มีกำหนด</td></tr>
+                <tr><td>lead_time_days</td><td><span style="color:var(--muted)">–</span></td><td>ระยะเวลาส่งมอบ (วัน) เฉพาะราคาซื้อ</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4"><div class="tag mb-1">Unique scope</div><p class="text-[13px]"><span class="mono text-[12px]">uq_item_prices_scope</span> (product+price_list+uom+supplier+batch+valid_from) กันซ้ำค่าตรงเป๊ะ — แต่ <b>ช่วงวันที่ทับซ้อนกัน</b> ต้องเช็คเองที่ service (DB จับไม่ได้)</p></div>
+          </div>
+
+          <!-- ITEM SUPPLIER -->
+          <div class="card p-6 mb-5" style="border-left:3px solid #7C3AED">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">item_suppliers · ผู้จัดซื้อของสินค้า (หลายราย) <span class="mono text-[11px]" style="color:var(--muted)">(inventory-bc)</span></div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>product_id · supplier_id</td><td><span style="color:#15803D">✓</span></td><td>คู่สินค้า-ผู้จัดซื้อ — unique ร่วมกัน</td></tr>
+                <tr><td>supplier_part_number</td><td><span style="color:var(--muted)">–</span></td><td>รหัสสินค้าตามผู้จัดซื้อรายนั้น</td></tr>
+                <tr><td>is_default</td><td><span style="color:var(--muted)">–</span></td><td>ผู้จัดซื้อหลักของสินค้านี้ — มีได้แถวเดียวที่ true ต่อสินค้า (service บังคับ)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">แทนที่ products.supplier_id เดิม</div><p class="text-[13px]"><span class="mono text-[12px]">products.supplier_id</span> รองรับผู้จัดซื้อได้รายเดียว — <b>คงไว้แบบ deprecated</b> จนกว่า frontend จะย้ายมาใช้ <span class="mono text-[12px]">item_suppliers</span> + <span class="mono text-[12px]">is_default</span> ครบ ค่อยลบใน migration แยกภายหลัง</p></div>
+          </div>
+
+          <!-- MULTI-BUSINESS PRICING SCENARIOS -->
+          <h4 class="font-semibold mt-10 mb-2 text-[16px]">ตัวอย่างการใช้งานจริงตามประเภทธุรกิจ · Price List / Item Price / Item Supplier ต้องรองรับได้หลายรูปแบบ</h4>
+          <p class="text-[13px] mb-5" style="color:var(--ink-soft)">โครง <span class="mono text-[12px]">price_lists</span> + <span class="mono text-[12px]">item_prices</span> + <span class="mono text-[12px]">item_suppliers</span> ออกแบบให้เป็น <b>generic master data</b> — ไม่ผูกกับธุรกิจใดธุรกิจหนึ่ง ตัวอย่างด้านล่างแสดงว่าฟิลด์เดียวกันถูกใช้ต่างกันยังไงในแต่ละประเภทกิจการ</p>
+
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(220,90,22,.12);color:var(--signal);border:1px solid rgba(220,90,22,.3)">ค้าปลีก</span>
+              <span class="text-[14px] font-semibold">มินิมาร์ท/ร้านสะดวกซื้อ — ราคาเดียว ไม่แยกลูกค้า</span>
+            </div>
+            <p class="text-[13px] mb-3" style="color:var(--ink-soft)">ใช้แค่ price list เดียวต่อทิศทาง ไม่มี tier ลูกค้า ไม่ขายเป็นแพ็ค — ฟิลด์ส่วนใหญ่ปล่อยว่าง</p>
+            <pre class="code p-4">price_lists: [{ name_en: "Standard Selling", currency: "THB", is_selling: true }]
+
+item_prices: {
+  product_id: "น้ำดื่ม-600ml", price_list_id: "Standard Selling",
+  uom_id: "ขวด", rate: 7.00
+  <span class="c">// packing_unit, batch_no, valid_from/upto ปล่อยว่างทั้งหมด</span>
+}</pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)"><b>ไม่ต้องใช้</b> <span class="mono text-[12px]">item_suppliers</span> เลยก็ได้ถ้าซื้อจากยี่ห้อเดียว/ร้านค้าส่งเจ้าเดียว — ใช้ <span class="mono text-[12px]">products.supplier_id</span> เดิมพอ</p>
+          </div>
+
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(124,58,237,.12);color:#7C3AED;border:1px solid rgba(124,58,237,.3)">ค้าส่ง/ตัวแทนจำหน่าย</span>
+              <span class="text-[14px] font-semibold">Distributor — ราคาต่างกันตาม tier ลูกค้า + ขายยกลัง</span>
+            </div>
+            <p class="text-[13px] mb-3" style="color:var(--ink-soft)">ลูกค้าแต่ละกลุ่มเห็นราคาไม่เท่ากัน (ร้านค้าปลีก vs ตัวแทนจำหน่ายรายใหญ่) และบังคับซื้อขั้นต่ำเป็นแพ็ค — ใช้ <span class="mono text-[12px]">price_lists</span> หลายใบ + <span class="mono text-[12px]">packing_unit</span></p>
+            <pre class="code p-4">price_lists: [
+  { name_en: "Retail Selling",      currency: "THB", is_selling: true },
+  { name_en: "Distributor Selling", currency: "THB", is_selling: true }
+]
+
+item_prices: [
+  { product_id: "มาม่า-ต้มยำกุ้ง", price_list_id: "Retail Selling",
+    uom_id: "ซอง", rate: 7.00,  packing_unit: 0 },
+  { product_id: "มาม่า-ต้มยำกุ้ง", price_list_id: "Distributor Selling",
+    uom_id: "ลัง",  rate: 285.00, packing_unit: 48 }  <span class="c">// ต้องซื้อขั้นต่ำ 1 ลัง = 48 ซอง</span>
+]
+
+<span class="c">// customers.default_price_list_id (sales-bc, Phase 4) → ชี้ price list ที่ลูกค้ารายนั้นเห็น</span></pre>
+          </div>
+
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">ร้านขายยา/เวชภัณฑ์</span>
+              <span class="text-[14px] font-semibold">Pharmacy — ซื้อยาชนิดเดียวได้หลายเจ้า ราคา/lead time ต่างกัน</span>
+            </div>
+            <p class="text-[13px] mb-3" style="color:var(--ink-soft)">ยาห้ามขาดสต็อก จึงต้องเทียบ <span class="mono text-[12px]">lead_time_days</span> ของแต่ละซัพพลายเออร์ + ราคาซื้ออาจต่างกันตามล็อตนำเข้า (<span class="mono text-[12px]">batch_no</span>)</p>
+            <pre class="code p-4">item_suppliers: [
+  { product_id: "พาราเซตามอล-500mg", supplier_id: "บ.เอบีซี", is_default: true,
+    supplier_part_number: "PARA-500-ABC" },
+  { product_id: "พาราเซตามอล-500mg", supplier_id: "บ.เมดิคอล", is_default: false,
+    supplier_part_number: "MED-PCM-500" }
+]
+
+item_prices: [
+  { product_id: "พาราเซตามอล-500mg", price_list_id: "Standard Buying",
+    supplier_id: "บ.เอบีซี",   uom_id: "กล่อง", rate: 45.00, lead_time_days: 2 },
+  { product_id: "พาราเซตามอล-500mg", price_list_id: "Standard Buying",
+    supplier_id: "บ.เมดิคอล", uom_id: "กล่อง", rate: 42.00, lead_time_days: 7 }
+]
+<span class="c">// เจ้าถูกกว่าส่งช้ากว่า — ฝ่ายจัดซื้อเลือกเองตามความเร่งด่วนของสต็อก ระบบแค่แสดงให้เทียบ</span></pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">ถ้าซื้อล็อตใหม่ราคาเปลี่ยน (เช่นค่าเงิน/ต้นทุนนำเข้าขึ้น) → เพิ่มแถวใหม่ระบุ <span class="mono text-[12px]">batch_no</span> แทนการแก้ราคาเดิมทับ เพื่อย้อนดูประวัติราคาได้</p>
+          </div>
+
+          <div class="card p-6 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(11,61,145,.12);color:var(--blueprint);border:1px solid rgba(11,61,145,.3)">โรงงานผลิต/OEM</span>
+              <span class="text-[14px] font-semibold">Manufacturing — เทียบราคาวัตถุดิบก่อนออก PO</span>
+            </div>
+            <p class="text-[13px] mb-3" style="color:var(--ink-soft)">ฝ่ายจัดซื้อต้องเห็นราคาวัตถุดิบจากผู้จัดซื้อทุกรายพร้อมกันก่อนตัดสินใจ — <span class="mono text-[12px]">item_suppliers.is_default</span> ใช้ auto-fill ตอนเปิด PO ใหม่ แต่ยังเลือกรายอื่นแทนได้เสมอ</p>
+            <pre class="code p-4">GET /item-prices?filter[]=product_id||$eq||{เม็ดพลาสติก-PP-id}
+    &amp;filter[]=price_list_id||$eq||{Standard-Buying-id}
+
+<span class="c">// → คืนราคาจากทุกซัพพลายเออร์ที่เคยตั้งไว้ ให้ฝ่ายจัดซื้อเทียบในหน้าเดียว
+// เลือกเจ้าที่ default (is_default=true) เป็นค่าเริ่มต้นในฟอร์ม PO
+// เปลี่ยนเจ้าได้ตรงฟอร์ม — ไม่กระทบ default ที่ตั้งไว้ในมาสเตอร์</span></pre>
           </div>
 
           <!-- REORDER -->
@@ -320,7 +472,8 @@
             <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Product (Item master)</b> — เลือก item_group + stock_uom (+ brand/supplier) · ตั้ง <span class="mono text-[12px]">has_variants</span> ถ้าต้องการ generate</p></div>
             <div class="step"><span class="sn">5</span><p class="text-[13.5px]"><b>UOM Conversion</b> ต่อสินค้า (ถ้าซื้อ/ขายต่างหน่วยจาก stock UOM)</p></div>
             <div class="step"><span class="sn">6</span><p class="text-[13.5px]"><b>Warehouse (tree)</b> — สร้างคลังปลายทาง (leaf · type=stock)</p></div>
-            <div class="step"><span class="sn">7</span><p class="text-[13.5px]"><b>Supplier</b> (supplier-bc) — สำหรับอ้างอิงตอนรับสินค้า/PO</p></div>
+            <div class="step"><span class="sn">7</span><p class="text-[13.5px]"><b>Supplier</b> (supplier-bc) — สำหรับอ้างอิงตอนรับสินค้า/PO (ถ้ามีหลายกลุ่ม ตั้ง <b>Supplier Group</b> ก่อน)</p></div>
+            <div class="step"><span class="sn">8</span><p class="text-[13.5px]"><b>Price List</b> (inventory-bc) — สร้างอย่างน้อย "ราคาซื้อมาตรฐาน" + "ราคาขายมาตรฐาน" แล้วเติม <b>Item Price</b> ต่อสินค้า · ผูก <b>Item Supplier</b> (หลายราย ถ้ามี) แทนการใช้ <span class="mono text-[12px]">products.supplier_id</span> เดิม</p></div>
           </div>
 
           <div class="grid md:grid-cols-2 gap-5">
@@ -450,6 +603,35 @@ erDiagram
         uuid warehouse_id FK
         int alert_qty
     }
+    PRICE_LISTS {
+        uuid id PK
+        string name_th
+        string name_en
+        string currency "ISO 4217"
+        boolean is_buying
+        boolean is_selling
+        boolean is_active
+    }
+    ITEM_PRICES {
+        uuid id PK
+        uuid product_id FK
+        uuid price_list_id FK
+        uuid uom_id FK
+        uuid supplier_id "ref supplier-bc, nullable"
+        string batch_no
+        decimal rate
+        decimal packing_unit "qty per uom, 0=unset"
+        date valid_from
+        date valid_upto
+        int lead_time_days
+    }
+    ITEM_SUPPLIERS {
+        uuid id PK
+        uuid product_id FK
+        uuid supplier_id "ref supplier-bc"
+        string supplier_part_number
+        boolean is_default
+    }
     ITEM_GROUPS ||--o{ ITEM_GROUPS : "parent of"
     ITEM_GROUPS ||--o{ PRODUCTS : classifies
     BRANDS ||--o{ PRODUCTS : brands
@@ -461,9 +643,13 @@ erDiagram
     PRODUCTS ||--o{ ITEM_VARIANT_ATTRIBUTES : "variant of"
     WAREHOUSES ||--o{ WAREHOUSES : "parent of"
     PRODUCTS ||--o| REORDER_LEVELS : has
+    PRODUCTS ||--o{ ITEM_PRICES : "priced in"
+    PRICE_LISTS ||--o{ ITEM_PRICES : contains
+    UOMS ||--o{ ITEM_PRICES : "quoted per"
+    PRODUCTS ||--o{ ITEM_SUPPLIERS : "supplied via"
 </pre>
           </div>
-          <p class="text-[12.5px] mt-2" style="color:var(--muted)">* <span class="mono">suppliers</span> อยู่ใน supplier-bc และ <span class="mono">file_objects</span> อยู่ใน storage-bc — อ้างข้าม BC ด้วย UUID เท่านั้น ไม่มี FK ข้ามฐานข้อมูล</p>
+          <p class="text-[12.5px] mt-2" style="color:var(--muted)">* <span class="mono">suppliers</span> อยู่ใน supplier-bc และ <span class="mono">file_objects</span> อยู่ใน storage-bc — อ้างข้าม BC ด้วย UUID เท่านั้น ไม่มี FK ข้ามฐานข้อมูล · <span class="mono">item_prices.supplier_id</span> / <span class="mono">item_suppliers.supplier_id</span> อ้าง <span class="mono">suppliers.id</span> แบบเดียวกัน</p>
         </div>
 
         <!-- 2.6 Dev Guide -->
@@ -478,6 +664,8 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · CONVERSION ROUND CHECK</div><p class="text-[13.5px]">ถ้า stock UOM <span class="mono text-[12px]">is_whole_number=true</span> ต้องตรวจว่า qty × conversion_factor เป็นจำนวนเต็ม มิฉะนั้น reject</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · UNIQUE KEYS</div><p class="text-[13.5px]"><span class="mono text-[12px]">uq_products_sku</span> · <span class="mono text-[12px]">uq_suppliers_code</span> — บังคับ unique ระดับ DB · UOM seed ~200+ รายการเป็น master ตั้งต้น</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · UUID CROSS-BC + EVENTS</div><p class="text-[13.5px]"><span class="mono text-[12px]">supplier_id</span> (supplier-bc) และ <span class="mono text-[12px]">context_ref</span> (storage-bc) อ้างด้วย UUID ห้าม FK ข้าม DB · การแก้ master ยิง <span class="mono text-[12px]">item.updated</span> ให้ report-bc/sales/supplier อัปเดต cache</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · SUPPLIER_ID VALIDATION (ไม่มี FK)</div><p class="text-[13.5px]">ก่อนบันทึก <span class="mono text-[12px]">item_prices.supplier_id</span> / <span class="mono text-[12px]">item_suppliers.supplier_id</span> ต้องเรียก supplier-bc ผ่าน <span class="mono text-[12px]">sendWithContext</span> (no-throw) เพื่อยืนยันว่ามีจริง — <span class="mono text-[12px]">null</span> กลับมา → throw <span class="mono text-[12px]">BadRequestException</span> เอง เพราะไม่มี FK ที่จะให้ Postgres จับ 23503 ให้</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · CHECK CONSTRAINT ไม่ auto-map</div><p class="text-[13.5px]"><span class="mono text-[12px]">chk_price_lists_buying_or_selling</span> (23514) <b>ไม่อยู่ในรายการที่ PostgresErrorMapper แปลงให้อัตโนมัติ</b> (มีแค่ 23505/23503/23502/22P02/22001) — ถ้าปล่อยให้ DB เป็นด่านเดียวจะได้ 500 แทนที่จะเป็น 400 ต้องตรวจ business rule นี้ที่ DTO/service ก่อน insert เสมอ</p></div>
           </div>
         </div>
 
@@ -501,6 +689,9 @@ erDiagram
                 <tr><td>Template</td><td>สินค้าต้นแบบ (<span class="mono text-[12px]">has_variants=true</span>) ใช้จัดกลุ่ม variant — ห้ามทำธุรกรรมตรง</td></tr>
                 <tr><td>Bundle / Kit</td><td>สินค้าชุดที่ประกอบจากสินค้าย่อยหลายรายการ</td></tr>
                 <tr><td>BOM</td><td>Bill of Materials — สูตร/รายการส่วนประกอบของสินค้าชุด</td></tr>
+                <tr><td>Price List</td><td>รายการราคาแม่ (เช่น "ราคาซื้อมาตรฐาน"/"ราคาขายมาตรฐาน") กำหนดสกุลเงิน + ทิศทาง Buying/Selling</td></tr>
+                <tr><td>Item Price</td><td>แถวราคาจริงต่อสินค้า ต่อ price list ต่อหน่วยนับ — ระบุผู้จัดซื้อ/ล็อต/ช่วงวันที่มีผลได้</td></tr>
+                <tr><td>Item Supplier</td><td>ผู้จัดซื้อที่สามารถส่งมอบสินค้านี้ได้ (หลายรายต่อสินค้า) พร้อมรหัสสินค้าตามผู้จัดซื้อ</td></tr>
               </tbody>
             </table>
           </div>

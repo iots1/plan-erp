@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Runbook: Pgpool All Backend Nodes Down — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="R" title="Runbook" subtitle="PGPOOL · ALL NODES DOWN" width="280">
+    <nav slot="nav">
+      <a href="#symptom"    class="navlink"><span class="n">1</span> อาการ</a>
+      <a href="#impact"     class="navlink"><span class="n">2</span> ผลกระทบ</a>
+      <a href="#diagnosis"  class="navlink"><span class="n">3</span> วินิจฉัย</a>
+      <a href="#rootcause"  class="navlink"><span class="n">4</span> สาเหตุ</a>
+      <a href="#fix"        class="navlink"><span class="n">5</span> การแก้ไข</a>
+      <a href="#verify"     class="navlink"><span class="n">6</span> ยืนยัน + ป้องกัน</a>
+    </nav>
+    <div slot="footnote">
+      <a href="runbook.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ Runbook Index</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="runbook.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Runbook Index
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Runbook · Database / Infra</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Pgpool: All Backend<br>
+          <span class="text-[#7FE3DE]">Nodes Down</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          ทุก BC (AUTH, IAM, SALES, …) ต่อ database ไม่ได้พร้อมกัน ขึ้น
+          <span class="mono text-[13px] text-white">pgpool is not accepting any new connections</span>
+          — ทั้งที่ PostgreSQL/repmgr จริงยังทำงานปกติทุกโหนด
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9635E"></span>Severity: Critical (Total DB Outage)</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Est. fix time: 2–5 นาที</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 1 SYMPTOM ========== -->
+      <section id="symptom" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">1 — อาการ (Symptom)</div>
+        <h2 class="display text-3xl mb-6">Log ที่จะเห็น</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทุก microservice ที่ TypeORM ต่อผ่าน pgpool VIP จะ retry connect วนไม่หยุด โดย error ซ้ำแบบนี้ในทุก BC พร้อมกัน
+          (ไม่ใช่แค่ BC เดียว — ถ้าเจอแค่ BC เดียวไม่ใช่เคสนี้ ให้เช็ค credential/DB เฉพาะ BC นั้นแทน):
+        </p>
+        <div class="code p-5">
+<pre><span class="c">[IAM] [Nest] ERROR [TypeOrmModule] Unable to connect to the database (erp_iam). Retrying (8)...</span>
+<span class="c">[IAM] error: pgpool is not accepting any new connections</span>
+<span class="c">[AUTH] error: pgpool is not accepting any new connections</span>
+<span class="c">[SALES] error: pgpool is not accepting any new connections</span></pre>
+        </div>
+        <p class="mt-6 text-[var(--ink-soft)] text-[15.5px] max-w-3xl leading-[1.85]">
+          บน pgpool node เอง (<span class="mono text-[13px]">journalctl -u pgpool2</span>) จะเห็นบรรทัดนี้ซ้ำทุก ~15 วินาที:
+        </p>
+        <div class="code p-5">
+<pre><span class="c">child pid xxxxx: FATAL:  pgpool is not accepting any new connections</span>
+<span class="c">child pid xxxxx: DETAIL:  all backend nodes are down, pgpool requires at least one valid node</span>
+<span class="c">child pid xxxxx: HINT:  repair the backend nodes and restart pgpool</span></pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 2 IMPACT ========== -->
+      <section id="impact" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">2 — ผลกระทบ (Impact)</div>
+        <h2 class="display text-3xl mb-6">Total DB Outage — ทุก BC</h2>
+        <div class="grid sm:grid-cols-3 gap-5">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">SCOPE</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ทุก BC ที่ผ่าน VIP นี้</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">auth, iam, inventory-bc, supplier-bc, sales-bc, finance-bc, report-bc — ทุก request ที่แตะ DB ล้มเหลว 100%</p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">SEVERITY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">Critical — escalate ทันที</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">ไม่ใช่ degrade แบบ node เดียวหาย — ระบบทั้งชุดหยุดทำงาน ไม่มี fallback</p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DATA SAFETY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ข้อมูลไม่เสี่ยง</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">นี่คือ pgpool routing layer ค้าง ไม่ใช่ PostgreSQL พัง/ข้อมูลหาย — แก้แล้วกลับมาใช้ได้ทันทีไม่ต้อง restore</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 3 DIAGNOSIS ========== -->
+      <section id="diagnosis" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">3 — วินิจฉัย (Diagnosis)</div>
+        <h2 class="display text-3xl mb-6">ยืนยันว่าใช่เคสนี้ก่อนแก้</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          สิ่งสำคัญที่สุดของเคสนี้: <b class="text-[var(--ink)]">PostgreSQL จริงมักจะปกติอยู่แล้ว</b> — ปัญหาอยู่ที่ pgpool
+          มองไม่เห็นมันเอง อย่าเพิ่งไป restart PostgreSQL/repmgr โดยไม่เช็คก่อน
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คว่า PostgreSQL/repmgr จริงยังปกติไหม</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">ssh เข้า primary (<span class="mono text-[12px]">ovh-ppm</span>) แล้วดู cluster ทั้งชุด</p>
+          <div class="code p-5">
+<pre>ssh ovh-ppm <span class="s">"sudo -u postgres repmgr cluster show"</span></pre>
+          </div>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ถ้าเจอแบบนี้ (ทุกโหนด <span class="mono text-[12px]">running</span>) = ยืนยันว่าใช่เคสนี้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">ppr1 | standby | running</span> ·
+              <span class="mono text-[12px]">ppm | primary | * running</span> ·
+              <span class="mono text-[12px]">ppr2 | standby | running</span>
+              — PostgreSQL ปกติ ไม่ต้องแตะ repmgr เลย ข้ามไปข้อ 3
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">(ถ้าข้อ 1 ก็ผิดปกติด้วย) เช็ค TCP ไปยัง backend แต่ละตัวจาก pgpool node</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">แยกให้ออกว่าเป็น network/firewall หรือ PostgreSQL ตายจริง — ถ้า TCP ต่อไม่ได้เลยคือปัญหาคนละเรื่อง ไม่ใช่ runbook นี้</p>
+          <div class="code p-5">
+<pre><span class="k">for</span> ip <span class="k">in</span> 172.16.0.221 172.16.0.222 172.16.0.223<span class="k">;</span> <span class="k">do</span>
+  ssh ovh-pgpool1 <span class="s">"nc -zv -w3 $ip 5432"</span>
+<span class="k">done</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คสถานะ node ที่ pgpool "คิด" ว่าเป็น — เทียบกับ backend จริง</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            นี่คือคำสั่งที่ชี้ตัวปัญหาตรงๆ — <span class="mono text-[12px]">psql</span> ผ่าน pgpool port 5432 จะต่อไม่ติด
+            (มันคือตัวปัญหาเอง) ให้ยิงผ่าน <span class="mono text-[12px]">pcp_node_info</span> แทน ทำครบทั้ง 3 node
+            (<span class="mono text-[12px]">-n 0</span>, <span class="mono text-[12px]">-n 1</span>, <span class="mono text-[12px]">-n 2</span>)
+          </p>
+          <div class="code p-5">
+<pre><span class="k">for</span> n <span class="k">in</span> 0 1 2<span class="k">;</span> <span class="k">do</span>
+  ssh ovh-pgpool1 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+    pcp_node_info -h localhost -p 9898 -U pgpool_admin -w -n $n -v"</span>
+<span class="k">done</span></pre>
+          </div>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ลายเซ็นของเคสนี้: Status Name กับ Backend Status Name ไม่ตรงกัน</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">Status Name: down</span> (pgpool คิดว่า node นี้ตาย — ค่านี้แหละที่บล็อก traffic)
+              แต่ <span class="mono text-[12px]">Backend Status Name: up</span> (PostgreSQL จริงตอบสนองปกติ) — เห็นแบบนี้พร้อมกันทั้ง 3 node = ใช่เคสนี้แน่นอน ข้ามไปข้อ 5 (การแก้ไข) ได้เลย
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 4 ROOT CAUSE ========== -->
+      <section id="rootcause" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">4 — สาเหตุ (Root Cause)</div>
+        <h2 class="display text-3xl mb-6">Pgpool ไม่ re-attach node ที่เคย mark down เองอัตโนมัติ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          Health check ของ pgpool ตรวจจับ <b>UP → DOWN</b> ได้เอง แต่ไม่ตรวจ <b>DOWN → UP</b> — เมื่อ node ใดถูก mark
+          down ครั้งหนึ่ง (เช่นตอน failover, restart, หรือ watchdog เสีย quorum ชั่วคราว) มันจะค้างสถานะ down อยู่แบบนั้น
+          แม้ PostgreSQL จริงจะกลับมาสมบูรณ์แล้วก็ตาม ต้องมีคนสั่ง <span class="mono text-[13px]">pcp_attach_node</span>
+          ด้วยมือเท่านั้นถึงจะกลับมาใช้งานได้
+        </p>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+    participant Ev as เหตุการณ์ต้นทาง (failover / restart / watchdog quorum หลุด)
+    participant PP as Pgpool
+    participant PG as PostgreSQL (จริง)
+
+    Ev->>PP: trigger degenerate/quarantine backend node
+    PP->>PP: mark node เป็น Status = down
+    Note over PG: PostgreSQL ฟื้นตัวเองปกติ (repmgr/manual)
+    PG-->>PP: backend จริง = up
+    Note over PP: Health check ตรวจ UP→DOWN เท่านั้น<br/>ไม่ตรวจ DOWN→UP ให้เอง
+    Note over PP: Status ค้างเป็น down ต่อไปเรื่อยๆ<br/>= "all backend nodes are down"
+    Note over Ev,PG: ต้อง pcp_attach_node ด้วยมือ<br/>ถึงจะกลับมา route traffic ได้
+</pre>
+        </div>
+
+        <div class="rulebox">
+          <div class="rc mb-1">ทำไมถึงมัก down พร้อมกันทั้ง 3 node ไม่ใช่แค่ node ที่มีปัญหาจริง</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ช่วงที่ primary หาย/watchdog เสีย quorum pgpool อาจมองไม่เห็น "primary ตัวไหนเลยสักตัว" ชั่วขณะ (ไม่ใช่แค่โหนดที่ปัญหาต้นตอ)
+            จึงมาร์ก down พร้อมกันได้ทั้ง 3 — เจอมาแล้วสองครั้ง (8/9 ตอน ppm ตายจริง และ 8/12 ตอน watchdog แย่ง quorum
+            ระหว่าง pgpool restart วนหลายรอบ) ดูรายละเอียดเต็มที่
+            <a href="postgresql-pgpool-cluster-guide.html#incident" class="underline" style="color:var(--accent)">§10 Accident Playbook</a>
+            และ <a href="postgresql-pgpool-cluster-guide.html#bugs" class="underline" style="color:var(--accent)">§08 Known Bugs (#24)</a>
+            ในคู่มือฉบับเต็ม
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 5 FIX ========== -->
+      <section id="fix" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">5 — การแก้ไข (Fix)</div>
+        <h2 class="display text-3xl mb-6">Re-attach ทั้ง 3 node — อย่าทำแค่ node เดียว</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          รันจาก pgpool node ตัวไหนก็ได้ที่ยัง ssh เข้าได้ (ไม่จำเป็นต้องเป็น watchdog leader) — ทำครบทั้ง 3 node เสมอ
+          แม้จะสงสัยว่ามีแค่ node เดียวที่เพี้ยน เพราะเช็คแล้วบ่อยครั้งค้างพร้อมกันหมด (ดู §4)
+        </p>
+        <div class="code p-5">
+<pre><span class="k">for</span> n <span class="k">in</span> 0 1 2<span class="k">;</span> <span class="k">do</span>
+  ssh ovh-pgpool1 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+    pcp_attach_node -h localhost -p 9898 -U pgpool_admin -w -n $n"</span>
+<span class="k">done</span></pre>
+        </div>
+        <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
+          แต่ละคำสั่งควรตอบ <span class="mono text-[12px]">pcp_attach_node -- Command Successful</span> — ถ้าเจอ
+          <span class="mono text-[12px]">FATAL: authentication failed</span> แทน แปลว่า <span class="mono text-[12px]">.pcppass</span>
+          หาย/ผิด ดูวิธีแก้ในคู่มือฉบับเต็ม
+          <a href="postgresql-pgpool-cluster-guide.html#bugs" class="underline" style="color:var(--accent)">§08 บั๊ก #13/#19</a>
+        </p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 6 VERIFY ========== -->
+      <section id="verify" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">6 — ยืนยัน + ป้องกัน (Verify / Prevent)</div>
+        <h2 class="display text-3xl mb-6">เช็คว่าหายจริง แล้วปิดสาเหตุ</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">รอ ~10–15 วินาที (สถานะจะขึ้น "waiting" ก่อน) แล้ว re-check ทั้ง 3 node</h3>
+          <div class="code p-5 mb-3">
+<pre><span class="k">for</span> n <span class="k">in</span> 0 1 2<span class="k">;</span> <span class="k">do</span>
+  ssh ovh-pgpool1 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+    pcp_node_info -h localhost -p 9898 -U pgpool_admin -w -n $n -v"</span>
+<span class="k">done</span></pre>
+          </div>
+          <div class="card overflow-hidden mb-4">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>Node</th><th>Host</th><th>Status Name</th><th>Backend Status</th><th>Role</th></tr></thead>
+                <tbody>
+                  <tr><td>0</td><td>ppm · 172.16.0.221</td><td><b>up</b></td><td>up</td><td>primary</td></tr>
+                  <tr><td>1</td><td>ppr1 · 172.16.0.222</td><td><b>up</b></td><td>up</td><td>standby</td></tr>
+                  <tr><td>2</td><td>ppr2 · 172.16.0.223</td><td><b>up</b></td><td>up</td><td>standby</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ทดสอบ query จริงผ่าน VIP/port 5432</h3>
+          <div class="code p-5 mb-3">
+<pre>ssh ovh-pgpool1 <span class="s">"sudo -u postgres psql -h 127.0.0.1 -p 5432 -U postgres -c 'select 1;'"</span></pre>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ผลลัพธ์ที่ต้องได้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">คืนแถวเดียว <span class="mono text-[12px]">1</span> — ถ้าได้แปลว่า routing กลับมาปกติแล้ว ไม่ต้อง restart pgpool หรือ service ฝั่ง Node.js เลย (มันมี retry loop รอต่ออยู่แล้วตาม TypeORM `retryAttempts`)</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็ค log ฝั่ง pgpool ว่าไม่มี FATAL ใหม่เกิดซ้ำ</h3>
+          <div class="code p-5">
+<pre>ssh ovh-pgpool1 <span class="s">"sudo journalctl -u pgpool2 --no-pager -n 30 | grep -iE 'fatal|not accepting'"</span>
+<span class="c"># ควรไม่มี output</span></pre>
+          </div>
+        </div>
+
+        <div class="rulebox mt-8">
+          <div class="rc mb-1">ป้องกันระยะยาว — ยังไม่ได้ทำ ณ ตอนเขียน runbook นี้</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            Pgpool ไม่มี auto re-attach ในตัว (ต้องใช้ external script เฝ้า <span class="mono text-[12px]">pcp_node_info</span>
+            แล้วยิง attach เอง หรือ cron ตรวจสอบ) — ทางที่ยั่งยืนกว่าคือ alert เร็วพอที่มนุษย์จะกดรันตาม runbook นี้ได้ทันที
+            แนะนำเพิ่ม Grafana alert จาก metric ที่มีอยู่แล้วใน
+            <a href="postgresql-pgpool-cluster-guide.html" class="underline" style="color:var(--accent)">Pgpool-II Cluster Guide</a>
+            ให้ยิงแจ้งทันทีที่ node ใดมี <span class="mono text-[12px]">Status Name != Backend Status Name</span> นานเกิน 1 นาที
+            แทนที่จะรอ user แจ้งว่า app ต่อ DB ไม่ได้เหมือนเคสนี้
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · RUNBOOK · PGPOOL ALL NODES DOWN"
+        line2="pcp_attach_node -n 0,1,2 · verified 2026-08-12/13">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
