@@ -16,6 +16,7 @@ class ErpDocnav extends HTMLElement {
     { href: 'nextjs-permission-guide.html', icon: '🔐', label: 'Next.js Integration Guide', desc: 'Frontend Integration · Permission System' },
     { href: 'observability-logging-guide.html', icon: '📊', label: 'Observability (Tempo/Loki)', desc: 'OpenTelemetry Traces · pino-http Logs' },
     { href: 'postgresql-pgpool-cluster-guide.html', icon: '🔌', label: 'Connection Pooling (Pgpool-II)', desc: 'HA Cluster Setup · Watchdog Failover · Grafana' },
+    { href: 'deployment-guide.html', icon: '🚀', label: 'Deployment Guide', desc: 'On-Premise · Docker Compose · Kong · Cloudflare Tunnel' },
     { href: 'runbook.html', icon: '🚨', label: 'Runbook', desc: 'Incident Response · Symptom → Diagnosis → Fix → Verify' },
   ];
 

@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deployment Guide: On-Premise &amp; Cloudflare Tunnel — Technical Guide · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="🚀" title="Deployment" subtitle="ON-PREMISE · DOCKER COMPOSE · CLOUDFLARE TUNNEL" width="280">
+    <nav slot="nav">
+      <a href="#overview"      class="navlink"><span class="n">01</span> ภาพรวม · ทำไมต้อง Tunnel</a>
+      <a href="#hardware"      class="navlink"><span class="n">02</span> Hardware / OS Requirement</a>
+      <a href="#provision"     class="navlink"><span class="n">03</span> เตรียม VM (Proxmox)</a>
+      <a href="#datastores"    class="navlink"><span class="n">04</span> Datastores (infra-erp)</a>
+      <a href="#app"           class="navlink"><span class="n">05</span> Deploy erp-api (pm2)</a>
+      <a href="#kong"          class="navlink"><span class="n">06</span> Kong API Gateway</a>
+      <a href="#tunnel"        class="navlink"><span class="n">07</span> Cloudflare Tunnel</a>
+      <a href="#production-env" class="navlink"><span class="n">08</span> Production .env Checklist</a>
+      <a href="#bugs"          class="navlink"><span class="n">09</span> บั๊กที่เจอและวิธีแก้</a>
+      <a href="#reference"     class="navlink"><span class="n">10</span> Reference</a>
+    </nav>
+    <div slot="footnote">
+      <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="erp-architecture.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่เอกสารสถาปัตยกรรม (Executive Overview)
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Technical Implementation Guide</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          On-Premise Deployment<br>
+          <span class="text-[#7FE3DE]">(Docker Compose · Kong · Cloudflare Tunnel)</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          แนวทางติดตั้งระบบ ERP บนเครื่องที่ลูกค้าซื้อมาเองและดูแลเอง (on-premise) — ตั้งแต่เตรียมเครื่อง/VM,
+          ตั้ง datastore + Kong API Gateway ด้วย Docker Compose, ไปจนถึงเปิด domain สาธารณะผ่าน
+          <b class="text-white font-medium">Cloudflare Tunnel</b> โดย<b>ไม่ต้อง</b> เปิด port forward บน router
+          หรือมี public IP คงที่เลย
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Docker Compose</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Kong + Konga</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Cloudflare Tunnel</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>pm2</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Proxmox VM</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 OVERVIEW ========== -->
+      <section id="overview" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — ภาพรวม</div>
+        <h2 class="display text-3xl mb-6">รูปแบบ Deployment สำหรับลูกค้าที่ซื้อเครื่องเอง</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ลูกค้าหลายรายซื้อเครื่อง/VM มาเองและติดตั้ง ERP ในเครือข่ายภายใน (LAN ส่วนตัว, IP วง private)
+          ไม่มี public IP คงที่ ไม่อยาก/ไม่สามารถเปิด port forward บน router ขององค์กรได้ — สถาปัตยกรรมนี้แก้ปัญหาด้วย
+          <b>Cloudflare Tunnel</b>: เครื่อง on-prem เป็นฝ่าย "เชื่อมออก" หา Cloudflare เอง (outbound connection)
+          แทนที่จะรอรับ inbound connection จากอินเทอร์เน็ต — ไม่ต้องเปิด firewall/port ใด ๆ เข้าเครือข่ายภายในเลย
+        </p>
+
+        <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    U["ผู้ใช้งาน<br/>(อินเทอร์เน็ต)"] -->|"HTTPS<br/>erp-api.example.com"| CF["Cloudflare Edge<br/>(TLS termination)"]
+    CF -->|"Tunnel (outbound<br/>จากฝั่ง on-prem)"| CD["cloudflared<br/>(systemd service)"]
+    CD -->|"HTTP :80<br/>(LAN เท่านั้น)"| K["Kong<br/>(API Gateway)"]
+    K -->|"path routing<br/>preserve_host=true"| BC1["auth-bc :3001"]
+    K --> BC2["iam-bc :3002"]
+    K --> BC3["... (8 BCs)"]
+    BC1 --> DB[("PostgreSQL<br/>Redis · RabbitMQ")]
+    BC2 --> DB
+</pre>
+        </div>
+
+        <div class="rulebox mt-6">
+          <div class="rc mb-1">RULE</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b>Cloudflare terminates TLS ที่ edge เสมอ</b> — จาก <span class="mono text-[12px]">cloudflared</span> เข้าไปที่
+            Kong เป็น <b>HTTP ธรรมดา</b>ตลอด ไม่ใช่ HTTPS แม้ domain ปลายทางที่ผู้ใช้เห็นจะเป็น
+            <span class="mono text-[12px]">https://</span> ก็ตาม — สำคัญมากตอนตั้งค่า Tunnel route และค่า
+            <span class="mono text-[12px]">COOKIE_SECURE</span>/<span class="mono text-[12px]">TRUST_PROXY</span> ใน §08
+          </p>
+        </div>
+
+        <div class="card overflow-hidden mt-6">
+          <div class="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+            <div class="p-6">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="evt evt-listen">ข้อดี</span>
+                <h3 class="font-semibold text-[15px]">ไม่ต้องมี Public IP / Port Forward</h3>
+              </div>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                เครื่อง on-prem อยู่หลัง NAT/Firewall ขององค์กรได้ตามปกติ — Cloudflare Tunnel เป็น outbound
+                connection ล้วน ๆ ลูกค้าไม่ต้องขอสิทธิ์แก้ router/firewall จาก IT องค์กรเลย
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="evt evt-tcp">เงื่อนไข</span>
+                <h3 class="font-semibold text-[15px]">ต้องมี Domain ผูกกับ Cloudflare</h3>
+              </div>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                ลูกค้าต้องมี domain (ซื้อเองหรือมีอยู่แล้ว) และ nameserver ชี้ไปที่ Cloudflare — ถ้าไม่มี domain
+                ระบบยังใช้งานได้ในวง LAN ภายในผ่าน IP ตรง แต่จะไม่มี HTTPS/public access
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 HARDWARE ========== -->
+      <section id="hardware" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Hardware / OS Requirement</div>
+        <h2 class="display text-3xl mb-6">ขนาดเครื่องที่ต้องเผื่อไว้จริง</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ตัวเลขด้านล่างมาจากการตั้งเครื่อง dev/staging จริง (8 BC ผ่าน pm2 cluster mode 2 instances/BC +
+          datastore stack + Kong stack) — <b class="text-[var(--signal)]">Disk คือจุดที่พลาดง่ายที่สุด</b>
+          เพราะ Docker image ของ Kong+Konga+Mongo เพิ่มมาอีกก้อนใหญ่ทีหลัง ถ้าตั้ง VM ไว้แค่พอสำหรับตัวแอปตอนแรก
+          จะเจอ <span class="mono text-[12px]">No space left on device</span> ตอนเพิ่ม Kong stack เข้าไป (ดู §09 บั๊ก #1)
+        </p>
+
+        <div class="overflow-x-auto">
+          <table class="d">
+            <thead><tr><th>Component</th><th>ขั้นต่ำ</th><th>แนะนำ</th><th>หมายเหตุ</th></tr></thead>
+            <tbody>
+              <tr><td>CPU</td><td>2 vCPU</td><td>4 vCPU</td><td>pm2 cluster mode รัน 2 instance/BC × 8 BC</td></tr>
+              <tr><td>RAM</td><td>8 GB</td><td>16 GB</td><td>แต่ละ NestJS worker ~200-300 MB, Kong/Postgres/Mongo อีกก้อน</td></tr>
+              <tr><td>Disk (root)</td><td>40 GB</td><td>80 GB+</td><td><b>อย่าตั้งเท่าที่คิดว่าพอ</b> — Docker images สะสมเร็วกว่าที่คาด</td></tr>
+              <tr><td>OS</td><td colspan="3">Ubuntu 22.04/24.04 LTS — ต้องมี <span class="mono text-[12px]">docker</span> + <span class="mono text-[12px]">docker compose</span> v2, Node.js (ผ่าน nvm), pnpm, pm2</td></tr>
+              <tr><td>Network</td><td colspan="3">Static IP หรือ DHCP reservation ในวง LAN — จำเป็นสำหรับตั้งค่า Kong upstream (§06) ให้คงที่</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="edge mt-6">
+          <div class="tag mb-1">Disk breakdown คร่าว ๆ ที่เจอจริง</div>
+          <p class="text-[13px]">
+            Docker images ของ datastore stack (Postgres/Redis/RabbitMQ/MinIO/Gotenberg) ~6 GB ·
+            Kong stack (Kong/Postgres/Konga/Mongo) ~4-5 GB · node_modules + build cache ของ erp-api เอง ~1-2 GB ·
+            pm2 logs สะสมได้เป็นหลัก GB ถ้าไม่มี log rotation — รวมแล้วเครื่องที่ตั้ง <b>ทุก stack พร้อมกัน</b>
+            (app + datastore + Kong + observability) ต้องการ headroom มากกว่าที่คิดตอนแรกเสมอ
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 PROVISION ========== -->
+      <section id="provision" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — เตรียม VM (Proxmox)</div>
+        <h2 class="display text-3xl mb-6">สร้างและตั้งค่า VM</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">สร้าง VM ด้วย disk size ที่เผื่อไว้ตั้งแต่แรก</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            อ้างอิงตาราง §02 — ตั้ง virtual disk อย่างน้อย <b>80 GB</b> ตั้งแต่สร้าง VM ครั้งแรก
+            (thin-provision ได้ ไม่กินพื้นที่จริงจนกว่าจะใช้) ดีกว่าต้องมาขยายทีหลังตอนเจอปัญหา
+          </p>
+          <div class="edge mb-3">
+            <div class="tag mb-1">ถ้าจำเป็นต้องขยาย disk ทีหลัง ต้องทำ 2 ระดับ</div>
+            <p class="text-[13px]">
+              1) ขยาย virtual disk ใน Proxmox ก่อน (<span class="mono text-[12px]">qm resize &lt;vmid&gt; scsi0 +40G</span>
+              หรือผ่าน UI) 2) เข้าไปขยาย partition/filesystem <b>ข้างใน guest OS เองอีกที</b> — สอง VM ที่ config ต่างกัน
+              (LVM ธรรมดา vs. loop-mounted rootfs แบบ cloud-image) ใช้คำสั่งขยายต่างกัน เช็ค
+              <span class="mono text-[12px]">lsblk</span>/<span class="mono text-[12px]">df -h /</span> ก่อนเสมอว่า
+              disk ใหม่ที่ Proxmox เห็นจริง ๆ ถูกขยายเข้าไปถึง filesystem จริงหรือยัง (ไม่ใช่แค่ระดับ virtual disk)
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง Docker + dependencies</h3>
+          <div class="code p-5 mb-3">
+<pre><span class="c"># Docker Engine + Compose plugin</span>
+curl -fsSL https://get.docker.com | sh
+
+<span class="c"># nvm + Node.js (เวอร์ชันตาม package.json ของ erp-api)</span>
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+nvm install --lts
+
+<span class="c"># pnpm + pm2</span>
+npm install -g pnpm pm2</pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ตั้ง static IP / DHCP reservation</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ตั้งค่า network interface ให้ได้ IP คงที่ในวง LAN (เช่นผ่าน Proxmox network config หรือ DHCP reservation
+            ที่ router) — ค่านี้จะถูกใช้ซ้ำหลายจุด: Kong's <span class="mono text-[12px]">BC_UPSTREAM_HOST</span>,
+            Konga's <span class="mono text-[12px]">KONGA_BIND_HOST</span>, และ Cloudflare Tunnel's origin URL (§07)
+            — ถ้า IP เปลี่ยนทีหลังต้องไปแก้ทุกจุดพร้อมกัน
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 DATASTORES ========== -->
+      <section id="datastores" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — Datastores</div>
+        <h2 class="display text-3xl mb-6">ตั้ง infra-erp stack</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          PostgreSQL + Redis + RabbitMQ ผ่าน Docker Compose — รายละเอียดเต็มอยู่ที่
+          <span class="mono text-[12px]">infrastructure/infra-erp/</span> ใน repo หลัก (ไม่ใช่เอกสารนี้)
+        </p>
+        <div class="code p-5 mb-6">
+<pre><span class="c"># แนะนำ: วางไว้นอก repo checkout เช่น /root/infra-erp (ไม่ใช่ /root/erp-api/infrastructure/infra-erp)</span>
+<span class="c"># เพื่อไม่ให้ deploy script (git reset --hard) มีผลกับ data/credentials</span>
+cp -r erp-api/infrastructure/infra-erp /root/infra-erp
+cd /root/infra-erp
+cp .env.example .env
+<span class="c"># แก้ POSTGRES_PASSWORD / REDIS_PASSWORD / RABBITMQ_PASSWORD ให้เป็นค่าจริง</span>
+docker compose up -d</pre>
+        </div>
+        <div class="rulebox">
+          <div class="rc mb-1">RULE</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <span class="mono text-[12px]">infrastructure/&lt;stack&gt;/</span> ใน repo คือ<b>template</b>เสมอ —ของจริงที่รันอยู่ควร
+            อยู่นอก checkout ของแอป กันไม่ให้ <span class="mono text-[12px]">deploy-ovh-dev.sh</span>-style script (ที่ทำ
+            <span class="mono text-[12px]">git reset --hard</span>) กระทบ data/credentials โดยไม่ตั้งใจ
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 APP ========== -->
+      <section id="app" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Deploy erp-api</div>
+        <h2 class="display text-3xl mb-6">Build + รันด้วย pm2</h2>
+        <div class="code p-5 mb-6">
+<pre>git clone https://github.com/iots1/erp-api.git /root/erp-api
+cd /root/erp-api
+cp .env.example .env
+<span class="c"># แก้ *_DB_HOST/PORT, REDIS_*, RABBITMQ_* ให้ตรงกับ §04</span>
+
+pnpm install --frozen-lockfile
+pnpm nx run-many -t build --all
+npm run build:assets:iam   <span class="c"># asset ของหน้า admin iam — พลาดขั้นนี้ = JS/CSS 404</span>
+
+pm2 start ecosystem.config.js</pre>
+        </div>
+        <p class="text-sm" style="color:var(--ink-soft)">
+          ทุก BC bind <span class="mono text-[12px]">0.0.0.0</span> โดย default (ไม่ใช่แค่ <span class="mono text-[12px]">localhost</span>)
+          ดังนั้น Kong เรียกเข้ามาจาก IP วง LAN ได้โดยตรงในขั้นถัดไป
+        </p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 KONG ========== -->
+      <section id="kong" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — Kong API Gateway</div>
+        <h2 class="display text-3xl mb-6">รวม 8 BC ไว้หลัง domain เดียว</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          Kong ทำ path-based routing — แต่ละ BC ยังคง prefix เดิมของตัวเอง
+          (<span class="mono text-[12px]">/auth/v1</span>, <span class="mono text-[12px]">/iam/v1</span>, ...)
+          ไม่ต้องแก้โค้ดแอปฝั่งไหนเลย รายละเอียดเต็มอยู่ที่ <span class="mono text-[12px]">infrastructure/kong/</span>
+          ใน repo หลัก
+        </p>
+
+        <div class="code p-5 mb-6">
+<pre>cp -r erp-api/infrastructure/kong /root/infra-erp/kong  <span class="c"># วางคู่กับ datastore stack เหมือน §04</span>
+cd /root/infra-erp/kong
+cp .env.example .env
+<span class="c"># KONG_PG_PASSWORD / KONGA_MONGO_PASSWORD / KONGA_TOKEN_SECRET / ACME_ACCOUNT_EMAIL</span>
+<span class="c"># DOMAIN=erp-api.&lt;ลูกค้า&gt;.com</span>
+<span class="c"># BC_UPSTREAM_HOST=&lt;LAN IP ของเครื่องจาก §03&gt;   — ไม่ใช้ host.docker.internal default</span>
+<span class="c"># KONGA_BIND_HOST=&lt;LAN IP เดียวกัน&gt; ถ้าต้องการเข้า Konga UI จากเครื่องอื่นในวง</span>
+
+docker compose up -d
+./setup-routes.sh   <span class="c"># สร้าง service+route ให้ 8 BC พร้อม preserve_host=true</span></pre>
+        </div>
+
+        <ul class="text-sm text-[var(--ink-soft)] leading-relaxed list-disc pl-5 space-y-1.5 mb-3">
+          <li><span class="mono text-[12px]">BC_UPSTREAM_HOST</span> ต้องเป็น IP ที่ Kong container เข้าถึงได้จริง — ใช้ LAN IP ของเครื่องเป็นค่าง่ายสุด เพราะทุก BC bind <span class="mono text-[12px]">0.0.0.0</span> อยู่แล้ว</li>
+          <li><span class="mono text-[12px]">preserve_host=true</span> (ตั้งให้อัตโนมัติโดย <span class="mono text-[12px]">setup-routes.sh</span>) ทำให้แต่ละ BC เห็น <span class="mono text-[12px]">Host</span> header เป็น domain จริง ไม่ใช่ upstream address — จำเป็นสำหรับ cookie/CORS ที่ §08</li>
+          <li>Kong Admin API (<span class="mono text-[12px]">8001</span>) และ Konga (<span class="mono text-[12px]">1337</span>) ควรเปิดแค่ในวง LAN/loopback เท่านั้น — <b>ห้าม</b>เปิดสู่อินเทอร์เน็ตผ่าน Tunnel</li>
+        </ul>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 TUNNEL ========== -->
+      <section id="tunnel" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — Cloudflare Tunnel</div>
+        <h2 class="display text-3xl mb-6">เปิด Domain สาธารณะโดยไม่เปิด Port</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">เตรียม Cloudflare account + Domain</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ลูกค้าต้องมี domain ที่ nameserver ชี้ไปที่ Cloudflare อยู่แล้ว (ย้าย DNS เข้า Cloudflare ฟรี ถ้ายังไม่ได้ทำ)
+            แล้วเข้า <b>Zero Trust dashboard</b> → <b>Networks → Tunnels</b> → สร้าง tunnel ใหม่ (type: <span class="mono text-[12px]">cloudflared</span>)
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง cloudflared บนเครื่อง on-prem</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            Dashboard จะให้คำสั่งติดตั้งพร้อม token เฉพาะของ tunnel นั้น — รันบนเครื่อง on-prem โดยตรง
+            (ติดตั้งเป็น systemd service อัตโนมัติ):
+          </p>
+          <div class="code p-5 mb-3">
+<pre><span class="c"># คำสั่งตัวอย่าง (ค่าจริงมาจาก dashboard ตอนสร้าง tunnel)</span>
+curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared.deb
+sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
+          </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            เช็คสถานะด้วย <span class="mono text-[12px]">systemctl status cloudflared</span> — ต้องเห็น
+            <span class="mono text-[12px]">Environment is healthy</span> ใน log ก่อนไปขั้นถัดไป
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">เพิ่ม Public Hostname route → Kong</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ในหน้า tunnel เดียวกัน → <b>Add a route</b> → เลือก <b>"Published application"</b>
+            (ไม่ใช่ Private hostname/Private CIDR/Workers VPC — สามแบบนั้นสำหรับ Zero Trust/WARP client เข้าถึง
+            private app ภายใน ไม่ใช่ publish เว็บสู่สาธารณะ)
+          </p>
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>Field</th><th>ค่า</th></tr></thead>
+              <tbody>
+                <tr><td>Subdomain</td><td><span class="mono text-[12px]">erp-api</span> (หรือชื่อที่ต้องการ)</td></tr>
+                <tr><td>Domain</td><td>domain ของลูกค้า</td></tr>
+                <tr><td>Service Type</td><td><b>HTTP</b> — <b>ห้าม</b>เลือก HTTPS</td></tr>
+                <tr><td>URL</td><td><span class="mono text-[12px]">&lt;LAN IP จาก §03&gt;:80</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="edge mt-3 mb-3">
+            <div class="tag mb-1">ทำไมต้อง HTTP ไม่ใช่ HTTPS</div>
+            <p class="text-[13px]">
+              Cloudflare terminate TLS ให้ผู้ใช้ที่ edge อยู่แล้ว (ดู diagram §01) — เลือก HTTPS ไปที่ Kong's port
+              443 จะไปเจอ TLS listener ที่<b>ไม่มี certificate ที่ใช้งานได้จริง</b> (ดู §09 บั๊ก #5 เรื่อง ACME)
+              ทำให้ tunnel handshake ล้มเหลว ใช้ HTTP เข้า port 80 ธรรมดา ปลอดภัยเพียงพอเพราะ traffic ระหว่าง
+              cloudflared ↔ Kong วิ่งอยู่ในเครื่อง/LAN เดียวกัน ไม่ใช่อินเทอร์เน็ตเปิด
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 PRODUCTION ENV ========== -->
+      <section id="production-env" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Production .env Checklist</div>
+        <h2 class="display text-3xl mb-6">ค่าที่ต้องเปลี่ยนก่อนขึ้นจริง — พลาดแล้วพังแบบเงียบ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ห้าค่านี้เป็น dev default ที่ใช้ได้ตอน localhost เท่านั้น — ถ้าลืมแก้หลังต่อ domain จริงผ่าน Kong+Tunnel
+          จะพังแบบไม่มี error message ที่ตรงจุดให้เห็นง่าย ๆ (พบจริงระหว่างตั้งระบบ — ดู §09 บั๊ก #4)
+        </p>
+
+        <div class="overflow-x-auto mb-6">
+          <table class="d">
+            <thead><tr><th>ตัวแปร</th><th>Dev default (ผิดสำหรับ prod)</th><th>ต้องเปลี่ยนเป็น</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">AUTH_PUBLIC_URL</span></td><td><span class="mono text-[12px]">http://localhost:3001</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
+              <tr><td><span class="mono text-[12px]">REPORT_PUBLIC_URL</span></td><td><span class="mono text-[12px]">http://localhost:3007</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
+              <tr><td><span class="mono text-[12px]">CORS_ORIGIN</span></td><td><span class="mono text-[12px]">http://localhost:3002</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
+              <tr><td><span class="mono text-[12px]">COOKIE_SECURE</span></td><td><span class="mono text-[12px]">false</span></td><td><span class="mono text-[12px]">true</span></td></tr>
+              <tr><td><span class="mono text-[12px]">TRUST_PROXY</span></td><td>(unset — default whitelist ไม่รวม Kong)</td><td>รวม Kong's docker network subnet + host LAN IP</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card p-6">
+          <h3 class="font-semibold text-[15px] mb-3">รายละเอียดทีละตัว</h3>
+          <ul class="text-sm text-[var(--ink-soft)] leading-relaxed list-disc pl-5 space-y-2.5">
+            <li><b><span class="mono text-[12px]">AUTH_PUBLIC_URL</span> / <span class="mono text-[12px]">REPORT_PUBLIC_URL</span></b> — ค่านี้ถูกฝังลงหน้า admin ของ iam เป็น URL ที่ <b>browser ของผู้ใช้เอง</b>ยิง fetch ตรง ๆ ไม่ใช่ server-to-server เหลือเป็น private IP/localhost แล้ว browser จริงจะโดนบล็อกด้วย Private Network Access policy ของ Chrome ทันที</li>
+            <li><b><span class="mono text-[12px]">CORS_ORIGIN</span></b> — ต้องเป็น origin จริงเป๊ะ ๆ (ไม่ใช่ <span class="mono text-[12px]">*</span>) เพราะแอปใช้ <span class="mono text-[12px]">credentials: true</span> สำหรับ cookie auth flow</li>
+            <li><b><span class="mono text-[12px]">COOKIE_SECURE</span></b> — เปิดเป็น <span class="mono text-[12px]">true</span> ได้ปลอดภัยเพราะผู้ใช้คุยกับ Cloudflare ด้วย HTTPS จริงเสมอ แม้ hop ภายใน (cloudflared → Kong → app) จะเป็น HTTP ก็ตาม</li>
+            <li><b><span class="mono text-[12px]">TRUST_PROXY</span></b> — หา subnet ของ Kong's docker network ด้วย <span class="mono text-[12px]">docker network inspect kong_default</span> แล้วใส่รวมกับ host's LAN IP (Docker NAT อาจ rewrite source IP เป็น host IP ตอน container เรียกกลับเข้า host) — ไม่งั้น <span class="mono text-[12px]">req.ip</span>/<span class="mono text-[12px]">req.protocol</span> จะอ่านผิดจาก Kong's <span class="mono text-[12px]">X-Forwarded-*</span> headers</li>
+          </ul>
+        </div>
+
+        <div class="rulebox mt-6">
+          <div class="rc mb-1">RULE</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            pm2's <span class="mono text-[12px]">env_file</span> อ่านค่าแค่ตอน <span class="mono text-[12px]">pm2 start</span> เท่านั้น —
+            แก้ <span class="mono text-[12px]">.env</span> แล้วต้อง <span class="mono text-[12px]">pm2 delete all &amp;&amp; pm2 start ecosystem.config.js</span>
+            (ไม่ใช่ <span class="mono text-[12px]">restart</span>/<span class="mono text-[12px]">reload</span>) ค่าใหม่ถึงจะมีผลจริง
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 09 BUGS ========== -->
+      <section id="bugs" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — บั๊กที่เจอระหว่าง Implement และวิธีแก้</div>
+        <h2 class="display text-3xl mb-6">5 บั๊กจริงที่เจอตอนตั้งระบบครั้งแรก</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          บันทึกไว้ละเอียดกันคนถัดไปเจอปัญหาเดิม — ทุกข้อเจอจริงตอนตั้ง Kong+Cloudflare Tunnel ครั้งแรกบน on-prem VM
+        </p>
+
+        <div class="space-y-6">
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">1</span>
+              <h3 class="font-semibold text-[15px]">Disk เต็มกลางทางตอนตั้ง Kong stack</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> <span class="mono text-[12px]">kong-database</span> container crash ตอน <span class="mono text-[12px]">initdb</span>
+              ด้วย <span class="mono text-[12px]">FATAL: could not extend file ... No space left on device</span>
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> VM root disk ตั้งไว้พอสำหรับ datastore stack เดิมเท่านั้น (20 GB) — Kong+Konga+Mongo images
+              เพิ่มมาอีก ~4-5 GB ดันให้ disk เต็มพอดีตอน initdb ต้องเขียนไฟล์
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> ขยาย virtual disk จาก Proxmox (ดู §03 ขั้นตอน 1 — ต้องขยายทั้งระดับ virtual disk และ
+              filesystem ข้างใน guest) ก่อนจะตั้ง stack ใหม่ใด ๆ เพิ่ม — ป้องกันได้ตั้งแต่ต้นด้วยการเผื่อ disk
+              ตามตาราง §02 ตั้งแต่สร้าง VM ครั้งแรก
+            </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">2</span>
+              <h3 class="font-semibold text-[15px]">Kong Admin API bind 127.0.0.1 แต่เข้าจากนอก container ไม่ได้</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> <span class="mono text-[12px]">curl 127.0.0.1:8001/status</span> จาก host ได้ <span class="mono text-[12px]">Connection reset by peer</span>
+              ทั้งที่ตั้ง port mapping <span class="mono text-[12px]">127.0.0.1:8001:8001</span> ไว้แล้ว
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> Docker's published-port NAT ส่ง connection เข้า container ผ่าน bridge interface
+              ไม่ใช่ loopback — service ที่ bind <span class="mono text-[12px]">127.0.0.1</span> <b>ข้างใน container</b>
+              จะปฏิเสธ connection ที่มาทาง bridge เสมอ ไม่ว่า host-side port mapping จะจำกัดแค่ loopback แค่ไหนก็ตาม
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> bind เป็น <span class="mono text-[12px]">0.0.0.0</span> <b>ข้างใน container</b> เสมอ
+              (<span class="mono text-[12px]">KONG_ADMIN_LISTEN: "0.0.0.0:8001"</span>) แล้วปล่อยให้ host-side port
+              mapping (<span class="mono text-[12px]">127.0.0.1:8001:8001</span>) เป็นตัวจำกัดการเข้าถึงจริงแทน
+            </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">3</span>
+              <h3 class="font-semibold text-[15px]">Konga ใช้งานกับ MongoDB รุ่นใหม่ไม่ได้เลย</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> ทุก query จาก Konga ล้มเหลวด้วย <span class="mono text-[12px]">Unsupported OP_QUERY command</span>
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> Konga (<span class="mono text-[12px]">pantsel/konga</span>, ไม่มีการดูแลต่อมาหลายปี) ใช้ driver
+              เก่า (<span class="mono text-[12px]">sails-mongo</span>) ที่พูด legacy <span class="mono text-[12px]">OP_QUERY</span>
+              wire protocol — MongoDB เอา protocol นี้ออกตั้งแต่ 5.0
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> pin image เป็น <span class="mono text-[12px]">mongo:4.4</span> (เวอร์ชันสุดท้ายที่ยังรองรับ
+              OP_QUERY) แทน <span class="mono text-[12px]">mongo:7</span>/latest
+            </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">4</span>
+              <h3 class="font-semibold text-[15px]">Browser บล็อก request เพราะ Private Network Access policy</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> หน้า admin เปิดผ่าน <span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span> ได้ปกติ
+              แต่ login ไม่ได้ — console error <span class="mono text-[12px]">blocked by CORS policy: Permission was
+              denied for this request to access the 'local' address space</span>
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> <span class="mono text-[12px]">AUTH_PUBLIC_URL</span> ยังเหลือเป็น private IP
+              (<span class="mono text-[12px]">http://172.x.x.x:3001</span>) — browser ของผู้ใช้ (อยู่บนหน้า public HTTPS)
+              พยายามยิง fetch ตรงไปที่ IP วง private โดน Chrome's Private Network Access ปฏิเสธทันที ไม่ว่า CORS
+              header จะถูกต้องแค่ไหนก็ตาม
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> ตั้ง <span class="mono text-[12px]">AUTH_PUBLIC_URL</span>/<span class="mono text-[12px]">REPORT_PUBLIC_URL</span>
+              เป็น public domain เสมอ ตาม §08 — ปัญหาหมดทันทีเพราะ browser ยิงไปที่ domain สาธารณะผ่าน Kong ปกติ
+            </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">5</span>
+              <h3 class="font-semibold text-[15px]">Let's Encrypt (ACME) ออก certificate ไม่ได้เมื่อผ่าน Tunnel</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> ตั้ง Kong's <span class="mono text-[12px]">acme</span> plugin ไว้แล้วแต่ certificate ไม่เคยออกสำเร็จ
+              ค้าง retry ตลอด
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> Let's Encrypt's HTTP-01 challenge ต้องการเข้าถึง port 80 <b>จากอินเทอร์เน็ตเปิดตรง ๆ</b>
+              เพื่อยืนยันว่าเราคุม domain จริง — เมื่อ Cloudflare Tunnel เป็นทางเข้าเดียว ไม่มี path แบบนั้นให้ Let's
+              Encrypt ไปถึงได้อีกแล้ว (มีแต่ผ่าน tunnel ซึ่ง Let's Encrypt เข้าไม่ถึง)
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> ไม่ต้องพึ่ง ACME เลยในสถาปัตยกรรมนี้ — <b>Cloudflare terminate TLS ให้แทนที่ edge อยู่แล้ว</b>
+              (ดู §01/§07) ปล่อยปลั๊กอิน acme ไว้เฉย ๆ ก็ได้ (ไม่กระทบอะไร แค่ retry ค้างไปเรื่อย ๆ) หรือปิดไปเลยถ้าต้องการ
+              ความสะอาด — ปัญหานี้จะกลับมาเกี่ยวข้องเฉพาะกรณีเปิด port 80/443 ตรงสู่อินเทอร์เน็ตแทน tunnel เท่านั้น
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 10 REFERENCE ========== -->
+      <section id="reference" class="section pb-16">
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — Reference</div>
+        <h2 class="display text-3xl mb-6">Checklist ก่อนส่งมอบลูกค้า</h2>
+
+        <div class="overflow-x-auto">
+          <table class="d">
+            <thead><tr><th>ขั้นตอน</th><th>เช็คด้วย</th></tr></thead>
+            <tbody>
+              <tr><td>Disk เผื่อพอ (≥80 GB)</td><td><span class="mono text-[12px]">df -h /</span></td></tr>
+              <tr><td>Datastore stack ขึ้นครบ</td><td><span class="mono text-[12px]">docker compose ps</span> ใน <span class="mono text-[12px]">infra-erp/</span></td></tr>
+              <tr><td>erp-api ทุก BC online</td><td><span class="mono text-[12px]">pm2 list</span> — ครบ 8 BC × 2 instance</td></tr>
+              <tr><td>Kong routes ครบ 8 BC</td><td><span class="mono text-[12px]">curl 127.0.0.1:8001/services</span></td></tr>
+              <tr><td>Cloudflare Tunnel healthy</td><td><span class="mono text-[12px]">systemctl status cloudflared</span></td></tr>
+              <tr><td>Login ผ่าน domain จริงสำเร็จ</td><td>เปิด <span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span> จริงจาก browser ภายนอก</td></tr>
+              <tr><td>Production .env ครบ §08</td><td>เทียบกับตารางเช็คลิสต์</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox ok mt-6">
+          <div class="rc mb-1">ลิงก์ที่เกี่ยวข้อง</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <a href="erp-architecture.html" style="color:var(--accent);text-decoration:underline">ERP Architecture</a> ·
+            <a href="observability-logging-guide.html" style="color:var(--accent);text-decoration:underline">Observability Guide</a> ·
+            <a href="postgresql-pgpool-cluster-guide.html" style="color:var(--accent);text-decoration:underline">PostgreSQL/Pgpool HA</a> ·
+            <a href="runbook.html" style="color:var(--accent);text-decoration:underline">Incident Runbook</a>
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · DEPLOYMENT GUIDE"
+        line2="Docker Compose · Kong · Cloudflare Tunnel · pm2">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
