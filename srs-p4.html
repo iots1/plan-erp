@@ -105,6 +105,7 @@
               </tbody>
             </table>
           </div>
+          <div class="edge mt-4"><div class="tag mb-1">ราคาที่ดึงมาต้องรู้ว่ารวม VAT หรือยัง</div><p class="text-[13px]">ตอนดึง <span class="mono text-[12px]">unit_price</span>/<span class="mono text-[12px]">unit_cost</span> เริ่มต้นจาก <span class="mono text-[12px]">item_prices</span> (inventory-bc) ต้องอ่าน <span class="mono text-[12px]">price_lists.is_tax_inclusive</span> คู่กันเสมอ — ราคาบน PO/Quotation ที่ denormalize มาต้องรู้ที่มาว่ารวมภาษีแล้วหรือยัง ก่อนส่งต่อให้ finance-bc คำนวณ VAT ตอนออกใบกำกับ (ดู <a href="srs-p2.html#p2" style="color:var(--blueprint);text-decoration:underline">P2 · tax_categories</a>)</p></div>
 
           <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
           <div class="grid sm:grid-cols-2 gap-4">

@@ -168,6 +168,7 @@
                 <tr><td>template_product_id</td><td><span style="color:var(--muted)">–</span></td><td>ถ้าเป็น variant → อ้าง product ต้นแบบ</td></tr>
                 <tr><td>brand_id</td><td><span style="color:var(--muted)">–</span></td><td>ยี่ห้อ</td></tr>
                 <tr><td>supplier_id</td><td><span style="color:var(--muted)">–</span></td><td>ผู้จัดซื้อหลัก (ref supplier-bc · UUID)</td></tr>
+                <tr><td>tax_category_id</td><td><span style="color:var(--muted)">–</span></td><td>ประเภทภาษี (ref <span class="mono text-[12px]">tax_categories</span>) — ไม่ระบุ = ใช้ VAT มาตรฐาน 7% ตามค่าเริ่มต้น</td></tr>
               </tbody>
             </table>
           </div>
@@ -231,6 +232,7 @@
                 <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ (ไทย)</td></tr>
                 <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ (อังกฤษ)</td></tr>
                 <tr><td>tax_id</td><td><span style="color:#15803D">✓</span></td><td>เลขประจำตัวผู้เสียภาษี (ใช้ต่อใน finance-bc)</td></tr>
+                <tr><td>is_vat_registered</td><td><span style="color:var(--muted)">–</span></td><td>จดทะเบียน VAT หรือไม่ — ค่าเริ่มต้น true · false = ซื้อจากรายนี้ขอเครดิตภาษีซื้อไม่ได้</td></tr>
                 <tr><td>contact_phone · address</td><td><span style="color:var(--muted)">–</span></td><td>ข้อมูลติดต่อ</td></tr>
                 <tr><td>credit_terms</td><td><span style="color:var(--muted)">–</span></td><td>เงื่อนไขเครดิต (วัน) — ใช้ตอนตั้งหนี้ AP</td></tr>
                 <tr><td>supplier_type</td><td><span style="color:var(--muted)">–</span></td><td><span class="mono text-[12px]">company</span> | <span class="mono text-[12px]">individual</span> — ค่าเริ่มต้น company</td></tr>
@@ -243,7 +245,7 @@
               </tbody>
             </table>
             <div class="edge mt-4"><div class="tag mb-1">ขอบเขต</div><p class="text-[13px]"><b>supplier-bc เป็นเจ้าของ</b> · inventory/finance อ้างด้วย <span class="mono text-[12px]">supplier_id</span> (UUID) เท่านั้น ไม่ join ข้าม DB</p></div>
-            <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ตัดขอบเขตรอบนี้</div><p class="text-[13px]">Company Bank Account (รอ finance-bc) และ Tax Withholding Category/Group ยังไม่ออกแบบในรอบนี้ — <span class="mono text-[12px]">tax_id</span> เดิมมีอยู่แล้วเพียงพอสำหรับ AP เบื้องต้น</p></div>
+            <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ตัดขอบเขตรอบนี้</div><p class="text-[13px]">Company Bank Account (รอ finance-bc) และ <b>Withholding Tax</b> (หัก ณ ที่จ่าย — แยกจาก VAT โดยสิ้นเชิง) ยังไม่ออกแบบในรอบนี้ — ดู <span class="mono text-[12px]">TAX_CONFIGS</span> ใน <a href="srs-p5.html#p5" style="color:#7C3AED;text-decoration:underline">P5 · Finance</a> ที่รองรับทั้ง VAT/WHT ไว้แล้วเป็นแผน (ยังไม่มีโค้ด) · VAT registration status (<span class="mono text-[12px]">is_vat_registered</span>) implement แล้วในรอบนี้</p></div>
           </div>
 
           <!-- PRICE LIST -->
@@ -258,12 +260,33 @@
                 <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อรายการราคา — unique ที่ name_en</td></tr>
                 <tr><td>currency</td><td><span style="color:#15803D">✓</span></td><td>สกุลเงินของ<b>ทั้งรายการราคา</b> (ISO 4217 เช่น THB) — <b>เจ้าของสกุลเงินหนึ่งเดียว</b>, ไม่เก็บซ้ำที่ item_prices</td></tr>
                 <tr><td>is_buying · is_selling</td><td><span style="color:#15803D">✓</span></td><td>ทิศทางการใช้งาน — <b>อย่างน้อยหนึ่งต้อง true</b> (DB CHECK)</td></tr>
+                <tr><td>is_tax_inclusive</td><td><span style="color:var(--muted)">–</span></td><td>true = <span class="mono text-[12px]">rate</span> ใน item_prices ของ price list นี้ <b>รวม VAT แล้ว</b> (ราคาหน้าร้าน) · false (ค่าเริ่มต้น) = ยังไม่รวมภาษี (ราคา B2B ทั่วไป)</td></tr>
                 <tr><td>is_active</td><td><span style="color:var(--muted)">–</span></td><td>เปิดใช้งาน (ค่าเริ่มต้น true)</td></tr>
                 <tr><td>description_th · _en</td><td><span style="color:var(--muted)">–</span></td><td>คำอธิบายเพิ่มเติม</td></tr>
               </tbody>
             </table>
             <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">Header/Line pattern (standard)</div><p class="text-[13px]">ตรงกับทุกระบบหลัก (ERPNext Price List, Odoo pricelist, Dynamics 365 BC Price List Header, NetSuite Price Level) — <b>currency อยู่ที่ header เท่านั้น</b> ไม่ปล่อยให้ line (item_prices) override ต่างสกุลเงินภายใน price list เดียวกัน ป้องกันการรวมยอด/เทียบราคาผิดพลาด</p></div>
             <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">Validate ที่ service ไม่ใช่ DB</div><p class="text-[13px]">DB CHECK constraint (23514) <b>ไม่ถูก map</b> โดย PostgresErrorMapper (ตกไปเป็น 500) — ต้องเช็ค <span class="mono text-[12px]">is_buying/is_selling</span> ในชั้น DTO/service ก่อน insert เสมอ</p></div>
+          </div>
+
+          <!-- TAX CATEGORY -->
+          <div class="card p-6 mb-5" style="border-left:3px solid #7C3AED">
+            <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div class="mono text-[12px]" style="color:#7C3AED">tax_categories · ประเภทภาษี (VAT) <span class="mono text-[11px]" style="color:var(--muted)">(inventory-bc)</span></div>
+              <span class="chip"><span class="dot" style="background:#7C3AED"></span>เช่น "VAT มาตรฐาน 7%" / "ยกเว้นภาษี (มาตรา 81)"</span>
+            </div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อประเภทภาษี — unique ที่ name_en</td></tr>
+                <tr><td>vat_treatment</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">standard</span> (7%) | <span class="mono text-[12px]">zero_rated</span> (ส่งออก/เขตปลอดอากร มาตรา 80/1) | <span class="mono text-[12px]">exempt</span> (ยกเว้นตามมาตรา 81)</td></tr>
+                <tr><td>rate</td><td><span style="color:#15803D">✓</span></td><td>อัตราภาษี % (0-100) — เก็บแยกจาก vat_treatment เผื่ออัตรามาตรฐานเปลี่ยนในอนาคต</td></tr>
+                <tr><td>legal_reference</td><td><span style="color:var(--muted)">–</span></td><td>อ้างอิงข้อกฎหมาย เช่น "มาตรา 81(1)(ก)" ไว้ตอบผู้ตรวจสอบบัญชี</td></tr>
+                <tr><td>is_active</td><td><span style="color:var(--muted)">–</span></td><td>เปิดใช้งาน (ค่าเริ่มต้น true)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4"><div class="tag mb-1">zero_rated ≠ exempt (สำคัญทางบัญชี)</div><p class="text-[13px]">ทั้งคู่คำนวณเป็น 0.00 บาทในบรรทัดเหมือนกัน แต่ <b>zero_rated ยังอยู่ในระบบ VAT</b> — ภาษีซื้อของต้นทุนที่ใช้ผลิต/ขายสินค้านั้นยังขอเครดิตคืนได้ ส่วน <b>exempt อยู่นอกระบบ VAT</b> — ภาษีซื้อที่เกี่ยวข้องขอเครดิตคืนไม่ได้ ต้องแยก <span class="mono text-[12px]">vat_treatment</span> ให้ถูกตั้งแต่ระดับสินค้า ไม่ใช่แค่ "ไม่มี VAT" เฉย ๆ</p></div>
+            <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ขอบเขต — คนละงานกับ TAX_CONFIGS ใน finance-bc</div><p class="text-[13px]"><span class="mono text-[12px]">tax_categories</span> ที่นี่คือ <b>การจัดประเภทสินค้าทางภาษี</b> (item-level) เท่านั้น — ตัวเลขจริงตอนออกใบกำกับภาษี (คำนวณ VAT ต่อบรรทัด, เลขที่ใบกำกับต่อเนื่อง, WHT) เป็นหน้าที่ <span class="mono text-[12px]">TAX_CONFIGS</span> + Tax Invoice ใน <a href="srs-p5.html#p5" style="color:#7C3AED;text-decoration:underline">P5 · Finance</a> ซึ่ง<b>ยังไม่มีโค้ดเลย</b> (ดู workflow เต็มด้านล่าง)</p></div>
           </div>
 
           <!-- ITEM PRICE -->
@@ -281,7 +304,8 @@
                 <tr><td>lead_time_days</td><td><span style="color:var(--muted)">–</span></td><td>ระยะเวลาส่งมอบ (วัน) เฉพาะราคาซื้อ</td></tr>
               </tbody>
             </table>
-            <div class="edge mt-4"><div class="tag mb-1">Unique scope</div><p class="text-[13px]"><span class="mono text-[12px]">uq_item_prices_scope</span> (product+price_list+uom+supplier+batch+valid_from) กันซ้ำค่าตรงเป๊ะ — แต่ <b>ช่วงวันที่ทับซ้อนกัน</b> ต้องเช็คเองที่ service (DB จับไม่ได้)</p></div>
+            <div class="edge mt-4"><div class="tag mb-1">Unique scope + Overlap guard (บังคับจริงที่ ItemPricesService)</div><p class="text-[13px]"><span class="mono text-[12px]">uq_item_prices_scope</span> (product+price_list+uom+supplier+batch+valid_from) กันซ้ำค่าตรงเป๊ะที่ DB · <b>ช่วงวันที่ทับซ้อนกัน</b> (DB จับไม่ได้) เช็คที่ <span class="mono text-[12px]">ItemPricesService.assertNoOverlap()</span> ก่อน insert/update ทุกครั้ง → ทับซ้อน = <span class="mono text-[12px]">409 Conflict</span></p></div>
+            <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ตั้งราคาได้เฉพาะสินค้าที่ "ซื้อขายตรงได้"</div><p class="text-[13px]"><span class="mono text-[12px]">ItemPricesService.assertValidProduct()</span> ปฏิเสธ <span class="mono text-[12px]">product.has_variants=true</span> (template) และ <span class="mono text-[12px]">product.type='bundle'</span> ทันที — ตั้งราคาได้เฉพาะ variant/สินค้าเดี่ยวที่ transact ได้จริงเท่านั้น (ดูตัวอย่างด้านล่าง)</p></div>
           </div>
 
           <!-- ITEM SUPPLIER -->
@@ -290,12 +314,151 @@
             <table class="d">
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
-                <tr><td>product_id · supplier_id</td><td><span style="color:#15803D">✓</span></td><td>คู่สินค้า-ผู้จัดซื้อ — unique ร่วมกัน</td></tr>
+                <tr><td>product_id · supplier_id</td><td><span style="color:#15803D">✓</span></td><td>คู่สินค้า-ผู้จัดซื้อ — unique ร่วมกัน · ปฏิเสธ template/bundle เหมือน item_prices</td></tr>
                 <tr><td>supplier_part_number</td><td><span style="color:var(--muted)">–</span></td><td>รหัสสินค้าตามผู้จัดซื้อรายนั้น</td></tr>
-                <tr><td>is_default</td><td><span style="color:var(--muted)">–</span></td><td>ผู้จัดซื้อหลักของสินค้านี้ — มีได้แถวเดียวที่ true ต่อสินค้า (service บังคับ)</td></tr>
+                <tr><td>is_default</td><td><span style="color:var(--muted)">–</span></td><td>ผู้จัดซื้อหลักของสินค้านี้ — มีได้แถวเดียวที่ true ต่อสินค้า (service บังคับ ในทรานแซกชันเดียวกับการเขียนแถว)</td></tr>
               </tbody>
             </table>
-            <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">แทนที่ products.supplier_id เดิม</div><p class="text-[13px]"><span class="mono text-[12px]">products.supplier_id</span> รองรับผู้จัดซื้อได้รายเดียว — <b>คงไว้แบบ deprecated</b> จนกว่า frontend จะย้ายมาใช้ <span class="mono text-[12px]">item_suppliers</span> + <span class="mono text-[12px]">is_default</span> ครบ ค่อยลบใน migration แยกภายหลัง</p></div>
+            <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">Sync กับ products.supplier_id อัตโนมัติ (บังคับจริงที่ ItemSuppliersService)</div><p class="text-[13px]"><span class="mono text-[12px]">products.supplier_id</span> เดิม (รองรับรายเดียว) <b>ไม่ใช่แค่ deprecated เฉย ๆ</b> — <span class="mono text-[12px]">ItemSuppliersService</span> sync ให้เท่ากับ <span class="mono text-[12px]">supplier_id</span> ของแถวที่ <span class="mono text-[12px]">is_default=true</span> ล่าสุดเสมอ ทั้งตอน create/update/delete (ในทรานแซกชันเดียวกับการ clear default แถวอื่น) กันไม่ให้สองแหล่งข้อมูลขัดกัน · ลบแถว default → <span class="mono text-[12px]">products.supplier_id</span> เซ็ตเป็น null</p></div>
+          </div>
+
+          <!-- ITEM PRICE / ITEM SUPPLIER · BUSINESS RULE EXAMPLES -->
+          <h4 class="font-semibold mt-10 mb-2 text-[16px]">ตัวอย่าง Data &amp; Workflow · Business Rule ที่บังคับจริงในโค้ด</h4>
+          <p class="text-[13px] mb-5" style="color:var(--ink-soft)">3 กฎด้านล่างเป็น validation ที่ implement จริงแล้วใน <span class="mono text-[12px]">ItemPricesService</span>/<span class="mono text-[12px]">ItemSuppliersService</span> (ไม่ใช่แค่แผนในเอกสาร) — แสดง request/response จริงเพื่อให้เห็นว่า data ไหลยังไง</p>
+
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(220,38,38,.12);color:#DC2626;border:1px solid rgba(220,38,38,.3)">RULE 1</span>
+              <span class="text-[14px] font-semibold">ห้ามตั้งราคาช่วงวันที่ทับซ้อนกัน (409 Conflict)</span>
+            </div>
+            <pre class="code p-4"><span class="c">// แถวแรก — ตั้งราคาสินค้า A ช่วง 1-31 ม.ค.</span>
+<span class="k">POST</span> /item-prices
+{ <span class="s">"product_id"</span>: <span class="s">"prod-A"</span>, <span class="s">"price_list_id"</span>: <span class="s">"Standard-Selling"</span>, <span class="s">"uom_id"</span>: <span class="s">"uom-piece"</span>,
+  <span class="s">"rate"</span>: 100, <span class="s">"valid_from"</span>: <span class="s">"2026-01-01"</span>, <span class="s">"valid_upto"</span>: <span class="s">"2026-01-31"</span> }
+<span class="c">// → 201 Created (id: ip-001)</span>
+
+<span class="c">// แถวสอง — ตั้งราคาสินค้า A ตัวเดียวกัน ช่วง 15-20 ม.ค. (ทับกับแถวแรก)</span>
+<span class="k">POST</span> /item-prices
+{ <span class="s">"product_id"</span>: <span class="s">"prod-A"</span>, <span class="s">"price_list_id"</span>: <span class="s">"Standard-Selling"</span>, <span class="s">"uom_id"</span>: <span class="s">"uom-piece"</span>,
+  <span class="s">"rate"</span>: 120, <span class="s">"valid_from"</span>: <span class="s">"2026-01-15"</span>, <span class="s">"valid_upto"</span>: <span class="s">"2026-01-20"</span> }
+<span class="c">// → 409 Conflict</span>
+{ <span class="s">"message"</span>: <span class="s">"Item price overlaps existing row 'ip-001' for the same product/price list/uom/supplier/batch (valid 2026-01-01 to 2026-01-31)."</span> }</pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">ตั้ง <span class="mono text-[12px]">valid_upto</span> เป็นค่าว่าง (ไม่มีกำหนด) ก็ยังโดนตรวจ — ระบบตีความ null เป็น -∞/+∞ ตามด้าน เทียบ overlap ให้ถูกต้องเสมอ</p>
+          </div>
+
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(220,38,38,.12);color:#DC2626;border:1px solid rgba(220,38,38,.3)">RULE 2</span>
+              <span class="text-[14px] font-semibold">ตั้งราคา/ผูกซัพพลายเออร์ให้ template หรือ bundle ไม่ได้ (400 Bad Request)</span>
+            </div>
+            <pre class="code p-4"><span class="c">// เสื้อยืด (template, has_variants=true) — ห้ามตั้งราคาตรง ต้องเลือก variant</span>
+<span class="k">POST</span> /item-prices
+{ <span class="s">"product_id"</span>: <span class="s">"TSHIRT"</span>, <span class="s">"price_list_id"</span>: <span class="s">"Standard-Selling"</span>, ... }
+<span class="c">// → 400 Bad Request</span>
+{ <span class="s">"message"</span>: <span class="s">"Product 'TSHIRT' is a variant template (has_variants=true) and cannot be priced directly — price the generated variants instead."</span> }
+
+<span class="c">// ชุดของขวัญปีใหม่ A (bundle) — ห้ามผูกซัพพลายเออร์ตรง ไม่มี Lot ของตัวเอง</span>
+<span class="k">POST</span> /item-suppliers
+{ <span class="s">"product_id"</span>: <span class="s">"GIFTSET-A"</span>, <span class="s">"supplier_id"</span>: <span class="s">"sup-xyz"</span> }
+<span class="c">// → 400 Bad Request</span>
+{ <span class="s">"message"</span>: <span class="s">"Product 'GIFTSET-A' is a bundle (type=bundle) and is never purchased directly — assign suppliers to the component items instead."</span> }</pre>
+          </div>
+
+          <div class="card p-6 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(220,38,38,.12);color:#DC2626;border:1px solid rgba(220,38,38,.3)">RULE 3</span>
+              <span class="text-[14px] font-semibold">products.supplier_id (เดิม) sync ตาม item_suppliers.is_default อัตโนมัติ</span>
+            </div>
+            <pre class="code p-4"><span class="c">// 1) ผูกผู้จัดซื้อรายแรกเป็น default → products.supplier_id ถูกตั้งค่าตาม ในทรานแซกชันเดียวกัน</span>
+<span class="k">POST</span> /item-suppliers
+{ <span class="s">"product_id"</span>: <span class="s">"PARA-500"</span>, <span class="s">"supplier_id"</span>: <span class="s">"บ.เอบีซี"</span>, <span class="s">"is_default"</span>: true }
+<span class="c">// → 201 Created · products.supplier_id (PARA-500) = "บ.เอบีซี" ทันที</span>
+
+<span class="c">// 2) เปลี่ยน default ไปอีกเจ้า → แถวเก่าถูก clear is_default + products.supplier_id ตามเจ้าใหม่</span>
+<span class="k">PUT</span> /item-suppliers/{id-เมดิคอล}
+{ <span class="s">"is_default"</span>: true }
+<span class="c">// → 200 OK · แถว "บ.เอบีซี" is_default=false อัตโนมัติ · products.supplier_id = "บ.เมดิคอล"</span>
+
+<span class="c">// 3) ลบแถว default ทิ้ง → products.supplier_id กลับเป็น null (ไม่ค้างชี้ผู้จัดซื้อที่ไม่ผูกแล้ว)</span>
+<span class="k">DELETE</span> /item-suppliers/{id-เมดิคอล}
+<span class="c">// → 204 No Content · products.supplier_id (PARA-500) = null</span></pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">ทั้ง 3 ขั้นรันใน <span class="mono text-[12px]">manager.transaction()</span> เดียวกับการเขียน <span class="mono text-[12px]">item_suppliers</span> — ไม่มีช่วงเวลาที่สองตารางเห็นค่าไม่ตรงกัน</p>
+          </div>
+
+          <!-- VAT SCENARIOS -->
+          <h4 class="font-semibold mt-10 mb-2 text-[16px]">ตัวอย่าง Data &amp; Workflow · การจัดประเภทภาษี VAT (4 กรณีที่ต้องรองรับ)</h4>
+          <div class="card p-4 mb-5 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">ขอบเขตของแต่ละตัวอย่าง:</b> ส่วน "การจัดประเภท" (master data: <span class="mono text-[12px]">tax_categories</span>, <span class="mono text-[12px]">products.tax_category_id</span>, <span class="mono text-[12px]">price_lists.is_tax_inclusive</span>, <span class="mono text-[12px]">suppliers.is_vat_registered</span>) <b style="color:#15803D">implement แล้วจริงในรอบนี้</b> — ส่วน "ตอนออกใบกำกับภาษี" เป็น<b>การออกแบบ workflow ที่ยังไม่มีโค้ด</b> เพราะต้องรอ Tax Invoice ใน finance-bc (P5) ซึ่งยังเป็น 0% (ดู <a href="srs-p4.html#p4" style="color:#7C3AED;text-decoration:underline">P4</a>/<a href="srs-p5.html#p5" style="color:#7C3AED;text-decoration:underline">P5</a>)</div>
+
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">กรณี 1</span>
+              <span class="text-[14px] font-semibold">สินค้ายกเว้น VAT ตามกฎหมาย (มาตรา 81) — เช่น พืชผลทางการเกษตรที่ไม่แปรรูป</span>
+            </div>
+            <pre class="code p-4"><span class="c">// 1) ตั้งประเภทภาษี (ครั้งเดียว, ทำได้จริงตอนนี้)</span>
+<span class="k">POST</span> /tax-categories
+{ <span class="s">"name_th"</span>: <span class="s">"ยกเว้นภาษี (มาตรา 81)"</span>, <span class="s">"name_en"</span>: <span class="s">"Exempt (Section 81)"</span>,
+  <span class="s">"vat_treatment"</span>: <span class="s">"exempt"</span>, <span class="s">"rate"</span>: 0, <span class="s">"legal_reference"</span>: <span class="s">"มาตรา 81(1)(ก)"</span> }
+<span class="c">// → 201 Created (id: tax-exempt-81)</span>
+
+<span class="c">// 2) ผูกสินค้าเข้ากับประเภทภาษีนี้ (ทำได้จริงตอนนี้)</span>
+<span class="k">PUT</span> /products/{ข้าวเปลือก-id}
+{ <span class="s">"tax_category_id"</span>: <span class="s">"tax-exempt-81"</span> }
+
+<span class="c">// 3) [ออกแบบไว้] ตอนออก Tax Invoice — finance-bc อ่าน tax_category_id ผ่าน TCP</span>
+<span class="c">// แล้ว "ไม่แสดงยอด VAT" บรรทัดนี้ในใบกำกับภาษี (ต่างจาก zero_rated ที่ยังต้องแสดง 0.00)</span></pre>
+          </div>
+
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(220,90,22,.12);color:var(--signal);border:1px solid rgba(220,90,22,.3)">กรณี 2</span>
+              <span class="text-[14px] font-semibold">ซื้อของจากผู้ขายที่ไม่ได้จด VAT (นอกระบบ)</span>
+            </div>
+            <pre class="code p-4"><span class="c">// ผู้จัดซื้อรายย่อยไม่ได้จดทะเบียน VAT (ทำได้จริงตอนนี้)</span>
+<span class="k">POST</span> /suppliers
+{ <span class="s">"code"</span>: <span class="s">"SUP-0099"</span>, <span class="s">"name_th"</span>: <span class="s">"สวนคุณสมชาย"</span>, <span class="s">"tax_id"</span>: <span class="s">"3101012345678"</span>,
+  <span class="s">"is_vat_registered"</span>: false }
+<span class="c">// → 201 Created</span>
+
+<span class="c">// [ออกแบบไว้] ตอนบันทึกใบรับสินค้า/ตั้งหนี้ — finance-bc เช็ค supplier.is_vat_registered
+// ก่อนคำนวณภาษีซื้อ: false → ไม่มีภาษีซื้อให้ขอเครดิต (ใบเสร็จรับเงินธรรมดา ไม่ใช่ใบกำกับภาษี)</span></pre>
+          </div>
+
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(124,58,237,.12);color:#7C3AED;border:1px solid rgba(124,58,237,.3)">กรณี 3</span>
+              <span class="text-[14px] font-semibold">ราคารวม VAT/ไม่รวม VAT ต่างกันตามราย SKU (จริง ๆ คือตามราย price list)</span>
+            </div>
+            <pre class="code p-4"><span class="c">// ราคาปลีกหน้าร้าน = แสดงราคารวม VAT แล้ว, ราคาส่ง B2B = ไม่รวม (ทำได้จริงตอนนี้)</span>
+<span class="k">POST</span> /price-lists
+{ <span class="s">"name_en"</span>: <span class="s">"Retail Selling"</span>, <span class="s">"currency"</span>: <span class="s">"THB"</span>, <span class="s">"is_selling"</span>: true,
+  <span class="s">"is_tax_inclusive"</span>: true }
+<span class="c">// → item_prices.rate ใน list นี้ = 107 บาท (ราคาที่ลูกค้าจ่ายจริง รวม VAT 7 บาทแล้ว)</span>
+
+<span class="k">POST</span> /price-lists
+{ <span class="s">"name_en"</span>: <span class="s">"Wholesale Selling"</span>, <span class="s">"currency"</span>: <span class="s">"THB"</span>, <span class="s">"is_selling"</span>: true,
+  <span class="s">"is_tax_inclusive"</span>: false }
+<span class="c">// → item_prices.rate ใน list นี้ = 100 บาท (ยังไม่รวม VAT — บวก 7% ตอนออกใบกำกับ)</span>
+
+<span class="c">// [ออกแบบไว้] finance-bc อ่าน price_lists.is_tax_inclusive ก่อนคำนวณ:
+//   inclusive: vat_amount = rate − rate/1.07,        net = rate/1.07
+//   exclusive: vat_amount = rate × 0.07,              net = rate</span></pre>
+          </div>
+
+          <div class="card p-6 mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(11,61,145,.12);color:var(--blueprint);border:1px solid rgba(11,61,145,.3)">กรณี 4</span>
+              <span class="text-[14px] font-semibold">ส่งออก/ขายในเขตปลอดอากร — VAT 0% (มาตรา 80/1)</span>
+            </div>
+            <pre class="code p-4"><span class="c">// 1) ตั้งประเภทภาษีแยกจาก "exempt" เพราะทางบัญชีต่างกัน (ทำได้จริงตอนนี้)</span>
+<span class="k">POST</span> /tax-categories
+{ <span class="s">"name_th"</span>: <span class="s">"ส่งออก/เขตปลอดอากร 0%"</span>, <span class="s">"name_en"</span>: <span class="s">"Export Zero-Rated"</span>,
+  <span class="s">"vat_treatment"</span>: <span class="s">"zero_rated"</span>, <span class="s">"rate"</span>: 0, <span class="s">"legal_reference"</span>: <span class="s">"มาตรา 80/1"</span> }
+
+<span class="c">// 2) [ออกแบบไว้] product.tax_category_id ตั้งเป็น standard (7%) ตามปกติ — ไม่เปลี่ยนที่ตัวสินค้า
+// เพราะ 0% นี้ขึ้นกับ "บริบทการขาย" (ลูกค้าปลายทางอยู่ต่างประเทศ) ไม่ใช่ตัวสินค้าเอง
+// finance-bc/sales-bc ต้องเลือก tax_category ที่ zero_rated ตอนออก SO/Invoice
+// ให้ลูกค้าเฉพาะที่ flag เป็น export customer เท่านั้น — ไม่ผูกตายตัวกับ product</span></pre>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">นี่คือเหตุผลที่ <span class="mono text-[12px]">tax_categories</span> เป็นตารางอิสระแยกจาก <span class="mono text-[12px]">products</span> ไม่ hardcode เป็น field บน product — สินค้าตัวเดียวกันอาจต้องใช้ได้ทั้ง standard (ขายในประเทศ) และ zero_rated (ส่งออก) ขึ้นกับลูกค้าปลายทาง ซึ่งเป็นการตัดสินใจระดับ "บรรทัดใบกำกับภาษี" ไม่ใช่ระดับ master data สินค้า</p>
           </div>
 
           <!-- MULTI-BUSINESS PRICING SCENARIOS -->
@@ -579,6 +742,7 @@ erDiagram
         boolean has_variants
         uuid template_product_id FK "variant of"
         uuid supplier_id "ref supplier-bc"
+        uuid tax_category_id FK "nullable, default=standard VAT"
     }
     UOM_CONVERSION_FACTORS {
         uuid id PK
@@ -610,6 +774,16 @@ erDiagram
         string currency "ISO 4217"
         boolean is_buying
         boolean is_selling
+        boolean is_tax_inclusive
+        boolean is_active
+    }
+    TAX_CATEGORIES {
+        uuid id PK
+        string name_th
+        string name_en
+        string vat_treatment "standard/zero_rated/exempt"
+        decimal rate "percent"
+        string legal_reference
         boolean is_active
     }
     ITEM_PRICES {
@@ -647,9 +821,10 @@ erDiagram
     PRICE_LISTS ||--o{ ITEM_PRICES : contains
     UOMS ||--o{ ITEM_PRICES : "quoted per"
     PRODUCTS ||--o{ ITEM_SUPPLIERS : "supplied via"
+    TAX_CATEGORIES ||--o{ PRODUCTS : classifies
 </pre>
           </div>
-          <p class="text-[12.5px] mt-2" style="color:var(--muted)">* <span class="mono">suppliers</span> อยู่ใน supplier-bc และ <span class="mono">file_objects</span> อยู่ใน storage-bc — อ้างข้าม BC ด้วย UUID เท่านั้น ไม่มี FK ข้ามฐานข้อมูล · <span class="mono">item_prices.supplier_id</span> / <span class="mono">item_suppliers.supplier_id</span> อ้าง <span class="mono">suppliers.id</span> แบบเดียวกัน</p>
+          <p class="text-[12.5px] mt-2" style="color:var(--muted)">* <span class="mono">suppliers</span> อยู่ใน supplier-bc และ <span class="mono">file_objects</span> อยู่ใน storage-bc — อ้างข้าม BC ด้วย UUID เท่านั้น ไม่มี FK ข้ามฐานข้อมูล · <span class="mono">item_prices.supplier_id</span> / <span class="mono">item_suppliers.supplier_id</span> อ้าง <span class="mono">suppliers.id</span> แบบเดียวกัน · <span class="mono">suppliers.is_vat_registered</span> อยู่ใน supplier-bc เอง (ไม่แสดงในไดอะแกรมนี้เพราะเป็น table คนละ DB)</p>
         </div>
 
         <!-- 2.6 Dev Guide -->

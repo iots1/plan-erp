@@ -81,6 +81,8 @@
             <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ใบวางบิล (Billing Note)</b> รวมหลายใบกำกับเพื่อเรียกเก็บเงินรอบเดียว</p></div>
           </div>
 
+          <div class="edge mb-8" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--teal)">Tax Invoice ต้องอ่าน 2 แหล่งข้อมูล — คนละ BC</div><p class="text-[13px]">ขั้นตอน "คำนวณ VAT" ในข้อ 3 ต้องดึงข้อมูล 2 ที่: <b>(1)</b> <span class="mono text-[12px]">tax_categories</span> + <span class="mono text-[12px]">products.tax_category_id</span> (inventory-bc, มีโค้ดแล้ว — <a href="srs-p2.html#p2" style="color:var(--teal);text-decoration:underline">ดู P2</a>) บอกว่าสินค้าแต่ละบรรทัด <span class="mono text-[12px]">standard</span>/<span class="mono text-[12px]">zero_rated</span>/<span class="mono text-[12px]">exempt</span> และ <span class="mono text-[12px]">price_lists.is_tax_inclusive</span> บอกว่าราคาที่ตกลงรวม VAT แล้วหรือยัง <b>(2)</b> <span class="mono text-[12px]">TAX_CONFIGS</span> (finance-bc, ตารางด้านล่าง) เก็บอัตราภาษีจริงที่ใช้คำนวณ (VAT7/WHT) — สองตารางนี้คนละหน้าที่กัน: inventory-bc บอก "สินค้านี้ประเภทไหน", finance-bc บอก "อัตราจริงเท่าไหร่และคำนวณยังไง" ต้องเรียกผ่าน TCP ข้าม BC เสมอ ไม่ query ตรง</p></div>
+
           <h4 class="font-semibold mt-2 mb-3 text-[15px]">ข้อมูลที่บันทึก</h4>
           <div class="card overflow-hidden">
             <table class="d">
