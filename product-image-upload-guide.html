@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>อัปโหลดรูปสินค้า (Product Images) — Implementation Guide · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="🖼" title="Product Images" subtitle="IMPLEMENTATION GUIDE · UPLOAD" width="280">
+    <nav slot="nav">
+      <a href="#overview"  class="navlink"><span class="n">01</span> ภาพรวม &amp; การตัดสินใจออกแบบ</a>
+      <a href="#schema"    class="navlink"><span class="n">02</span> Database · product_images</a>
+      <a href="#storage-bc" class="navlink"><span class="n">03</span> storage-bc · คำสั่งใหม่</a>
+      <a href="#flow-a"    class="navlink"><span class="n">04</span> Flow A · Presigned Upload</a>
+      <a href="#flow-b"    class="navlink"><span class="n">05</span> Flow B · Multipart Create</a>
+      <a href="#api"       class="navlink"><span class="n">06</span> API Reference</a>
+      <a href="#viewing"   class="navlink"><span class="n">07</span> การแสดงรูป (Signed URL)</a>
+      <a href="#gotchas"   class="navlink"><span class="n">08</span> ปัญหาที่เจอระหว่างทดสอบจริง</a>
+      <a href="#testing"   class="navlink"><span class="n">09</span> Test Coverage</a>
+    </nav>
+    <div slot="footnote">
+      <a href="srs-p2.html#storage" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ SRS Phase 2 (Storage §04)</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(124,58,237,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="srs-p2.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ SRS Phase 2 — Master Data &amp; Storage
+        </a>
+        <div class="eyebrow text-[#C9A6FF] mb-5">Implementation Guide · inventory-bc + storage-bc</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          อัปโหลดรูปสินค้า<br>
+          <span class="text-[#C9A6FF]">(Product Images — Presigned &amp; Multipart)</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          บันทึกการ implement จริงของฟีเจอร์อัปโหลดรูปสินค้า ครอบคลุมทั้งสินค้าปกติ (single), template
+          (<span class="mono text-[13px]">has_variants=true</span>) และ variant ที่ generate ออกมา — ตาราง
+          <span class="mono text-[13px] text-white">product_images</span> ตัวเดียวรองรับทั้งสามกรณี พร้อม 2 flow
+          การอัปโหลด (presigned URL ตรงไป MinIO และ multipart ผ่าน backend) — เขียนขึ้นแทนที่ร่างเดิมใน
+          <span class="mono text-[13px] text-white">srs-p2.html §04</span> ซึ่งยังอิง schema
+          <span class="mono text-[13px] text-white">file_objects</span> ที่ไม่ตรงกับของจริงที่ build แล้ว
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#C9A6FF"></span>MinIO / S3-Compatible</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#C9A6FF"></span>@fastify/multipart</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Presigned PUT/GET</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>RMQ (TRANSPORT=rmq)</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 OVERVIEW ========== -->
+      <section id="overview" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — ภาพรวม &amp; การตัดสินใจออกแบบ</div>
+        <h2 class="display text-3xl mb-6">ทำไมตารางเดียวพอสำหรับทุกกรณี</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <span class="mono text-[13px]">product.entity.ts</span> ออกแบบไว้แล้วว่า template (<span class="mono text-[12px]">has_variants=true</span>)
+          และ variant ที่ generate ออกมา (<span class="mono text-[12px]">template_product_id</span> ชี้กลับ) เป็นแถวใน
+          <span class="mono text-[12px]">products</span> เหมือนกันทั้งหมด — ดังนั้นตาราง
+          <span class="mono text-[13px] text-[var(--ink)]">product_images</span> ที่ FK ไป
+          <span class="mono text-[12px]">product_id</span> เพียงคอลัมน์เดียวจึงครอบคลุมทั้ง 3 กรณีโดยไม่ต้องมี
+          polymorphic table หรือ schema แยก
+        </p>
+
+        <div class="grid sm:grid-cols-3 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DECISION 1</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ไม่เก็บ Signed URL ลง DB</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              เก็บแค่ <span class="mono text-[12px]">bucket</span> + <span class="mono text-[12px]">object_key</span> —
+              presigned URL หมดอายุ (1 ชม.) เก็บลง DB คือเก็บค่าที่เน่า ต้อง sign ใหม่ทุกครั้งตอนอ่าน
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DECISION 2</div>
+            <h3 class="font-semibold mb-2 text-[15px]">size/extension/etag มาจาก S3 เท่านั้น</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              ไม่เชื่อค่าที่ client ส่งมา — <span class="mono text-[12px]">HeadObject</span> คือแหล่งความจริงเดียว
+              ก่อน insert แถวเสมอ (ดู §04/05)
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DECISION 3</div>
+            <h3 class="font-semibold mb-2 text-[15px]">Soft-delete แถว ไม่ลบ object บน S3</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              เหมือน <span class="mono text-[12px]">print_templates</span> — ย้อนดู/กู้คืนได้ทันที ไม่ต้อง
+              compensating-delete ตอน insert fail ทีหลัง
+            </p>
+          </div>
+        </div>
+
+        <div class="rulebox ok"><div class="rc mb-1">TRANSPORT · ไม่เกี่ยวกับ RMQ/TCP</div><p class="text-[13.5px]">Flow B (presigned) ทำให้ไบต์ไฟล์ไม่วิ่งผ่าน message broker เลย ไม่ว่า <span class="mono text-[12px]">TRANSPORT</span> จะเป็น <span class="mono text-[12px]">rmq</span> หรือ <span class="mono text-[12px]">tcp</span> — inventory-bc คุยกับ storage-bc แค่ 2 คำสั่งเล็ก ๆ (ขอ presigned URL / verify object) ไม่ใช่ buffer ไฟล์ จึงไม่ต้อง override transport ของ platform เลย</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 SCHEMA ========== -->
+      <section id="schema" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Database · product_images (erp_inventory)</div>
+        <h2 class="display text-3xl mb-6">Schema จริงที่ build แล้ว</h2>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Column</th><th>Type</th><th>คำอธิบาย</th></tr></thead>
+            <tbody>
+              <tr><td>product_id</td><td>uuid</td><td>FK → products (ON DELETE CASCADE) — single/template/variant ใช้ร่วมกัน</td></tr>
+              <tr><td>bucket</td><td>varchar(100)</td><td>MinIO/S3 bucket ปลายทาง</td></tr>
+              <tr><td>object_key</td><td>varchar(500)</td><td>path ใน bucket — ไม่ใช่ signed URL</td></tr>
+              <tr><td>original_name</td><td>varchar(255)</td><td>ชื่อไฟล์ต้นฉบับ (UTF-8 เต็มรูปแบบ — ดู §08)</td></tr>
+              <tr><td>mime_type</td><td>varchar(100)</td><td>image/jpeg · image/png · image/webp เท่านั้น</td></tr>
+              <tr><td>extension</td><td>varchar(20)</td><td>derive จาก original_name ฝั่ง server</td></tr>
+              <tr><td>size</td><td>int</td><td>bytes — ค่าจริงจาก S3 HeadObject</td></tr>
+              <tr><td>etag</td><td>varchar(100), null</td><td>S3 ETag จาก HeadObject — flow multipart ไม่มี (null)</td></tr>
+              <tr><td>is_primary</td><td>boolean</td><td>รูปหลัก — บังคับ 1 รูป/product ด้วย partial unique index</td></tr>
+              <tr><td>sort_order</td><td>int</td><td>ลำดับการแสดงผล</td></tr>
+              <tr><td>alt_th / alt_en</td><td>varchar(255), null</td><td>i18n flat columns → response ยุบเป็น <span class="mono text-[12px]">alt: {th, en}</span></td></tr>
+              <tr><td>attribute_value_id</td><td>uuid, null</td><td>ผูกรูปกับ attribute value เฉพาะของ template (เช่น "รูปตามสี") — สร้างคอลัมน์ไว้แล้ว ยังไม่ implement resolve logic ข้ามไปหา variant</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="edge mb-8"><div class="tag mb-1">Partial Unique Index</div><p class="text-[13px]"><span class="mono text-[12px]">uq_product_images_primary</span> บน <span class="mono text-[12px]">(product_id) WHERE is_primary = true AND is_deleted = false</span> — บังคับที่ระดับ DB ว่า product หนึ่งมีรูปหลักได้ไม่เกิน 1 รูป service ทั้งสองฝั่ง (confirm/update) unset รูปหลักเดิมในทรานแซกชันเดียวกันก่อน insert เสมอ ไม่ปล่อยให้ constraint นี้ throw 409 ใส่ผู้ใช้</p></div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Migration — generate จาก entity diff เสมอ (ห้ามเขียน SQL มือ)</div>
+        <div class="code p-5">
+<pre><span class="c">$ npm_config_name=CreateProductImages npm run migration:generate:inventory</span>
+<span class="c">$ npm run migration:run:inventory</span>
+
+<span class="c">-- ตรวจ SQL ที่ generate ได้เสมอก่อน commit</span>
+CREATE UNIQUE INDEX <span class="s">"uq_product_images_primary"</span> ON <span class="s">"product_images"</span> (<span class="s">"product_id"</span>)
+  WHERE <span class="s">"is_primary"</span> = <span class="k">true</span> AND <span class="s">"is_deleted"</span> = <span class="k">false</span>;</pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 STORAGE-BC ========== -->
+      <section id="storage-bc" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — storage-bc · คำสั่งใหม่ (AppMicroservice.Storage.cmd)</div>
+        <h2 class="display text-3xl mb-6">2 RPC command ที่เพิ่มเข้ามา</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          storage-bc เป็น thin wrapper รอบ S3 SDK ล้วน ๆ (ไม่มี DB) — เพิ่ม 2 คำสั่งใหม่ต่อจาก
+          <span class="mono text-[13px]">Upload/UploadWithMeta/Remove/GetPath/GenerateSignedUrls</span> เดิม
+        </p>
+        <div class="card overflow-hidden mb-7">
+          <table class="d">
+            <thead><tr><th>cmd</th><th>Input</th><th>Output</th></tr></thead>
+            <tbody>
+              <tr><td>GeneratePresignedUpload</td><td>bucket, key, original_name, mime_type</td><td>{ bucket, path, upload_url } — PUT URL อายุ 5 นาที</td></tr>
+              <tr><td>HeadObject</td><td>bucket, key</td><td>{ size, content_type, etag } | null — null = ยังไม่มีการอัปโหลดจริง</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox"><div class="rc mb-1">headObject คืน null ไม่ throw</div><p class="text-[13.5px]">"ยังไม่ได้อัปโหลด" เป็น outcome ปกติที่ caller ต้องตัดสินใจเอง (เช่น client ขอ presigned URL แล้วไม่เคย PUT จริง) — ไม่ใช่ error ของ storage-bc</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 FLOW A ========== -->
+      <section id="flow-a" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — Flow A · Presigned Upload (client อัปตรงเข้า MinIO)</div>
+        <h2 class="display text-3xl mb-6">เพิ่ม/เปลี่ยนรูปหลังสร้างสินค้าไปแล้ว</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          ตรงตาม flow ที่ SRS วาดไว้ตั้งแต่แรก — backend ไม่เคยเห็นไบต์ไฟล์เลย เบาที่สุด เหมาะกับหน้า
+          "จัดการรูปสินค้า" ของสินค้าที่มีอยู่แล้ว
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ขอ presigned URL</h3>
+          <div class="code p-5 mb-3">
+<pre><span class="k">POST</span> /products/:product_id/images/presigned-url
+{ <span class="s">"original_name"</span>: <span class="s">"photo.jpg"</span>, <span class="s">"mime_type"</span>: <span class="s">"image/jpeg"</span> }
+
+<span class="c">→ 200</span>
+{ <span class="s">"bucket"</span>: <span class="s">"erp-storage"</span>,
+  <span class="s">"object_key"</span>: <span class="s">"inventory/products/&lt;id&gt;/photo-915e46ef.jpg"</span>,
+  <span class="s">"upload_url"</span>: <span class="s">"https://minio.../erp-storage/...?X-Amz-Signature=..."</span> }</pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">Client PUT ไฟล์ตรงเข้า MinIO</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">ไม่ผ่าน inventory-bc เลย — <span class="mono text-[12px]">curl -X PUT "$upload_url" --data-binary @photo.jpg</span></p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">Confirm — ยืนยันว่าอัปโหลดสำเร็จจริง</h3>
+          <div class="code p-5 mb-3">
+<pre><span class="k">POST</span> /products/:product_id/images
+{ <span class="s">"bucket"</span>: <span class="s">"erp-storage"</span>, <span class="s">"object_key"</span>: <span class="s">"inventory/products/&lt;id&gt;/photo-915e46ef.jpg"</span>,
+  <span class="s">"original_name"</span>: <span class="s">"photo.jpg"</span>, <span class="s">"mime_type"</span>: <span class="s">"image/jpeg"</span> }</pre>
+          </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            Service เรียก <span class="mono text-[12px]">HeadObject</span> ยืนยันว่ามีจริง แล้วดึง
+            <span class="mono text-[12px]">size/etag</span> จากผลลัพธ์นั้นตรง ๆ — <b>ไม่เชื่อ</b> ค่าที่ client ส่งมา
+          </p>
+        </div>
+
+        <div class="rulebox mt-2"><div class="rc mb-1">OWNERSHIP GUARD</div><p class="text-[13.5px]"><span class="mono text-[12px]">object_key</span> ที่ส่งมา confirm ต้องขึ้นต้นด้วย <span class="mono text-[12px]">inventory/products/&lt;product_id&gt;/</span> ของ product นั้นเท่านั้น — กัน client ชี้ไปที่ object เดิมของสินค้าอื่นที่ตัวเองไม่เคยอัปโหลดจริง (ตรวจก่อนยิง HeadObject ด้วยซ้ำ)</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 FLOW B ========== -->
+      <section id="flow-b" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Flow B · Multipart Create (สร้างสินค้าพร้อมรูปในจังหวะเดียว)</div>
+        <h2 class="display text-3xl mb-6">POST /products รับ multipart/form-data ด้วย</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          Endpoint เดิมยังรับ <span class="mono text-[13px]">application/json</span> ตามปกติ — multipart เป็นทางเลือกเสริมสำหรับฟอร์มสร้างสินค้าที่อยากแนบรูปในคลิกเดียว
+          ไฟล์ในกรณีนี้ผ่าน backend จริง (ต่าง Flow A) จึงใช้ <span class="mono text-[13px]">UploadWithMeta</span> ธรรมดา ไม่ใช้ presigned
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Request shape</div>
+        <div class="code p-5 mb-7">
+<pre><span class="k">POST</span> /products
+Content-Type: multipart/form-data
+
+data:   <span class="s">'{"sku":"...","name_th":"...","name_en":"...","type":"single","item_group_id":"...","stock_uom_id":"..."}'</span>
+images: &lt;file&gt;, &lt;file&gt;, ...   <span class="c">// สูงสุด 5 ไฟล์ · jpeg/png/webp · ≤5MB/ไฟล์</span></pre>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ทำไมใช้ @Req() แทน @Body()</div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              Fastify ไม่เติม <span class="mono text-[12px]">request.body</span> ให้ multipart request (นอกจากตั้ง
+              <span class="mono text-[12px]">attachFieldsToBody</span>) — ถ้ายังใช้ <span class="mono text-[12px]">@Body() dto: CreateProductDTO</span>
+              global ValidationPipe จะ validate <span class="mono text-[12px]">undefined→{}</span> แล้ว throw
+              ก่อนโค้ด handler จะได้รันด้วยซ้ำ handler จึงต้องรับ <span class="mono text-[12px]">@Req()</span> เองแล้ว
+              validate มือทั้งสอง content-type ผ่าน <span class="mono text-[12px]">validateDto()</span>/<span class="mono text-[12px]">parseMultipartJsonBody()</span>
+              (<span class="mono text-[12px]">libs/common/utils/multipart-json-body.util.ts</span>) ซึ่งโยน
+              <span class="mono text-[12px]">ValidationException</span> แบบเดียวกับ pipe อัตโนมัติทุกประการ
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">Product id ถูก mint ล่วงหน้า</div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              อัปโหลดทุกไฟล์ก่อน (นอกทรานแซกชัน — network call ไม่ควรค้างอยู่ในทรานแซกชัน DB) โดยใช้
+              <span class="mono text-[12px]">randomUUID()</span> เป็น product id ล่วงหน้า แล้ว insert
+              product + product_images ทั้งหมดในทรานแซกชันเดียว — รูปแรกในลิสต์ = <span class="mono text-[12px]">is_primary: true</span>
+              โดยอัตโนมัติ ที่เหลือ <span class="mono text-[12px]">sort_order</span> ตามลำดับ
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 API ========== -->
+      <section id="api" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — API Reference</div>
+        <h2 class="display text-3xl mb-6">Endpoint ทั้งหมด</h2>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method</th><th>Path</th><th>Permission</th><th>คำอธิบาย</th></tr></thead>
+            <tbody>
+              <tr><td>POST</td><td>/products</td><td>product:create</td><td>JSON หรือ multipart (Flow B)</td></tr>
+              <tr><td>POST</td><td>/products/:id/images/presigned-url</td><td>product:update</td><td>ขอ presigned PUT URL (Flow A)</td></tr>
+              <tr><td>POST</td><td>/products/:id/images</td><td>product:update</td><td>Confirm รูปที่อัปโหลดแล้ว</td></tr>
+              <tr><td>GET</td><td>/products/:id/images</td><td>product:view</td><td>List แบบ paginated</td></tr>
+              <tr><td>GET</td><td>/products/:id/images/:image_id</td><td>product:view</td><td>อ่านทีละรูป</td></tr>
+              <tr><td>GET</td><td>/products/:id/images/:image_id/url</td><td>product:view</td><td>Resolve presigned GET URL (§07)</td></tr>
+              <tr><td>PUT</td><td>/products/:id/images/:image_id</td><td>product:update</td><td>alt_th/alt_en, sort_order, is_primary</td></tr>
+              <tr><td>DELETE</td><td>/products/:id/images/:image_id</td><td>product:update</td><td>Soft delete — object บน S3 ยังอยู่</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox"><div class="rc mb-1">Permission ใช้ของเดิม — ไม่ต้อง sync</div><p class="text-[13.5px]">ทุก endpoint ใช้ <span class="mono text-[12px]">product:create/view/update</span> เดิมที่มีอยู่แล้ว ไม่มี permission string ใหม่ จึงไม่ต้องรัน <span class="mono text-[12px]">npm run permissions:sync</span> สำหรับฟีเจอร์นี้</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 VIEWING ========== -->
+      <section id="viewing" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — การแสดงรูป (Signed URL)</div>
+        <h2 class="display text-3xl mb-6">Resolve ทีละรูป ไม่ฝังไว้ในทุก response</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          <span class="mono text-[13px]">GET .../images</span> และ <span class="mono text-[13px]">GET .../:id</span> คืนแค่
+          <span class="mono text-[13px]">bucket</span>/<span class="mono text-[13px]">object_key</span> ดิบ — ไม่แนบ signed URL ให้อัตโนมัติ
+          เพราะ URL หมดอายุใน 1 ชม. การ embed ไว้ในทุกแถวของตารางแบบ paginated จะเสียเปล่าสำหรับแถวที่ผู้ใช้ไม่ได้กดดู
+          และเสีย request ไป storage-bc เพิ่มทุกครั้งที่โหลดหน้า ตรงตาม pattern เดิมของ
+          <span class="mono text-[12px]">PrintTemplatesService.fetchTemplateAsset</span> ที่ resolve URL เฉพาะตอนจะใช้จริง
+        </p>
+        <div class="code p-5">
+<pre><span class="k">GET</span> /products/:product_id/images/:image_id/url
+
+<span class="c">→ 200</span>
+{ <span class="s">"url"</span>: <span class="s">"https://minio.../erp-storage/...?X-Amz-Signature=...&amp;X-Amz-Expires=3600"</span> }</pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 GOTCHAS ========== -->
+      <section id="gotchas" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — ปัญหาที่เจอระหว่างทดสอบจริง (curl + ไฟล์จริง)</div>
+        <h2 class="display text-3xl mb-6">3 บั๊กที่ยืนยัน/แก้ระหว่างทดสอบ end-to-end</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทดสอบด้วยไฟล์จริง (jpeg + png ชื่อไทย) ผ่าน superadmin เต็ม flow — เจอ 3 จุดที่ต้องแก้จริง ก่อนจะผ่านครบทุกเคส
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ชื่อไฟล์ไทยเพี้ยน (mojibake) ตอน multipart create</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">storage.service.ts</span> เดิมมี <span class="mono text-[12px]">decodeOriginalName()</span>
+            ที่ reinterpret ชื่อไฟล์เป็น latin1→utf8 เสมอ — comment เดิมอ้างว่าเป็นการแก้ mojibake ของ Busboy/Multer
+            แต่ <span class="mono text-[12px]">@fastify/multipart</span> (ตัวจริงที่ repo นี้ใช้) decode UTF-8 ถูกต้องอยู่แล้ว
+            การรัน fix ซ้ำจึงไป corrupt ชื่อไฟล์ที่ถูกต้องอยู่แล้วแทน
+          </p>
+          <div class="edge">
+            <div class="tag mb-1">Fix</div>
+            <p class="text-[13px]">ลบ <span class="mono text-[12px]">decodeOriginalName()</span> ออกจากทั้ง <span class="mono text-[12px]">upload()</span> และ <span class="mono text-[12px]">uploadWithMeta()</span> — ยืนยันด้วย regression test ที่ assert <span class="mono text-[12px]">original_name</span> ไม่เปลี่ยนแปลง</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">เกิน files limit → 500 แทนที่จะเป็น 400</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ส่ง 6 ไฟล์ (เกิน limit ของ <span class="mono text-[12px]">@fastify/multipart</span> ที่ตั้งไว้ 5) — คาดว่าจะได้
+            <span class="mono text-[12px]">FST_FILES_LIMIT</span> ตามเอกสาร แต่ log จริงขึ้น
+            <span class="mono text-[12px]">ERR_STREAM_PREMATURE_CLOSE</span> จาก Node stream แทน (stream ของ part
+            ถูก destroy กลางทางตอน <span class="mono text-[12px]">toBuffer()</span>) — error นี้ไม่ใช่ <span class="mono text-[12px]">HttpException</span>
+            เลยหลุดไปเจอ catch-all ของ <span class="mono text-[12px]">AllExceptionsFilter</span> กลายเป็น 500 เปล่า ๆ
+          </p>
+          <div class="edge">
+            <div class="tag mb-1">Fix</div>
+            <p class="text-[13px]"><span class="mono text-[12px]">parseMultipartJsonBody()</span> ครอบ <span class="mono text-[12px]">try/catch</span> รอบการวน <span class="mono text-[12px]">request.parts()</span> ทั้งหมด แล้วแปลง <b>error อะไรก็ตาม</b> ที่เกิดระหว่างอ่าน multipart body ให้เป็น <span class="mono text-[12px]">BadRequestException</span> (400) — ไม่จำกัดเฉพาะ error ที่มี code ขึ้นต้นด้วย <span class="mono text-[12px]">FST_</span></p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ลืม resolve viewable URL ตามแผนเดิม</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            แผนแรกระบุ "read path: GenerateSignedUrls แบบ batch" แต่ implementation จริงข้ามขั้นตอนนี้ไป —
+            ทดสอบ end-to-end แล้วโหลดรูปไม่ได้เลยเพราะ response มีแค่ <span class="mono text-[12px]">object_key</span> ดิบ
+          </p>
+          <div class="edge">
+            <div class="tag mb-1">Fix</div>
+            <p class="text-[13px]">เพิ่ม <span class="mono text-[12px]">GET .../images/:id/url</span> (§07) — ตรวจ byte-for-byte ด้วย SHA-256 checksum เทียบไฟล์ต้นฉบับกับไฟล์ที่ดาวน์โหลดผ่าน signed URL ที่ resolve ได้ ทั้ง 2 flow (presigned + multipart) ตรงกันทุกไบต์</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 09 TESTING ========== -->
+      <section id="testing" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — Test Coverage</div>
+        <h2 class="display text-3xl mb-6">curl ครบเคส + Unit Test</h2>
+
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] mb-3" style="color:var(--accent)">MANUAL · curl (ไฟล์จริง)</div>
+            <ul class="text-sm space-y-1.5" style="color:var(--ink-soft)">
+              <li>✓ Create ปกติ (JSON, ไม่มีรูป)</li>
+              <li>✓ Multipart create + 2 รูป (jpeg + ชื่อไทย)</li>
+              <li>✓ Presigned request → PUT MinIO → confirm</li>
+              <li>✓ List / get-one / update primary-swap / soft delete</li>
+              <li>✓ Ownership guard, HeadObject-miss, bad mime type</li>
+              <li>✓ Too-many-files, download-url checksum match</li>
+            </ul>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] mb-3" style="color:var(--accent)">AUTOMATED · Jest (Unit)</div>
+            <ul class="text-sm space-y-1.5" style="color:var(--ink-soft)">
+              <li><span class="mono text-[12px]">multipart-json-body.util.spec.ts</span> — 11 tests</li>
+              <li><span class="mono text-[12px]">storage.service.spec.ts</span> — 7 tests</li>
+              <li><span class="mono text-[12px]">product-images.service.spec.ts</span> — 13 tests</li>
+              <li><span class="mono text-[12px]">products.service.spec.ts</span> (createWithImages) — 4 tests</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="rulebox ok"><div class="rc mb-1">Mock pattern</div><p class="text-[13.5px]">Service มักถูก instantiate ตรง (<span class="mono text-[12px]">new XxxService(...)</span>) กับ mock repository/manager แทนที่จะผ่าน Nest TestingModule — ให้ logic จริงของ service รันกับ mock repo, spy เฉพาะ <span class="mono text-[12px]">BaseServiceOperations.prototype</span> ตอนต้องการแยกจาก base-class internals (ดู <span class="mono text-[12px]">.claude/skills/testing/SKILL.md</span>)</p></div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · IMPLEMENTATION GUIDE · PRODUCT IMAGES"
+        line2="INVENTORY-BC · STORAGE-BC · MINIO · @FASTIFY/MULTIPART">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>

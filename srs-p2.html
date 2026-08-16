@@ -666,8 +666,9 @@ item_prices: [
         </div>
 
         <!-- 2.4 Storage -->
-        <div class="mb-12">
+        <div class="mb-12" id="storage">
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">04</span><h3 class="text-xl font-semibold">Storage · MinIO — รูปสินค้า &amp; เอกสารแนบ</h3></div>
+          <div class="rulebox ok mb-5"><div class="rc mb-1">AS-BUILT · schema จริงต่างจากร่างด้านล่าง</div><p class="text-[13.5px]">Implement จริงใช้ตาราง <span class="mono text-[12px]">product_images</span> ใน <span class="mono text-[12px]">erp_inventory</span> (ไม่ใช่ <span class="mono text-[12px]">file_objects</span>/<span class="mono text-[12px]">context_ref</span> ตามร่างเดิม) และรองรับทั้ง presigned upload กับ multipart create — ดูรายละเอียดทั้งหมดที่ <a href="product-image-upload-guide.html" class="underline" style="color:#7C3AED">Product Image Upload Guide →</a></p></div>
           <div class="card p-6 mb-5">
             <div class="mono text-[12px] mb-3" style="color:#7C3AED">file_objects · storage-bc</div>
             <table class="d">
