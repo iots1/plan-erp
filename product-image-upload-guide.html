@@ -9,6 +9,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>อัปโหลดรูปสินค้า (Product Images) — Implementation Guide · ERP</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -222,7 +223,51 @@ CREATE UNIQUE INDEX <span class="s">"uq_product_images_primary"</span> ON <span 
           </p>
         </div>
 
-        <div class="rulebox mt-2"><div class="rc mb-1">OWNERSHIP GUARD</div><p class="text-[13.5px]"><span class="mono text-[12px]">object_key</span> ที่ส่งมา confirm ต้องขึ้นต้นด้วย <span class="mono text-[12px]">inventory/products/&lt;product_id&gt;/</span> ของ product นั้นเท่านั้น — กัน client ชี้ไปที่ object เดิมของสินค้าอื่นที่ตัวเองไม่เคยอัปโหลดจริง (ตรวจก่อนยิง HeadObject ด้วยซ้ำ)</p></div>
+        <div class="rulebox mt-2 mb-8"><div class="rc mb-1">OWNERSHIP GUARD</div><p class="text-[13.5px]"><span class="mono text-[12px]">object_key</span> ที่ส่งมา confirm ต้องขึ้นต้นด้วย <span class="mono text-[12px]">inventory/products/&lt;product_id&gt;/</span> ของ product นั้นเท่านั้น — กัน client ชี้ไปที่ object เดิมของสินค้าอื่นที่ตัวเองไม่เคยอัปโหลดจริง (ตรวจก่อนยิง HeadObject ด้วยซ้ำ)</p></div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Sequence Diagram · ครบทุก scenario (happy path + error)</div>
+        <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor FE as Frontend
+    participant BE as inventory-bc
+    participant ST as storage-bc
+    participant S3 as MinIO
+
+    FE->>BE: POST /products/:product_id/images/presigned-url
+    BE->>BE: assertProductExists(product_id)
+    alt product ไม่มีอยู่จริง
+        BE-->>FE: 404 Not Found
+    else product มีอยู่จริง
+        BE->>ST: GeneratePresignedUpload(bucket, key, name, mime)
+        ST-->>BE: bucket, path, upload_url (5 นาที)
+        BE-->>FE: 200 OK (bucket, object_key, upload_url)
+
+        FE->>S3: PUT upload_url (ไฟล์จริง)
+        S3-->>FE: 200 OK
+
+        FE->>BE: POST /products/:product_id/images (confirm)
+        BE->>BE: assertObjectKeyOwnedByProduct(object_key)
+        alt object_key ไม่ตรง prefix ของ product นี้
+            BE-->>FE: 400 Bad Request (ownership guard)
+        else object_key ถูกต้อง
+            BE->>ST: HeadObject(bucket, key)
+            alt ยังไม่เคยอัปโหลดจริง (client ขอ URL แล้วไม่ PUT)
+                ST-->>BE: null
+                BE-->>FE: 400 Bad Request (no uploaded object found)
+            else อัปโหลดสำเร็จแล้วจริง
+                ST-->>BE: size, content_type, etag
+                opt is_primary = true ในคำขอ
+                    BE->>BE: demote รูปหลักเดิม (ในทรานแซกชันเดียวกัน)
+                end
+                BE->>BE: INSERT product_images (size/extension/etag จาก HeadObject)
+                BE-->>FE: 201 Created
+            end
+        end
+    end
+</pre>
+        </div>
       </section>
 
       <div class="rule my-14"></div>
@@ -268,6 +313,50 @@ images: &lt;file&gt;, &lt;file&gt;, ...   <span class="c">// สูงสุด 
             </p>
           </div>
         </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Sequence Diagram · JSON vs multipart บน endpoint เดียวกัน</div>
+        <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor FE as Frontend
+    participant BE as inventory-bc
+    participant ST as storage-bc
+    participant S3 as MinIO
+
+    FE->>BE: POST /products
+    BE->>BE: request.isMultipart() ?
+
+    alt Content-Type: application/json
+        BE->>BE: validateDto(CreateProductDTO, request.body)
+        alt validate ไม่ผ่าน
+            BE-->>FE: 400 Validation Failed
+        else validate ผ่าน
+            BE->>BE: INSERT product (ไม่มีรูป)
+            BE-->>FE: 201 Created (product)
+        end
+    else Content-Type: multipart/form-data
+        BE->>BE: parseMultipartJsonBody() → dto + files[]
+        alt error ระหว่างอ่าน multipart (เกิน 5 ไฟล์ / ข้อมูลเสีย ฯลฯ)
+            BE-->>FE: 400 Bad Request (ดู §08 · ไม่ใช่ 500)
+        else อ่านสำเร็จ
+            alt mime type ไม่ใช่ jpeg/png/webp
+                BE-->>FE: 400 Unsupported image type
+            else mime type ผ่านครบทุกไฟล์
+                BE->>BE: productId = randomUUID()
+                loop แต่ละไฟล์ในลิสต์
+                    BE->>ST: UploadWithMeta(bucket, key=".../"+productId, file)
+                    ST->>S3: PutObject
+                    S3-->>ST: 200 OK
+                    ST-->>BE: path, size, extension
+                end
+                BE->>BE: INSERT product (id=productId) + product_images[] (ทรานแซกชันเดียว)
+                BE-->>FE: 201 Created (product + images[], รูปแรก is_primary=true)
+            end
+        end
+    end
+</pre>
+        </div>
       </section>
 
       <div class="rule my-14"></div>
@@ -312,6 +401,31 @@ images: &lt;file&gt;, &lt;file&gt;, ...   <span class="c">// สูงสุด 
 
 <span class="c">→ 200</span>
 { <span class="s">"url"</span>: <span class="s">"https://minio.../erp-storage/...?X-Amz-Signature=...&amp;X-Amz-Expires=3600"</span> }</pre>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3 mt-7">Sequence Diagram · ดึงรูปมาแสดง</div>
+        <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor FE as Frontend
+    participant BE as inventory-bc
+    participant ST as storage-bc
+    participant S3 as MinIO
+
+    FE->>BE: GET /products/:product_id/images/:image_id/url
+    BE->>BE: findById(image_id) → bucket, object_key
+    BE->>ST: GenerateSignedUrls([object_key])
+    alt storage-bc ไม่ตอบ (timeout/unreachable)
+        ST-->>BE: null
+        BE-->>FE: 503 Service Unavailable
+    else สำเร็จ
+        ST-->>BE: [signed_url] (หมดอายุใน 1 ชม.)
+        BE-->>FE: 200 OK (url)
+        FE->>S3: GET signed_url
+        S3-->>FE: image bytes
+    end
+</pre>
         </div>
       </section>
 
@@ -412,6 +526,23 @@ images: &lt;file&gt;, &lt;file&gt;, ...   <span class="c">// สูงสุด 
     </div>
   </main>
 </div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
 
 <script>
   // Scroll-spy active nav
