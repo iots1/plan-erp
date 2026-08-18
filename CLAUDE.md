@@ -16,6 +16,18 @@ govern **every code example written into these docs** and the future backend imp
 - `backend-convention.html` — **backend naming / error / response / query conventions** (this reference, rendered).
 - `style.css` — the design system. `components.js` — vanilla Web Components (`<erp-docnav>`, `<erp-sidebar>`, `<erp-footer>`).
 
+**Never leak real customer identifiers — this repo is a real public GitHub repo (`iots1/plan-erp`)**
+- No real customer domain/subdomain/public IP in any page — use `example.com` for every
+  illustrative domain, even in "bug we hit in production" write-ups where the real value is
+  tempting to paste verbatim. Genericize the shape instead (a real `<subdomain>.<customer>.com`
+  becomes `<subdomain>.example.com`, keeping the structure the write-up depends on) — same
+  lesson, no real identifier. That includes this rule itself: never use an actual past customer
+  domain as the "before" example when explaining this policy.
+- **Never `git commit`/`git push` in this submodule without the user's explicit instruction or
+  confirmation for that specific action** — a leaked domain becomes permanent GitHub history the
+  moment it's pushed; an uncommitted working-tree change is still fully recoverable. Full rule
+  and rationale: root `erp-api/CLAUDE.md` § "Never leak real customer identifiers into git".
+
 **Design system (do not break when editing docs)**
 - Tailwind via CDN + `style.css` + `components.js` (defer) + Mermaid (CDN). No bundler.
 - Reuse existing classes — do **not** invent new ones: `.card`, `.step/.sn`, `.rulebox/.rc(.ok)`,

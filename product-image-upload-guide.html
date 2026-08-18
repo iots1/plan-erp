@@ -490,11 +490,11 @@ sequenceDiagram
           <h3 class="font-semibold text-[16px] mb-2">Presigned URL กลายเป็น virtual-hosted style หลังเปลี่ยนเป็น public domain</h3>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
             ย้าย <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> จาก <span class="mono text-[12px]">http://172.x.x.x:9000</span>
-            เป็น <span class="mono text-[12px]">https://erp-bucket-api.iotechsoft.com</span> (ผ่าน Kong ตาม
+            เป็น <span class="mono text-[12px]">https://erp-bucket-api.example.com</span> (ผ่าน Kong ตาม
             <a href="deployment-guide.html#kong" style="color:var(--accent);text-decoration:underline">Deployment Guide §06</a>)
             แล้ว <span class="mono text-[12px]">upload_url</span> ที่คืนออกไปกลับกลายเป็น
-            <span class="mono text-[12px]">erp-storage.erp-bucket-api.iotechsoft.com/...</span> (virtual-hosted) แทนที่จะเป็น
-            <span class="mono text-[12px]">erp-bucket-api.iotechsoft.com/erp-storage/...</span> (path-style) ทั้งที่
+            <span class="mono text-[12px]">erp-storage.erp-bucket-api.example.com/...</span> (virtual-hosted) แทนที่จะเป็น
+            <span class="mono text-[12px]">erp-bucket-api.example.com/erp-storage/...</span> (path-style) ทั้งที่
             <span class="mono text-[12px]">STORAGE_S3_FORCE_PATH_STYLE=true</span> ตั้งไว้แล้ว — virtual-hosted ต้องมี
             wildcard DNS ของตัวเอง ซึ่งไม่มี ทำให้อัปโหลดจากเบราว์เซอร์จริง resolve host ไม่ได้เลย
           </p>
