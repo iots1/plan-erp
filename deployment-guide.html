@@ -30,12 +30,13 @@
       <a href="#hardware"      class="navlink"><span class="n">02</span> Hardware / OS Requirement</a>
       <a href="#provision"     class="navlink"><span class="n">03</span> เตรียม VM (Proxmox)</a>
       <a href="#datastores"    class="navlink"><span class="n">04</span> Datastores (infra-erp)</a>
-      <a href="#app"           class="navlink"><span class="n">05</span> Deploy erp-api (pm2)</a>
+      <a href="#app"           class="navlink"><span class="n">05</span> Deploy Apps (pm2)</a>
       <a href="#kong"          class="navlink"><span class="n">06</span> Kong API Gateway</a>
       <a href="#tunnel"        class="navlink"><span class="n">07</span> Cloudflare Tunnel</a>
       <a href="#production-env" class="navlink"><span class="n">08</span> Production .env Checklist</a>
       <a href="#bugs"          class="navlink"><span class="n">09</span> บั๊กที่เจอและวิธีแก้</a>
-      <a href="#reference"     class="navlink"><span class="n">10</span> Reference</a>
+      <a href="#operations"    class="navlink"><span class="n">10</span> Day-2 Operations</a>
+      <a href="#reference"     class="navlink"><span class="n">11</span> Reference</a>
     </nav>
     <div slot="footnote">
       <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
@@ -167,8 +168,9 @@ flowchart LR
           <p class="text-[13px]">
             Docker images ของ datastore stack (Postgres/Redis/RabbitMQ/MinIO/Gotenberg) ~6 GB ·
             Kong stack (Kong/Postgres/Konga/Mongo) ~4-5 GB · node_modules + build cache ของ erp-api เอง ~1-2 GB ·
-            pm2 logs สะสมได้เป็นหลัก GB ถ้าไม่มี log rotation — รวมแล้วเครื่องที่ตั้ง <b>ทุก stack พร้อมกัน</b>
-            (app + datastore + Kong + observability) ต้องการ headroom มากกว่าที่คิดตอนแรกเสมอ
+            pm2 logs สะสมได้เป็นหลัก GB ถ้าไม่มี log rotation (<b>เคยพบจริง ~1 GB โดยไฟล์เดียวกินไป ~740 MB</b> —
+            ตั้ง rotation ตาม <a href="#operations" class="underline">§10</a> ตั้งแต่วันแรก) — รวมแล้วเครื่องที่ตั้ง
+            <b>ทุก stack พร้อมกัน</b> (app + datastore + Kong + observability) ต้องการ headroom มากกว่าที่คิดตอนแรกเสมอ
           </p>
         </div>
       </section>
@@ -260,8 +262,18 @@ docker compose up -d</pre>
 
       <!-- ========== 05 APP ========== -->
       <section id="app" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">05 — Deploy erp-api</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Deploy Apps</div>
         <h2 class="display text-3xl mb-6">Build + รันด้วย pm2</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          เครื่องเดียวรัน <b>2 repo</b> — <span class="mono text-[12px]">erp-api</span> (8 BC) และ
+          <span class="mono text-[12px]">erp-frontend</span> (Next.js) — และทั้งคู่อยู่บน
+          <b>pm2 daemon ตัวเดียวกัน</b> ข้อนี้สำคัญกว่าที่คิด เพราะทำให้คำสั่ง pm2 แบบเหมารวม
+          (<span class="mono text-[12px]">pm2 delete all</span>) ของ repo หนึ่งไปดับอีก repo หนึ่งได้ — ดู RULE ท้ายหัวข้อนี้
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">erp-api — 8 bounded contexts</h3>
         <div class="code p-5 mb-6">
 <pre>git clone https://github.com/iots1/erp-api.git /root/erp-api
 cd /root/erp-api
@@ -278,6 +290,90 @@ pm2 start ecosystem.config.js</pre>
           ทุก BC bind <span class="mono text-[12px]">0.0.0.0</span> โดย default (ไม่ใช่แค่ <span class="mono text-[12px]">localhost</span>)
           ดังนั้น Kong เรียกเข้ามาจาก IP วง LAN ได้โดยตรงในขั้นถัดไป
         </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">erp-frontend — Next.js web app</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            repo แยก ใช้ <b>pnpm + Turborepo</b> (ไม่ใช่ Nx แบบ erp-api) — build เฉพาะ
+            <span class="mono text-[12px]">apps/web</span> ก็พอ ส่วน <span class="mono text-[12px]">apps/docs</span>
+            กับ <span class="mono text-[12px]">apps/storybook</span> เป็นเครื่องมือตอน dev ไม่ต้อง deploy
+          </p>
+        <div class="code p-5 mb-4">
+<pre>git clone https://github.com/iots1/erp-frontend.git /root/erp-frontend
+cd /root/erp-frontend
+
+pnpm install --frozen-lockfile
+pnpm turbo run build --filter=web   <span class="c"># build apps/web + workspace deps ของมัน</span>
+
+pm2 start ecosystem.config.js
+pm2 save</pre>
+        </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ได้ process ชื่อ <span class="mono text-[12px]">erp-web</span> ฟังอยู่ที่ port
+            <span class="mono text-[12px]">3300</span> ซึ่งเป็น upstream ที่ Kong ชี้มาใน §06 —
+            deploy รอบถัดไปใช้ <span class="mono text-[12px]">scripts/deploy-ovh-dev.sh</span> ใน repo นั้นได้เลย
+            (git reset → install → build → restart → health check)
+          </p>
+        </div>
+
+        <div class="rulebox mt-6">
+          <div class="rc mb-1">RULE</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b>ห้าม <span class="mono text-[12px]">pm2 delete all</span> ใน deploy script ของ repo ใดก็ตาม</b> เมื่อเครื่องนี้
+            รันทั้ง erp-api และ erp-frontend — ให้ระบุชื่อ process ตรง ๆ เช่น
+            <span class="mono text-[12px]">pm2 delete erp-web</span> เท่านั้น มิฉะนั้น deploy backend จะลบ
+            <span class="mono text-[12px]">erp-web</span> ทิ้งและ<b>ไม่ start กลับ</b> (เพราะไม่ได้อยู่ใน
+            <span class="mono text-[12px]">ecosystem.config.js</span> ของ erp-api) — เว็บดับเงียบ ๆ โดยไม่มีใครสังเกต
+            จนกว่าจะมีคนเปิดหน้าเว็บ
+          </p>
+        </div>
+
+        <div class="edge mt-4">
+          <div class="tag mb-1">pnpm สร้าง <span class="mono">.bin</span> shim เป็น shell script ไม่ใช่ JS</div>
+          <p class="text-[13px]">
+            <span class="mono text-[12px]">ecosystem.config.js</span> ของ erp-frontend ต้องมี
+            <span class="mono text-[12px]">interpreter: 'none'</span> — pm2 default จะเอา node ไปรัน
+            <span class="mono text-[12px]">node_modules/.bin/next</span> ซึ่ง pnpm สร้างเป็น POSIX shell script
+            (npm/yarn สร้างเป็น JS จึงไม่เจอปัญหานี้) ผลคือ process ตายทันทีด้วย
+            <span class="mono text-[12px]">SyntaxError: Invalid or unexpected token</span> ตั้งแต่บรรทัด shebang
+          </p>
+        </div>
+
+        <h3 class="font-semibold text-[16px] mt-8 mb-3">Port ที่ถูกจองบนเครื่องนี้</h3>
+        <p class="text-sm mb-4" style="color:var(--ink-soft)">
+          ก่อนเพิ่ม service ใหม่ ต้องเช็คทั้ง port ที่ <b>listen อยู่จริง</b> และ port ที่
+          <b>container ที่ดับอยู่จองไว้</b> — container สถานะ <span class="mono text-[12px]">Exited</span>
+          จะไม่โผล่ใน <span class="mono text-[12px]">ss</span> แต่จะแย่ง port ทันทีที่ถูก start ขึ้นมา
+        </p>
+        <div class="code p-5 mb-5">
+<pre>ss -tlnp                                        <span class="c"># ที่ listen อยู่จริง</span>
+docker ps -a --format '{{.Names}}\t{{.Ports}}'  <span class="c"># รวม container ที่ดับอยู่ด้วย</span></pre>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="d">
+            <thead><tr><th>Port</th><th>เจ้าของ</th><th>หมายเหตุ</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">3001–3008</span></td><td>erp-api 8 BC (HTTP)</td><td>ตาม <span class="mono text-[12px]">*_MODULE_HTTP_PORT</span> ใน .env</td></tr>
+              <tr><td><span class="mono text-[12px]">4001–4008</span></td><td>erp-api 8 BC (microservice TCP)</td><td>ใช้เฉพาะโหมด <span class="mono text-[12px]">TRANSPORT=tcp</span></td></tr>
+              <tr><td><span class="mono text-[12px]">3009</span></td><td>Gotenberg</td><td>container map 3009→3000</td></tr>
+              <tr><td><span class="mono text-[12px]">3300</span></td><td><b>erp-web (Next.js)</b></td><td>upstream ของ Kong route <span class="mono text-[12px]">FRONTEND_DOMAIN</span></td></tr>
+              <tr><td><span class="mono text-[12px]">5433 · 6333 · 5666 · 15672</span></td><td>Postgres · Redis · RabbitMQ · RabbitMQ UI</td><td>infra-erp stack (§04)</td></tr>
+              <tr><td><span class="mono text-[12px]">9000 · 9001</span></td><td>MinIO S3 API · Console</td><td>—</td></tr>
+              <tr><td><span class="mono text-[12px]">80 · 443 · 8001–8002 · 1337</span></td><td>Kong proxy · Kong Admin · Konga</td><td>Admin bind <span class="mono text-[12px]">127.0.0.1</span> เท่านั้น</td></tr>
+              <tr><td><span class="mono text-[12px]">3000 · 3100 · 3200 · 4317–4318 · 9090</span></td><td>Grafana · Loki · Tempo · Alloy (OTLP) · Prometheus</td><td>observability stack — <b>ชนง่ายที่สุด</b> เพราะมักถูกปิดไว้</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="edge mt-4">
+          <div class="tag mb-1">ทำไม erp-web ถึงเป็น 3300 ไม่ใช่ 3100</div>
+          <p class="text-[13px]">
+            3100 เป็นของ <b>Loki</b> ซึ่งตอนเลือก port อยู่ในสถานะ <span class="mono text-[12px]">Exited</span>
+            จึงไม่ปรากฏใน <span class="mono text-[12px]">ss -tlnp</span> เลย — ถ้าเลือกไปแล้วค่อยมา start observability
+            stack กลับ จะชนกันทันทีและ debug ยากเพราะ "ตอนตั้งมันว่างจริง ๆ" 3300 อยู่นอกทุกช่วงที่มีการจองไว้
+          </p>
+        </div>
       </section>
 
       <div class="rule my-14"></div>
@@ -602,9 +698,118 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
 
       <div class="rule my-14"></div>
 
-      <!-- ========== 10 REFERENCE ========== -->
+      <!-- ========== 10 DAY-2 OPERATIONS ========== -->
+      <section id="operations" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — Day-2 Operations</div>
+        <h2 class="display text-3xl mb-6">สองอย่างที่ไม่ตั้งแล้วพังแน่นอน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทั้งสองข้อนี้ไม่ทำให้ระบบพังตอน deploy — มันพัง<b>ทีหลัง</b> ตอนไฟดับ หรือตอน disk เต็มในอีกหลายเดือน
+          ซึ่งเป็นเวลาที่ไม่มีใครนั่งเฝ้าอยู่ สำหรับเครื่อง on-premise ที่ลูกค้าดูแลเอง ทั้งคู่คือ
+          <b>ขั้นตอนบังคับตอนส่งมอบ</b> ไม่ใช่ของเสริม
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">pm2 startup — ให้ process กลับมาเองหลังไฟดับ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            pm2 โดย default <b>ไม่</b> ผูกกับ systemd — ถ้าเครื่อง reboot (ไฟดับ, patch kernel, ลูกค้ากดปิด)
+            ทุก process จะหายหมดและไม่มีอะไรพากลับมา ระบบจะดับค้างจนกว่าจะมีคน ssh เข้าไป
+            <span class="mono text-[12px]">pm2 start</span> เองทีละตัว
+          </p>
+        <div class="code p-5 mb-4">
+<pre>pm2 startup systemd -u root --hp /root   <span class="c"># สร้าง systemd unit ชื่อ pm2-root</span>
+pm2 save                                 <span class="c"># freeze process list ปัจจุบันลง ~/.pm2/dump.pm2</span>
+
+<span class="c"># ยืนยัน — ต้องได้ enabled</span>
+systemctl is-enabled pm2-root</pre>
+        </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ตอน boot systemd จะเรียก <span class="mono text-[12px]">pm2 resurrect</span> ซึ่งอ่านจาก
+            <span class="mono text-[12px]">dump.pm2</span> — <b>ไม่ใช่</b> จาก
+            <span class="mono text-[12px]">ecosystem.config.js</span> ของ repo ไหนเลย
+          </p>
+        </div>
+
+        <div class="rulebox mt-2 mb-8">
+          <div class="rc mb-1">RULE</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b>ทุกครั้งที่เพิ่ม/ลบ process ต้อง <span class="mono text-[12px]">pm2 save</span> ซ้ำ</b> — ไม่งั้น
+            <span class="mono text-[12px]">dump.pm2</span> ยังเป็นชุดเก่า และ reboot ครั้งถัดไปจะได้ process ชุดที่
+            ไม่ตรงกับความจริง (เช่น มี erp-web อยู่ตอนนี้ แต่ตอน boot ไม่มี เพราะ save ไว้ก่อนเพิ่ม)
+            deploy script ควรเรียก <span class="mono text-[12px]">pm2 save</span> ปิดท้ายเสมอ
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">pm2-logrotate — กัน disk เต็มจาก log ตัวเอง</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            pm2 เขียน stdout/stderr ของทุก process ลง <span class="mono text-[12px]">/root/.pm2/logs/</span>
+            แบบ<b>ไม่มีเพดาน</b> — ไฟล์เดียวโตถึงหลักร้อย MB ได้สบายถ้ามี error loop
+            (เคยพบ <span class="mono text-[12px]">iam-error-1.log</span> ~740 MB จากรวม ~1 GB)
+          </p>
+        <div class="code p-5 mb-4">
+<pre>pm2 install pm2-logrotate
+
+pm2 set pm2-logrotate:max_size 10M          <span class="c"># rotate เมื่อไฟล์เกิน 10 MB</span>
+pm2 set pm2-logrotate:retain 14             <span class="c"># เก็บย้อนหลัง 14 ไฟล์</span>
+pm2 set pm2-logrotate:compress true         <span class="c"># gzip ไฟล์เก่า</span>
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *'   <span class="c"># rotate ทุกเที่ยงคืนด้วย</span>
+
+pm2 conf pm2-logrotate                      <span class="c"># ยืนยันค่าที่ตั้งไป</span>
+du -sh /root/.pm2/logs                      <span class="c"># เช็คขนาดรวม</span></pre>
+        </div>
+          <div class="edge">
+            <div class="tag mb-1">rotation ไม่ย้อนหลัง</div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">pm2-logrotate</span> จัดการเฉพาะไฟล์ที่โตขึ้น<b>หลัง</b>ติดตั้ง —
+              ก้อนที่ค้างอยู่ก่อนหน้า (รวมถึง log ของโปรเจกต์เก่าที่เลิกรันไปแล้วแต่ไฟล์ยังอยู่)
+              ต้องลบเอง ตรวจด้วย <span class="mono text-[12px]">ls -S /root/.pm2/logs | head</span> ตอนส่งมอบ
+            </p>
+          </div>
+        </div>
+
+        <h3 class="font-semibold text-[16px] mt-10 mb-3">log มี 2 ระบบ แยกกันคนละทาง — อย่าสับสน</h3>
+        <p class="text-sm mb-5" style="color:var(--ink-soft)">
+          เครื่องนี้มี log 2 สายที่<b>ไม่เกี่ยวกันเลย</b> คนละไฟล์ คนละกลไก rotate คนละปลายทาง —
+          การตั้ง <span class="mono text-[12px]">pm2-logrotate</span> จึง<b>ไม่</b>กระทบ pipeline ที่ส่งเข้า Loki
+          (Alloy tail คนละ path กัน) และในทางกลับกัน log ที่เห็นใน Grafana ก็<b>ไม่ใช่</b>ทุกอย่างที่ process พ่นออกมา
+        </p>
+        <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  A["NestJS BC process"]
+  A -->|"stdout / stderr"| B["/root/.pm2/logs/*.log"]
+  A -->|"pino-roll transport"| C["/var/log/erp-api/*/http/*.log"]
+  B --> D["pm2-logrotate<br/>rotate + gzip"]
+  C --> E["Grafana Alloy<br/>tail glob"]
+  E --> F[("Loki")]
+</pre>
+        </div>
+        <div class="overflow-x-auto mt-6">
+          <table class="d">
+            <thead><tr><th></th><th>pm2 logs</th><th>HTTP access log</th></tr></thead>
+            <tbody>
+              <tr><td>ที่อยู่</td><td><span class="mono text-[12px]">/root/.pm2/logs/</span></td><td><span class="mono text-[12px]">/var/log/erp-api/*/http/</span></td></tr>
+              <tr><td>เนื้อหา</td><td>stdout/stderr ดิบ · stack trace · crash</td><td>structured JSON ต่อ request (pino)</td></tr>
+              <tr><td>rotate ด้วย</td><td><span class="mono text-[12px]">pm2-logrotate</span></td><td><span class="mono text-[12px]">pino-roll</span> (ในแอปเอง)</td></tr>
+              <tr><td>เข้า Loki?</td><td><b>ไม่</b> — ดูได้เฉพาะบนเครื่อง</td><td>ใช่ ผ่าน Alloy</td></tr>
+              <tr><td>ใช้ตอน</td><td>process ตาย/ไม่ start — <span class="mono text-[12px]">pm2 logs &lt;name&gt; --err</span></td><td>ตาม request/trace — Grafana + <span class="mono text-[12px]">trace_id</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-sm mt-4" style="color:var(--ink-soft)">
+          แปลว่าเวลา process <b>start ไม่ขึ้นเลย</b> Loki จะว่างเปล่า (แอปยังไม่ทันได้ทำงานถึงขั้นเขียน pino log)
+          — ต้องไปดู <span class="mono text-[12px]">pm2 logs &lt;name&gt; --err</span> บนเครื่องเท่านั้น
+          รายละเอียดฝั่ง observability เต็ม ๆ อยู่ที่ <a href="observability-logging-guide.html" class="underline">Observability Guide</a>
+        </p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 11 REFERENCE ========== -->
       <section id="reference" class="section pb-16">
-        <div class="eyebrow text-[var(--accent)] mb-3">10 — Reference</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">11 — Reference</div>
         <h2 class="display text-3xl mb-6">Checklist ก่อนส่งมอบลูกค้า</h2>
 
         <div class="overflow-x-auto">
@@ -614,6 +819,9 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
               <tr><td>Disk เผื่อพอ (≥80 GB)</td><td><span class="mono text-[12px]">df -h /</span></td></tr>
               <tr><td>Datastore stack ขึ้นครบ</td><td><span class="mono text-[12px]">docker compose ps</span> ใน <span class="mono text-[12px]">infra-erp/</span></td></tr>
               <tr><td>erp-api ทุก BC online</td><td><span class="mono text-[12px]">pm2 list</span> — ครบ 8 BC × 2 instance</td></tr>
+              <tr><td>erp-web online (frontend)</td><td><span class="mono text-[12px]">curl -I 127.0.0.1:3300</span> — ต้องได้ HTTP 200</td></tr>
+              <tr><td><b>process กลับมาเองหลัง reboot</b> (§10)</td><td><span class="mono text-[12px]">systemctl is-enabled pm2-root</span> = enabled — ถ้าทดสอบได้ ให้ <span class="mono text-[12px]">reboot</span> จริงแล้วเช็ค <span class="mono text-[12px]">pm2 list</span> ซ้ำ</td></tr>
+              <tr><td><b>log rotation ทำงาน</b> (§10)</td><td><span class="mono text-[12px]">pm2 conf pm2-logrotate</span> + <span class="mono text-[12px]">du -sh /root/.pm2/logs</span></td></tr>
               <tr><td>Kong routes ครบ 8 BC + minio-s3 + erp-web (10 services)</td><td><span class="mono text-[12px]">curl 127.0.0.1:8001/services</span></td></tr>
               <tr><td>Presigned upload URL เป็น path-style ไม่ใช่ virtual-hosted</td><td>เรียก <span class="mono text-[12px]">POST /products/:id/images/presigned-url</span> จริง เช็คว่า <span class="mono text-[12px]">upload_url</span> ขึ้นต้นด้วย domain ตรง ๆ ไม่ใช่ <span class="mono text-[12px]">&lt;bucket&gt;.domain</span> (ดู §09 บั๊ก #6)</td></tr>
               <tr><td>Cloudflare Tunnel healthy</td><td><span class="mono text-[12px]">systemctl status cloudflared</span></td></tr>
