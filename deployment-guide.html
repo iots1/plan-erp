@@ -273,9 +273,57 @@ docker compose up -d</pre>
 
         <div class="step">
           <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">Deploy key — ทั้ง 2 repo เป็น private</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">git clone/fetch</span> ผ่าน HTTPS แบบไม่ล็อกอินใช้ไม่ได้แล้ว —
+            ต้องมี credential แบบ <b>อ่านอย่างเดียว</b> บนเครื่อง ใช้ SSH deploy key แยกคนละอันต่อ repo
+            (GitHub ไม่ยอมให้ใช้ deploy key ซ้ำข้าม repo — จะขึ้น <span class="mono text-[12px]">key is already in use</span>)
+          </p>
+        <div class="code p-5 mb-4">
+<pre><span class="c"># 1) สร้าง key คนละอันต่อ repo (ไม่ตั้ง passphrase — deploy รันแบบ non-interactive)</span>
+ssh-keygen -t ed25519 -N <span class="s">''</span> -C <span class="s">"ovh-dev deploy key (erp-api)"</span> -f ~/.ssh/id_ed25519_erp_api
+ssh-keygen -t ed25519 -N <span class="s">''</span> -C <span class="s">"ovh-dev deploy key (erp-frontend)"</span> -f ~/.ssh/id_ed25519_erp_frontend
+
+<span class="c"># 2) ตั้ง host alias ให้ ssh เลือก key ถูกตัว</span>
+cat &gt;&gt; ~/.ssh/config &lt;&lt;<span class="s">'EOF'</span>
+Host github-erp-api
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_erp_api
+  IdentitiesOnly yes
+
+Host github-erp-frontend
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_erp_frontend
+  IdentitiesOnly yes
+<span class="s">EOF</span>
+chmod 700 ~/.ssh &amp;&amp; chmod 600 ~/.ssh/config ~/.ssh/id_ed25519_erp_*
+
+<span class="c"># 3) เอา public key ไปใส่ที่ repo → Settings › Deploy keys › Add deploy key</span>
+<span class="c">#    อย่าติ๊ก "Allow write access" — deploy ต้องการแค่อ่าน</span>
+cat ~/.ssh/id_ed25519_erp_api.pub
+cat ~/.ssh/id_ed25519_erp_frontend.pub
+
+<span class="c"># 4) ยืนยันว่าใช้ได้จริงก่อนไปต่อ</span>
+GIT_TERMINAL_PROMPT=0 git -C /root/erp-api ls-remote origin HEAD</pre>
+        </div>
+          <div class="rulebox">
+            <div class="rc mb-1">IdentitiesOnly yes ไม่ใช่ของประดับ</div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+              ถ้าไม่ใส่ ssh จะเสนอ key <b>ทุกอัน</b>ที่มีให้ GitHub ตามลำดับ — GitHub รับ key แรกที่ผ่าน
+              แล้วผูก session นั้นกับ repo ที่ key นั้นเป็น deploy key อยู่ ผลคือ clone อีก repo หนึ่งจะขึ้น
+              <span class="mono text-[12px]">ERROR: Repository not found</span> ทั้งที่ key ถูกต้องและสิทธิ์ครบ
+              — เป็น error ที่หลอกมาก เพราะข้อความบอกเหมือน repo ไม่มีอยู่จริง
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
           <h3 class="font-semibold text-[16px] mb-2">erp-api — 8 bounded contexts</h3>
         <div class="code p-5 mb-6">
-<pre>git clone https://github.com/iots1/erp-api.git /root/erp-api
+<pre>git clone git@github-erp-api:iots1/erp-api.git /root/erp-api
 cd /root/erp-api
 cp .env.example .env
 <span class="c"># แก้ *_DB_HOST/PORT, REDIS_*, RABBITMQ_* ให้ตรงกับ §04</span>
@@ -293,7 +341,7 @@ pm2 start ecosystem.config.js</pre>
         </div>
 
         <div class="step">
-          <span class="sn">2</span>
+          <span class="sn">3</span>
           <h3 class="font-semibold text-[16px] mb-2">erp-frontend — Next.js web app</h3>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
             repo แยก ใช้ <b>pnpm + Turborepo</b> (ไม่ใช่ Nx แบบ erp-api) — build เฉพาะ
@@ -301,7 +349,7 @@ pm2 start ecosystem.config.js</pre>
             กับ <span class="mono text-[12px]">apps/storybook</span> เป็นเครื่องมือตอน dev ไม่ต้อง deploy
           </p>
         <div class="code p-5 mb-4">
-<pre>git clone https://github.com/iots1/erp-frontend.git /root/erp-frontend
+<pre>git clone git@github-erp-frontend:iots1/erp-frontend.git /root/erp-frontend
 cd /root/erp-frontend
 
 pnpm install --frozen-lockfile
@@ -818,6 +866,7 @@ flowchart LR
             <tbody>
               <tr><td>Disk เผื่อพอ (≥80 GB)</td><td><span class="mono text-[12px]">df -h /</span></td></tr>
               <tr><td>Datastore stack ขึ้นครบ</td><td><span class="mono text-[12px]">docker compose ps</span> ใน <span class="mono text-[12px]">infra-erp/</span></td></tr>
+              <tr><td><b>deploy key ใช้ได้ทั้ง 2 repo</b> (§05)</td><td><span class="mono text-[12px]">GIT_TERMINAL_PROMPT=0 git -C /root/erp-api ls-remote origin HEAD</span> — และซ้ำกับ <span class="mono text-[12px]">/root/erp-frontend</span></td></tr>
               <tr><td>erp-api ทุก BC online</td><td><span class="mono text-[12px]">pm2 list</span> — ครบ 8 BC × 2 instance</td></tr>
               <tr><td>erp-web online (frontend)</td><td><span class="mono text-[12px]">curl -I 127.0.0.1:3300</span> — ต้องได้ HTTP 200</td></tr>
               <tr><td><b>process กลับมาเองหลัง reboot</b> (§10)</td><td><span class="mono text-[12px]">systemctl is-enabled pm2-root</span> = enabled — ถ้าทดสอบได้ ให้ <span class="mono text-[12px]">reboot</span> จริงแล้วเช็ค <span class="mono text-[12px]">pm2 list</span> ซ้ำ</td></tr>
