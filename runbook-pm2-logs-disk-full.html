@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Runbook: Disk เต็มจาก pm2 Logs — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="R" title="Runbook" subtitle="PM2 LOGS · DISK FULL" width="280">
+    <nav slot="nav">
+      <a href="#symptom"    class="navlink"><span class="n">1</span> อาการ</a>
+      <a href="#impact"     class="navlink"><span class="n">2</span> ผลกระทบ</a>
+      <a href="#diagnosis"  class="navlink"><span class="n">3</span> วินิจฉัย</a>
+      <a href="#rootcause"  class="navlink"><span class="n">4</span> สาเหตุ</a>
+      <a href="#fix"        class="navlink"><span class="n">5</span> การแก้ไข</a>
+      <a href="#verify"     class="navlink"><span class="n">6</span> ยืนยัน + ป้องกัน</a>
+    </nav>
+    <div slot="footnote">
+      <a href="runbook.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ Runbook Index</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="runbook.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Runbook Index
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Runbook · Application / Infra</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Disk เต็ม<br>
+          <span class="text-[#7FE3DE]">จาก pm2 Logs ที่ไม่เคย rotate</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          <span class="mono text-[13px] text-white">/root/.pm2/logs/</span> โตขึ้นเรื่อย ๆ จนกิน disk หลาย GB
+          โดยไม่มีใครสังเกต — เพราะ pm2 <b class="text-white font-medium">ไม่มี log rotation ให้โดย default</b>
+          และไฟล์ที่โตเร็วที่สุดมักเป็น error log ของ BC ที่ retry วนอยู่เงียบ ๆ
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Severity: High (นำไปสู่ outage ทั้งเครื่อง)</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Est. fix time: 5–10 นาที</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 1 SYMPTOM ========== -->
+      <section id="symptom" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">1 — อาการ (Symptom)</div>
+        <h2 class="display text-3xl mb-6">เจอได้ 2 จังหวะ — ก่อนเต็ม กับ ตอนเต็มแล้ว</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เคสนี้ต่างจาก incident อื่นตรงที่มัน<b>ไม่มีสัญญาณเตือน</b>ระหว่างทางเลย ระบบทำงานปกติทุกอย่าง
+          จนถึงวินาทีที่ disk เต็มแล้วทุกอย่างพังพร้อมกัน — ส่วนใหญ่จึงถูกเจอตอนบังเอิญไปรัน
+          <span class="mono text-[13px]">df -h</span> ด้วยเรื่องอื่น
+        </p>
+
+        <h3 class="font-semibold text-[16px] mb-3">จังหวะที่ 1 — ยังไม่เต็ม (เจอตอนตรวจสุขภาพเครื่อง)</h3>
+        <div class="code p-5 mb-8">
+<pre>$ du -sh /root/.pm2/logs
+994M    /root/.pm2/logs
+
+$ ls -lS /root/.pm2/logs | head -4
+-rw-r--r-- 1 root root 774866121 Aug  1 18:10 iam-error-1.log     <span class="c"># ~740 MB ไฟล์เดียว</span>
+-rw-r--r-- 1 root root  77506602 Aug  1 18:10 auth-error-0.log
+-rw-r--r-- 1 root root  29188034 Aug 16 14:14 iam-out-1.log</pre>
+        </div>
+
+        <h3 class="font-semibold text-[16px] mb-3">จังหวะที่ 2 — เต็มแล้ว (ทุกอย่างพังพร้อมกัน)</h3>
+        <div class="code p-5">
+<pre><span class="c">ENOSPC: no space left on device</span>
+<span class="c">Error: EROFS: read-only file system   # Postgres อาจ remount RO เพื่อกันข้อมูลเสีย</span>
+<span class="c">docker: failed to create endpoint ... no space left on device</span>
+<span class="c">pnpm install → ERR_PNPM_ENOSPC</span></pre>
+        </div>
+        <div class="edge mt-5">
+          <div class="tag mb-1">สัญญาณที่แยกเคสนี้ออกจาก "disk เต็มเพราะ Docker"</div>
+          <p class="text-[13px]">
+            Docker images/volume โตแบบ<b>ก้าวกระโดดตอน deploy</b> แต่ pm2 logs โตแบบ<b>เชิงเส้นตลอดเวลา</b>
+            แม้ไม่มีใครแตะเครื่องเลย — ถ้า <span class="mono text-[12px]">df</span> ขยับขึ้นทุกวันทั้งที่ไม่ได้ deploy อะไร
+            ให้สงสัยเคสนี้ก่อน
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 2 IMPACT ========== -->
+      <section id="impact" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">2 — ผลกระทบ (Impact)</div>
+        <h2 class="display text-3xl mb-6">เต็มเมื่อไหร่ = ทั้งเครื่องหยุด</h2>
+        <div class="grid sm:grid-cols-3 gap-5">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">SCOPE</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ทุกอย่างบนเครื่องเดียวกัน</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">8 BC + erp-web + Postgres/Redis/RabbitMQ/MinIO + Kong — เพราะทุกตัวใช้ filesystem เดียวกัน ไม่มีตัวไหนรอด</p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">SEVERITY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">High — แต่ป้องกันได้ 100%</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">ต่างจาก incident อื่นตรงที่รู้ล่วงหน้าเสมอ และแก้ถาวรได้ด้วยคำสั่งเดียว — ถ้าเกิดขึ้นแปลว่าพลาดขั้นตอนส่งมอบ</p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DATA SAFETY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">เสี่ยงถ้าปล่อยจนเต็มจริง</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">Postgres เขียน WAL ไม่ได้จะหยุดรับ write ทันที (กันข้อมูลเสีย) — ไม่ถึงกับ corrupt แต่ recovery ช้ากว่าการล้าง log มาก</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 3 DIAGNOSIS ========== -->
+      <section id="diagnosis" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">3 — วินิจฉัย (Diagnosis)</div>
+        <h2 class="display text-3xl mb-6">ยืนยันว่าใช่ pm2 logs ก่อนลบอะไร</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ดูว่า disk เหลือเท่าไหร่จริง</h3>
+          <div class="code p-5">
+<pre>df -h /</pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">หาว่าใครกิน — เทียบ 3 ผู้ต้องสงสัยหลัก</h3>
+          <div class="code p-5 mb-3">
+<pre>du -sh /root/.pm2/logs /var/log /var/lib/docker 2>/dev/null | sort -h</pre>
+          </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ถ้า <span class="mono text-[12px]">/root/.pm2/logs</span> ขึ้นมาเป็นอันดับต้น ๆ (หลักหลายร้อย MB ถึง GB)
+            แปลว่าใช่เคสนี้ — ถ้าเป็น <span class="mono text-[12px]">/var/lib/docker</span> ให้ไปทาง
+            <span class="mono text-[12px]">docker system prune</span> แทน ไม่ใช่ runbook นี้
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ดูว่าไฟล์ไหนตัวการ และเป็นของ process ที่ยังรันอยู่ไหม</h3>
+          <div class="code p-5 mb-3">
+<pre>ls -lS /root/.pm2/logs | head -10   <span class="c"># เรียงตามขนาด</span>
+pm2 list                            <span class="c"># process ที่ยังรันอยู่จริง</span></pre>
+          </div>
+          <div class="rulebox">
+            <div class="rc mb-1">ให้สังเกต</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              มักเจอ log ของ<b>โปรเจกต์เก่าที่เลิกรันไปแล้ว</b>ปนอยู่ด้วย (ชื่อ process ที่ไม่มีใน
+              <span class="mono text-[12px]">pm2 list</span> แล้ว) — พวกนี้ลบได้อิสระเพราะไม่มี process ไหนถือ
+              file descriptor อยู่ ต่างจาก log ของ process ที่ยังรัน ซึ่งต้องใช้วิธีใน §5
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 4 ROOT CAUSE ========== -->
+      <section id="rootcause" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">4 — สาเหตุ (Root Cause)</div>
+        <h2 class="display text-3xl mb-6">pm2 ไม่มี log rotation ให้ และไม่เคยเตือน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          pm2 เปิดไฟล์ <span class="mono text-[13px]">&lt;name&gt;-out-&lt;id&gt;.log</span> กับ
+          <span class="mono text-[13px]">&lt;name&gt;-error-&lt;id&gt;.log</span> ค้างไว้แล้ว append ไปเรื่อย ๆ
+          <b>ไม่มีเพดาน ไม่มี rotation</b> — ต้องติดตั้ง module
+          <span class="mono text-[13px]">pm2-logrotate</span> เองเท่านั้น ซึ่งไม่ได้อยู่ในขั้นตอนติดตั้งมาตรฐานของใคร
+        </p>
+        <div class="rulebox">
+          <div class="rc mb-1">ทำไมไฟล์เดียวถึงโตถึง 740 MB</div>
+          <p class="text-[13.5px]" style="color:var(--ink-soft)">
+            ตัวเร่งเกือบทุกครั้งคือ <b>retry loop</b> — เช่น BC ต่อ DB/RabbitMQ ไม่ได้แล้ว NestJS retry ทุกไม่กี่วินาที
+            แต่ละรอบพ่น stack trace เต็ม ๆ ลง error log ระบบยัง "ทำงานอยู่" ในสายตาคนดู
+            (<span class="mono text-[12px]">pm2 list</span> ขึ้น online) แต่เขียน log หลัก MB ต่อนาที
+            ยิ่งไม่มีใครดู log ยิ่งโตนาน
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 5 FIX ========== -->
+      <section id="fix" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">5 — การแก้ไข (Fix)</div>
+        <h2 class="display text-3xl mb-6">ล้างของเก่า แล้วปิดสาเหตุถาวร</h2>
+
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">อ่านก่อนพิมพ์ rm</div>
+          <p class="text-[13.5px]" style="color:var(--ink-soft)">
+            <b><span class="mono text-[12px]">rm</span> ไฟล์ log ที่ pm2 ยังเปิดอยู่ จะ<u>ไม่</u>คืนพื้นที่</b> —
+            Linux ปลด directory entry ให้ก็จริง แต่ inode ยังถูกถือไว้ด้วย file descriptor ของ process
+            พื้นที่จะคืนก็ต่อเมื่อ process ปิด fd (คือตอน restart) ผลคือ
+            <span class="mono text-[12px]">df</span> ไม่ขยับเลยทั้งที่ไฟล์หายจาก <span class="mono text-[12px]">ls</span> แล้ว
+            — สับสนหนักตอนกำลังกู้ระบบ ให้ใช้ <span class="mono text-[12px]">pm2 flush</span> หรือ
+            <span class="mono text-[12px]">truncate</span> แทน
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ล้าง log ของ process ที่ยังรันอยู่ — ใช้ pm2 flush</h3>
+          <div class="code p-5 mb-3">
+<pre>pm2 flush              <span class="c"># ล้างทุก process (ตัดไฟล์เป็น 0 ไม่ใช่ลบ — คืนพื้นที่ทันที)</span>
+pm2 flush erp-web      <span class="c"># หรือระบุตัวเดียว</span></pre>
+          </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ปลอดภัยกับ process ที่รันอยู่ ไม่ต้อง restart อะไรเลย — แต่<b>ลบ log ทิ้งจริง</b>
+            ถ้ายังต้องสืบสาเหตุ retry loop ให้ copy ส่วนที่ต้องการออกไปก่อน
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ลบ log ของโปรเจกต์เก่าที่ไม่มี process แล้ว</h3>
+          <div class="code p-5 mb-3">
+<pre><span class="c"># ดูก่อนว่าจะลบอะไรบ้าง — อย่าเพิ่งลบ</span>
+ls -lS /root/.pm2/logs | head -20
+pm2 list
+
+<span class="c"># ลบเฉพาะไฟล์ของ process ที่ไม่มีอยู่ใน pm2 list แล้ว (ตัวอย่าง)</span>
+rm /root/.pm2/logs/&lt;ชื่อโปรเจกต์เก่า&gt;-*.log</pre>
+          </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            เคสนี้ <span class="mono text-[12px]">rm</span> ใช้ได้ปลอดภัย เพราะไม่มี process ถือ fd อยู่แล้ว
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง rotation เพื่อไม่ให้กลับมาอีก</h3>
+          <div class="code p-5 mb-3">
+<pre>pm2 install pm2-logrotate
+
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 14
+pm2 set pm2-logrotate:compress true
+pm2 set pm2-logrotate:rotateInterval <span class="s">'0 0 * * *'</span></pre>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ผลลัพธ์ที่ต้องได้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">pm2 list</span> จะมีบรรทัด
+              <span class="mono text-[12px]">pm2-logrotate</span> อยู่ในตาราง Module แยกจาก process ปกติ
+              และ <span class="mono text-[12px]">pm2 conf pm2-logrotate</span> แสดงค่าตามที่ตั้งไป
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">ถ้า retry loop ยังอยู่ ให้ตามแก้ต้นเหตุด้วย</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            rotation กันไม่ให้ disk เต็ม แต่ไม่ได้แก้ว่า<b>ทำไม</b>ถึงพ่น error ตลอดเวลา — ดูว่า BC ไหนเป็นตัวเขียน
+            แล้วไล่ต่อจากตรงนั้น
+          </p>
+          <div class="code p-5">
+<pre>pm2 logs &lt;name&gt; --err --lines 50</pre>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 6 VERIFY / PREVENT ========== -->
+      <section id="verify" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">6 — ยืนยัน + ป้องกัน (Verify / Prevent)</div>
+        <h2 class="display text-3xl mb-6">เช็คว่าคืนพื้นที่จริง แล้วปิดจบ</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">พื้นที่คืนมาจริงหรือแค่ไฟล์หายจาก ls</h3>
+          <div class="code p-5 mb-3">
+<pre>df -h /
+du -sh /root/.pm2/logs</pre>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ผลลัพธ์ที่ต้องได้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              ตัวเลข <span class="mono text-[12px]">Avail</span> ใน <span class="mono text-[12px]">df</span>
+              ต้องเพิ่มขึ้นจริง — ถ้า <span class="mono text-[12px]">du</span> ลดแต่
+              <span class="mono text-[12px]">df</span> ไม่ขยับ แปลว่าโดนกับดัก
+              <span class="mono text-[12px]">rm</span>-ไฟล์ที่ยังเปิดอยู่ ให้เช็คด้วย
+              <span class="mono text-[12px]">lsof +L1 | head</span> แล้ว restart process ตัวนั้นเพื่อปล่อย fd
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยืนยันว่า rotation ทำงานและทุก process ยังปกติ</h3>
+          <div class="code p-5">
+<pre>pm2 conf pm2-logrotate    <span class="c"># ค่าตรงกับที่ตั้งไว้</span>
+pm2 list                  <span class="c"># ทุก process ยัง online + มี pm2-logrotate ใน Module</span></pre>
+          </div>
+        </div>
+
+        <h3 class="font-semibold text-[16px] mt-10 mb-4">ป้องกันไม่ให้เกิดซ้ำ</h3>
+        <div class="overflow-x-auto">
+          <table class="d">
+            <thead><tr><th>มาตรการ</th><th>ทำเมื่อไหร่</th><th>อ้างอิง</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>ติดตั้ง <span class="mono text-[12px]">pm2-logrotate</span> ตั้งแต่วันแรก</td>
+                <td>ตอนติดตั้งเครื่องใหม่ ก่อนส่งมอบ</td>
+                <td><a href="deployment-guide.html#operations" class="underline">Deployment §10</a></td>
+              </tr>
+              <tr>
+                <td>ใส่ "log rotation ทำงาน" ในเช็คลิสต์ส่งมอบ</td>
+                <td>ทุกครั้งที่ส่งมอบเครื่องลูกค้า</td>
+                <td><a href="deployment-guide.html#reference" class="underline">Deployment §11</a></td>
+              </tr>
+              <tr>
+                <td>ตั้ง disk usage alert ที่ ~80%</td>
+                <td>ตอนตั้ง observability stack</td>
+                <td><a href="observability-logging-guide.html" class="underline">Observability Guide</a></td>
+              </tr>
+              <tr>
+                <td>ไล่ error log ที่โตผิดปกติเป็นงานประจำ</td>
+                <td>ตรวจสุขภาพเครื่องรายเดือน</td>
+                <td><span class="mono text-[12px]">ls -lS /root/.pm2/logs | head</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="edge mt-6">
+          <div class="tag mb-1">log อีกกองที่ไม่ได้อยู่ในนี้</div>
+          <p class="text-[13px]">
+            HTTP access log ของ erp-api เขียนผ่าน <span class="mono text-[12px]">pino-roll</span> ไปที่
+            <span class="mono text-[12px]">/var/log/erp-api/*/http/</span> ซึ่ง<b>คนละกองกับ pm2 logs</b>
+            และ rotate ด้วยกลไกของตัวเอง — <span class="mono text-[12px]">pm2 flush</span> ไม่แตะกองนั้น
+            และ <span class="mono text-[12px]">pm2-logrotate</span> ก็ไม่ได้ดูแลให้ ดูตารางเทียบใน
+            <a href="deployment-guide.html#operations" class="underline">Deployment §10</a>
+          </p>
+        </div>
+      </section>
+
+      <erp-footer
+        line1="ERP SYSTEM · RUNBOOK · PM2 LOGS DISK FULL"
+        line2="pm2 flush · pm2-logrotate · observed 2026-08-18">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>

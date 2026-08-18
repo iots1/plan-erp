@@ -31,6 +31,7 @@
       <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
       <div class="navsub">Database / Infra</div>
       <a href="runbook-pgpool-nodes-down.html" class="navlink"><span class="n" style="color:var(--signal)">01</span> Pgpool: All Backend Nodes Down</a>
+      <a href="runbook-pm2-logs-disk-full.html" class="navlink"><span class="n" style="color:var(--signal)">02</span> Disk เต็มจาก pm2 Logs</a>
     </nav>
     <div slot="footnote">
       <a href="postgresql-pgpool-cluster-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ Pgpool-II Cluster Guide (Setup/Deep-dive)</a>
@@ -159,6 +160,14 @@
             <p class="text-sm" style="color:var(--muted)">
               App ทุกตัว connect DB ไม่ได้ (<span class="mono text-[12px]">pgpool is not accepting any new connections</span>)
               ทั้งที่ PostgreSQL/repmgr จริงปกติ
+            </p>
+          </a>
+          <a href="runbook-pm2-logs-disk-full.html" class="bc-card block p-6 no-underline">
+            <div class="chip mb-4"><span class="dot" style="background:var(--signal)"></span>PM2 · DISK</div>
+            <h3 class="text-lg font-semibold mb-2" style="color:var(--ink)">Disk เต็มจาก pm2 Logs</h3>
+            <p class="text-sm" style="color:var(--muted)">
+              <span class="mono text-[12px]">/root/.pm2/logs/</span> โตหลาย GB เพราะ pm2 ไม่มี log rotation ให้
+              โดย default — รวมกับดัก <span class="mono text-[12px]">rm</span> ไฟล์ที่ยังเปิดอยู่แล้วพื้นที่ไม่คืน
             </p>
           </a>
         </div>
