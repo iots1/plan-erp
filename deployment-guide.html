@@ -311,6 +311,27 @@ docker compose up -d
           <li><span class="mono text-[12px]">preserve_host=true</span> (ตั้งให้อัตโนมัติโดย <span class="mono text-[12px]">setup-routes.sh</span>) ทำให้แต่ละ BC เห็น <span class="mono text-[12px]">Host</span> header เป็น domain จริง ไม่ใช่ upstream address — จำเป็นสำหรับ cookie/CORS ที่ §08</li>
           <li>Kong Admin API (<span class="mono text-[12px]">8001</span>) และ Konga (<span class="mono text-[12px]">1337</span>) ควรเปิดแค่ในวง LAN/loopback เท่านั้น — <b>ห้าม</b>เปิดสู่อินเทอร์เน็ตผ่าน Tunnel</li>
         </ul>
+
+        <div class="eyebrow text-[var(--muted)] mb-3 mt-8">Service เพิ่มเติมนอกเหนือ 8 BC — MinIO S3 API &amp; erp-frontend</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
+          <span class="mono text-[13px]">setup-routes.sh</span> เดียวกันนี้ยังลงทะเบียนอีก 2 service ที่<b>ไม่ใช่</b> path-based
+          routing แบบ BC — ทั้งคู่ผูกกับ <b>host แยกของตัวเอง</b> แทน
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Service</th><th>Host (Kong route)</th><th>Upstream</th><th>เหตุผลที่ไม่ใช้ path prefix</th></tr></thead>
+            <tbody>
+              <tr><td>minio-s3</td><td><span class="mono text-[12px]">MINIO_DOMAIN</span> (default <span class="mono text-[12px]">storage.$DOMAIN</span>)</td><td>:9000</td><td>Presigned URL ทั้ง path <b>คือ</b> bucket/object key ที่ signed มาแล้ว — rewrite path ไม่ได้ ดู <a href="product-image-upload-guide.html" style="color:var(--accent);text-decoration:underline">Product Image Upload Guide</a></td></tr>
+              <tr><td>erp-web</td><td><span class="mono text-[12px]">FRONTEND_DOMAIN</span> (default <span class="mono text-[12px]">web.$DOMAIN</span>)</td><td>:3300</td><td>Next.js (repo แยก <span class="mono text-[12px]">erp-frontend</span>) เสิร์ฟทั้งเว็บที่ root ไม่มี versioned prefix แบบ JSON:API</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox ok"><div class="rc mb-1">minio-s3 · preserve_host=true ไม่ใช่แค่ convention — จำเป็นจริง</div><p class="text-[13.5px]">MinIO ตรวจ SigV4 signature โดย recompute จาก <span class="mono text-[12px]">Host</span> header ที่ได้รับจริง แล้วเทียบกับค่าที่ S3 SDK เซ็นไว้ตอนสร้าง presigned URL (มาจาก <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span>) — ถ้า Kong rewrite host เป็น upstream address (พฤติกรรม default เมื่อ <span class="mono text-[12px]">preserve_host=false</span>) ทุก presigned PUT/GET จะ fail ด้วย <span class="mono text-[12px]">SignatureDoesNotMatch</span> ทันที</p></div>
+        <p class="text-sm text-[var(--ink-soft)] leading-relaxed mt-4">
+          หลังตั้ง <span class="mono text-[12px]">MINIO_DOMAIN</span> แล้ว ต้องอัปเดต <span class="mono text-[12px]">STORAGE_S3_ENDPOINT=https://&lt;MINIO_DOMAIN&gt;</span>
+          ใน erp-api's <span class="mono text-[12px]">.env</span> แล้ว <span class="mono text-[12px]">pm2 restart storage</span> ด้วย —
+          ไม่งั้น presigned URL ที่คืนออกไปยังชี้ไปที่ internal IP เดิม (ดูบั๊ก #6 ที่ §09)
+        </p>
       </section>
 
       <div class="rule my-14"></div>
@@ -376,6 +397,15 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
               cloudflared ↔ Kong วิ่งอยู่ในเครื่อง/LAN เดียวกัน ไม่ใช่อินเทอร์เน็ตเปิด
             </p>
           </div>
+          <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+            <b>หนึ่ง route ต่อ host ที่ Kong รู้จัก</b> — ไม่ใช่แค่ <span class="mono text-[12px]">erp-api.&lt;domain&gt;</span> เท่านั้น
+            ทุก host ที่ตั้งไว้ใน <span class="mono text-[12px]">infrastructure/kong/.env</span> (§06 — <span class="mono text-[12px]">DOMAIN</span>,
+            <span class="mono text-[12px]">MINIO_DOMAIN</span>, <span class="mono text-[12px]">FRONTEND_DOMAIN</span>) ต้องมี
+            Public Hostname entry ของตัวเองใน tunnel เดียวกันนี้ — Service Type/URL <b>เหมือนกันทุกอัน</b>
+            (<span class="mono text-[12px]">HTTP → &lt;LAN IP&gt;:80</span>) เพราะ Kong เป็นคนแยกปลายทางจริงด้วย
+            <span class="mono text-[12px]">Host</span> header เอง ไม่ใช่ Cloudflare — เพิ่ม Subdomain ใหม่แล้วชี้ไปที่ URL
+            เดิมซ้ำได้เลย ไม่ต้องสร้าง tunnel ใหม่
+          </p>
         </div>
       </section>
 
@@ -428,9 +458,10 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
       <!-- ========== 09 BUGS ========== -->
       <section id="bugs" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">09 — บั๊กที่เจอระหว่าง Implement และวิธีแก้</div>
-        <h2 class="display text-3xl mb-6">5 บั๊กจริงที่เจอตอนตั้งระบบครั้งแรก</h2>
+        <h2 class="display text-3xl mb-6">6 บั๊กจริงที่เจอตอนตั้งระบบครั้งแรก</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          บันทึกไว้ละเอียดกันคนถัดไปเจอปัญหาเดิม — ทุกข้อเจอจริงตอนตั้ง Kong+Cloudflare Tunnel ครั้งแรกบน on-prem VM
+          บันทึกไว้ละเอียดกันคนถัดไปเจอปัญหาเดิม — 5 ข้อแรกเจอตอนตั้ง Kong+Cloudflare Tunnel ครั้งแรกบน on-prem VM,
+          ข้อ 6 เจอตอนเพิ่ม MinIO S3 API เข้าหลัง domain จริงทีหลัง
         </p>
 
         <div class="space-y-6">
@@ -536,6 +567,36 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
               ความสะอาด — ปัญหานี้จะกลับมาเกี่ยวข้องเฉพาะกรณีเปิด port 80/443 ตรงสู่อินเทอร์เน็ตแทน tunnel เท่านั้น
             </p>
           </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">6</span>
+              <h3 class="font-semibold text-[15px]">Presigned URL ใช้ virtual-hosted style แทน path-style หลังเปลี่ยนจาก IP เป็น domain</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> พอเปลี่ยน <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> จาก internal IP
+              (<span class="mono text-[12px]">http://172.x.x.x:9000</span>) เป็น public domain ผ่าน Kong แล้ว
+              presigned URL ที่คืนออกไปกลับมีรูปแบบ <span class="mono text-[12px]">&lt;bucket&gt;.&lt;domain&gt;/...</span>
+              (virtual-hosted style) แทนที่จะเป็น <span class="mono text-[12px]">&lt;domain&gt;/&lt;bucket&gt;/...</span>
+              (path-style) ทั้งที่ตั้ง <span class="mono text-[12px]">STORAGE_S3_FORCE_PATH_STYLE=true</span> ไว้แล้ว —
+              รูปแบบ virtual-hosted ต้องมี wildcard DNS record ของตัวเอง (<span class="mono text-[12px]">*.&lt;domain&gt;</span>)
+              ซึ่งไม่มีใครตั้งไว้ ทำให้อัปโหลดจากเบราว์เซอร์จริงล้มเหลวทันที (resolve ไม่ได้)
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> <span class="mono text-[12px]">STORAGE_S3_FORCE_PATH_STYLE</span> ไม่ได้อยู่ใน Joi validation
+              schema ของ <span class="mono text-[12px]">libs/config</span> — <span class="mono text-[12px]">ConfigService.get()</span>
+              จึงคืนค่าตามที่ dotenv parse มาตรง ๆ คือ<b>สตริง</b> <span class="mono text-[12px]">"true"</span> ไม่ใช่
+              boolean แท้ ๆ และพบว่า AWS SDK v3's S3 client เลือก address style ผิดเมื่อ config หลายค่าพร้อมกันมาจาก
+              env (สตริงที่ไม่ผ่านการ type-coerce) — ยืนยันซ้ำหลายรอบว่า literal boolean ตรง ๆ ไม่มีปัญหา แต่ค่าที่มาจาก
+              <span class="mono text-[12px]">process.env</span> ทำให้ SDK behavior ไม่แน่นอน
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>แก้:</b> coerce เป็น boolean แท้ ๆ อย่างชัดเจนในโค้ดแทนที่จะเชื่อว่า SDK จะปฏิบัติกับสตริง truthy
+              เหมือน boolean เสมอ — <span class="mono text-[12px]">forcePathStyle: configService.get('STORAGE_S3_FORCE_PATH_STYLE', 'true') !== 'false'</span>
+              (<span class="mono text-[12px]">apps/storage/src/storage.service.ts</span>) ยืนยันด้วยการทดสอบ presigned
+              upload ผ่าน domain จริงซ้ำหลายรอบหลังแก้ — path-style ถูกต้องสม่ำเสมอ
+            </p>
+          </div>
         </div>
       </section>
 
@@ -553,7 +614,8 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
               <tr><td>Disk เผื่อพอ (≥80 GB)</td><td><span class="mono text-[12px]">df -h /</span></td></tr>
               <tr><td>Datastore stack ขึ้นครบ</td><td><span class="mono text-[12px]">docker compose ps</span> ใน <span class="mono text-[12px]">infra-erp/</span></td></tr>
               <tr><td>erp-api ทุก BC online</td><td><span class="mono text-[12px]">pm2 list</span> — ครบ 8 BC × 2 instance</td></tr>
-              <tr><td>Kong routes ครบ 8 BC</td><td><span class="mono text-[12px]">curl 127.0.0.1:8001/services</span></td></tr>
+              <tr><td>Kong routes ครบ 8 BC + minio-s3 + erp-web (10 services)</td><td><span class="mono text-[12px]">curl 127.0.0.1:8001/services</span></td></tr>
+              <tr><td>Presigned upload URL เป็น path-style ไม่ใช่ virtual-hosted</td><td>เรียก <span class="mono text-[12px]">POST /products/:id/images/presigned-url</span> จริง เช็คว่า <span class="mono text-[12px]">upload_url</span> ขึ้นต้นด้วย domain ตรง ๆ ไม่ใช่ <span class="mono text-[12px]">&lt;bucket&gt;.domain</span> (ดู §09 บั๊ก #6)</td></tr>
               <tr><td>Cloudflare Tunnel healthy</td><td><span class="mono text-[12px]">systemctl status cloudflared</span></td></tr>
               <tr><td>Login ผ่าน domain จริงสำเร็จ</td><td>เปิด <span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span> จริงจาก browser ภายนอก</td></tr>
               <tr><td>Production .env ครบ §08</td><td>เทียบกับตารางเช็คลิสต์</td></tr>

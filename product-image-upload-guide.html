@@ -434,9 +434,11 @@ sequenceDiagram
       <!-- ========== 08 GOTCHAS ========== -->
       <section id="gotchas" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">08 — ปัญหาที่เจอระหว่างทดสอบจริง (curl + ไฟล์จริง)</div>
-        <h2 class="display text-3xl mb-6">3 บั๊กที่ยืนยัน/แก้ระหว่างทดสอบ end-to-end</h2>
+        <h2 class="display text-3xl mb-6">4 บั๊กที่ยืนยัน/แก้ระหว่างทดสอบ end-to-end</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          ทดสอบด้วยไฟล์จริง (jpeg + png ชื่อไทย) ผ่าน superadmin เต็ม flow — เจอ 3 จุดที่ต้องแก้จริง ก่อนจะผ่านครบทุกเคส
+          3 ข้อแรกเจอตอนทดสอบด้วยไฟล์จริง (jpeg + png ชื่อไทย) ผ่าน superadmin เต็ม flow บนเครื่อง dev — ข้อ 4 เจอทีหลัง
+          ตอนย้าย <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> จาก internal IP ไปเป็น public domain จริงบน
+          ovh-dev (รายละเอียด deploy เต็มอยู่ที่ <a href="deployment-guide.html#bugs" style="color:var(--accent);text-decoration:underline">Deployment Guide §09</a>)
         </p>
 
         <div class="step">
@@ -480,6 +482,25 @@ sequenceDiagram
           <div class="edge">
             <div class="tag mb-1">Fix</div>
             <p class="text-[13px]">เพิ่ม <span class="mono text-[12px]">GET .../images/:id/url</span> (§07) — ตรวจ byte-for-byte ด้วย SHA-256 checksum เทียบไฟล์ต้นฉบับกับไฟล์ที่ดาวน์โหลดผ่าน signed URL ที่ resolve ได้ ทั้ง 2 flow (presigned + multipart) ตรงกันทุกไบต์</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">Presigned URL กลายเป็น virtual-hosted style หลังเปลี่ยนเป็น public domain</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ย้าย <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> จาก <span class="mono text-[12px]">http://172.x.x.x:9000</span>
+            เป็น <span class="mono text-[12px]">https://erp-bucket-api.iotechsoft.com</span> (ผ่าน Kong ตาม
+            <a href="deployment-guide.html#kong" style="color:var(--accent);text-decoration:underline">Deployment Guide §06</a>)
+            แล้ว <span class="mono text-[12px]">upload_url</span> ที่คืนออกไปกลับกลายเป็น
+            <span class="mono text-[12px]">erp-storage.erp-bucket-api.iotechsoft.com/...</span> (virtual-hosted) แทนที่จะเป็น
+            <span class="mono text-[12px]">erp-bucket-api.iotechsoft.com/erp-storage/...</span> (path-style) ทั้งที่
+            <span class="mono text-[12px]">STORAGE_S3_FORCE_PATH_STYLE=true</span> ตั้งไว้แล้ว — virtual-hosted ต้องมี
+            wildcard DNS ของตัวเอง ซึ่งไม่มี ทำให้อัปโหลดจากเบราว์เซอร์จริง resolve host ไม่ได้เลย
+          </p>
+          <div class="edge">
+            <div class="tag mb-1">Fix</div>
+            <p class="text-[13px]"><span class="mono text-[12px]">STORAGE_S3_FORCE_PATH_STYLE</span> ไม่ได้อยู่ใน Joi validation schema (<span class="mono text-[12px]">libs/config</span>) จึงมาเป็น<b>สตริง</b> <span class="mono text-[12px]">"true"</span> ไม่ใช่ boolean แท้ — coerce ให้ชัดเจนใน <span class="mono text-[12px]">storage.service.ts</span>: <span class="mono text-[12px]">forcePathStyle: configService.get(..., 'true') !== 'false'</span> รายละเอียดการ debug เต็ม + วิธียืนยันดูที่ Deployment Guide §09 บั๊ก #6</p>
           </div>
         </div>
       </section>
