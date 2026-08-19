@@ -701,11 +701,77 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
         </div>
 
         <div class="rulebox mt-6">
-          <div class="rc mb-1">RULE</div>
+          <div class="rc mb-1">RULE — แก้จากของเดิมที่เขียนผิด</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
-            pm2's <span class="mono text-[12px]">env_file</span> อ่านค่าแค่ตอน <span class="mono text-[12px]">pm2 start</span> เท่านั้น —
-            แก้ <span class="mono text-[12px]">.env</span> แล้วต้อง <span class="mono text-[12px]">pm2 delete all &amp;&amp; pm2 start ecosystem.config.js</span>
-            (ไม่ใช่ <span class="mono text-[12px]">restart</span>/<span class="mono text-[12px]">reload</span>) ค่าใหม่ถึงจะมีผลจริง
+            เอกสารฉบับก่อนเขียนไว้ว่า &ldquo;pm2's <span class="mono text-[12px]">env_file</span> อ่านค่าแค่ตอน
+            <span class="mono text-[12px]">pm2 start</span> — ต้อง <span class="mono text-[12px]">pm2 delete all &amp;&amp; pm2 start</span>&rdquo;
+            <b>ผิดทั้งข้อเท็จจริงและวิธีแก้</b> และยังขัดกับ RULE ใน §05 ที่ห้าม
+            <span class="mono text-[12px]">pm2 delete all</span> บนเครื่องที่แชร์ daemon กัน (ดู §09 บั๊ก #9)
+          </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-2">
+            ของจริง: <span class="mono text-[12px]">env_file</span> <b>ไม่ inject อะไรเลย</b> — ค่าถึงแอปผ่าน
+            NestJS <span class="mono text-[12px]">ConfigModule</span> ที่อ่าน
+            <span class="mono text-[12px]">.env</span> เองด้วย dotenv ตอน bootstrap
+            (<span class="mono text-[12px]">envFilePath: ['.env']</span>, resolve จาก
+            <span class="mono text-[12px]">process.cwd()</span> = <span class="mono text-[12px]">/root/erp-api</span>
+            ซึ่ง 8 BC ใช้ไฟล์เดียวกัน และมี Joi schema ตรวจ — ค่าขาด/ผิดชนิด = ตายตอน boot ไม่ใช่พังตอน runtime)
+          </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-2">
+            ดังนั้น <b>process เกิดใหม่แบบไหนก็ได้ค่าใหม่</b> — <span class="mono text-[12px]">pm2 reload</span>
+            ก็พอ และได้ zero-downtime แถมมาด้วย deploy script จึงใช้
+            <span class="mono text-[12px]">pm2 startOrReload</span> ไม่ต้อง delete ทิ้งอีกต่อไป
+          </p>
+        </div>
+
+        <h3 class="font-semibold text-[16px] mt-10 mb-3">erp-frontend — config อยู่คนละที่กับ backend</h3>
+        <p class="text-sm mb-4" style="color:var(--ink-soft)">
+          erp-web <b>ไม่มี <span class="mono text-[12px]">.env</span> เลย</b>ในสถานะปัจจุบัน — ค่าทั้งหมดมาจาก
+          <span class="mono text-[12px]">env: {}</span> ใน <span class="mono text-[12px]">ecosystem.config.js</span>
+          (ต่างจาก <span class="mono text-[12px]">env_file</span> ตรงที่อันนี้<b>ทำงานจริง</b>) พอเริ่มต่อ API
+          จะมีสองที่ให้เลือก และเลือกผิดจะเงียบ:
+        </p>
+        <div class="overflow-x-auto mb-5">
+          <table class="d">
+            <thead><tr><th>ค่า</th><th>อยู่ที่</th><th>เปลี่ยนแล้วต้อง</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="mono text-[12px]">PORT</span>, <span class="mono text-[12px]">NODE_ENV</span> (runtime)</td>
+                <td><span class="mono text-[12px]">ecosystem.config.js</span> → <span class="mono text-[12px]">env: {}</span></td>
+                <td><span class="mono text-[12px]">pm2 reload</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono text-[12px]">NEXT_PUBLIC_*</span> (build-time)</td>
+                <td><span class="mono text-[12px]">apps/web/.env</span></td>
+                <td><b>build ใหม่</b> — reload ไม่พอ</td>
+              </tr>
+              <tr>
+                <td>server-only (ไม่มี prefix)</td>
+                <td><span class="mono text-[12px]">apps/web/.env</span></td>
+                <td><span class="mono text-[12px]">pm2 reload</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="edge">
+          <div class="tag mb-1">ทำไมไฟล์ต้องอยู่ที่ <span class="mono">apps/web/</span> ไม่ใช่ root</div>
+          <p class="text-[13px]">
+            Next อ่าน <span class="mono text-[12px]">.env</span> จาก working directory ของตัวเอง และ pm2 ตั้ง
+            <span class="mono text-[12px]">cwd: 'apps/web'</span> ไว้ — วางไว้ที่ root ของ repo จะไม่ถูกอ่านและไม่มี error
+            ให้เห็น ส่วน <span class="mono text-[12px]">NEXT_PUBLIC_*</span> ถูก inline เข้า client bundle ตอน
+            <span class="mono text-[12px]">next build</span> จึงเป็นค่าที่ &ldquo;ติดไปกับ build&rdquo; ไม่ใช่ค่าที่อ่านตอนรัน —
+            แต่ไม่มีกับดัก bundle ค้าง เพราะ <span class="mono text-[12px]">turbo.json</span> ประกาศ
+            <span class="mono text-[12px]">.env*</span> เป็น build input — ยืนยันด้วย deploy จริงสองรอบ
+            (สร้าง <span class="mono text-[12px]">.env</span> แล้ว deploy → ลบทิ้งแล้ว deploy):
+          </p>
+          <div class="code p-5 my-3">
+<pre>รอบ A (มี .env)   web:build: <span class="s">cache miss</span>, executing 156a2900214a8ed6
+รอบ B (ลบ .env)   web:build: <span class="s">cache miss</span>, executing 5b4fa78adcd8ca6a
+                  web:lint : <span class="k">cache hit</span>   <span class="c">← lint ไม่ผูกกับ .env จึงไม่ถูก invalidate</span></pre>
+          </div>
+          <p class="text-[13px]">
+            build ถูกสร้างใหม่ทั้งสองรอบ ส่วน lint ยัง cache hit — แปลว่า invalidation ผูกอยู่กับ
+            <span class="mono text-[12px]">build</span> เท่านั้นตามที่ควร ไม่ได้เหวี่ยงล้าง cache ทั้งหมด
+            template อยู่ที่ <span class="mono text-[12px]">apps/web/.env.example</span>
           </p>
         </div>
       </section>
