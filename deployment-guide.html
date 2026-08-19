@@ -390,6 +390,40 @@ pm2 save</pre>
   → pm2 delete (ตามชื่อ) + start → pm2 save
   → health check <span class="mono">/health/ready</span> ครบทั้ง 8 app</pre>
         </div>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <b>erp-frontend มี script รูปทรงเดียวกัน</b> (<span class="mono text-[12px]">scripts/deploy-ovh-dev.sh</span>
+            ใน repo นั้น) — flock ตัวเดียวกัน → git reset → install → lint → test →
+            snapshot <span class="mono text-[12px]">apps/web/.next</span> → build → pm2 delete/start →
+            health check ต่างกันแค่รายละเอียดที่ควรต่าง:
+          </p>
+          <div class="code p-5 mb-4">
+<pre>                    erp-api                      erp-frontend
+lock                /tmp/ovh-dev-pm2-deploy.lock <span class="c">(ตัวเดียวกัน — ดู RULE ข้างบน)</span>
+gate                lint · test · migration      lint · test
+snapshot            dist/ + apps/iam/dist        apps/web/.next <span class="c">(ตัด .next/cache)</span>
+restart             pm2 delete 8 ชื่อ + start     pm2 delete erp-web + start
+health              /health/ready × 8 app        /login <span class="c">(Next ไม่มี health endpoint)</span></pre>
+          </div>
+          <div class="edge mb-4">
+            <div class="tag mb-1">ทำไม erp-frontend ต้องมี step <span class="mono">lint</span> แยก</div>
+            <p class="text-[13px]">
+              <b>Next.js 16 ถอด ESLint ออกจาก <span class="mono">next build</span> แล้ว</b> — ไม่มี subcommand
+              <span class="mono text-[12px]">next lint</span> และไม่มี option
+              <span class="mono text-[12px]">eslint.ignoreDuringBuilds</span> อีกต่อไป ดังนั้น build
+              <b>ไม่ lint ให้</b> step นี้คือ lint coverage เดียวที่ deploy มี ส่วน type error ยัง fail build
+              อยู่ (<span class="mono text-[12px]">typescript.ignoreBuildErrors</span> ยังมี) จึงไม่ต้องรัน
+              <span class="mono text-[12px]">check-types</span> ซ้ำ
+            </p>
+          </div>
+          <div class="edge mb-4">
+            <div class="tag mb-1">snapshot ของ Next ต้องตัด <span class="mono">.next/cache</span> ทิ้ง</div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">.next</span> ทั้งก้อนวัดได้ <b>80 MB</b> แต่ส่วนที่ rollback
+              จริง ๆ ต้องใช้มีแค่ <b>14 MB</b> — ที่เหลือคือ
+              <span class="mono text-[12px]">.next/cache</span> ซึ่งเป็นตัวเร่ง build ที่สร้างใหม่ได้เสมอ
+              เก็บไว้ก็เปลืองดิสก์คูณจำนวน snapshot ที่ retain โดยไม่ได้อะไรกลับมา
+            </p>
+          </div>
           <div class="rulebox mb-4">
             <div class="rc mb-1">snapshot ต้องอยู่ก่อน build ไม่ใช่ก่อน pm2</div>
             <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
@@ -433,6 +467,27 @@ pm2 save</pre>
             <span class="mono text-[12px]">erp-web</span> ทิ้งและ<b>ไม่ start กลับ</b> (เพราะไม่ได้อยู่ใน
             <span class="mono text-[12px]">ecosystem.config.js</span> ของ erp-api) — เว็บดับเงียบ ๆ โดยไม่มีใครสังเกต
             จนกว่าจะมีคนเปิดหน้าเว็บ
+          </p>
+        </div>
+
+        <div class="rulebox mt-4">
+          <div class="rc mb-1">RULE</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b>deploy script ของทั้งสอง repo ต้องใช้ lock file ชื่อ<u>เดียวกัน</u></b> —
+            <span class="mono text-[12px]">/tmp/ovh-dev-pm2-deploy.lock</span> lock แยกตาม repo
+            ไม่ได้ป้องกันอะไรเลยในกรณีนี้ เพราะอันตรายอยู่ที่ <span class="mono text-[12px]">pm2 save</span>
+            ซึ่งทั้งคู่เรียก และมันเขียน <span class="mono text-[12px]">~/.pm2/dump.pm2</span>
+            ทับด้วย<b>รายการ process ณ วินาทีนั้น</b>
+          </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-2">
+            จังหวะที่พัง: deploy ของ erp-api มีช่วงระหว่าง <span class="mono text-[12px]">pm2 delete</span>
+            8 BC กับ <span class="mono text-[12px]">pm2 start</span> ที่ backend <b>ไม่มีอยู่จริง</b> —
+            ถ้า deploy ของ erp-frontend เรียก <span class="mono text-[12px]">pm2 save</span> ตกในช่วงนั้นพอดี
+            dump จะถูกเขียนโดยไม่มี backend เลย แล้ว reboot ครั้งถัดไป
+            <span class="mono text-[12px]">pm2 resurrect</span> จะปลุกขึ้นมาแค่
+            <span class="mono text-[12px]">erp-web</span> ตัวเดียว (ทางกลับกันก็ทำให้เสีย
+            <span class="mono text-[12px]">erp-web</span> เหมือนกัน) — เป็นบั๊กชนิดเดียวกับ RULE ด้านบน
+            แค่เข้าทางประตูหลัง และเงียบกว่ามาก เพราะไม่มีอะไรผิดปกติจนกว่าจะ reboot
           </p>
         </div>
 
