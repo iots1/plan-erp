@@ -362,8 +362,66 @@ pm2 save</pre>
             ได้ process ชื่อ <span class="mono text-[12px]">erp-web</span> ฟังอยู่ที่ port
             <span class="mono text-[12px]">3300</span> ซึ่งเป็น upstream ที่ Kong ชี้มาใน §06 —
             deploy รอบถัดไปใช้ <span class="mono text-[12px]">scripts/deploy-ovh-dev.sh</span> ใน repo นั้นได้เลย
-            (git reset → install → build → restart → health check)
           </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">Deploy รอบถัดไป — <span class="mono text-[13px]">scripts/deploy-ovh-dev.sh</span></h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ขั้นตอนข้างบนคือการตั้งเครื่อง<b>ครั้งแรก</b>เท่านั้น หลังจากนั้นทุก deploy รันจากเครื่อง dev
+            คำสั่งเดียว — script ssh เข้าไปทำงานทั้งหมดบน server ใน session เดียว
+          </p>
+        <div class="code p-5 mb-4">
+<pre>./scripts/deploy-ovh-dev.sh                    <span class="c"># redeploy branch ที่ server อยู่</span>
+./scripts/deploy-ovh-dev.sh main               <span class="c"># checkout + reset ไป origin/main</span>
+./scripts/deploy-ovh-dev.sh --skip-migrations  <span class="c"># deploy เฉพาะโค้ด ไม่แตะ DB</span></pre>
+        </div>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ลำดับขั้นถูกออกแบบให้ <b>ทุก gate อยู่ก่อน pm2</b> — ทั้ง script รันใต้
+            <span class="mono text-[12px]">set -euo pipefail</span> ดังนั้น lint/test/build/migration ที่ fail
+            จะหยุด deploy ทันทีโดยที่ process เดิม<b>ยังรันอยู่ไม่ถูกแตะเลย</b>
+          </p>
+        <div class="code p-5 mb-4">
+<pre>flock กัน deploy ซ้อน → เช็ค git credential → เช็ค .env → git reset --hard origin/&lt;branch&gt;
+  → pnpm install → lint → test
+  → <b>snapshot dist ที่รันอยู่</b> ไป backups/dist_YYYYMMDD_NNN   <span class="c"># ← ก่อน build</span>
+  → build ทุก BC → build asset ของ iam → migration
+  → pm2 delete (ตามชื่อ) + start → pm2 save
+  → health check <span class="mono">/health/ready</span> ครบทั้ง 8 app</pre>
+        </div>
+          <div class="rulebox mb-4">
+            <div class="rc mb-1">snapshot ต้องอยู่ก่อน build ไม่ใช่ก่อน pm2</div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+              สัญชาตญาณบอกให้ copy <span class="mono text-[12px]">dist</span> ตอน "ก่อนสลับเวอร์ชัน" คือก่อน
+              <span class="mono text-[12px]">pm2 start</span> — แต่ตรงจุดนั้น <span class="mono text-[12px]">dist</span>
+              <b>เป็นของใหม่ที่เพิ่ง build เสร็จไปแล้ว</b> สิ่งที่ได้จึงเป็นสำเนาของสิ่งที่กำลังจะ deploy
+              ไม่ใช่สิ่งที่กำลังจะถูกแทนที่ — ใช้ rollback ไม่ได้ ต้องวางไว้<b>ก่อน build</b> ตรงที่
+              <span class="mono text-[12px]">dist</span> ยังเป็น bundle ที่ pm2 รันอยู่จริง และเก็บ
+              <span class="mono text-[12px]">apps/iam/dist</span> (esbuild asset) กับไฟล์
+              <span class="mono text-[12px]">COMMIT</span> ไปด้วย เพราะ <span class="mono text-[12px]">dist</span>
+              เปล่า ๆ บอกไม่ได้ว่า build มาจาก source ไหน
+            </p>
+          </div>
+          <div class="edge mb-4">
+            <div class="tag mb-1">health check ต้อง <span class="mono">gate</span> ไม่ใช่แค่ <span class="mono">print</span></div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">curl -w '%{http_code}'</span> เฉย ๆ <b>ไม่</b> return non-zero เมื่อเจอ
+              HTTP 500 (ต้องมี <span class="mono text-[12px]">-f</span> หรือเช็คค่าที่ได้เอง) — script ที่แค่พิมพ์
+              ตัวเลขออกมาแล้วจบด้วย "done" จึงรายงานว่าสำเร็จทั้งที่ service พังอยู่ และต้องเช็ค
+              <b>ทุก app</b> ไม่ใช่แค่ตัวเดียว เพราะ BC ที่ crash เพราะ env ขาดจะเงียบจนมี user เจอ
+            </p>
+          </div>
+          <div class="edge">
+            <div class="tag mb-1">ใช้ <span class="mono">/health/ready</span> ไม่ใช่ <span class="mono">/health</span></div>
+            <p class="text-[13px]">
+              liveness (<span class="mono text-[12px]">/health</span>) ตอบ 200 แม้ระหว่างที่ process กำลัง drain
+              ปิดตัว จึงแยกไม่ออกระหว่าง "เพิ่งขึ้นมาพร้อมใช้" กับ "กำลังจะตาย" — readiness
+              (<span class="mono text-[12px]">/health/ready</span>) ตอบ 503 ตอน shutting down ทั้งสอง route
+              ลงทะเบียนตรงกับ Fastify adapter จึงไม่ผ่าน AuthGuard ไม่ต้องใช้ token
+              (ดู <span class="mono text-[12px]">libs/common/src/utils/bootstrap.util.ts</span>)
+            </p>
+          </div>
         </div>
 
         <div class="rulebox mt-6">
@@ -602,10 +660,12 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
       <!-- ========== 09 BUGS ========== -->
       <section id="bugs" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">09 — บั๊กที่เจอระหว่าง Implement และวิธีแก้</div>
-        <h2 class="display text-3xl mb-6">6 บั๊กจริงที่เจอตอนตั้งระบบครั้งแรก</h2>
+        <h2 class="display text-3xl mb-6">8 บั๊กจริงที่เจอตอนตั้งระบบครั้งแรก</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           บันทึกไว้ละเอียดกันคนถัดไปเจอปัญหาเดิม — 5 ข้อแรกเจอตอนตั้ง Kong+Cloudflare Tunnel ครั้งแรกบน on-prem VM,
-          ข้อ 6 เจอตอนเพิ่ม MinIO S3 API เข้าหลัง domain จริงทีหลัง
+          ข้อ 6 เจอตอนเพิ่ม MinIO S3 API เข้าหลัง domain จริงทีหลัง, ข้อ 7-8 เจอตอนทำ deploy script
+          ให้มี gate ครบ (lint/test/migration/health check) แล้ว<b>รันจริง</b> — ทั้งคู่เป็นบั๊กที่อ่าน script
+          เฉย ๆ ไม่มีทางเห็น ต้องรันถึงจะโผล่
         </p>
 
         <div class="space-y-6">
@@ -740,6 +800,79 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
               (<span class="mono text-[12px]">apps/storage/src/storage.service.ts</span>) ยืนยันด้วยการทดสอบ presigned
               upload ผ่าน domain จริงซ้ำหลายรอบหลังแก้ — path-style ถูกต้องสม่ำเสมอ
             </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">7</span>
+              <h3 class="font-semibold text-[15px]">ssh ไม่รักษาขอบเขต argument — argument ว่างหายไปทั้งตัว</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> deploy script ตายทันทีด้วย <span class="mono text-[12px]">bash: line 10: $8: unbound variable</span>
+              ทั้งที่ส่ง argument ไปครบ 8 ตัว เกิดเฉพาะตอน<b>ไม่ระบุ branch</b> — ถ้าสั่ง
+              <span class="mono text-[12px]">deploy-ovh-dev.sh main</span> กลับผ่านปกติ
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> <span class="mono text-[12px]">ssh host bash -s -- a "" c</span> ไม่ได้ส่ง argv เป็น array —
+              ssh เอาทุกอย่างหลังชื่อ host มา<b>ต่อเป็นสตริงเดียว</b> แล้ว shell ปลายทาง split ใหม่ด้วย whitespace
+              argument ที่เป็นสตริงว่างจึง<b>หายไปเลย</b> ไม่ได้มาถึงเป็น <span class="mono text-[12px]">""</span> —
+              ตัวที่เหลือเลื่อนตำแหน่งลงมาหนึ่งช่อง แล้ว <span class="mono text-[12px]">set -u</span> ก็ฆ่า script ทิ้ง
+            </p>
+            <div class="code p-5 my-3">
+<pre><span class="c"># ผิด — BRANCH ว่างเมื่อไม่ระบุ branch ⇒ remote เห็นแค่ 7 ตัว</span>
+ssh -T <span class="s">"$REMOTE_HOST"</span> bash -s -- <span class="s">"$REMOTE_DIR"</span> <span class="s">"$BRANCH"</span> <span class="s">"$NODE_VERSION"</span> ...
+
+<span class="c"># ถูก — printf %q เขียนสตริงว่างเป็น '' ให้ shell ปลายทางเห็นเป็น argument จริง</span>
+REMOTE_ARGS=<span class="s">""</span>
+<span class="k">for</span> arg <span class="k">in</span> <span class="s">"$REMOTE_DIR"</span> <span class="s">"$BRANCH"</span> <span class="s">"$NODE_VERSION"</span> ...; <span class="k">do</span>
+  REMOTE_ARGS=<span class="s">"${REMOTE_ARGS} $(printf '%q' "$arg")"</span>
+<span class="k">done</span>
+ssh -T <span class="s">"$REMOTE_HOST"</span> <span class="s">"bash -s --${REMOTE_ARGS}"</span> &lt;&lt;<span class="s">'REMOTE_SCRIPT'</span></pre>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <b>บทเรียน:</b> เวอร์ชันเดิมของ script ส่งแค่ 2 argument และอ่านด้วย
+              <span class="mono text-[12px]">${2:-}</span> — บั๊กนี้<b>มีอยู่แล้วแต่ถูกกลบ</b> เพราะ default value
+              ดูดซับความผิดพลาดพอดี พอเพิ่มเป็น 8 argument มันจึงโผล่ ทดสอบยืนยันด้วยการ echo
+              <span class="mono text-[12px]">$#</span> กลับมาจาก server จริงว่าได้ครบ 8 และ
+              <span class="mono text-[12px]">$2</span> เป็นค่าว่างจริง
+            </p>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">8</span>
+              <h3 class="font-semibold text-[15px]">nx lint ไม่เคยเขียว เพราะ lint ไฟล์ที่ generate ขึ้นมาเอง</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> ใส่ <span class="mono text-[12px]">nx run-many -t lint --all</span> เป็น gate ใน deploy แล้ว
+              deploy ไม่ผ่านสักครั้ง — 12 project fail ด้วย
+              <span class="mono text-[12px]">Parsing error: ... was not found by the project service</span>
+              รวมถึงไฟล์ที่ไม่ควรถูก lint เลย เช่น <span class="mono text-[12px]">apps/iam/dist/public/**/bundle.js</span>
+              (build output ของ esbuild) และไฟล์ใน git submodule
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> <span class="mono text-[12px]">@nx/eslint/plugin</span> รัน
+              <span class="mono text-[12px]">eslint .</span> ต่อ project คือลาก <b>ทุก</b> <span class="mono text-[12px]">.js/.mjs</span>
+              เข้ามาด้วย ขณะที่ <span class="mono text-[12px]">npm run lint</span> ของ repo glob แค่
+              <span class="mono text-[12px]">{apps,libs}/**/*.ts</span> จึงไม่เคยเห็นไฟล์เหล่านั้น พอเจอ
+              <span class="mono text-[12px]">projectService: true</span> แล้วไฟล์ไม่ได้อยู่ใน tsconfig ก็ parse ไม่ได้
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>แก้:</b> เพิ่ม <span class="mono text-[12px]">ignores</span> สำหรับ
+              <span class="mono text-[12px]">**/dist/**</span>, <span class="mono text-[12px]">coverage/</span>,
+              <span class="mono text-[12px]">.nx/</span>, <span class="mono text-[12px]">docs/</span> (submodule) แล้ว lint
+              ไฟล์ JS แบบไม่ใช้ type information ด้วย <span class="mono text-[12px]">disableTypeChecked</span>
+            </p>
+            <div class="rulebox">
+              <div class="rc mb-1">ลำดับใน flat config เป็นเรื่องเป็นตาย</div>
+              <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+                บล็อก <span class="mono text-[12px]">disableTypeChecked</span> ต้องอยู่<b>หลัง</b>บล็อก
+                <span class="mono text-[12px]">rules</span> ที่ไม่มี <span class="mono text-[12px]">files</span> —
+                เพราะบล็อกนั้นมีผลกับทุกไฟล์ จึงเปิด type-checked rules กลับมาให้ <span class="mono text-[12px]">.js</span> อีก
+                ผลลัพธ์ไม่ใช่ lint error ธรรมดา แต่เป็น eslint <b>crash ทั้งตัว</b> ด้วย
+                <span class="mono text-[12px]">Error while loading rule '@typescript-eslint/no-floating-promises'</span>
+              </p>
+            </div>
           </div>
         </div>
       </section>
