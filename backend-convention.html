@@ -32,6 +32,7 @@
       <a href="#response"   class="navlink"><span class="n">05</span> Response · JSON:API</a>
       <a href="#errors"     class="navlink"><span class="n">06</span> Error Handling</a>
       <a href="#query"      class="navlink"><span class="n">07</span> Query Params</a>
+      <a href="#microservice" class="navlink"><span class="n">08</span> Microservice Calls</a>
     </nav>
     <div slot="footnote">
       <a href="i18n-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ i18n Guide (TH/EN)</a><br>
@@ -400,10 +401,94 @@ findAll(<span class="d">@ValidatedQuery</span>(<span class="t">QueryParamsDTO</s
         </div>
       </section>
 
+      <!-- ========== 08 MICROSERVICE CALLS ========== -->
+      <section id="microservice" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Microservice Calls (RMQ/TCP)</div>
+        <h2 class="display text-3xl mb-6">การเรียกข้าม BC · RMQ/TCP</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          <span class="mono text-[13px] text-[var(--signal)]">MicroserviceClientService.sendWithContext()</span> คือทางเดียวที่ถูกต้องในการเรียก BC อื่น —
+          <b>ไม่ throw เอง</b>: คืน <span class="mono text-[13px]">defaultValue</span>/<span class="mono text-[13px]">null</span> เมื่อฝั่งรับ<b>ไม่ตอบสนอง</b>จริง ๆ (connection/timeout)
+          แต่ <b>throw HttpException ที่ถูกต้อง</b> เมื่อฝั่งรับตอบกลับมาเป็น business error (400/404/409 ฯลฯ) — ผู้เรียกตัดสินใจต่อจากตรงนั้น
+          (เช่น <span class="mono text-[13px]">if (!x) throw new NotFoundException(...)</span> เฉพาะกรณี "หาไม่เจอจริง ๆ" ไม่ใช่กรณี "BC อื่นตอบ 404 มาแล้ว")
+        </p>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">HANDLER · @UseInterceptors(RmqAckInterceptor) บังคับ</div><p class="text-[13.5px]">ทุก controller ที่มี <span class="mono text-[12px]">@MessagePattern</span>/<span class="mono text-[12px]">@EventPattern</span> ต้องมี <span class="mono text-[12px]">RmqAckInterceptor</span> — server รัน <span class="mono text-[12px]">noAck: false</span> + <span class="mono text-[12px]">prefetchCount: 1</span> และ NestJS <b>ไม่ ack ให้เองตอนสำเร็จ</b> ถ้าลืม queue จะ head-of-line block ถาวร (อาการ: caller timeout 15s ทุกตัว โดยไม่มี error log ใด ๆ, restart service ก็ไม่ช่วย) ดู pattern ที่ <span class="mono text-[12px]">SupplierEventsController</span>/<span class="mono text-[12px]">ProductEventsController</span></p></div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">⚠️ Gotcha · Global filter/interceptor ไม่ไปถึง microservice instance</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
+          <span class="mono text-[13px]">app.connectMicroservice()</span> (ใน <span class="mono text-[13px]">bootstrap.util.ts</span>) เรียกแบบ<b>ไม่ใส่ <span class="mono text-[13px]">{ inheritAppConfig: true }</span> โดยตั้งใจ</b>
+          (ใส่แล้วจะลาก <span class="mono text-[13px]">AuthGuard</span>/<span class="mono text-[13px]">ValidationPipe</span> ของ HTTP มาด้วย แล้วเริ่ม reject internal service-to-service call ที่ไม่มี JWT แนบมา)
+          ผลข้างเคียงที่ไม่มีใครตั้งใจ: <span class="mono text-[13px]">app.useGlobalFilters(...)</span> / <span class="mono text-[13px]">app.useGlobalInterceptors(...)</span> /
+          <span class="mono text-[13px]">APP_FILTER</span>/<span class="mono text-[13px]">APP_GUARD</span>/<span class="mono text-[13px]">APP_INTERCEPTOR</span> — ที่ผูกกับ <span class="mono text-[13px]">ApplicationConfig</span> ของ HTTP app เท่านั้น —
+          <b>ไม่เคยถูกคัดลอกไปยัง microservice instance เลย</b> ต้องผูกตรงเข้า <span class="mono text-[13px]">microserviceInstance</span> เองใน <span class="mono text-[13px]">setupMicroservice()</span> เสมอ
+        </p>
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--signal)">❌ Bug ที่เจอจริง (2026-08) — RpcExceptionsFilter ไม่เคยทำงาน</div>
+            <div class="code p-4">
+<pre><span class="k">const</span> microserviceInstance =
+  app.connectMicroservice(options);
+microserviceInstance.useGlobalInterceptors(
+  <span class="k">new</span> <span class="t">OtelRpcContextInterceptor</span>(),
+);
+<span class="k">await</span> app.startAllMicroservices();
+
+<span class="c">// RpcExceptionsFilter ผูกไว้เฉพาะที่ app (HTTP)</span>
+<span class="c">// → ทุก exception ใน @MessagePattern</span>
+<span class="c">// → ตกไปที่ default ของ Nest:</span>
+<span class="c">// {"status":"error","message":</span>
+<span class="c">//   "Internal server error"}</span>
+<span class="c">// แม้จะแค่ throw NotFoundException</span>
+<span class="c">// ธรรมดา ๆ ก็ตาม</span></pre>
+            </div>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--accent)">✅ แก้แล้ว — ผูก filter ตรงเข้า microservice instance</div>
+            <div class="code p-4">
+<pre><span class="k">const</span> microserviceInstance =
+  app.connectMicroservice(options);
+microserviceInstance.useGlobalInterceptors(
+  <span class="k">new</span> <span class="t">OtelRpcContextInterceptor</span>(),
+);
+<span class="d">microserviceInstance.useGlobalFilters(
+  new</span> <span class="t">RpcExceptionsFilter</span>(),
+);
+<span class="k">await</span> app.startAllMicroservices();
+
+<span class="c">// ตอนนี้ NotFoundException/BadRequest</span>
+<span class="c">// ฯลฯ ที่โยนใน @MessagePattern จะถูก</span>
+<span class="c">// format เป็น IRpcErrorPayload จริง</span></pre>
+            </div>
+          </div>
+        </div>
+        <div class="rulebox ok mb-6"><div class="rc mb-1">แหล่งอ้างอิง</div><p class="text-[13.5px]">ดู <span class="mono text-[12px]">OtelRpcContextInterceptor</span>'s docblock (มีคำอธิบายกลไกนี้อยู่ก่อนแล้วสำหรับ interceptor) และ <span class="mono text-[12px]">setupMicroservice()</span> ใน <span class="mono text-[12px]">libs/common/src/utils/bootstrap.util.ts</span> — จุดเดียวที่ทุก BC ต้องแก้ถ้าจะเพิ่ม global filter/interceptor ใหม่สำหรับ RPC</p></div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">⚠️ Gotcha ที่ 2 · error จาก RPC ถูกห่อไว้อีกชั้นบน wire</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
+          แม้ <span class="mono text-[13px]">RpcExceptionsFilter</span> จะ format <span class="mono text-[13px]">IRpcErrorPayload</span> ถูกต้องแล้ว (gotcha ด้านบน) —
+          <span class="mono text-[13px]">@nestjs/microservices</span> client ฝั่งผู้เรียกจะ deserialize response ที่ error เป็น
+          <span class="mono text-[13px]">{ message: 'Rpc Exception', error: &lt;payload จริง&gt; }</span> เสมอ ไม่ใช่ payload เปล่า ๆ ที่ top level —
+          ถ้า shape-check ไม่ unwrap ชั้นนี้ก่อน จะตกไปที่ fallback "service unavailable" เสมอ (คืน <span class="mono text-[13px]">null</span>) แม้ปลายทางจะตอบ 404/400 กลับมาถูกต้องแล้วก็ตาม —
+          <b>แยกไม่ออกระหว่าง "หาไม่เจอจริง" กับ "BC ปลายทางล่ม"</b>
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>รูปแบบ (บน wire)</th><th>ที่มา</th><th>ต้องเช็คก่อนไหม</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">{ status:{code,message}, errors:[...], meta:{...} }</span></td><td>payload เปล่า (บาง path เก่า)</td><td>ตรงอยู่แล้ว</td></tr>
+              <tr><td><span class="mono text-[12px]">{ message:'Rpc Exception', error:{status,errors,meta} }</span></td><td><b>ค่าจริงจาก RMQ/TCP client เสมอ</b></td><td><b>ต้อง unwrap <span class="mono text-[12px]">.error</span> ก่อน</b></td></tr>
+              <tr><td><span class="mono text-[12px]">{ status_code, message }</span></td><td>legacy format</td><td>ตรงอยู่แล้ว (คนละ helper)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">MicroserviceClientService · unwrapRpcError()</div><p class="text-[13.5px]"><span class="mono text-[12px]">sendWithContext</span>'s catch block เรียก <span class="mono text-[12px]">unwrapRpcError(error)</span> ก่อนเช็ค <span class="mono text-[12px]">isRpcErrorPayload</span>/<span class="mono text-[12px]">isRpcErrorResponse</span> เสมอ — unwrap เฉพาะ shape <span class="mono text-[12px]">{error: X}</span> ที่ <span class="mono text-[12px]">X</span> ตรงกับ payload จริงเท่านั้น (object อื่นที่บังเอิญมี key ชื่อ <span class="mono text-[12px]">error</span> เช่น driver error ดิบ จะไม่ถูก unwrap ผิด ๆ)</p></div>
+        <p class="text-[12.5px] mb-2" style="color:var(--muted)">ทั้งสอง gotcha นี้กระทบทุก cross-BC lookup ในระบบเท่ากัน (ไม่ใช่แค่ endpoint ใดหนึ่ง) — ก่อนหน้านี้ <span class="mono text-[13px]">assertValidSupplier</span>/<span class="mono text-[13px]">assertValidProductLine</span> ทุกจุดจะรายงาน "service unavailable" แทน "not found" เสมอเมื่อ reference ไม่มีอยู่จริง หลังแก้ทั้งสองจุด (2026-08) พฤติกรรมถูกต้องทั่วทั้งแพลตฟอร์ม — ตรวจสอบด้วยการยิง RMQ ตรง ๆ ไปยัง handler ก่อน/หลังแก้ ดูตัวอย่างการ probe ใน commit message ของ M1 (Purchase Order)</p>
+      </section>
+
       <!-- FOOTER -->
       <erp-footer
         line1="ERP SYSTEM · BACKEND CONVENTIONS · NESTJS 11 · POSTGRESQL"
-        line2="Naming · JSON:API · Error Handling · Query Params">
+        line2="Naming · JSON:API · Error Handling · Query Params · Microservice Calls">
       </erp-footer>
 
     </div>

@@ -40,6 +40,7 @@
       <div class="navsub">3 · Data Flow &amp; Events</div>
       <div class="navsub">4 · ER Diagram</div>
       <div class="navsub">5 · Dev Guide</div>
+      <div class="navsub">6 · M1 Status &amp; Testing</div>
     </nav>
     <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
   </erp-sidebar>
@@ -113,6 +114,7 @@
             <div class="edge"><div class="tag mb-1">Quotation หมดอายุ</div><p class="text-[13px]">หาก <span class="mono text-[12px]">valid_until</span> ผ่านไปแล้ว ห้ามแปลงเป็น SO ต้องต่ออายุหรือออกใบใหม่</p></div>
             <div class="edge"><div class="tag mb-1">ราคาพิเศษ</div><p class="text-[13px]">รองรับราคาพิเศษ 1/2/3 ตามช่วงวันที่ (เริ่ม–ถึง) — ระบบเลือกราคาที่มีผลอัตโนมัติ</p></div>
             <div class="edge"><div class="tag mb-1">รับของไม่ครบ PO</div><p class="text-[13px]">รับได้บางส่วน → PO สถานะ PARTIAL รอรับส่วนที่เหลือ ไม่ปิด PO อัตโนมัติ</p></div>
+            <div class="edge"><div class="tag mb-1">ยกเลิก PO หลังรับของแล้ว</div><p class="text-[13px]">ยกเลิกได้จาก <span class="mono text-[12px]">DRAFT/APPROVED/SENT/PARTIAL</span> เท่านั้น และ <b>บล็อกทันที</b>ถ้ามีรายการใดถูกรับเข้าไปแล้ว (<span class="mono text-[12px]">received_qty &gt; 0</span>) — PO ที่ถูกรับไปบางส่วนต้องปิดผ่านการคืนสินค้า (Purchase Return, inventory-bc) ไม่ใช่ยกเลิก PO ตรงๆ · <span class="mono text-[12px]">RECEIVED</span> ยกเลิกไม่ได้เลย (ไม่มีอะไรเหลือให้ยกเลิก)</p></div>
           </div>
         </div>
 
@@ -131,6 +133,7 @@
                 <span class="evt evt-emit">delivery.confirmed</span>
                 <span class="evt evt-emit">po.approved</span>
                 <span class="evt evt-emit">po.received</span>
+                <span class="evt evt-emit">po.cancelled</span>
               </div>
             </div>
             <div class="card p-5">
@@ -148,6 +151,8 @@
                 <tr><td>delivery.confirmed</td><td>sales-bc</td><td>inventory-bc (ตัดสต็อก) · finance-bc (ตั้งใบกำกับ)</td></tr>
                 <tr><td>so.confirmed</td><td>sales-bc</td><td>finance-bc · report-bc</td></tr>
                 <tr><td>po.received</td><td>supplier-bc</td><td>inventory-bc (สร้างล็อต)</td></tr>
+                <tr><td>po.approved</td><td>supplier-bc</td><td>— (ยังไม่มีผู้ฟังใน Phase 3/4 · เตรียมไว้สำหรับ report-bc/notification ในอนาคต)</td></tr>
+                <tr><td>po.cancelled</td><td>supplier-bc</td><td>— (ยังไม่มีผู้ฟังใน Phase 3/4)</td></tr>
               </tbody>
             </table>
           </div>
@@ -169,13 +174,21 @@ erDiagram
         uuid id PK
         uuid supplier_id FK
         string po_number
-        string status "DRAFT_APPROVED_SENT_RECEIVED"
+        string status "DRAFT_APPROVED_SENT_PARTIAL_RECEIVED_CANCELLED"
         date expected_date
         decimal total
+        uuid approved_by "ref iam"
+        timestamp approved_at
+        uuid sent_by "ref iam"
+        timestamp sent_at
+        uuid cancelled_by "ref iam"
+        timestamp cancelled_at
+        string cancel_reason
     }
     PURCHASE_ORDER_ITEMS {
         uuid id PK
         uuid po_id FK
+        int received_qty "bumped by goods_receipt.submitted"
         uuid product_id "ref inventory-bc"
         int qty
         decimal unit_cost
@@ -287,6 +300,77 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · TAX PER LINE</div><p class="text-[13.5px]">คำนวณภาษี <b>รายบรรทัด</b> (per-line) ตาม item tax template แล้วค่อย aggregate หัวเอกสาร — รองรับหลายอัตรา/ยกเว้นภาษีในใบเดียว · เก็บ item-wise tax detail ไว้ตรวจสอบ</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · BUNDLE = PACKED ITEM</div><p class="text-[13.5px]">เมื่อขายสินค้า bundle ให้ <b>explode เป็น packed_items</b> เก็บ denormalized บนเอกสาร (SO/Delivery) เพื่อส่งให้ inventory ตัดสต็อกรายสินค้าย่อย และคง traceability</p></div>
           </div>
+        </div>
+
+        <!-- 4.6 M1 Status & Testing -->
+        <div class="mb-12" id="p4-m1">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">06</span><h3 class="text-xl font-semibold">Implementation Status &amp; Testing Guide · M1 (Purchase Order)</h3></div>
+
+          <div class="card p-6 mb-8" style="border-left:3px solid var(--blue)">
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1 (2026-08)</b> implement เต็มรูปแบบใน <b style="color:var(--ink)">supplier-bc</b>: <span class="mono text-[12px]">PurchaseOrder</span>/<span class="mono text-[12px]">PurchaseOrderItem</span> + state machine 6 สถานะ, การออกเลขที่ <span class="mono text-[12px]">PO-{YYYY}-{00001}</span> แบบ concurrency-safe, TCP validation ข้าม BC ไปยัง inventory-bc (<span class="mono text-[12px]">getProductById</span>), permission <span class="mono text-[12px]">purchase_order:*</span> 6 ตัว · ทดสอบผ่านทั้ง unit test (mock) และ end-to-end จริงผ่าน HTTP + RabbitMQ กับฐานข้อมูล dev — ดู state machine เต็มที่หัวข้อ 02 และ ER diagram ที่หัวข้อ 04 ด้านบน · ยังไม่ implement: Goods Receipt (M2, inventory-bc), Stock Adjustment (M3), Purchase Return (M4)</p>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[15px]">User Journey · เส้นทางผู้ใช้งาน</h4>
+          <div class="diagram mb-8">
+<pre class="mermaid">
+journey
+    title ใบสั่งซื้อ (Purchase Order) — จากสร้างจนถึงรับสินค้า
+    section สร้างใบสั่งซื้อ (M1 — implement แล้ว)
+      เข้าสู่ระบบ: 5: เจ้าหน้าที่จัดซื้อ
+      เลือกผู้จัดซื้อ + เพิ่มรายการสินค้า: 4: เจ้าหน้าที่จัดซื้อ
+      บันทึกร่าง DRAFT: 5: เจ้าหน้าที่จัดซื้อ
+      แก้ไขร่างก่อนอนุมัติ: 4: เจ้าหน้าที่จัดซื้อ
+    section อนุมัติ (M1 — implement แล้ว)
+      ตรวจสอบรายการ/ยอดรวม: 4: ผู้จัดการจัดซื้อ
+      กดอนุมัติ APPROVED: 5: ผู้จัดการจัดซื้อ
+    section ส่งให้ผู้จัดซื้อ (M1 — implement แล้ว)
+      ส่ง PO ให้ผู้จัดซื้อ SENT: 5: เจ้าหน้าที่จัดซื้อ
+      ระบบเตรียม emit po.approved: 3: ระบบ
+    section รับสินค้าเข้าคลัง (M2 — แผนถัดไป)
+      บันทึกรับสินค้า Goods Receipt: 3: เจ้าหน้าที่คลัง
+      ระบบอัปเดต received_qty จาก goods_receipt.submitted: 3: ระบบ
+      สถานะ PO เปลี่ยนเป็น PARTIAL หรือ RECEIVED อัตโนมัติ: 3: ระบบ
+    section เส้นทางทางเลือก — ยกเลิก (M1 — implement แล้ว)
+      ยกเลิกก่อนได้รับสินค้า พร้อมเหตุผล: 2: เจ้าหน้าที่จัดซื้อ
+      ระบบบล็อกถ้ามีของรับเข้าไปแล้ว: 1: ระบบ
+</pre>
+          </div>
+          <p class="text-[12.5px] mt-2 mb-8" style="color:var(--muted)">คะแนน (1-5) สะท้อนความ "ราบรื่น" ของแต่ละขั้นจากมุมผู้ใช้ ไม่ใช่ความสำคัญ — ขั้น "ระบบบล็อก" ได้คะแนนต่ำเพราะเป็น dead-end ที่ตั้งใจ (ต้องไปทำ Purchase Return แทน ไม่ใช่ bug)</p>
+
+          <h4 class="font-semibold mb-3 text-[15px]">วิธีทดสอบ · Testing Guide (manual, ผ่าน HTTP จริง)</h4>
+          <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)">ใช้ทดสอบกับ dev environment ที่รัน <span class="mono text-[12px]">pnpm run start:dev:all</span> แล้ว (ทุก BC ต้องขึ้นพร้อมกันเพราะ PO เรียก TCP ข้าม BC ไปยัง inventory-bc จริง)</p>
+
+          <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>Login</b> — ขอ JWT จาก auth-bc ด้วย mock user (<span class="mono text-[12px]">superadmin</span> / <span class="mono text-[12px]">ErpSuper26</span> — ต่างจาก bootstrap <span class="mono text-[12px]">admin</span>/<span class="mono text-[12px]">Admin@12345</span> ที่มาจากคนละ migration)</p></div>
+          <div class="code p-4 mb-4">
+<pre>curl -X POST http://localhost:3001/auth/v1/auth/login \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"username":"superadmin","password":"ErpSuper26"}'</span>
+<span class="c"># -> { "access_token": "...", "refresh_token": "...", ... }</span></pre>
+          </div>
+
+          <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>Permission ต้อง grant ก่อนถึงจะใช้ได้</b> — <span class="mono text-[12px]">permissions:sync</span> เติมแค่ catalog ไม่ได้ grant ให้ policy ใด ๆ (ตามดีไซน์) ต้องมี migration แบบ <span class="mono text-[12px]">GrantPurchaseOrderPermissionsToMockPolicies</span> ให้ <span class="mono text-[12px]">POL_SUPERADMIN_FULL_ACCESS</span>/<span class="mono text-[12px]">POL_STAFF_GENERAL_ACCESS</span> ก่อน — ไม่งั้นจะได้ <span class="mono text-[12px]">403 Missing required permission</span> · login ใหม่หลัง grant เพื่อให้ JWT พก permission ล่าสุด (permission ถูกฝังไว้ใน token ตอน login ไม่ re-evaluate ทุก request)</p></div>
+
+          <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>สร้าง PO (happy path)</b> — <span class="mono text-[12px]">product_id</span> ต้องเป็นสินค้าจริงจาก inventory-bc ที่ <span class="mono text-[12px]">has_variants=false</span> และ <span class="mono text-[12px]">type=single</span> (เช็คได้จาก <span class="mono text-[12px]">GET /inventory-bc/v1/products</span>)</p></div>
+          <div class="code p-4 mb-4">
+<pre>TOKEN=<span class="s">"&lt;access_token จาก step 1&gt;"</span>
+
+curl -X POST http://localhost:3004/supplier-bc/v1/procurement/purchase-orders \
+  -H <span class="s">"Authorization: Bearer $TOKEN"</span> -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{
+    "supplier_id": "&lt;uuid จาก GET .../suppliers&gt;",
+    "expected_date": null, "remark_th": null, "remark_en": null,
+    "items": [{ "product_id": "&lt;uuid สินค้า&gt;", "qty": 10, "unit_cost": 5.5 }]
+  }'</span>
+<span class="c"># -> 201, status=DRAFT, po_number="PO-2026-00001", total=55</span></pre>
+          </div>
+
+          <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>เดินตาม state machine</b> — <span class="mono text-[12px]">POST .../{id}/approve</span> → <span class="mono text-[12px]">POST .../{id}/send</span> → <span class="mono text-[12px]">POST .../{id}/cancel</span> (body <span class="mono text-[12px]">{"cancel_reason":"..."}</span>) แต่ละ transition ที่ผิดกฎ (เช่น approve ซ้ำ, cancel ที่ RECEIVED) ต้องได้ <span class="mono text-[12px]">409</span> พร้อมข้อความบอกสถานะปัจจุบัน/ปลายทางที่พยายามไป</p></div>
+
+          <div class="step"><span class="sn">5</span><p class="text-[13.5px]"><b>Edge case ที่ต้องทดสอบครบ</b> — product ที่ <span class="mono text-[12px]">has_variants=true</span> → 400 · product ซ้ำกันสองบรรทัด → 400 · supplier ไม่มีจริง/<span class="mono text-[12px]">is_active=false</span> → 400 · product ไม่มีจริง (uuid สุ่ม) → <b>400</b> "not found" (ไม่ใช่ 503 — ถ้าเจอ 503 แปลว่า platform fix ใน backend-convention.html §08 ยังไม่ได้ deploy) · PO id ไม่มีจริง → 404 · UUID param ผิดรูปแบบ → 400002 · update/delete PO ที่ไม่ใช่ DRAFT → 409</p></div>
+
+          <div class="step"><span class="sn">6</span><p class="text-[13.5px]"><b>เก็บกวาดข้อมูลทดสอบ</b> — ลบแถวที่สร้างออกจาก <span class="mono text-[12px]">purchase_order_items</span>/<span class="mono text-[12px]">purchase_orders</span> แล้ว reset <span class="mono text-[12px]">purchase_order_number_counters.last_number</span> กลับตามจำนวน PO ที่เหลือจริงในปีนั้น ๆ — ไม่งั้นเลขที่ PO ถัดไปจะกระโดดข้ามช่วงที่ลบทิ้ง (ไม่ผิด แค่ไม่สวย)</p></div>
+
+          <div class="rulebox ok mt-6"><div class="rc mb-1">Automated coverage</div><p class="text-[13.5px]">unit test ครอบคลุม state machine ทุก transition + guard (<span class="mono text-[12px]">apps/supplier-bc/test/unit/purchase-order/</span>), การ unwrap RPC error 2 ชั้น (<span class="mono text-[12px]">libs/common/src/services/microservice-client.service.spec.ts</span>) — รัน <span class="mono text-[12px]">pnpm nx run supplier-bc:test</span> / <span class="mono text-[12px]">pnpm nx run inventory-bc:test</span> ก่อน commit เสมอ</p></div>
         </div>
       </section>
 
