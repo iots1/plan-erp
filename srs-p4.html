@@ -40,7 +40,7 @@
       <div class="navsub">3 · Data Flow &amp; Events</div>
       <div class="navsub">4 · ER Diagram</div>
       <div class="navsub">5 · Dev Guide</div>
-      <div class="navsub">6 · M1 Status &amp; Testing</div>
+      <div class="navsub">6 · Status &amp; Testing</div>
     </nav>
     <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
   </erp-sidebar>
@@ -166,9 +166,11 @@
 erDiagram
     SUPPLIERS {
         uuid id PK
-        jsonb name "i18n th_en"
+        string code
+        string name_th
+        string name_en
         string tax_id
-        string phone
+        string contact_phone
     }
     PURCHASE_ORDERS {
         uuid id PK
@@ -199,27 +201,57 @@ erDiagram
         string status
         timestamp arrived_at
     }
+    CUSTOMER_GROUPS {
+        uuid id PK
+        string name_th
+        string name_en
+        bool is_active
+    }
     CUSTOMERS {
         uuid id PK
-        jsonb name "i18n th_en"
-        string province
+        string code
+        string name_th
+        string name_en
         string tax_id
+        bool is_vat_registered
+        string customer_type "company_individual"
+        uuid customer_group_id FK
+        string province
+        int credit_terms
+        decimal credit_limit "0_eq_cash_only"
+        uuid default_price_list_id "ref inventory-bc"
+        bool is_active
     }
     QUOTATIONS {
         uuid id PK
         uuid customer_id FK
-        string status "DRAFT_SENT_APPROVED_EXPIRED"
+        string quotation_number "QT_YYYY_00001"
+        string status "DRAFT_SENT_APPROVED_EXPIRED_CANCELLED"
         date valid_until
-        decimal total
+        uuid price_list_id "ref inventory-bc"
+        bool is_tax_inclusive "snapshot from price_list"
+        decimal total "before tax"
+        uuid sent_by "ref iam"
+        timestamp sent_at
+        uuid approved_by "ref iam"
+        timestamp approved_at
+        timestamp expired_at
+        uuid cancelled_by "ref iam"
+        timestamp cancelled_at
+        string cancel_reason
     }
     QUOTATION_ITEMS {
         uuid id PK
         uuid quotation_id FK
         uuid product_id "ref inventory-bc"
-        string name_snapshot
+        string product_sku_snapshot
+        string product_name_snapshot_th
+        string product_name_snapshot_en
         int qty
         decimal unit_price
+        string discount_type "percent_amount"
         decimal discount
+        decimal line_total
     }
     SALES_ORDERS {
         uuid id PK
@@ -272,6 +304,7 @@ erDiagram
     SUPPLIERS ||--o{ PURCHASE_ORDERS : receives
     PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ITEMS : contains
     PURCHASE_ORDERS ||--o{ INBOUND_SHIPMENTS : ships
+    CUSTOMER_GROUPS ||--o{ CUSTOMERS : groups
     CUSTOMERS ||--o{ QUOTATIONS : requests
     QUOTATIONS ||--o{ QUOTATION_ITEMS : contains
     QUOTATIONS ||--o| SALES_ORDERS : "converts to"
@@ -304,38 +337,77 @@ erDiagram
 
         <!-- 4.6 M1 Status & Testing -->
         <div class="mb-12" id="p4-m1">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">06</span><h3 class="text-xl font-semibold">Implementation Status &amp; Testing Guide · M1 (Purchase Order)</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">06</span><h3 class="text-xl font-semibold">Implementation Status &amp; Testing Guide · ฝั่งซื้อ M1 · ฝั่งขาย M1–M2</h3></div>
 
           <div class="card p-6 mb-8" style="border-left:3px solid var(--blue)">
             <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1 (2026-08)</b> implement เต็มรูปแบบใน <b style="color:var(--ink)">supplier-bc</b>: <span class="mono text-[12px]">PurchaseOrder</span>/<span class="mono text-[12px]">PurchaseOrderItem</span> + state machine 6 สถานะ, การออกเลขที่ <span class="mono text-[12px]">PO-{YYYY}-{00001}</span> แบบ concurrency-safe, TCP validation ข้าม BC ไปยัง inventory-bc (<span class="mono text-[12px]">getProductById</span>), permission <span class="mono text-[12px]">purchase_order:*</span> 6 ตัว · ทดสอบผ่านทั้ง unit test (mock) และ end-to-end จริงผ่าน HTTP + RabbitMQ กับฐานข้อมูล dev — ดู state machine เต็มที่หัวข้อ 02 และ ER diagram ที่หัวข้อ 04 ด้านบน · ยังไม่ implement: Goods Receipt (M2, inventory-bc), Stock Adjustment (M3), Purchase Return (M4)</p>
           </div>
 
-          <h4 class="font-semibold mb-3 text-[15px]">User Journey · เส้นทางผู้ใช้งาน</h4>
+          <h4 class="font-semibold mb-3 text-[15px]">Sequence Diagram · เส้นทางผู้ใช้งาน (PO lifecycle)</h4>
           <div class="diagram mb-8">
 <pre class="mermaid">
-journey
-    title ใบสั่งซื้อ (Purchase Order) — จากสร้างจนถึงรับสินค้า
-    section สร้างใบสั่งซื้อ (M1 — implement แล้ว)
-      เข้าสู่ระบบ: 5: เจ้าหน้าที่จัดซื้อ
-      เลือกผู้จัดซื้อ + เพิ่มรายการสินค้า: 4: เจ้าหน้าที่จัดซื้อ
-      บันทึกร่าง DRAFT: 5: เจ้าหน้าที่จัดซื้อ
-      แก้ไขร่างก่อนอนุมัติ: 4: เจ้าหน้าที่จัดซื้อ
-    section อนุมัติ (M1 — implement แล้ว)
-      ตรวจสอบรายการ/ยอดรวม: 4: ผู้จัดการจัดซื้อ
-      กดอนุมัติ APPROVED: 5: ผู้จัดการจัดซื้อ
-    section ส่งให้ผู้จัดซื้อ (M1 — implement แล้ว)
-      ส่ง PO ให้ผู้จัดซื้อ SENT: 5: เจ้าหน้าที่จัดซื้อ
-      ระบบเตรียม emit po.approved: 3: ระบบ
-    section รับสินค้าเข้าคลัง (M2 — แผนถัดไป)
-      บันทึกรับสินค้า Goods Receipt: 3: เจ้าหน้าที่คลัง
-      ระบบอัปเดต received_qty จาก goods_receipt.submitted: 3: ระบบ
-      สถานะ PO เปลี่ยนเป็น PARTIAL หรือ RECEIVED อัตโนมัติ: 3: ระบบ
-    section เส้นทางทางเลือก — ยกเลิก (M1 — implement แล้ว)
-      ยกเลิกก่อนได้รับสินค้า พร้อมเหตุผล: 2: เจ้าหน้าที่จัดซื้อ
-      ระบบบล็อกถ้ามีของรับเข้าไปแล้ว: 1: ระบบ
+sequenceDiagram
+    autonumber
+    actor PUR as เจ้าหน้าที่จัดซื้อ
+    actor MGR as ผู้จัดการจัดซื้อ
+    actor WH as เจ้าหน้าที่คลัง
+    participant SUP as supplier-bc · PurchaseOrdersService
+    participant DB as erp_supplier (Postgres)
+    participant INV as inventory-bc
+
+    Note over PUR,INV: M1 · สร้างใบสั่งซื้อ — implement แล้ว
+    PUR->>SUP: POST /procurement/purchase-orders (supplier_id, items[])
+    SUP->>DB: อ่าน supplier — ต้องมีจริง + is_active=true
+    DB-->>SUP: supplier
+    loop ทุก product_id ที่ไม่ซ้ำ (ยิงขนานกัน ไม่ทีละบรรทัด)
+        SUP->>INV: getProductById (RPC sync)
+        INV-->>SUP: has_variants / type=single|bundle
+    end
+    Note over SUP,INV: has_variants=true หรือ type=bundle → 400 · product ไม่มีจริง → 400 · inventory-bc ล่ม → 503
+    SUP->>DB: BEGIN · ออกเลขที่ PO-{YYYY}-{00001} (FOR UPDATE บน counter ของปีนั้น)
+    SUP->>DB: INSERT purchase_orders + purchase_order_items · COMMIT
+    SUP-->>PUR: 201 · status=DRAFT · total คำนวณจากรายการ
+
+    opt แก้ไขร่างก่อนอนุมัติ (ได้เฉพาะ DRAFT)
+        PUR->>SUP: PUT /procurement/purchase-orders/{id}
+        SUP->>DB: SELECT ... FOR UPDATE — ไม่ใช่ DRAFT → 409
+        SUP->>DB: ลบรายการเดิม เขียนรายการใหม่ + total
+        SUP-->>PUR: 200 · สถานะคงเป็น DRAFT
+    end
+
+    Note over MGR,DB: M1 · อนุมัติ — implement แล้ว
+    MGR->>SUP: POST /procurement/purchase-orders/{id}/approve
+    SUP->>DB: FOR UPDATE header + ตรวจ transition DRAFT → APPROVED
+    SUP->>DB: UPDATE status, approved_by, approved_at
+    SUP-->>MGR: 200 · APPROVED (approve ซ้ำ → 409)
+
+    Note over PUR,INV: M1 · ส่งให้ผู้จัดซื้อ — implement แล้ว
+    PUR->>SUP: POST /procurement/purchase-orders/{id}/send
+    SUP->>DB: FOR UPDATE header + ตรวจ transition APPROVED → SENT
+    SUP->>DB: UPDATE status, sent_by, sent_at
+    Note over SUP,INV: po.approved · ยังไม่ emit จริง (ยังไม่มี subscriber) — ตอนนี้แค่ log ไว้
+    SUP-->>PUR: 200 · SENT
+
+    Note over WH,INV: M2 · รับสินค้าเข้าคลัง — แผนถัดไป · ยังไม่ implement
+    WH->>INV: บันทึกรับสินค้า Goods Receipt (อ้าง po_id)
+    INV->>SUP: getPurchaseOrderById (RPC) — อ่าน qty/received_qty ไปคิด over-receipt
+    SUP-->>INV: PO + items
+    INV-)SUP: goods_receipt.submitted (event · async · idempotent ต่อ receipt id)
+    SUP->>DB: bump received_qty รายบรรทัด
+    SUP->>DB: สรุปสถานะ → PARTIAL หรือ RECEIVED
+
+    Note over PUR,DB: เส้นทางทางเลือก · ยกเลิก (M1 — implement แล้ว)
+    PUR->>SUP: POST /procurement/purchase-orders/{id}/cancel { cancel_reason }
+    SUP->>DB: FOR UPDATE header แล้วจึงอ่าน items (locked read จอยน์ไม่ได้)
+    alt ทุกบรรทัด received_qty = 0
+        SUP->>DB: UPDATE status=CANCELLED, cancelled_by/at, cancel_reason
+        SUP-->>PUR: 200 · CANCELLED
+    else มีบรรทัดที่รับเข้าไปแล้ว
+        SUP-->>PUR: 409 · ต้องปิดด้วย Purchase Return (inventory-bc, M4) แทน
+    end
 </pre>
           </div>
-          <p class="text-[12.5px] mt-2 mb-8" style="color:var(--muted)">คะแนน (1-5) สะท้อนความ "ราบรื่น" ของแต่ละขั้นจากมุมผู้ใช้ ไม่ใช่ความสำคัญ — ขั้น "ระบบบล็อก" ได้คะแนนต่ำเพราะเป็น dead-end ที่ตั้งใจ (ต้องไปทำ Purchase Return แทน ไม่ใช่ bug)</p>
+          <p class="text-[12.5px] mt-2 mb-8" style="color:var(--muted)">เส้น <span class="mono text-[12px]">--&gt;&gt;</span> คือการตอบกลับแบบ sync · <span class="mono text-[12px]">-)</span> คือ event แบบ async (fire-and-forget) — ทุก transition เกิดขึ้นใน transaction ที่ล็อกแถว header ก่อน (<span class="mono text-[12px]">SELECT ... FOR UPDATE</span>) จึงตรวจสถานะ กัน double-click / concurrent request ทำให้ข้าม state machine</p>
 
           <h4 class="font-semibold mb-3 text-[15px]">วิธีทดสอบ · Testing Guide (manual, ผ่าน HTTP จริง)</h4>
           <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)">ใช้ทดสอบกับ dev environment ที่รัน <span class="mono text-[12px]">pnpm run start:dev:all</span> แล้ว (ทุก BC ต้องขึ้นพร้อมกันเพราะ PO เรียก TCP ข้าม BC ไปยัง inventory-bc จริง)</p>
@@ -371,6 +443,120 @@ curl -X POST http://localhost:3004/supplier-bc/v1/procurement/purchase-orders \
           <div class="step"><span class="sn">6</span><p class="text-[13.5px]"><b>เก็บกวาดข้อมูลทดสอบ</b> — ลบแถวที่สร้างออกจาก <span class="mono text-[12px]">purchase_order_items</span>/<span class="mono text-[12px]">purchase_orders</span> แล้ว reset <span class="mono text-[12px]">purchase_order_number_counters.last_number</span> กลับตามจำนวน PO ที่เหลือจริงในปีนั้น ๆ — ไม่งั้นเลขที่ PO ถัดไปจะกระโดดข้ามช่วงที่ลบทิ้ง (ไม่ผิด แค่ไม่สวย)</p></div>
 
           <div class="rulebox ok mt-6"><div class="rc mb-1">Automated coverage</div><p class="text-[13.5px]">unit test ครอบคลุม state machine ทุก transition + guard (<span class="mono text-[12px]">apps/supplier-bc/test/unit/purchase-order/</span>), การ unwrap RPC error 2 ชั้น (<span class="mono text-[12px]">libs/common/src/services/microservice-client.service.spec.ts</span>) — รัน <span class="mono text-[12px]">pnpm nx run supplier-bc:test</span> / <span class="mono text-[12px]">pnpm nx run inventory-bc:test</span> ก่อน commit เสมอ</p></div>
+
+          <div class="rule my-10" style="background:var(--line)"></div>
+
+          <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">ฝั่งขาย · sales-bc M1 (Customer) + M2 (Quotation)</h4>
+          <div class="card p-6 mb-8" style="border-left:3px solid var(--blue)">
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1–M2 (2026-08)</b> เป็นการเปิด <b style="color:var(--ink)">sales-bc</b> ครั้งแรก (ก่อนหน้านี้มีแค่ module shell ไม่มี entity/migration เลย) — <span class="mono text-[12px]">CustomerGroup</span>/<span class="mono text-[12px]">Customer</span> master (วงเงินเครดิต, รายการราคาขายเริ่มต้นที่ตรวจ <span class="mono text-[12px]">is_selling</span> ข้าม BC), <span class="mono text-[12px]">Quotation</span>/<span class="mono text-[12px]">QuotationItem</span> + state machine 5 สถานะ, การออกเลขที่ <span class="mono text-[12px]">QT-{YYYY}-{00001}</span> แบบ concurrency-safe (row lock ต่อปี เหมือน PO), RPC validation ข้าม BC ไป inventory-bc (<span class="mono text-[12px]">getProductById</span> · <span class="mono text-[12px]">getPriceListById</span>), snapshot ชื่อ/รหัสสินค้าลงรายการ + snapshot <span class="mono text-[12px]">is_tax_inclusive</span> ลงหัวเอกสาร, permission <span class="mono text-[12px]">customer_group:* · customer:* · quotation:*</span> 12 ตัว · ยังไม่ implement: <b>pricing rule engine</b> (ตอนนี้ผู้ใช้กรอก <span class="mono text-[12px]">unit_price</span> เอง — <span class="mono text-[12px]">price_list_id</span> เก็บไว้บอกที่มาของราคาเท่านั้น), <b>taxes &amp; charges</b> รายบรรทัด, <b>SO conversion</b>, Delivery Note, packed_items</p>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[15px]">Sequence Diagram · เส้นทางใบเสนอราคา (Quotation lifecycle)</h4>
+          <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor REP as พนักงานขาย
+    actor CUS as ลูกค้า
+    participant SAL as sales-bc · QuotationsService
+    participant DB as erp_sales (Postgres)
+    participant INV as inventory-bc
+
+    Note over REP,INV: M1 · ตั้งลูกค้า (Customer master)
+    REP->>SAL: POST /customers (code, name_th/en, credit_limit, default_price_list_id)
+    SAL->>DB: ตรวจ customer_group_id (ตาราง customer_groups ใน BC เดียวกัน)
+    SAL->>INV: getPriceListById (RPC sync)
+    INV-->>SAL: price list (is_selling, is_tax_inclusive)
+    Note over SAL,INV: is_selling=false → 400 · เป็น price list ฝั่งซื้อ ห้ามใช้เป็นราคาขาย
+    SAL-->>REP: 201 · customer
+
+    Note over REP,INV: M2 · ออกใบเสนอราคา
+    REP->>SAL: POST /selling/quotations (customer_id, valid_until, items[])
+    SAL->>DB: อ่าน customer — ต้องมีจริง + is_active=true
+    SAL->>INV: getPriceListById (ถ้าไม่ส่ง price_list_id ใช้ค่า default ของลูกค้า)
+    INV-->>SAL: is_tax_inclusive → snapshot ลงหัวเอกสาร
+    loop ทุก product_id ที่ไม่ซ้ำ (ยิงขนานกัน)
+        SAL->>INV: getProductById (RPC sync)
+        INV-->>SAL: sku · name_th/en · has_variants · type
+    end
+    Note over SAL,INV: has_variants=true หรือ type=bundle → 400 · inventory-bc ล่ม → 503
+    SAL->>DB: BEGIN · ออกเลขที่ QT-{YYYY}-{00001} (FOR UPDATE บน counter ของปีนั้น)
+    SAL->>DB: INSERT quotations + quotation_items (snapshot ชื่อ/รหัส · line_total หลังหักส่วนลด) · COMMIT
+    SAL-->>REP: 201 · DRAFT · total ก่อนภาษี
+
+    REP->>SAL: POST /selling/quotations/{id}/send
+    SAL->>DB: FOR UPDATE header + ตรวจ valid_until จากค่าที่เก็บไว้จริง
+    alt valid_until ยังไม่เลย
+        SAL->>DB: UPDATE status=SENT, sent_by/at
+        SAL-->>REP: 200 · SENT
+        SAL-->>CUS: ส่งใบเสนอราคาให้ลูกค้า (นอกระบบ)
+    else valid_until เลยไปแล้ว
+        SAL-->>REP: 400 · ต่ออายุ valid_until ก่อน (ยังเป็น DRAFT แก้ได้)
+    end
+
+    CUS-->>REP: ตอบรับ / ปฏิเสธ
+    REP->>SAL: POST /selling/quotations/{id}/approve
+    SAL->>DB: FOR UPDATE header
+    alt ยังอยู่ในอายุ
+        SAL->>DB: UPDATE status=APPROVED, approved_by/at
+        SAL-->>REP: 200 · APPROVED (พร้อมแปลงเป็น SO — M3)
+    else หมดอายุระหว่างรอลูกค้า
+        SAL->>DB: UPDATE status=EXPIRED, expired_at (commit ก่อน)
+        SAL-->>REP: 409 · หมดอายุแล้ว ออกใบใหม่
+    end
+
+    Note over REP,DB: เส้นทางทางเลือก · ยกเลิก
+    REP->>SAL: POST /selling/quotations/{id}/cancel { cancel_reason }
+    SAL->>DB: FOR UPDATE header + ตรวจ transition
+    SAL-->>REP: 200 · CANCELLED (EXPIRED/CANCELLED แล้ว → 409 เพราะเป็นสถานะปลายทาง)
+</pre>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[15px]">วิธีทดสอบฝั่งขาย · Testing Guide</h4>
+
+          <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>Migrate ก่อน</b> — <span class="mono text-[12px]">pnpm run migration:run:sales</span> (baseline <span class="mono text-[12px]">CreateSalesSchema</span> สร้าง 5 ตาราง + เปิด extension <span class="mono text-[12px]">uuid-ossp</span> ให้ <span class="mono text-[12px]">erp_sales</span> ซึ่งยังไม่มี) แล้ว <span class="mono text-[12px]">pnpm run migration:run:iam</span> สำหรับ <span class="mono text-[12px]">GrantSalesPermissionsToMockPolicies</span> · จากนั้น login ใหม่ เพราะ permission ฝังอยู่ใน JWT ตอน login</p></div>
+
+          <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>ตั้งกลุ่มลูกค้า + ลูกค้า</b> — <span class="mono text-[12px]">POST /sales-bc/v1/customer-groups</span> แล้ว <span class="mono text-[12px]">POST /sales-bc/v1/customers</span> · ส่ง <span class="mono text-[12px]">default_price_list_id</span> ที่เป็น price list ฝั่งขาย (<span class="mono text-[12px]">is_selling=true</span>) เท่านั้น ไม่งั้นได้ 400</p></div>
+          <div class="code p-4 mb-4">
+<pre>TOKEN=<span class="s">"&lt;access_token&gt;"</span>
+
+curl -X POST http://localhost:3005/sales-bc/v1/customers \
+  -H <span class="s">"Authorization: Bearer $TOKEN"</span> -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{
+    "code": "CUS-0001",
+    "name_th": "บริษัท เกษตรรุ่งเรือง จำกัด", "name_en": "Kaset Rungrueang Co., Ltd.",
+    "tax_id": "0105558000001", "province": "เชียงใหม่",
+    "credit_terms": 30, "credit_limit": 500000
+  }'</span>
+<span class="c"># -> 201, name = { "th": "...", "en": "..." } (LocalizationInterceptor รวม _th/_en ให้)</span></pre>
+          </div>
+
+          <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>ออกใบเสนอราคา</b> — <span class="mono text-[12px]">product_id</span> ต้องเป็นสินค้าจริงจาก inventory-bc ที่ <span class="mono text-[12px]">has_variants=false</span> และ <span class="mono text-[12px]">type=single</span> (bundle ยังเสนอราคาไม่ได้จนกว่าจะมี packed_items)</p></div>
+          <div class="code p-4 mb-4">
+<pre>curl -X POST http://localhost:3005/sales-bc/v1/selling/quotations \
+  -H <span class="s">"Authorization: Bearer $TOKEN"</span> -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{
+    "customer_id": "&lt;uuid จาก step 2&gt;",
+    "valid_until": "2026-09-30",
+    "price_list_id": null, "remark_th": null, "remark_en": null,
+    "items": [{
+      "product_id": "&lt;uuid สินค้า&gt;", "qty": 10, "unit_price": 100,
+      "discount_type": "percent", "discount": 10
+    }]
+  }'</span>
+<span class="c"># -> 201, status=DRAFT, quotation_number="QT-2026-00001", total=900</span>
+<span class="c">#    item: product_name_snapshot = { th, en }, line_total=900</span></pre>
+          </div>
+
+          <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>เดินตาม state machine</b> — <span class="mono text-[12px]">POST .../{id}/send</span> → <span class="mono text-[12px]">POST .../{id}/approve</span> → <span class="mono text-[12px]">POST .../{id}/cancel</span> (body <span class="mono text-[12px]">{"cancel_reason":"..."}</span>) · transition ที่ผิดกฎต้องได้ <span class="mono text-[12px]">409</span> พร้อมบอกสถานะปัจจุบัน/ปลายทาง (เช่น approve ใบที่ยังเป็น DRAFT, cancel ใบที่ EXPIRED)</p></div>
+
+          <div class="step"><span class="sn">5</span><p class="text-[13.5px]"><b>Edge case ที่ต้องทดสอบครบ</b> — <span class="mono text-[12px]">valid_until</span> เป็นวันในอดีตตอนสร้าง → 400 · <b>send ใบที่หมดอายุระหว่างเป็นร่าง → 400 และยังเป็น DRAFT</b> (แก้วันได้) · <b>approve ใบ SENT ที่หมดอายุ → 409 และสถานะกลายเป็น EXPIRED จริงในฐานข้อมูล</b> (flip แล้ว commit ก่อน throw) · ส่วนลด percent &gt; 100 → 400 · ส่วนลด amount มากกว่า <span class="mono text-[12px]">qty × unit_price</span> → 400 · product ซ้ำสองบรรทัด → 400 · ลูกค้า <span class="mono text-[12px]">is_active=false</span> → 400 · price list ที่ <span class="mono text-[12px]">is_selling=false</span> → 400 · product ไม่มีจริง → 400 (ไม่ใช่ 503) · inventory-bc ดับ → 503 · update/delete ใบที่ไม่ใช่ DRAFT → 409 · UUID param ผิดรูปแบบ → 400002</p></div>
+
+          <div class="step"><span class="sn">6</span><p class="text-[13.5px]"><b>เก็บกวาดข้อมูลทดสอบ</b> — ลบแถวจาก <span class="mono text-[12px]">quotation_items</span>/<span class="mono text-[12px]">quotations</span> แล้ว reset <span class="mono text-[12px]">quotation_number_counters.last_number</span> ตามจำนวนที่เหลือจริงในปีนั้น — เหมือน <span class="mono text-[12px]">purchase_order_number_counters</span> ในขั้นตอนฝั่งซื้อด้านบน</p></div>
+
+          <div class="rulebox ok mt-6"><div class="rc mb-1">Automated coverage · sales-bc</div><p class="text-[13.5px]">unit test 52 เคสใน <span class="mono text-[12px]">apps/sales-bc/test/unit/</span> ครอบคลุม state machine ทุก transition + guard, เลข QT แบบ sequential/row-locked, การคิดส่วนลดทั้งสองแบบ + ขอบเขต, การแยก 400 (ข้อมูลผิด) ออกจาก 503 (inventory-bc ล่ม), lazy expiry ตอน approve, และ RPC handler ทั้งสองตัว — รัน <span class="mono text-[12px]">pnpm nx run sales-bc:test</span> ก่อน commit เสมอ</p></div>
+
+          <div class="rulebox mt-3"><div class="rc mb-1">ยังไม่ได้ทำ · ตั้งใจ</div><p class="text-[13.5px]"><span class="mono text-[12px]">EXPIRED</span> ถูก set แบบ lazy ตอน approve เท่านั้น (ไม่มี scheduler) — ใบที่หมดอายุแต่ยังไม่มีใครแตะจะยังแสดงสถานะ <span class="mono text-[12px]">SENT</span> ในลิสต์ · เพิ่ม <span class="mono text-[12px]">QuotationJobsController</span> (cron กวาดรายวัน) ได้ภายหลังโดยไม่ต้องแก้ guard เดิม เพราะ guard ตัดสินจาก <span class="mono text-[12px]">valid_until</span> ไม่ใช่จากสถานะ · <span class="mono text-[12px]">seed</span> ยังไม่มี seeder ของ erp_sales — ต้องเพิ่ม <span class="mono text-[12px]">ISeedDatabase</span>/<span class="mono text-[12px]">SEED_DATABASE_ENV</span> ก่อน ถ้าจะ seed ลูกค้าตัวอย่าง</p></div>
         </div>
       </section>
 
