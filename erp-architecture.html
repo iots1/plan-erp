@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 <script src="components.js" defer></script>
 <script src="theme-toggle.js" defer></script>
 </head>
@@ -32,8 +33,9 @@
       <a href="#admin-console" class="navlink"><span class="n">05</span> Admin Console &amp; Access Control</a>
       <a href="#fifo"         class="navlink"><span class="n">06</span> FIFO · Lot · กำไร/ขาดทุน</a>
       <a href="#events"       class="navlink"><span class="n">07</span> Event Storming</a>
-      <a href="#roadmap"      class="navlink"><span class="n">08</span> แผนพัฒนาแบบเฟส</a>
-      <a href="#migration"    class="navlink"><span class="n">09</span> การย้ายระบบเดิม</a>
+      <a href="#journey"      class="navlink"><span class="n">08</span> เส้นทางลูกค้า · ขาย → การเงิน</a>
+      <a href="#roadmap"      class="navlink"><span class="n">09</span> แผนพัฒนาแบบเฟส</a>
+      <a href="#migration"    class="navlink"><span class="n">10</span> การย้ายระบบเดิม</a>
     </nav>
     <div slot="footnote">
       MONOREPO · NX + PNPM<br>
@@ -857,9 +859,144 @@
 
       <div class="rule my-14"></div>
 
-      <!-- ========== 08 ROADMAP ========== -->
+      <!-- ========== 08 CUSTOMER JOURNEY · SALES → FINANCE ========== -->
+      <section id="journey" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Cross-Context Journey</div>
+        <h2 class="display text-3xl sm:text-4xl mb-4">เส้นทางลูกค้า · ฝ่ายขาย → การเงิน</h2>
+        <p class="text-[15px] mb-8" style="color:var(--ink-soft)">
+          ภาพรวมเส้นเดียวจาก <b style="color:var(--ink)">ลูกค้าถามราคา</b> ไปจนถึง <b style="color:var(--ink)">เงินเข้าและปิดภาษี</b> —
+          ไล่ผ่าน 4 bounded contexts (sales-bc · inventory-bc · finance-bc · report-bc) และ 6 บทบาท
+          หัวข้อนี้ไม่ใช่ SRS ของเฟสใดเฟสหนึ่ง แต่เป็น <b style="color:var(--ink)">เส้นเชื่อม</b> ที่อธิบายว่าเอกสารแต่ละใบ
+          ส่งต่ออะไรให้ใบถัดไป และทำไมข้อมูลบางอย่างต้อง snapshot ไม่ใช่ join
+          รายละเอียดรายเฟสอยู่ใน <a href="srs-p4.html" style="color:var(--blue)">SRS P4</a> (ซื้อ/ขาย) และ
+          <a href="srs-p5.html" style="color:var(--accent)">SRS P5</a> (การเงิน)
+        </p>
+
+        <!-- 8.1 Role matrix -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(217,119,6,.14);color:var(--accent)">01</span><h3 class="text-xl font-semibold">ใครทำอะไร · Role &times; Document</h3></div>
+          <div class="card p-6 overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>บทบาท</th><th>เอกสาร/การกระทำที่เป็นเจ้าของ</th><th>BC</th><th>Permission</th></tr></thead>
+              <tbody>
+                <tr><td><b>SALES</b><br><span class="text-[12px]" style="color:var(--ink-soft)">พนักงานขาย</span></td><td>สร้าง/แก้ <b>ใบเสนอราคา</b> (DRAFT), ส่งให้ลูกค้า, บันทึกว่าลูกค้าตอบรับ</td><td>sales-bc</td><td class="mono text-[12px]">quotation:create · :update · :send · :approve</td></tr>
+                <tr><td><b>SALES MANAGER</b><br><span class="text-[12px]" style="color:var(--ink-soft)">ผู้จัดการขาย</span></td><td>ยกเลิกใบเสนอราคา, คุมส่วนลด/มาร์จิ้นที่เกินกรอบ</td><td>sales-bc</td><td class="mono text-[12px]">quotation:cancel</td></tr>
+                <tr><td><b>WAREHOUSE</b><br><span class="text-[12px]" style="color:var(--ink-soft)">เจ้าหน้าที่คลัง</span></td><td>ยืนยัน <b>ใบส่งของ</b> → ตัดสต็อกแบบ FIFO ต่อล็อต และปล่อย event ต้นทุนจริง</td><td>inventory-bc</td><td class="mono text-[12px]">delivery_note:confirm</td></tr>
+                <tr><td><b>ACCOUNTANT</b><br><span class="text-[12px]" style="color:var(--ink-soft)">นักบัญชี</span></td><td>ออก <b>ใบกำกับภาษี</b> (ออกเลขที่ + ล็อกเอกสาร), ยกเลิกใบกำกับ, ดูแลอัตราภาษี</td><td>finance-bc</td><td class="mono text-[12px]">tax_invoice:create · :issue · :void · tax_config:*</td></tr>
+                <tr><td><b>AR CLERK</b><br><span class="text-[12px]" style="color:var(--ink-soft)">เจ้าหน้าที่การเงิน</span></td><td>วางบิล, รับชำระ, ตัดหนี้ตามใบกำกับ, ออกใบเสร็จ</td><td>finance-bc</td><td class="mono text-[12px]">billing_note:* · payment_entry:*</td></tr>
+                <tr><td><b>FINANCE MANAGER</b><br><span class="text-[12px]" style="color:var(--ink-soft)">ผู้จัดการการเงิน</span></td><td>อนุมัติเอกสารเกินวงเงิน, ดูกำไรขั้นต้นต่อล็อต, ปิดงวด</td><td>finance-bc · report-bc</td><td class="mono text-[12px]">report:view · period:close</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 8.2 The sequence -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">02</span><h3 class="text-xl font-semibold">Sequence Diagram · เส้นทางเต็มจากถามราคาถึงเงินเข้า</h3></div>
+          <div class="card p-6 diagram overflow-x-auto">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor CUS as ลูกค้า
+    actor SAL as SALES · พนักงานขาย
+    actor WH as WAREHOUSE · คลัง
+    actor ACC as ACCOUNTANT · นักบัญชี
+    actor AR as AR CLERK · การเงิน
+    participant SLS as sales-bc
+    participant INV as inventory-bc
+    participant FIN as finance-bc
+    participant RPT as report-bc
+
+    Note over CUS,RPT: ระยะ 1 · เสนอราคา (P4 M2 — implement แล้ว)
+    CUS->>SAL: ขอใบเสนอราคา
+    SAL->>SLS: POST /quotations (customer_id, items[], discount_mode)
+    SLS->>SLS: อ่าน customer — ต้อง is_active · snapshot ชื่อ + เลขผู้เสียภาษี
+    SLS->>INV: getProductById (RPC) ต่อ product ที่ไม่ซ้ำ — ยิงขนาน
+    INV-->>SLS: sku, ชื่อ, has_variants, type
+    SLS->>INV: getEffectivePrice (RPC) — ราคาอ้างอิงจาก item_prices
+    INV-->>SLS: rate อ้างอิง (หรือ null = ไม่มีข้อมูลอ้างอิง)
+    Note over SLS,INV: unit_price เบี่ยงเบนเกิน ±20% จากราคาอ้างอิง → 400<br/>ไม่มีราคาอ้างอิง → ผ่าน (ต่อรองได้)
+    SLS-->>SAL: 201 · QT-{YYYY}-{00001} · DRAFT
+    SAL->>SLS: POST /quotations/{id}/send
+    SLS-->>CUS: ใบเสนอราคา (valid_until)
+    CUS->>SAL: ตอบรับ
+    SAL->>SLS: POST /quotations/{id}/approve
+    Note over SLS: เลย valid_until แล้ว → พลิกเป็น EXPIRED + 409 (ต้องออกใบใหม่)
+
+    Note over SAL,INV: ระยะ 2 · แปลงเป็นใบสั่งขาย + ส่งของ (P4 M3 — ยังไม่ implement)
+    SAL->>SLS: แปลง Quotation → Sales Order
+    SLS->>INV: ตรวจ available_qty
+    SLS->>INV: สร้าง Delivery Note
+    WH->>INV: ยืนยันส่งของ
+    INV->>INV: ตัดสต็อก FIFO ต่อล็อต · CHECK (available_qty >= 0)
+    INV-)FIN: stock.deducted (allocations + unit_cost จริงต่อล็อต)
+    INV-)SLS: delivery.confirmed
+
+    Note over ACC,RPT: ระยะ 3 · ออกใบกำกับภาษี (P5 — implement แล้ว)
+    ACC->>FIN: POST /tax-invoices (customer_id, items[], vat_type)
+    FIN->>SLS: getCustomerById (RPC) — snapshot ชื่อ + เลขผู้เสียภาษี (§86/4(2))
+    SLS-->>FIN: customer (ต้องมี tax_id ไม่งั้น 400)
+    FIN->>INV: getProductById (RPC) — พร้อม tax_category.vat_treatment
+    INV-->>FIN: standard | zero_rated | exempt ต่อบรรทัด
+    FIN->>FIN: อ่านอัตราจริงจาก tax_configs ตาม document_date (VAT + WHT)
+    Note over FIN: การจัดประเภทมาจาก inventory-bc · อัตรามาจาก finance-bc<br/>ไม่รับ vat_treatment จาก client (กันเลี่ยง VAT)
+    FIN->>FIN: ปันส่วนลดท้ายบิลลงบรรทัดตามสัดส่วน แล้วจึงคิด VAT
+    FIN-->>ACC: 201 · DRAFT · ยังไม่มี invoice_number
+    ACC->>FIN: POST /tax-invoices/{id}/issue
+    FIN->>FIN: BEGIN · FOR UPDATE counter ปีนั้น · ออกเลข INV-{YYYY}-{00001} · COMMIT
+    Note over FIN: ออกเลขตอน issue ไม่ใช่ตอน create — เลขต้องเรียงไม่ข้าม (§86/4)<br/>หลัง ISSUED แก้ไม่ได้ ต้องออกใบลด/เพิ่มหนี้แทน
+    FIN-)RPT: invoice.issued
+    FIN-)FIN: คำนวณ COGS ต่อ allocation จาก stock.deducted → กำไรต่อล็อต
+    FIN-)RPT: profit.calculated
+
+    Note over CUS,AR: ระยะ 4 · วางบิล · รับเงิน (P5 — ยังไม่ implement)
+    AR->>FIN: รวมหลายใบกำกับเป็นใบวางบิล
+    FIN-->>CUS: ใบวางบิล
+    CUS->>AR: ชำระเงิน (หัก ณ ที่จ่ายถ้ามี)
+    AR->>FIN: บันทึกรับชำระ + ตัดหนี้ตามใบกำกับ
+    Note over FIN: WHT ลดเงินสดที่ได้รับ แต่ไม่ลดยอดหนี้<br/>เงินสดที่คาด = total − total_wht
+    FIN->>FIN: โพสต์ GL คู่ debit = credit (append-only)
+    FIN-)RPT: payment.received
+    RPT-->>AR: ยอดขาย · ภาษี · กำไรต่อล็อต · ลูกหนี้คงค้าง
+</pre>
+          </div>
+        </div>
+
+        <!-- 8.3 Handoff contract -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(5,150,105,.14);color:var(--signal)">03</span><h3 class="text-xl font-semibold">แต่ละใบส่งต่ออะไร · Handoff Contract</h3></div>
+          <div class="card p-6 overflow-x-auto mb-6">
+            <table class="d">
+              <thead><tr><th>จาก → ไป</th><th>ส่งต่อผ่าน</th><th>ข้อมูลที่ส่งต่อ</th><th>สถานะ</th></tr></thead>
+              <tbody>
+                <tr><td>Quotation → Sales Order</td><td>แปลงเอกสาร (ใน sales-bc)</td><td>บรรทัดที่ตกลง + <span class="mono text-[12px]">price_list_id</span> + <span class="mono text-[12px]">is_tax_inclusive</span> ที่ snapshot ไว้</td><td><span class="chip">P4 M3</span></td></tr>
+                <tr><td>Sales Order → Delivery</td><td>แปลงเอกสาร + ตรวจ <span class="mono text-[12px]">available_qty</span></td><td>บรรทัดที่จะส่ง · bundle ต้อง explode เป็น <span class="mono text-[12px]">packed_items</span></td><td><span class="chip">P4 M3</span></td></tr>
+                <tr><td>Delivery → inventory ledger</td><td>ยืนยันส่งของ (ใน inventory-bc)</td><td>ตัดสต็อก FIFO ต่อล็อต — ได้ <span class="mono text-[12px]">unit_cost</span> จริงของแต่ละล็อต</td><td><span class="chip">P3/P4</span></td></tr>
+                <tr><td>inventory-bc → finance-bc</td><td>event <span class="mono text-[12px]">stock.deducted</span></td><td><b>allocations พร้อม unit_cost จริง</b> — finance ใช้คิด COGS ห้ามเฉลี่ย</td><td><span class="chip">P5</span></td></tr>
+                <tr><td>Delivery → Tax Invoice</td><td><span class="mono text-[12px]">delivery_note_id</span> บนใบกำกับ</td><td>อ้างอิงว่าใบกำกับนี้ออกจากการส่งของครั้งไหน (uuid ข้าม BC ไม่มี FK)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>sales-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getCustomerById</span></td><td>ชื่อ + เลขผู้เสียภาษีลูกค้า → <b>snapshot</b> ลงใบกำกับ (§86/4(2) บังคับให้พิมพ์บนเอกสาร)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>inventory-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getProductById</span></td><td>sku/ชื่อ + <span class="mono text-[12px]">tax_category.vat_treatment</span> → snapshot ต่อบรรทัด</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>Tax Invoice → Billing Note</td><td><span class="mono text-[12px]">billing_note_invoices</span> (join table)</td><td>รวมหลายใบกำกับเรียกเก็บรอบเดียว — ใบกำกับต้องมีก่อน</td><td><span class="chip">P5 ถัดไป</span></td></tr>
+                <tr><td>Payment → Tax Invoice</td><td><span class="mono text-[12px]">payment_allocations</span></td><td>1 การชำระตัดได้หลายใบกำกับ · <span class="mono text-[12px]">outstanding = total − Σ allocation</span></td><td><span class="chip">P5 ถัดไป</span></td></tr>
+                <tr><td>finance-bc → report-bc</td><td>events <span class="mono text-[12px]">invoice.issued</span> · <span class="mono text-[12px]">profit.calculated</span></td><td>ยอดขาย/ภาษี/กำไรต่อล็อต — consumer ต้อง idempotent</td><td><span class="chip">P6</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rulebox"><div class="rc mb-1">RULE · SNAPSHOT ไม่ใช่ JOIN</div><p class="text-[13.5px]">ทุกครั้งที่เอกสารข้าม BC ข้อมูลที่ต้อง<b>พิมพ์บนเอกสาร</b> จะถูก <b>คัดลอกลงแถวนั้น</b> ไม่ join ตอนพิมพ์ — ลูกค้าเปลี่ยนชื่อ หรือสินค้าถูกเปลี่ยนชื่อ/เปลี่ยนประเภทภาษีทีหลัง ต้องไม่ย้อนไปแก้เอกสารที่ออกไปแล้ว</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · อ้างข้าม BC ด้วย UUID เท่านั้น</div><p class="text-[13.5px]">ทุกลูกศรข้าม BC ในไดอะแกรมเป็น <b>RPC</b> หรือ <b>event</b> — ไม่มี FK ข้าม database และไม่มีการ query ตรงข้าม BC แม้แต่ครั้งเดียว</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · ราคาและภาษีเชื่อหลังบ้าน</div><p class="text-[13.5px]">client กำหนดราคาได้แต่ต้องอยู่ในกรอบ <b>±20%</b> ของ <span class="mono text-[12px]">item_prices</span> · ส่วน <b>ประเภทภาษี</b> client กำหนดไม่ได้เลย ต้องมาจาก inventory-bc เท่านั้น</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · เอกสารภาษี immutable</div><p class="text-[13.5px]">ใบเสนอราคาแก้ได้ตอน DRAFT · <b>ใบกำกับภาษีที่ ISSUED แล้วแก้ไม่ได้</b> เลขที่ถูกใช้แล้วห้ามนำกลับมาใช้ซ้ำ แก้ยอดต้องออกใบลด/เพิ่มหนี้</p></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 09 ROADMAP ========== -->
       <section id="roadmap" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">08 — Development Plan</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — Development Plan</div>
         <h2 class="display text-3xl sm:text-4xl mb-4">แผนพัฒนาแบบเฟส · Task &amp; Man-hours</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           แตกงานทั้ง <b>Backend</b> และ <b>Frontend</b> เป็นงานย่อย พร้อมประมาณ Man-hours และ Duration
@@ -1285,9 +1422,9 @@
 
       <div class="rule my-14"></div>
 
-      <!-- ========== 09 MIGRATION ========== -->
+      <!-- ========== 10 MIGRATION ========== -->
       <section id="migration" class="section py-4 pb-20">
-        <div class="eyebrow text-[var(--accent)] mb-3">09 — Legacy Migration</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — Legacy Migration</div>
         <h2 class="display text-3xl sm:text-4xl mb-6">การย้ายระบบเดิม</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
           ใช้รูปแบบ <b>Strangler Fig</b> — รันระบบใหม่คู่ขนานกับระบบเดิม แล้วค่อย ๆ ย้ายทีละโมดูล
@@ -1370,6 +1507,24 @@
     // default: expand every phase
     heads.forEach(h => setPhase(h, false));
   })();
+</script>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
 </script>
 
 </body>

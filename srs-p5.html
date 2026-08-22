@@ -39,7 +39,9 @@
       <div class="navsub">2 · Use Cases &amp; Data</div>
       <div class="navsub">3 · Data Flow &amp; Events</div>
       <div class="navsub">4 · ER Diagram</div>
-      <div class="navsub">5 · Dev Guide</div>
+      <div class="navsub">5 · Tax Invoice Lifecycle</div>
+      <div class="navsub">6 · Dev Guide</div>
+      <div class="navsub">7 · Implementation Status</div>
     </nav>
     <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
   </erp-sidebar>
@@ -147,22 +149,60 @@
 erDiagram
     TAX_INVOICES {
         uuid id PK
-        string invoice_number UK "gapless"
+        string invoice_number UK "null until ISSUED · gapless"
+        string status "DRAFT_ISSUED_VOID"
         uuid customer_id "ref sales-bc"
+        string customer_name_th "snapshot 86/4(2)"
+        string customer_name_en "snapshot"
+        string customer_tax_id "snapshot 86/4(2)"
         uuid delivery_note_id "ref sales-bc"
-        decimal net_amount
+        date document_date "selects the tax rate"
+        decimal sub_total "gross before discount"
+        string discount_mode "none_header_per_item"
+        string discount_type "percent_amount · header only"
+        decimal discount_value "header only"
+        decimal total_discount
+        string vat_type "exclude_include"
+        decimal vat_rate "snapshot from tax_configs"
+        decimal net_amount "sub_total - total_discount"
+        decimal total_standard_vat_price "PP30 box"
+        decimal total_zero_vat_price "PP30 box"
+        decimal total_exempt_vat_price "PP30 box"
         decimal vat_amount
-        decimal total
-        string status "ISSUED_VOID"
+        decimal total "net_amount + vat_amount"
+        decimal wht_rate "snapshot from tax_configs"
+        decimal total_wht "NOT deducted from total"
+        string currency "ISO 4217"
+        decimal currency_rate "snapshot at currency_date"
+        date currency_date
+        decimal raw_sub_total "in currency"
+        decimal raw_total_discount "in currency"
+        decimal raw_net_amount "in currency"
+        decimal raw_vat_amount "in currency"
+        decimal raw_total "in currency"
+        decimal raw_total_wht "in currency"
         timestamp issued_at
+        uuid issued_by
+        timestamp voided_at
+        uuid voided_by
+        string void_reason "required on void"
     }
     TAX_INVOICE_ITEMS {
         uuid id PK
-        uuid invoice_id FK
+        uuid tax_invoice_id FK
         uuid product_id "ref inventory-bc"
+        string product_sku "snapshot 86/4(5)"
+        string product_name_th "snapshot 86/4(5)"
+        string product_name_en "snapshot"
         int qty
         decimal unit_price
-        decimal line_total
+        string discount_type "per_item mode only"
+        decimal discount "per_item mode only"
+        decimal header_discount_amount "pro-rata share"
+        string vat_treatment "standard_zero_exempt · from inventory-bc"
+        decimal vat_rate "0 when zero_rated_exempt"
+        decimal vat_amount
+        decimal line_total "EX-VAT · sums to net_amount"
     }
     COGS_ENTRIES {
         uuid id PK
@@ -193,10 +233,15 @@ erDiagram
     }
     TAX_CONFIGS {
         uuid id PK
-        string name "VAT7 etc"
-        string tax_type "VAT_or_WHT"
-        decimal rate
-        boolean accumulate
+        string code UK "VAT7 · WHT3_SERVICE"
+        string name_th
+        string name_en
+        string tax_type "vat_or_wht"
+        decimal rate "percent not fraction"
+        date effective_from "no overlap per code"
+        date effective_upto "null = current"
+        boolean is_accumulate
+        boolean is_active
     }
     CREDIT_NOTES {
         uuid id PK
@@ -235,6 +280,11 @@ erDiagram
         string voucher_type
         boolean is_cancelled
     }
+    TAX_INVOICE_NUMBER_COUNTERS {
+        uuid id PK
+        int year UK "one row per year"
+        int last_number "FOR UPDATE on issue"
+    }
     TAX_INVOICES ||--o{ TAX_INVOICE_ITEMS : contains
     TAX_INVOICES ||--o{ CREDIT_NOTES : "amended by"
     TAX_INVOICES ||--o{ BILLING_NOTE_INVOICES : "billed in"
@@ -247,9 +297,72 @@ erDiagram
           </div>
         </div>
 
-        <!-- 5.5 Dev Guide -->
-        <div>
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">05</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+        <!-- 5.5 Tax Invoice Lifecycle -->
+        <div class="mb-12" id="p5-lifecycle">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">05</span><h3 class="text-xl font-semibold">Sequence Diagram · วงจรใบกำกับภาษี</h3></div>
+          <p class="text-[14px] mb-5" style="color:var(--ink-soft)">
+            ภาพเจาะเฉพาะ finance-bc — ดูภาพรวมที่เชื่อมกับฝ่ายขายทั้งเส้นได้ที่
+            <a href="erp-architecture.html#journey" style="color:var(--accent)">Architecture &sect;08 · เส้นทางลูกค้า</a>
+          </p>
+          <div class="diagram overflow-x-auto">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor ACC as ACCOUNTANT · นักบัญชี
+    participant FIN as finance-bc · TaxInvoicesService
+    participant CFG as tax_configs
+    participant DB as erp_finance (Postgres)
+    participant SLS as sales-bc
+    participant INV as inventory-bc
+
+    Note over ACC,INV: สร้างร่าง — implement แล้ว
+    ACC->>FIN: POST /tax-invoices (customer_id, items[], vat_type)
+    FIN->>SLS: getCustomerById (RPC)
+    SLS-->>FIN: ชื่อ + tax_id + is_active
+    Note over FIN,SLS: is_active=false → 400 · ไม่มี tax_id → 400 (86/4(2) บังคับพิมพ์บนใบ)<br/>sales-bc ล่ม → 503 (ไม่ใช่ 400 "ไม่พบลูกค้า")
+    loop ทุก product_id ที่ไม่ซ้ำ — ยิงขนาน
+        FIN->>INV: getProductById (RPC) พร้อม tax_category
+        INV-->>FIN: sku, ชื่อ, has_variants, vat_treatment
+    end
+    Note over FIN,INV: has_variants=true → 400 · ไม่มี tax_category → ถือเป็น standard (เก็บภาษีเกินดีกว่าขาด)
+    FIN->>CFG: อัตรา VAT + WHT ที่มีผล ณ document_date
+    CFG-->>FIN: rate (ไม่มี config → 0%)
+    FIN->>FIN: ปันส่วนลดท้ายบิลลงบรรทัดตามสัดส่วน → คิด VAT ต่อบรรทัด → รวมเป็น 3 ถัง
+    FIN->>DB: BEGIN · INSERT tax_invoices + tax_invoice_items · COMMIT
+    FIN-->>ACC: 201 · DRAFT · invoice_number = null
+
+    opt แก้ร่าง (ได้เฉพาะ DRAFT)
+        ACC->>FIN: PUT /tax-invoices/{id}
+        FIN->>CFG: อ่านอัตราใหม่ตาม document_date ที่อาจเปลี่ยน
+        FIN->>DB: SELECT ... FOR UPDATE — ไม่ใช่ DRAFT → 409
+        FIN->>DB: sync บรรทัด (จับคู่ด้วย product_id) แล้วคำนวณภาษีใหม่ทั้งใบ
+        FIN-->>ACC: 200 · ยังเป็น DRAFT
+    end
+
+    Note over ACC,DB: ออกเลข — implement แล้ว
+    ACC->>FIN: POST /tax-invoices/{id}/issue
+    FIN->>DB: FOR UPDATE header · ตรวจ transition DRAFT → ISSUED
+    FIN->>DB: นับบรรทัด — ไม่มีบรรทัด → 400 (86/4(5))
+    FIN->>DB: FOR UPDATE counter ของปีใน document_date · last_number + 1
+    FIN->>DB: UPDATE invoice_number, status, issued_by, issued_at · COMMIT
+    Note over FIN,DB: ออกเลขใน transaction เดียวกับที่เปลี่ยนสถานะ — crash กลางทางไม่เผาเลข<br/>ใช้ปีจาก document_date ไม่ใช่วันนี้ · issue ซ้ำ → 409 (ไม่มี ISSUED → ISSUED)
+    FIN-->>ACC: 200 · INV-{YYYY}-{00001} · ISSUED (แก้ไม่ได้อีก)
+
+    Note over ACC,DB: ยกเลิก — implement แล้ว
+    ACC->>FIN: POST /tax-invoices/{id}/void (void_reason บังคับ)
+    FIN->>DB: FOR UPDATE header · ตรวจ transition ISSUED → VOID
+    FIN->>DB: UPDATE status, voided_by, voided_at, void_reason
+    Note over FIN,DB: เก็บแถวและเลขไว้ ไม่นำเลขกลับมาใช้ซ้ำ — เลขที่ใช้แล้วต้องอธิบายได้<br/>void DRAFT → 409 (ไม่มีเลข ให้ลบทิ้งแทน) · void ซ้ำ → 409
+    FIN-->>ACC: 200 · VOID
+
+    Note over ACC,INV: ยังไม่ implement — ใบวางบิล · รับชำระ · COGS/P&amp;L · GL
+</pre>
+          </div>
+        </div>
+
+        <!-- 5.6 Dev Guide -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">06</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
           <div class="space-y-3">
             <div class="rulebox"><div class="rc mb-1">RULE · EXACT LOT COST</div><p class="text-[13.5px]"><b>COGS = Σ(allocation.qty × allocation.unit_cost)</b> ต้องใช้ <b>unit_cost ที่มากับ event</b> เท่านั้น <b>ห้าม</b>คำนวณเฉลี่ย และห้าม query ราคาปัจจุบันของสินค้า</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · PER-ALLOCATION P&amp;L</div><p class="text-[13.5px]">คำนวณกำไรต่อ allocation แล้วค่อย aggregate — หนึ่ง delivery อาจกินหลายล็อตที่ต้นทุนต่างกัน</p></div>
@@ -262,6 +375,45 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · PAYMENT ALLOCATION</div><p class="text-[13.5px]">1 การชำระเงิน allocate ไปได้ <b>หลายใบกำกับ</b> · ผลรวม allocation ≤ paid_amount · ส่วนเกินเก็บเป็น <span class="mono text-[12px]">unallocated_amount</span> (เครดิตลูกค้า) · outstanding ของใบกำกับ = total − Σ allocation</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · WITHHOLDING TAX</div><p class="text-[13.5px]">รองรับภาษี <b>หัก ณ ที่จ่าย (WHT)</b> แยกจาก VAT — ตอนรับ/จ่ายเงินคำนวณ WHT ตามอัตราของประเภทเงินได้ แล้วออกหนังสือรับรองหัก ณ ที่จ่าย · WHT ลดยอดเงินสดจริงแต่ไม่ลดยอดหนี้</p></div>
           </div>
+        </div>
+
+        <!-- 5.7 Implementation Status -->
+        <div id="p5-status">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(14,124,134,.14);color:var(--teal)">07</span><h3 class="text-xl font-semibold">Implementation Status &amp; Testing Guide · Tax Invoice slice</h3></div>
+
+          <div class="card p-6 mb-8" style="border-left:3px solid var(--teal)">
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">2026-08</b> implement ส่วนแรกของเฟส 5 ใน <b style="color:var(--ink)">finance-bc</b> (ก่อนหน้านี้ BC นี้ว่างทั้งหมด ไม่มีตารางเลย): <span class="mono text-[12px]">TaxConfig</span> (อัตรา VAT/WHT แบบมีช่วงวันมีผล), <span class="mono text-[12px]">TaxInvoice</span>/<span class="mono text-[12px]">TaxInvoiceItem</span> + state machine 3 สถานะ, การออกเลข <span class="mono text-[12px]">INV-{YYYY}-{00001}</span> แบบ gapless/row-locked, RPC ข้าม BC ไป sales-bc (<span class="mono text-[12px]">getCustomerById</span>) และ inventory-bc (<span class="mono text-[12px]">getProductById</span> พร้อม <span class="mono text-[12px]">tax_category</span>), permission <span class="mono text-[12px]">tax_invoice:*</span> 5 ตัว + <span class="mono text-[12px]">tax_config:*</span> 3 ตัว · <b style="color:var(--ink)">ยังไม่ implement</b>: Billing Note, Payment Entry/Allocation/Schedule, Credit Note, COGS/P&amp;L (รอ <span class="mono text-[12px]">stock.deducted</span> จาก P3/P4 M3), GL Ledger</p>
+          </div>
+
+          <div class="card p-6 overflow-x-auto mb-8">
+            <table class="d">
+              <thead><tr><th>ตาราง</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>
+              <tbody>
+                <tr><td class="mono text-[12px]">tax_configs</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td><td>เพิ่มจาก SRS เดิม: <span class="mono text-[12px]">code</span> (unique), <span class="mono text-[12px]">name_th/en</span>, <span class="mono text-[12px]">effective_from/upto</span> — ห้ามช่วงวันซ้อนกันภายใน code เดียว</td></tr>
+                <tr><td class="mono text-[12px]">tax_invoices</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td><td>เพิ่มจาก SRS เดิม: <span class="mono text-[12px]">DRAFT</span> (SRS มีแต่ ISSUED/VOID), snapshot ลูกค้า, discount 3 โหมด, VAT 3 ถัง, WHT, multi-currency</td></tr>
+                <tr><td class="mono text-[12px]">tax_invoice_items</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td><td>เพิ่มจาก SRS เดิม: snapshot sku/ชื่อ, <span class="mono text-[12px]">vat_treatment</span>/<span class="mono text-[12px]">vat_rate</span> ต่อบรรทัด, <span class="mono text-[12px]">header_discount_amount</span></td></tr>
+                <tr><td class="mono text-[12px]">tax_invoice_number_counters</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td><td>ไม่มีใน SRS เดิม — ตารางที่ทำให้ RULE · GAPLESS NUMBERING เป็นจริงได้</td></tr>
+                <tr><td class="mono text-[12px]">billing_notes</td><td><span class="chip">ถัดไป</span></td><td>ต้องมี <span class="mono text-[12px]">tax_invoices</span> ก่อน เพราะรวมใบกำกับผ่าน join table</td></tr>
+                <tr><td class="mono text-[12px]">payment_entries</td><td><span class="chip">ถัดไป</span></td><td>+ <span class="mono text-[12px]">payment_allocations</span>, <span class="mono text-[12px]">payment_schedules</span></td></tr>
+                <tr><td class="mono text-[12px]">credit_notes</td><td><span class="chip">ถัดไป</span></td><td>ทางแก้เดียวของใบกำกับที่ ISSUED แล้ว</td></tr>
+                <tr><td class="mono text-[12px]">cogs_entries</td><td><span class="chip">รอ P4 M3</span></td><td>+ <span class="mono text-[12px]">profit_loss_records</span> — ต้องรอ event <span class="mono text-[12px]">stock.deducted</span> ที่ยังไม่มีผู้ผลิต</td></tr>
+                <tr><td class="mono text-[12px]">ledger_entries</td><td><span class="chip">ถัดไป</span></td><td>GL double-entry append-only</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="space-y-3 mb-8">
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>ตั้งอัตราภาษีก่อนออกใบ</b> — <span class="mono text-[12px]">POST /tax-configs</span> สร้าง <span class="mono text-[12px]">VAT7</span> (<span class="mono text-[12px]">tax_type=vat, rate=7, effective_from</span>) · ถ้าไม่มี config ที่มีผล ระบบคิด VAT 0% แล้วออกใบได้ปกติ (บริษัทที่ไม่จด VAT ก็ต้องออกใบได้) ไม่ใช่ error</p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>ทดสอบเลข gapless</b> — สร้างร่าง 3 ใบ ลบทิ้ง 1 ใบ แล้ว issue อีก 2 ใบ → เลขต้องเป็น <span class="mono text-[12px]">00001</span>, <span class="mono text-[12px]">00002</span> ติดกัน ไม่ข้าม (พิสูจน์ว่าเลขไม่ได้จ่ายตอน create) · ยิง issue พร้อมกัน 2 request บนใบเดียว → ได้เลขเดียว อีกอันได้ 409</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>ทดสอบภาษีผสมในใบเดียว</b> — ใส่ 3 บรรทัดที่สินค้ามี <span class="mono text-[12px]">tax_category</span> ต่างกัน (standard / zero_rated / exempt) → <span class="mono text-[12px]">total_standard_vat_price</span>, <span class="mono text-[12px]">total_zero_vat_price</span>, <span class="mono text-[12px]">total_exempt_vat_price</span> ต้องแยกกัน และ <span class="mono text-[12px]">vat_amount</span> คิดจากบรรทัด standard เท่านั้น</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ทดสอบส่วนลดท้ายบิลกับ VAT</b> — ใส่ส่วนลด <span class="mono text-[12px]">header</span> บนใบที่มีทั้ง standard และ exempt → ส่วนลดต้องถูกปันลงทั้งสองบรรทัดตามสัดส่วน และฐาน VAT ต้องลดตามด้วย (ถ้าไม่ปัน ฐานภาษีจะเกินไปเท่าจำนวนส่วนลด) · ผลรวม <span class="mono text-[12px]">header_discount_amount</span> ทุกบรรทัดต้องเท่ากับ <span class="mono text-[12px]">total_discount</span> เป๊ะ</p></div>
+            <div class="step"><span class="sn">5</span><p class="text-[13.5px]"><b>Edge case ที่ต้องทดสอบครบ</b> — ลูกค้าไม่มี <span class="mono text-[12px]">tax_id</span> → 400 · ลูกค้า <span class="mono text-[12px]">is_active=false</span> → 400 · sales-bc ล่ม → 503 (ไม่ใช่ 400) · สินค้าเป็น variant template → 400 · product ซ้ำสองบรรทัด → 400 · <b>issue ใบที่ไม่มีบรรทัด → 400</b> · <b>issue ซ้ำ → 409</b> · <b>PUT ใบที่ ISSUED แล้ว → 409</b> · <b>DELETE ใบที่ ISSUED แล้ว → 409</b> (ต้อง void) · void ใบ DRAFT → 409 · void ซ้ำ → 409 · ส่วนลด percent &gt; 100 → 400 · ส่วนลด amount &gt; sub_total → 400 · <span class="mono text-[12px]">currency</span> ไม่ใช่ THB แต่ไม่ส่ง <span class="mono text-[12px]">currency_rate</span> → 400 · <span class="mono text-[12px]">currency=THB</span> แต่ <span class="mono text-[12px]">currency_rate != 1</span> → 400</p></div>
+            <div class="step"><span class="sn">6</span><p class="text-[13.5px]"><b>เก็บกวาดข้อมูลทดสอบ</b> — ลบแถวจาก <span class="mono text-[12px]">tax_invoice_items</span>/<span class="mono text-[12px]">tax_invoices</span> แล้ว reset <span class="mono text-[12px]">tax_invoice_number_counters.last_number</span> ตามจำนวนที่เหลือจริงในปีนั้น — เหมือน counter ของ PO/Quotation ใน P4</p></div>
+          </div>
+
+          <div class="rulebox ok mb-3"><div class="rc mb-1">Automated coverage · finance-bc</div><p class="text-[13.5px]">unit test 65 เคสใน <span class="mono text-[12px]">apps/finance-bc/test/unit/</span> ครอบคลุม: reproduce ใบจริง (134,000 + 7% = 143,380), VAT ผสม 3 ประเภทในใบเดียว, ถอด VAT แบบ include, ปันส่วนลดท้ายบิลลงบรรทัด + เศษปัดครบ, WHT ไม่หักจาก total, multi-currency, gapless numbering ใน transaction เดียว, ห้าม issue ซ้ำ/แก้ ISSUED/void DRAFT, และช่วงวันมีผลของ <span class="mono text-[12px]">tax_configs</span> ห้ามซ้อน · arithmetic ทั้งหมดอยู่ใน <span class="mono text-[12px]">@lib/common/utils/vat.util.ts</span> (อีก 36 เคส) เพื่อให้เอกสารภาษีทุกชนิดในอนาคตคิดเหมือนกัน · รัน <span class="mono text-[12px]">pnpm nx run finance-bc:test</span> ก่อน commit เสมอ</p></div>
+
+          <div class="rulebox"><div class="rc mb-1">ต่างจาก SRS เดิม · ตั้งใจ</div><p class="text-[13.5px]"><b>เพิ่มสถานะ <span class="mono text-[12px]">DRAFT</span></b> — SRS เดิมระบุแค่ <span class="mono text-[12px]">ISSUED_VOID</span> แต่ถ้าไม่มีร่าง เลขจะต้องจ่ายตอน create ซึ่งทำให้เลขข้ามเมื่อร่างถูกทิ้ง ขัดกับ RULE · GAPLESS NUMBERING เอง · <b>multi-currency ไม่มีใน SRS</b> — เพิ่มคู่คอลัมน์ <span class="mono text-[12px]">raw_*</span> โดยคอลัมน์ไม่มี prefix เป็นสกุลบัญชี (THB) เพราะ GL/ภ.พ.30/report อ่านตัวนั้น · <b>ยังไม่ทำตาม JSON อ้างอิง</b>: e-tax, สาขา/โครงการ/ช่องทางขาย/คอมมิชชัน, เงินมัดจำ (down payment) — ตัดออกเพราะ SRS ไม่ได้กำหนด เพิ่มภายหลังได้เมื่อมี requirement จริง</p></div>
         </div>
       </section>
 
