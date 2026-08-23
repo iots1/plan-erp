@@ -658,6 +658,23 @@ item_prices: [
             <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ไม่เก็บอะไร</div><p class="text-[13px]"><b>ไม่มีคอลัมน์ qty ต่อการยิง</b> — จำนวนของ <span class="mono text-[12px]">pack</span> อ่านจาก <span class="mono text-[12px]">uom_conversion_factors.conversion_factor</span> ตอนยิง เพื่อให้อัตราแปลงมีที่มาที่เดียว · <b>ไม่มีรูปภาพบาร์โค้ด</b> — เรนเดอร์ตอนพิมพ์ป้าย (report-bc) จากค่า + symbology</p></div>
           </div>
 
+          <!-- SYMBOLOGY -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">symbology &middot; ความยาว &amp; การตรวจสอบต่อชนิดรหัส (enum <span class="mono">BarcodeSymbology</span>)</div>
+            <table class="d">
+              <thead><tr><th style="width:110px">ค่า</th><th style="width:80px">ความยาว</th><th style="width:110px">Check digit</th><th>ลักษณะ &amp; การใช้งานจริง</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">ean13</span></td><td>13 หลัก</td><td><span style="color:#15803D">✓ GS1 mod-10</span></td><td>มาตรฐานค้าปลีกที่พบมากสุดในไทย — สินค้านำเข้า/ผลิตเองส่วนใหญ่ใช้ · เป็นค่า default ของ <span class="mono text-[12px]">ean13_internal</span></td></tr>
+                <tr><td><span class="mono text-[12px]">ean8</span></td><td>8 หลัก</td><td><span style="color:#15803D">✓ GS1 mod-10</span></td><td>สำหรับบรรจุภัณฑ์เล็กที่พื้นที่พิมพ์จำกัด (เช่น หลอดยา) — ระบบรองรับเฉพาะกรณี <span class="mono text-[12px]">manual</span> (มาจากผู้ผลิต) ไม่มี strategy auto ที่สร้างให้</td></tr>
+                <tr><td><span class="mono text-[12px]">upc_a</span></td><td>12 หลัก</td><td><span style="color:#15803D">✓ GS1 mod-10</span></td><td>มาตรฐานอเมริกาเหนือ — พบในสินค้านำเข้าจากสหรัฐฯ/แคนาดา เป็นกรณี <span class="mono text-[12px]">manual</span> เท่านั้นเช่นกัน</td></tr>
+                <tr><td><span class="mono text-[12px]">itf14</span></td><td>14 หลัก</td><td><span style="color:#15803D">✓ GS1 mod-10</span></td><td><b>ระดับลัง/พาเลทเท่านั้น</b> ไม่ใช่ระดับชิ้น — ตัวเลือกสำหรับ <span class="mono text-[12px]">target_type=pack</span> เมื่อ manual (ผู้ผลิตพิมพ์ ITF-14 บนลังมาให้แล้ว) แทนที่จะสร้าง EAN-13 ภายในเอง</td></tr>
+                <tr><td><span class="mono text-[12px]">code128</span></td><td>ไม่ตายตัว</td><td><span style="color:var(--muted)">— (มี check char ในตัว encoder แต่ไม่ใช่ GS1 mod-10)</span></td><td>รองรับตัวอักษร A-Z/0-9/เครื่องหมาย — ใช้เมื่อ &ldquo;ต้องการให้อ่านค่าที่พิมพ์แล้วรู้ทันทีว่าเป็นตัวไหน&rdquo; เช่น SKU ตรง ๆ (<span class="mono text-[12px]">code128_sku</span>) เพราะ EAN-13 เป็นตัวเลขล้วนอ่านไม่รู้เรื่อง</td></tr>
+                <tr><td><span class="mono text-[12px]">qr</span></td><td>ไม่ตายตัว</td><td><span style="color:var(--muted)">— (Reed-Solomon ในตัว ไม่ใช่ GS1)</span></td><td><b>รับได้เฉพาะ <span class="mono text-[12px]">manual</span></b> — ยังไม่มี strategy auto ที่สร้าง QR ให้ (รอ requirement จริงจากฝั่งขายที่อยากผูก URL/ข้อมูลเพิ่มเติมเข้าไปในโค้ด)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4"><div class="tag mb-1">ทำไม code128/qr ไม่มี check digit แบบ GS1</div><p class="text-[13px]">GS1 mod-10 (ถ่วงน้ำหนัก 1,3 สลับกัน) เป็นกติกาเฉพาะของสัญลักษณ์ตระกูล EAN/UPC/ITF ที่เข้ารหัส<b>ตัวเลขล้วน</b>เท่านั้น — <span class="mono text-[12px]">code128</span>/<span class="mono text-[12px]">qr</span> เข้ารหัสตัวอักษรได้ด้วย จึงมีกลไกตรวจสอบของตัวเองอยู่ในระดับ encoder (Code Set C checksum / Reed-Solomon) ซึ่งเครื่องพิมพ์/เครื่องยิงจัดการให้อัตโนมัติ ระบบฝั่ง backend จึงแค่ตรวจว่า &ldquo;ไม่ว่างเปล่า&rdquo; (<span class="mono text-[12px]">isValidBarcodeFormat</span>) ไม่ต้องคำนวณ checksum เอง</p></div>
+          </div>
+
           <!-- TARGET TYPES -->
           <div class="card p-6 mb-5">
             <div class="mono text-[12px] mb-3" style="color:#7C3AED">target_type &middot; บาร์โค้ดหมายถึงอะไร (enum <span class="mono">BarcodeTargetType</span>)</div>
@@ -673,6 +690,17 @@ item_prices: [
               </tbody>
             </table>
             <div class="edge mt-4"><div class="tag mb-1">ทำไมต้องเก็บ target_type ทั้งที่เดาจาก product ได้</div><p class="text-[13px]">เป็นการ <b>ประกาศเจตนา</b> ของผู้บันทึกให้ระบบตรวจกลับได้ตอนสร้าง — สร้างป้าย <span class="mono text-[12px]">variant</span> แต่ชี้ไป product ที่เป็นต้นแบบ = reject ทันที (400) แทนที่จะไปพังตอนยิงหน้างานหกเดือนถัดมา · ธรรมชาติของ product (<span class="mono text-[12px]">has_variants</span> / <span class="mono text-[12px]">type</span>) แก้ไม่ได้เมื่อมี variant/movement แล้ว ค่าที่เก็บจึงไม่ drift</p></div>
+
+            <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">ตัวอย่างจริงต่อชนิด (agriculture catalogue)</div>
+            <div class="grid sm:grid-cols-2 gap-4">
+              <div class="edge"><div class="tag mb-1">item</div><p class="text-[13px]">ปุ๋ยเคมี <span class="mono text-[12px]">AGCH-FUN-01</span> (สินค้าเดี่ยว ไม่มีตัวเลือก) — ยิงป้ายที่ถุงแล้วรับเข้าคลังได้ทันที 1 ถุง = 1 <span class="mono text-[12px]">stock_uom</span></p></div>
+              <div class="edge"><div class="tag mb-1">variant</div><p class="text-[13px]">น้ำยาสมุนไพร template <span class="mono text-[12px]">AGCH-HRB-T01</span> ถูก generate เป็น <span class="mono text-[12px]">AGCH-HRB-T01-1L</span> / <span class="mono text-[12px]">-4L</span> / <span class="mono text-[12px]">-20L</span> — แต่ละขนาดมีป้ายของตัวเอง ยิงป้าย 4L แล้วรับเข้าคลังเป็น &ldquo;น้ำยาสมุนไพร ขนาด 4 ลิตร&rdquo; ทันที ไม่ต้องเลือกขนาดซ้ำ</p></div>
+              <div class="edge"><div class="tag mb-1">pack</div><p class="text-[13px]">สินค้าเดียวกับ <span class="mono text-[12px]">AGCH-FUN-01</span> แต่มีป้าย &ldquo;ลัง&rdquo; แยกอีกใบ ชี้ <span class="mono text-[12px]">uom_id</span> = ลัง (มี <span class="mono text-[12px]">uom_conversion_factors</span> บอกว่า 1 ลัง = 24 ถุง) — ยิงป้ายลังแล้วรับเข้าคลัง <b>24</b> หน่วยในคราวเดียว ไม่ใช่ 1</p></div>
+              <div class="edge"><div class="tag mb-1">template</div><p class="text-[13px]">ยิงป้ายที่ติดอยู่บนกล่องโชว์สินค้าของ <span class="mono text-[12px]">AGCH-HRB-T01</span> (ต้นแบบ ไม่ใช่ของจริงที่ขาย) — ระบบตอบกลับว่า &ldquo;นี่คือสินค้าต้นแบบ มี 3 variant: 1L, 4L, 20L&rdquo; ให้พนักงานไปหยิบของแล้วยิงป้ายที่ตัวสินค้าจริงแทน</p></div>
+              <div class="edge"><div class="tag mb-1">item_group</div><p class="text-[13px]">ป้ายติดชั้นวางหมวด &ldquo;ปุ๋ยเคมี&rdquo; — ยิงแล้วเปิดหน้าจอ &ldquo;สินค้าในหมวดนี้&rdquo; ใช้เดินสต็อก/ตรวจนับ ไม่ใช่รับเข้าคลัง</p></div>
+              <div class="edge"><div class="tag mb-1">bundle</div><p class="text-[13px]">ชุด &ldquo;สตาร์ทเตอร์ปลูกผัก&rdquo; (เมล็ด + ปุ๋ย + กระถาง) — สร้างป้ายได้ตั้งแต่วันนี้ (สำหรับติดป้ายราคา/โปรโมชัน) แต่ยิงเพื่อ &ldquo;รับเข้าคลัง/ระเบิดเป็นส่วนประกอบ&rdquo; ยังทำไม่ได้จนกว่า Phase 4 จะมีตาราง <span class="mono text-[12px]">bundle_items</span></p></div>
+            </div>
           </div>
 
           <!-- CONSTRAINTS -->
@@ -689,6 +717,8 @@ item_prices: [
               </tbody>
             </table>
             <div class="edge mt-4" style="background:rgba(185,28,28,.05);border-color:rgba(185,28,28,.2)"><div class="tag mb-1" style="color:#B91C1C">ระวัง</div><p class="text-[13px]"><span class="mono text-[12px]">23514</span> (check constraint) <b>ไม่อยู่ในชุดที่ PostgresErrorMapper แปลงให้อัตโนมัติ</b> — ทั้งสอง <span class="mono text-[12px]">chk_*</span> ข้างบนต้องถูกตรวจที่ service ก่อน insert เสมอ ไม่งั้น client ได้ 500 แทน 400</p></div>
+            <div class="edge mt-3"><div class="tag mb-1">ทำไม uq_barcodes_primary_target ต้อง COALESCE</div><p class="text-[13px]"><span class="mono text-[12px]">product_id</span>/<span class="mono text-[12px]">item_group_id</span>/<span class="mono text-[12px]">uom_id</span> เป็น nullable ทั้งสามคอลัมน์ — unique index ธรรมดาจะ<b>ไม่จับ</b>ป้ายหลักซ้ำสองใบของ item_group เดียวกัน เพราะ SQL ถือว่า <span class="mono text-[12px]">NULL ≠ NULL</span> เสมอ จึงต้อง <span class="mono text-[12px]">COALESCE(col, '00000000-...'::uuid)</span> แทนค่าว่างด้วย sentinel UUID คงที่ก่อนเข้า index — รายละเอียดอยู่ในคอมเมนต์ migration <span class="mono text-[12px]">CreateBarcode</span></p></div>
+            <div class="edge mt-3"><div class="tag mb-1">seed data ใช้ prefix แยกจากของจริง</div><p class="text-[13px]">บาร์โค้ดตัวอย่างที่ seed สร้าง (<span class="mono text-[12px]">libs/database/src/scripts/seed/seeders/barcodes.seeder.ts</span>) ใช้ prefix ภายใน <span class="mono text-[12px]">29</span> เสมอ — คนละตัวกับ <span class="mono text-[12px]">BARCODE_INTERNAL_PREFIX</span> (default <span class="mono text-[12px]">20</span>) ที่ระบบจริงออกให้ผ่าน API — เพื่อไม่ให้เลขที่ seed ไปชนกับเลขที่ระบบออกจริงในภายหลัง แม้ seed จะเขียนตรงด้วย SQL โดยไม่ผ่าน <span class="mono text-[12px]">barcode_number_counters</span> ก็ตาม</p></div>
           </div>
 
           <!-- GENERATION -->
@@ -749,10 +779,10 @@ item_prices: [
               <thead><tr><th style="width:300px">Endpoint</th><th style="width:150px">permission</th><th>หมายเหตุ</th></tr></thead>
               <tbody>
                 <tr><td><span class="mono text-[12px]">POST /barcodes</span></td><td><span class="mono text-[12px]">barcode:create</span></td><td>สร้าง 1 ใบ — <span class="mono text-[12px]">generation_strategy</span> ตัดสินว่าต้องส่ง <span class="mono text-[12px]">barcode</span> มาเองหรือให้ระบบสร้าง</td></tr>
-                <tr><td><span class="mono text-[12px]">POST /products/{id}/variant-barcodes</span></td><td><span class="mono text-[12px]">barcode:create</span></td><td>สร้างป้ายหลักให้ <b>ทุก variant</b> ของ template ในครั้งเดียว (ต่อจาก <span class="mono text-[12px]">generate-variants</span>) — <b>idempotent</b>: variant ที่มี primary แล้วให้ข้าม ไม่สร้างซ้ำ</td></tr>
-                <tr><td><span class="mono text-[12px]">GET /barcodes</span> &middot; <span class="mono text-[12px]">GET /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:read</span></td><td>paginate + <span class="mono text-[12px]">@ValidatedQuery</span> · กรองด้วย <span class="mono text-[12px]">filter[]=product_id||$eq||&lt;uuid&gt;</span>, <span class="mono text-[12px]">target_type</span>, <span class="mono text-[12px]">is_active</span></td></tr>
-                <tr><td><span class="mono text-[12px]">PATCH /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:update</span></td><td>แก้ได้เฉพาะ <span class="mono text-[12px]">is_primary</span> / <span class="mono text-[12px]">is_active</span></td></tr>
-                <tr><td><span class="mono text-[12px]">DELETE /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:delete</span></td><td>soft delete — ค่าเดิมกลับมาสร้างใหม่ได้เพราะ unique เป็น partial</td></tr>
+                <tr><td><span class="mono text-[12px]">POST /products/{id}/variant-barcodes</span></td><td><span class="mono text-[12px]">product:update</span></td><td>สร้างป้ายหลักให้ <b>ทุก variant</b> ของ template ในครั้งเดียว (ต่อจาก <span class="mono text-[12px]">generate-variants</span>) — <b>idempotent</b>: variant ที่มี primary แล้วให้ข้าม ไม่สร้างซ้ำ · endpoint นี้ประกาศอยู่ใน module <span class="mono text-[12px]">barcode/</span> ไม่ใช่ <span class="mono text-[12px]">product/</span> (ดู &ldquo;Cross-module dependency&rdquo; ด้านล่าง)</td></tr>
+                <tr><td><span class="mono text-[12px]">GET /barcodes</span> &middot; <span class="mono text-[12px]">GET /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:view</span></td><td>paginate + <span class="mono text-[12px]">@ValidatedQuery</span> · กรองด้วย <span class="mono text-[12px]">filter[]=product_id||$eq||&lt;uuid&gt;</span>, <span class="mono text-[12px]">target_type</span>, <span class="mono text-[12px]">is_active</span></td></tr>
+                <tr><td><span class="mono text-[12px]">PUT /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:update</span></td><td>แก้ได้เฉพาะ <span class="mono text-[12px]">is_primary</span> / <span class="mono text-[12px]">is_active</span></td></tr>
+                <tr><td><span class="mono text-[12px]">DELETE /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:update</span></td><td>soft delete — ค่าเดิมกลับมาสร้างใหม่ได้เพราะ unique เป็น partial (delete ใช้ permission เดียวกับ update ตามธรรมเนียมทั้ง inventory-bc)</td></tr>
               </tbody>
             </table>
             <div class="rulebox mt-4"><div class="rc mb-1">RULE &middot; ค่า barcode แก้ไม่ได้</div><p class="text-[13.5px]">เมื่อบันทึกแล้ว <span class="mono text-[12px]">barcode</span> / <span class="mono text-[12px]">symbology</span> / <span class="mono text-[12px]">target_type</span> / <span class="mono text-[12px]">product_id</span> <b>ห้ามแก้</b> — ป้ายถูกพิมพ์และติดไปกับของแล้ว การแก้ค่าในฐานข้อมูลทำให้ป้ายที่หมุนเวียนอยู่ชี้ผิดสินค้าเงียบ ๆ · ถ้าผิดให้ <span class="mono text-[12px]">DELETE</span> แล้วสร้างใบใหม่ (ประวัติยังอยู่ครบเพราะเป็น soft delete)</p></div>
@@ -764,11 +794,172 @@ item_prices: [
             <div class="space-y-2">
               <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>enums + entity</b> — <span class="mono text-[12px]">BarcodeTargetType</span> · <span class="mono text-[12px]">BarcodeSymbology</span> · <span class="mono text-[12px]">BarcodeSource</span> · <span class="mono text-[12px]">BarcodeGenerationStrategy</span> แล้วเขียน <span class="mono text-[12px]">barcode.entity.ts</span> + <span class="mono text-[12px]">barcode-number-counter.entity.ts</span></p></div>
               <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>migration</b> — <span class="mono text-[12px]">pnpm run migration:generate:inventory --name=CreateBarcode</span> แล้ว <b>เติมมือ</b> เฉพาะสิ่งที่ generator มองไม่เห็น: partial unique 2 ตัว + <span class="mono text-[12px]">chk_*</span> 2 ตัว</p></div>
-              <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>utils ใน <span class="mono text-[12px]">@lib/common</span></b> — <span class="mono text-[12px]">barcode.util.ts</span> (check digit · normalize · validate ตาม symbology) พร้อม <span class="mono text-[12px]">.spec.ts</span> · pure function ไม่แตะ DB เหมือน <span class="mono text-[12px]">generate-variant-combinations.util.ts</span></p></div>
-              <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>DTO + service + controller</b> — <span class="mono text-[12px]">@ResourceType('barcodes')</span> · <span class="mono text-[12px]">ParseUuidParamPipe</span> ทุก param · prose ของ Swagger อยู่ใน <span class="mono text-[12px]">constants/barcode.swagger.ts</span> · การออกเลขทำใน transaction เดียวกับ insert (<span class="mono text-[12px]">FOR UPDATE</span> บน counter)</p></div>
+              <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>utils ใน module เอง</b> — <span class="mono text-[12px]">barcode/utils/barcode.util.ts</span> (check digit · normalize · validate ตาม symbology) พร้อม <span class="mono text-[12px]">.spec.ts</span> · pure function ไม่แตะ DB เหมือน <span class="mono text-[12px]">product/utils/generate-variant-combinations.util.ts</span> — <b>ไม่ใช่ <span class="mono text-[12px]">@lib/common</span></b> เพราะยังไม่มี BC อื่นต้องใช้ (ต่างจาก <span class="mono text-[12px]">document-totals.util.ts</span>/<span class="mono text-[12px]">vat.util.ts</span> ที่ใช้ร่วมกันหลาย BC จริง)</p></div>
+              <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>DTO + service + controller</b> — <span class="mono text-[12px]">@ResourceType('barcodes')</span> · <span class="mono text-[12px]">ParseUuidParamPipe</span> ทุก param · prose ของ Swagger อยู่ใน <span class="mono text-[12px]">constants/barcode.swagger.ts</span> · การออกเลขทำใน transaction เดียวกับ insert (<span class="mono text-[12px]">FOR UPDATE</span> บน counter) · <span class="mono text-[12px]">BarcodesService</span> อ่าน product/item_group/uom_conversion ผ่าน <span class="mono text-[12px]">ProductsService</span>/<span class="mono text-[12px]">ItemGroupsService</span>/<span class="mono text-[12px]">UomConversionFactorsService</span> ของ module เจ้าของเสมอ — <b>ห้าม</b> <span class="mono text-[12px]">@InjectRepository</span> entity ข้าม module ตรง ๆ (ดู &ldquo;Cross-module dependency&rdquo; ด้านล่าง)</p></div>
               <div class="step"><span class="sn">5</span><p class="text-[13.5px]"><b>ตรวจเป้าหมายก่อนบันทึกเสมอ</b> — โหลด product/item_group จริงมาเทียบกับ <span class="mono text-[12px]">target_type</span> · <span class="mono text-[12px]">pack</span> ต้องเจอ <span class="mono text-[12px]">uom_conversion_factors</span> ที่ตรงกัน มิฉะนั้น 400</p></div>
               <div class="step"><span class="sn">6</span><p class="text-[13.5px]"><b>seed</b> — เติมป้ายให้สินค้าตัวอย่างใน <span class="mono text-[12px]">libs/database/src/scripts/seed/</span> (เลือกแบบ deterministic ผ่าน <span class="mono text-[12px]">stable-index.util.ts</span> ห้าม random) + เพิ่ม <span class="mono text-[12px]">barcodes</span> ใน <span class="mono text-[12px]">truncates</span></p></div>
               <div class="step"><span class="sn">7</span><p class="text-[13.5px]"><b>permission</b> — <span class="mono text-[12px]">npm run permissions:sync</span> แล้วเขียน grant migration ให้ policy ที่ต้องใช้ (sync สร้างแค่ catalog ไม่ผูก <span class="mono text-[12px]">statement_actions</span> ให้)</p></div>
+            </div>
+          </div>
+
+          <!-- CROSS-MODULE DEPENDENCY -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">Cross-module dependency &middot; ทำไม variant-barcodes ไม่อยู่ใน ProductsController</div>
+            <p class="text-[13.5px] mb-3">โมดูล <span class="mono text-[12px]">barcode/</span> ต้องอ่านข้อมูล product/item_group/uom_conversion เพื่อตรวจ <span class="mono text-[12px]">target_type</span> จึงพึ่ง <span class="mono text-[12px]">ProductsService</span> · <span class="mono text-[12px]">ItemGroupsService</span> · <span class="mono text-[12px]">UomConversionFactorsService</span> ของ module เจ้าของข้อมูลเสมอ (ไม่ inject repository ข้าม module ตรง ๆ) — ทิศทางเดียว: <span class="mono text-[12px]">BarcodeModule → ProductModule</span></p>
+            <p class="text-[13.5px] mb-3">ถ้า endpoint <span class="mono text-[12px]">POST /products/{id}/variant-barcodes</span> ถูกประกาศใน <span class="mono text-[12px]">ProductsController</span> (module <span class="mono text-[12px]">product/</span>) ตามสัญชาตญาณ — <span class="mono text-[12px]">ProductModule</span> จะต้อง import <span class="mono text-[12px]">BarcodeModule</span> กลับมาด้วย (เพื่อ inject <span class="mono text-[12px]">BarcodesService</span>) กลายเป็น <b>circular dependency</b> (<span class="mono text-[12px]">ProductModule ↔ BarcodeModule</span>) ซึ่ง Nest DI graph resolve ไม่ได้สะอาด</p>
+            <p class="text-[13.5px]">ทางแก้ที่ใช้จริง: ประกาศ <span class="mono text-[12px]">ProductBarcodesController</span> (<span class="mono text-[12px]">@Controller('products')</span>) ไว้ใน <span class="mono text-[12px]">barcode/controllers/</span> แทน — ได้ URL <span class="mono text-[12px]">/products/{id}/variant-barcodes</span> เหมือนเดิมทุกประการ แต่ <span class="mono text-[12px]">ProductModule</span> ไม่ต้องรู้จัก <span class="mono text-[12px]">BarcodeModule</span> เลย เป็นแพทเทิร์นเดียวกับที่ <span class="mono text-[12px]">ReorderLevelsController</span>/<span class="mono text-[12px]">UomConversionFactorsController</span> ใช้อยู่แล้ว (แต่ละตัวประกาศ <span class="mono text-[12px]">@Controller('products')</span> จาก module ของตัวเอง) — กติกาเต็มอยู่ใน root <span class="mono text-[12px]">CLAUDE.md</span> หัวข้อ &ldquo;Cross-module data access&rdquo;</p>
+          </div>
+
+          <!-- TESTING -->
+          <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+          <div class="mono text-[12px] mb-3" style="color:#7C3AED">ทดสอบ end-to-end จริง &middot; curl บน dev environment (ยกให้ทีม FE ใช้อ้างอิง)</div>
+          <p class="text-[13.5px] mb-5" style="color:var(--ink-soft)">รันผ่าน auth-bc (login จริง) + inventory-bc (สร้างบาร์โค้ดจริง) บน Postgres dev instance เดียวกับที่ backend ใช้ &mdash; ไม่ใช่ unit test ที่ mock repository ครอบคลุมทั้ง 3 รูปแบบการสร้างที่ทีม FE ต้องเรียกจริง (เดี่ยว/SKU · หมวดหมู่ · variant ทั้งชุด) บวก edge case อีก 7 เคส</p>
+
+          <div class="diagram mb-6">
+<pre class="mermaid">
+sequenceDiagram
+    participant FE as FE Client
+    participant Auth as auth-bc &middot; /auth/v1
+    participant Inv as inventory-bc &middot; /inventory-bc/v1
+    participant DB as erp_inventory (Postgres)
+
+    FE->>Auth: POST /auth/login { username, password }
+    Auth-->>FE: 200 { access_token, csrf_token, expires_in }
+    Note over FE,Auth: Bearer token ไม่มี cookie &rarr; CsrfGuard exempt ให้อัตโนมัติ
+
+    rect rgba(124,58,237,.08)
+    Note over FE,Inv: Case A &middot; สินค้าเดี่ยว + barcode = SKU
+    FE->>Inv: POST /barcodes { code128_sku, target_type=item, product_id }
+    Inv->>DB: assertProductTransactable + resolve sku
+    DB-->>Inv: product.sku = 'FERT-CHM-01'
+    Inv-->>FE: 201 { barcode: 'FERT-CHM-01', symbology: code128 }
+    end
+
+    rect rgba(2,132,199,.08)
+    Note over FE,Inv: Case B &middot; บาร์โค้ดหมวดหมู่ (item_group)
+    FE->>Inv: POST /barcodes { ean13_internal, target_type=item_group, item_group_id }
+    Inv->>DB: SELECT ... FOR UPDATE barcode_number_counters WHERE prefix='20'
+    DB-->>Inv: last_number=0 &rarr; ออกเลข 1
+    Inv-->>FE: 201 { barcode: '2000000000015', symbology: ean13 }
+    end
+
+    rect rgba(21,128,61,.08)
+    Note over FE,Inv: Case C &middot; ต้นแบบมี variant &rarr; ออกให้ทุกตัวในคำขอเดียว
+    FE->>Inv: POST /products/{template_id}/variant-barcodes { ean13_internal }
+    Inv->>DB: findAll products WHERE template_product_id = :template_id
+    DB-->>Inv: [1KG, 25KG, 50KG]
+    loop ทุก variant ที่ยังไม่มี primary barcode
+        Inv->>DB: ออกเลขถัดไป + insert (transaction เดียวกับ variant นั้น)
+    end
+    Inv-->>FE: 201 [ {1KG: 2000000000022}, {25KG: ...039}, {50KG: ...046} ]
+    FE->>Inv: POST /products/{template_id}/variant-barcodes (เรียกซ้ำ)
+    Inv-->>FE: 201 [] &larr; idempotent ทุกตัวมี primary แล้ว ไม่สร้างซ้ำ
+    end
+</pre>
+          </div>
+
+          <!-- CURL: LOGIN -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">0 &middot; Login &mdash; ขอ access_token (ครั้งเดียว ใช้ได้ทุกเคสด้านล่าง)</div>
+<pre class="code p-4"><span class="c"># mock user จาก SeedAuthMockupData (dev เท่านั้น)</span>
+curl -X POST http://localhost:3001/auth/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"superadmin","password":"ErpSuper26"}'
+
+<span class="c"># 200 OK</span>
+{ "access_token": "eyJhbGciOi...", "csrf_token": "64b85dd8...", "token_type": "Bearer", "expires_in": 28800 }</pre>
+            <div class="edge mt-3"><div class="tag mb-1">ทำไมไม่ต้องส่ง x-csrf-token</div><p class="text-[13px]"><span class="mono text-[12px]">CsrfGuard</span> เช็คเฉพาะตอนมี <span class="mono text-[12px]">csrf_token</span> cookie (flow แบบ browser/cookie) — client ที่ยิง <span class="mono text-[12px]">Authorization: Bearer</span> ตรง ๆ แบบทีม FE เทสนี้ไม่มี cookie เลยเข้าเงื่อนไข exempt โดยอัตโนมัติ ไม่ต้องแนบ header เพิ่ม</p></div>
+          </div>
+
+          <!-- CURL: CASE A -->
+          <div class="card p-6 mb-5" style="border-left:3px solid #7C3AED">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">A &middot; สินค้าเดี่ยว + barcode = SKU (code128_sku)</div>
+<pre class="code p-4">curl -X POST http://localhost:3003/inventory-bc/v1/barcodes \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "generation_strategy": "code128_sku",
+    "target_type": "item",
+    "product_id": "b6fc3781-...",
+    "is_primary": true
+  }'
+
+<span class="c"># 201 Created</span>
+{
+  "barcode": "FERT-CHM-01",
+  "symbology": "code128",
+  "target_type": "item",
+  "source": "auto_code128",
+  "is_primary": true
+}</pre>
+          </div>
+
+          <!-- CURL: CASE B -->
+          <div class="card p-6 mb-5" style="border-left:3px solid var(--blueprint)">
+            <div class="mono text-[12px] mb-3" style="color:var(--blueprint)">B &middot; บาร์โค้ดหมวดหมู่ (item_group, ean13_internal)</div>
+<pre class="code p-4">curl -X POST http://localhost:3003/inventory-bc/v1/barcodes \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "generation_strategy": "ean13_internal",
+    "target_type": "item_group",
+    "item_group_id": "85667689-...",
+    "is_primary": true
+  }'
+
+<span class="c"># 201 Created</span>
+{
+  "barcode": "2000000000015",
+  "symbology": "ean13",
+  "target_type": "item_group",
+  "source": "auto_ean13",
+  "is_primary": true
+}</pre>
+          </div>
+
+          <!-- CURL: CASE C -->
+          <div class="card p-6 mb-5" style="border-left:3px solid var(--signal)">
+            <div class="mono text-[12px] mb-3" style="color:var(--signal)">C &middot; ต้นแบบมี variant &mdash; ออกบาร์โค้ดให้ทุกตัวในคำขอเดียว</div>
+<pre class="code p-4">curl -X POST http://localhost:3003/inventory-bc/v1/products/ae1207be-.../variant-barcodes \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"generation_strategy": "ean13_internal"}'
+
+<span class="c"># 201 Created — 1 รายการต่อ variant ที่ยังไม่มี primary</span>
+[
+  { "barcode": "2000000000022", "target_type": "variant", "product_id": "...-1KG"  },
+  { "barcode": "2000000000039", "target_type": "variant", "product_id": "...-25KG" },
+  { "barcode": "2000000000046", "target_type": "variant", "product_id": "...-50KG" }
+]
+
+<span class="c"># เรียกซ้ำทันที (idempotent) &rarr; 201 []</span>
+curl -X POST http://localhost:3003/inventory-bc/v1/products/ae1207be-.../variant-barcodes \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"generation_strategy": "ean13_internal"}'
+<span class="c"># [] — ทุก variant มี primary barcode แล้ว ไม่สร้างซ้ำ ไม่มี error</span></pre>
+          </div>
+
+          <!-- EDGE CASES TABLE -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">Edge case ที่ยิงทดสอบเพิ่ม (7 เคส &mdash; ผ่านทั้งหมด)</div>
+            <table class="d">
+              <thead><tr><th>สิ่งที่ยิง</th><th style="width:110px">คาดว่าได้</th><th style="width:110px">ผลจริง</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">target_type=item</span> บน product ที่จริงเป็น variant (มี <span class="mono text-[12px]">template_product_id</span>)</td><td>400</td><td><span style="color:#15803D">400 ✓</span></td></tr>
+                <tr><td>สร้างบาร์โค้ดค่าเดิมซ้ำ (<span class="mono text-[12px]">code128_sku</span> ของสินค้าเดียวกันสองครั้ง)</td><td>409</td><td><span style="color:#15803D">409 ✓</span></td></tr>
+                <tr><td><span class="mono text-[12px]">target_type=pack</span> โดยสินค้ายังไม่มี <span class="mono text-[12px]">uom_conversion_factors</span> คู่กับ uom นั้น</td><td>400</td><td><span style="color:#15803D">400 ✓</span></td></tr>
+                <tr><td><span class="mono text-[12px]">manual</span> ใส่ EAN-13 ที่ check digit ผิด</td><td>400</td><td><span style="color:#15803D">400 ✓</span></td></tr>
+                <tr><td><span class="mono text-[12px]">code128_sku</span> คู่กับ <span class="mono text-[12px]">target_type=pack</span></td><td>400</td><td><span style="color:#15803D">400 ✓</span></td></tr>
+                <tr><td><span class="mono text-[12px]">target_type=template</span> บนสินค้าต้นแบบจริง (<span class="mono text-[12px]">has_variants=true</span>)</td><td>201 (ค้นหาได้ ไม่ทำธุรกรรม)</td><td><span style="color:#15803D">201 ✓</span></td></tr>
+                <tr><td>สร้าง primary ใบใหม่ให้ target เดิมที่มี primary อยู่แล้ว</td><td>ใบเก่าถูกดึง <span class="mono text-[12px]">is_primary=false</span> อัตโนมัติ</td><td><span style="color:#15803D">✓ ยืนยันด้วย query DB ตรง</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- BUG FOUND DURING TESTING -->
+          <div class="step">
+            <span class="sn">!</span>
+            <div>
+              <h4 class="font-semibold text-[15px] mb-2">บั๊กที่เจอระหว่างเตรียมข้อมูลทดสอบ (ไม่เกี่ยวกับ barcode โดยตรง แต่บล็อกการเทส) &mdash; แก้แล้ว</h4>
+              <p class="text-[13.5px] mb-3" style="color:var(--ink-soft)"><span class="mono text-[12px]">GET /item-groups</span> และ <span class="mono text-[12px]">GET /item-attributes</span> ตอบ <span class="mono text-[12px]">403</span> แม้เรียกด้วย superadmin — สาเหตุคือ <span class="mono text-[12px]">item-groups.controller.ts</span>/<span class="mono text-[12px]">item-attributes.controller.ts</span> ประกาศ <span class="mono text-[12px]">@RequirePermission('item-group:view')</span> แบบมีขีดกลาง แต่ regex ตรวจสอบ permission string ใน <span class="mono text-[12px]">permission-sync-scan.util.ts</span> (<span class="mono text-[12px]">^([a-zA-Z0-9_]+):([a-zA-Z0-9_]+)$</span>) ไม่รับขีดกลาง — permission เหล่านี้จึงไม่เคยเข้า catalog มาตั้งแต่สร้างโมดูล ทำให้ 403 เงียบ ๆ ทุกคนแม้ superadmin</p>
+              <div class="edge"><div class="tag mb-1">Fix</div><p class="text-[13px]">เปลี่ยนเป็น <span class="mono text-[12px]">item_group:*</span> / <span class="mono text-[12px]">item_attribute:*</span> (underscore ตาม convention เดียวกับทุก resource อื่นในระบบ) &rarr; รัน <span class="mono text-[12px]">permissions:sync</span> &rarr; เขียน grant migration ให้ policy mock &rarr; verify แล้วว่า 200</p></div>
             </div>
           </div>
 
