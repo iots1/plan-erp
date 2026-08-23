@@ -37,11 +37,12 @@
       <div class="navsub">ในเฟสนี้ประกอบด้วย</div>
       <div class="navsub">1 · Business &amp; Roles</div>
       <div class="navsub">2 · Master + ตัวอย่างสินค้า</div>
-      <div class="navsub">3 · Setup Sequence → Inventory</div>
-      <div class="navsub">4 · Storage · MinIO</div>
-      <div class="navsub">5 · ER Diagram</div>
-      <div class="navsub">6 · Dev Guide</div>
-      <div class="navsub">7 · Glossary</div>
+      <div class="navsub">3 · Barcode · สร้าง/auto-gen</div>
+      <div class="navsub">4 · Setup Sequence → Inventory</div>
+      <div class="navsub">5 · Storage · MinIO</div>
+      <div class="navsub">6 · ER Diagram</div>
+      <div class="navsub">7 · Dev Guide</div>
+      <div class="navsub">8 · Glossary</div>
     </nav>
     <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
   </erp-sidebar>
@@ -624,9 +625,159 @@ item_prices: [
           </div>
         </div>
 
-        <!-- 2.3 Setup Sequence & Handoff -->
+        <!-- 2.3 Barcode -->
         <div class="mb-12">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">03</span><h3 class="text-xl font-semibold">Setup Sequence &amp; Handoff to Inventory · ลำดับตั้งค่า → ส่งต่อ</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">03</span><h3 class="text-xl font-semibold">Barcode &middot; ระบุเอง หรือให้ระบบสร้าง</h3></div>
+          <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">บาร์โค้ดไม่ได้ผูกกับ &ldquo;สินค้า&rdquo; อย่างเดียว — ธุรกิจจริงมีทั้ง <b>ป้ายชิ้น</b> (SKU/variant), <b>ป้ายลัง</b> (ต่างที่หน่วยบรรจุ), <b>ป้ายชุดสินค้า</b> (bundle) และ <b>ป้ายหมวด/ชั้นวาง</b> (item group) ที่ใช้ค้นหาอย่างเดียว · ส่วนนี้กำหนดโครงข้อมูลและกติกาการ <b>สร้าง</b> บาร์โค้ด (การยิงเพื่อรับเข้าคลังอยู่ใน Phase 3)</p>
+
+          <div class="space-y-3 mb-6">
+            <div class="rulebox"><div class="rc mb-1">RULE &middot; ตารางเดียว &middot; unique ทั้งระบบ</div><p class="text-[13.5px]">บาร์โค้ดทุกชนิดอยู่ใน <span class="mono text-[12px]">barcodes</span> ตารางเดียว ไม่แยกตารางตามชนิดเป้าหมาย — เพราะเครื่องยิงส่งมาแค่ &ldquo;สตริงเดียว&rdquo; ระบบต้องตอบได้ทันทีว่าเจออะไร ด้วย query เดียว และค่าเดียวกัน <b>ห้ามซ้ำข้ามชนิด</b> (ถ้าแยกตาราง Postgres จะบังคับ unique ข้ามตารางให้ไม่ได้ → ยิงแล้วกำกวม)</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE &middot; 1 ยิง = 1 การกระทำ (UX ที่บังคับด้วยข้อมูล)</div><p class="text-[13.5px]">บาร์โค้ดที่ <b>ทำธุรกรรมได้</b> ต้องชี้ไปที่ product ที่แน่นอนเสมอ — ยิงป้าย &ldquo;เสื้อยืดสีดำ M&rdquo; แล้ว <b>รับเข้าคลังได้เลย</b> ห้ามเด้งถามให้เลือก variant ซ้ำ · ชนิดที่กำกวม (<span class="mono text-[12px]">template</span>, <span class="mono text-[12px]">item_group</span>) จึงถูกกันไม่ให้ทำธุรกรรม <b>ที่ชั้นข้อมูล</b> (ผ่าน <span class="mono text-[12px]">assertProductTransactable</span>) ไม่ใช่กันที่หน้าจอ</p></div>
+          </div>
+
+          <!-- BARCODES -->
+          <div class="card p-6 mb-5" style="border-left:3px solid #7C3AED">
+            <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div class="mono text-[12px]" style="color:#7C3AED">barcodes &middot; บาร์โค้ด (inventory-bc)</div>
+              <span class="chip"><span class="dot" style="background:var(--signal)"></span>ใหม่ใน Phase 2 &mdash; ยังไม่ได้ implement</span>
+            </div>
+            <table class="d">
+              <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
+              <tbody>
+                <tr><td>barcode</td><td><span style="color:#15803D">✓</span></td><td>ค่าที่ยิงได้จริง (varchar 64) — เก็บแบบ <b>normalize แล้ว</b> · unique ทั้งตาราง เฉพาะแถวที่ยังไม่ถูกลบ (<span class="mono text-[12px]">uq_barcodes_barcode</span> &middot; partial index <span class="mono text-[12px]">WHERE is_deleted = false</span>)</td></tr>
+                <tr><td>symbology</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">ean13</span> | <span class="mono text-[12px]">ean8</span> | <span class="mono text-[12px]">upc_a</span> | <span class="mono text-[12px]">itf14</span> | <span class="mono text-[12px]">code128</span> | <span class="mono text-[12px]">qr</span> — ชนิดรหัส ใช้ตรวจความถูกต้อง (check digit) และเลือกวิธีพิมพ์ป้าย</td></tr>
+                <tr><td>target_type</td><td><span style="color:#15803D">✓</span></td><td>บาร์โค้ดนี้หมายถึงอะไร — ดูตารางถัดไป</td></tr>
+                <tr><td>product_id</td><td><span style="color:var(--muted)">cond</span></td><td>ต้องมีเมื่อ <span class="mono text-[12px]">target_type ≠ item_group</span> (FK <span class="mono text-[12px]">products.id</span> ตารางเดียวกัน)</td></tr>
+                <tr><td>item_group_id</td><td><span style="color:var(--muted)">cond</span></td><td>ต้องมีเมื่อ <span class="mono text-[12px]">target_type = item_group</span> (FK <span class="mono text-[12px]">item_groups.id</span>)</td></tr>
+                <tr><td>uom_id</td><td><span style="color:var(--muted)">cond</span></td><td>ต้องมี<b>เฉพาะ</b> <span class="mono text-[12px]">target_type = pack</span> — หน่วยบรรจุ (เช่น ลัง) และต้องมีแถวคู่กันใน <span class="mono text-[12px]">uom_conversion_factors</span> ของสินค้านั้น</td></tr>
+                <tr><td>is_primary</td><td><span style="color:#15803D">✓</span></td><td>บาร์โค้ดหลักที่ใช้พิมพ์ป้าย — <b>มีได้ตัวเดียวต่อเป้าหมาย</b> (partial unique) · default false</td></tr>
+                <tr><td>is_active</td><td><span style="color:#15803D">✓</span></td><td>ปิดใช้ชั่วคราวโดยไม่ลบ — ป้ายเก่าที่ยังหมุนเวียนอยู่ยังยิงเจอ แต่ระบบเตือน · default true</td></tr>
+                <tr><td>source</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">manual</span> | <span class="mono text-[12px]">auto_ean13</span> | <span class="mono text-[12px]">auto_code128</span> — ที่มาของค่า (ใช้ตรวจสอบย้อนหลังว่าใครเป็นคนกำหนด)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ไม่เก็บอะไร</div><p class="text-[13px]"><b>ไม่มีคอลัมน์ qty ต่อการยิง</b> — จำนวนของ <span class="mono text-[12px]">pack</span> อ่านจาก <span class="mono text-[12px]">uom_conversion_factors.conversion_factor</span> ตอนยิง เพื่อให้อัตราแปลงมีที่มาที่เดียว · <b>ไม่มีรูปภาพบาร์โค้ด</b> — เรนเดอร์ตอนพิมพ์ป้าย (report-bc) จากค่า + symbology</p></div>
+          </div>
+
+          <!-- TARGET TYPES -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">target_type &middot; บาร์โค้ดหมายถึงอะไร (enum <span class="mono">BarcodeTargetType</span>)</div>
+            <table class="d">
+              <thead><tr><th style="width:110px">ค่า</th><th>ชี้ไปที่ / เงื่อนไขของแถวปลายทาง</th><th style="width:90px">ยิงเข้าคลัง</th><th>1 ยิง = จำนวนเท่าไร</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">item</span></td><td><span class="mono text-[12px]">products</span> สินค้าเดี่ยว (<span class="mono text-[12px]">type=single</span> &middot; <span class="mono text-[12px]">has_variants=false</span> &middot; ไม่มี template)</td><td><span style="color:#15803D">✓</span></td><td>1 <span class="mono text-[12px]">stock_uom</span></td></tr>
+                <tr><td><span class="mono text-[12px]">variant</span></td><td><span class="mono text-[12px]">products</span> ที่ generate จาก template (<span class="mono text-[12px]">template_product_id</span> ไม่เป็น null) เช่น เสื้อยืด-ดำ-M</td><td><span style="color:#15803D">✓</span></td><td>1 <span class="mono text-[12px]">stock_uom</span></td></tr>
+                <tr><td><span class="mono text-[12px]">pack</span></td><td>สินค้าเดียวกับ <span class="mono text-[12px]">item</span>/<span class="mono text-[12px]">variant</span> แต่ระบุ <span class="mono text-[12px]">uom_id</span> เป็นหน่วยบรรจุ (โหล/ลัง)</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">conversion_factor</span> <span class="mono text-[12px]">stock_uom</span></td></tr>
+                <tr><td><span class="mono text-[12px]">bundle</span></td><td><span class="mono text-[12px]">products</span> ที่ <span class="mono text-[12px]">type=bundle</span> (ชุด/kit)</td><td><span style="color:var(--muted)">P4</span></td><td>ระเบิดเป็นส่วนประกอบตาม <span class="mono text-[12px]">bundle_items</span> (<b>ยังไม่มีตาราง</b> — รอ Phase 4)</td></tr>
+                <tr><td><span class="mono text-[12px]">template</span></td><td><span class="mono text-[12px]">products</span> ที่ <span class="mono text-[12px]">has_variants=true</span> (สินค้าต้นแบบ)</td><td><span style="color:#B91C1C">✗</span></td><td>ค้นหา / ป้ายชั้นวางเท่านั้น — ยิงแล้วระบบตอบว่าเป็นต้นแบบ พร้อมรายการ variant ให้ไปยิงป้ายที่ถูกต้อง <b>ไม่ใช่ dialog ให้เลือกแล้วรับเข้าคลัง</b></td></tr>
+                <tr><td><span class="mono text-[12px]">item_group</span></td><td><span class="mono text-[12px]">item_groups</span> (node หรือ leaf ก็ได้)</td><td><span style="color:#B91C1C">✗</span></td><td>ค้นหา / ป้ายหมวดหมู่เท่านั้น</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4"><div class="tag mb-1">ทำไมต้องเก็บ target_type ทั้งที่เดาจาก product ได้</div><p class="text-[13px]">เป็นการ <b>ประกาศเจตนา</b> ของผู้บันทึกให้ระบบตรวจกลับได้ตอนสร้าง — สร้างป้าย <span class="mono text-[12px]">variant</span> แต่ชี้ไป product ที่เป็นต้นแบบ = reject ทันที (400) แทนที่จะไปพังตอนยิงหน้างานหกเดือนถัดมา · ธรรมชาติของ product (<span class="mono text-[12px]">has_variants</span> / <span class="mono text-[12px]">type</span>) แก้ไม่ได้เมื่อมี variant/movement แล้ว ค่าที่เก็บจึงไม่ drift</p></div>
+          </div>
+
+          <!-- CONSTRAINTS -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">Constraint &amp; index ที่ต้องมีระดับ DB</div>
+            <table class="d">
+              <thead><tr><th style="width:280px">ชื่อ</th><th>บังคับอะไร</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">uq_barcodes_barcode</span></td><td>partial unique index บน <span class="mono text-[12px]">(barcode) WHERE is_deleted = false</span> — ค่าที่ลบแล้วนำกลับมาใช้ใหม่ได้ แต่ค่าที่ยังใช้อยู่ห้ามซ้ำเด็ดขาด</td></tr>
+                <tr><td><span class="mono text-[12px]">uq_barcodes_primary_target</span></td><td>partial unique บน <span class="mono text-[12px]">(product_id, item_group_id, uom_id) WHERE is_primary AND is_deleted = false</span> — ป้ายหลักมีได้ตัวเดียวต่อเป้าหมาย</td></tr>
+                <tr><td><span class="mono text-[12px]">chk_barcodes_target_reference</span></td><td><span class="mono text-[12px]">item_group</span> → <span class="mono text-[12px]">item_group_id</span> NOT NULL และ <span class="mono text-[12px]">product_id</span> NULL · ชนิดอื่น → กลับกัน (กัน &ldquo;แถวที่ชี้สองที่พร้อมกัน&rdquo;)</td></tr>
+                <tr><td><span class="mono text-[12px]">chk_barcodes_pack_uom</span></td><td><span class="mono text-[12px]">uom_id IS NOT NULL</span> ก็ต่อเมื่อ <span class="mono text-[12px]">target_type = pack</span> เท่านั้น</td></tr>
+                <tr><td><span class="mono text-[12px]">idx_barcodes_product_id</span> &middot; <span class="mono text-[12px]">idx_barcodes_item_group_id</span></td><td>ลิสต์บาร์โค้ดทั้งหมดของสินค้า/หมวดหนึ่ง ๆ ในหน้าจอ Item form (tab Barcode)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mt-4" style="background:rgba(185,28,28,.05);border-color:rgba(185,28,28,.2)"><div class="tag mb-1" style="color:#B91C1C">ระวัง</div><p class="text-[13px]"><span class="mono text-[12px]">23514</span> (check constraint) <b>ไม่อยู่ในชุดที่ PostgresErrorMapper แปลงให้อัตโนมัติ</b> — ทั้งสอง <span class="mono text-[12px]">chk_*</span> ข้างบนต้องถูกตรวจที่ service ก่อน insert เสมอ ไม่งั้น client ได้ 500 แทน 400</p></div>
+          </div>
+
+          <!-- GENERATION -->
+          <div class="card p-6 mb-5" style="border-left:3px solid var(--signal)">
+            <div class="mono text-[12px] mb-3" style="color:var(--signal)">การได้มาซึ่งค่า barcode &mdash; ผู้ใช้ระบุเอง หรือระบบสร้าง (เลือกตอนสร้าง)</div>
+            <table class="d">
+              <thead><tr><th style="width:150px">generation_strategy</th><th>ค่าที่ได้</th><th>ใช้เมื่อ</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">manual</span></td><td>ผู้ใช้กรอกเอง (ต้องส่ง <span class="mono text-[12px]">barcode</span> + <span class="mono text-[12px]">symbology</span> มาด้วย)</td><td>สินค้าซื้อมาขายไปที่มี EAN จากผู้ผลิตติดมาแล้ว — <b>ห้ามสร้างทับ</b> ให้ใช้ของเดิมเสมอ</td></tr>
+                <tr><td><span class="mono text-[12px]">ean13_internal</span></td><td>prefix ภายใน + running number + check digit &rarr; <span class="mono text-[12px]">symbology=ean13</span>, <span class="mono text-[12px]">source=auto_ean13</span></td><td>สินค้าที่ไม่มีบาร์โค้ดจากผู้ผลิต / ป้าย <span class="mono text-[12px]">pack</span> / สินค้าผลิตเอง — เครื่องยิงทุกรุ่นอ่านได้ ตัวเลขล้วน</td></tr>
+                <tr><td><span class="mono text-[12px]">code128_sku</span></td><td>เอา <span class="mono text-[12px]">products.sku</span> มาเป็นค่าบาร์โค้ดตรง ๆ &rarr; <span class="mono text-[12px]">symbology=code128</span>, <span class="mono text-[12px]">source=auto_code128</span></td><td>ใช้ภายในคลังล้วน อยากให้คนอ่านป้ายแล้วรู้ว่าเป็นตัวไหน (<span class="mono text-[12px]">TSHIRT-01-BLK-M</span>) — ป้ายยาวกว่า</td></tr>
+              </tbody>
+            </table>
+
+            <div class="rulebox mt-4"><div class="rc mb-1">RULE &middot; EAN-13 ภายในต้องอยู่ในช่วง 20&ndash;29</div><p class="text-[13.5px]">prefix มาจาก config (<span class="mono text-[12px]">BARCODE_INTERNAL_PREFIX</span>) และต้องขึ้นต้น <b>20&ndash;29</b> ซึ่งเป็นช่วงที่ GS1 สงวนไว้ให้ใช้ภายในองค์กร — จึงไม่มีวันชนกับ EAN จริงของผู้ผลิตรายใด ๆ · ถ้าตั้ง prefix เป็นเลขอื่น ระบบต้องปฏิเสธตั้งแต่ตอน bootstrap ไม่ใช่ตอนสร้างป้ายใบแรก</p></div>
+            <div class="rulebox mt-3"><div class="rc mb-1">RULE &middot; code128_sku ใช้กับ pack ไม่ได้</div><p class="text-[13.5px]">SKU มีค่าเดียวต่อสินค้า แต่ <span class="mono text-[12px]">pack</span> ต้องได้บาร์โค้ดคนละตัวต่อหน่วยบรรจุ — ถ้าอนุญาตจะชน <span class="mono text-[12px]">uq_barcodes_barcode</span> ทันทีที่สร้างป้ายลังใบที่สอง · <span class="mono text-[12px]">pack</span> ใช้ได้เฉพาะ <span class="mono text-[12px]">manual</span> หรือ <span class="mono text-[12px]">ean13_internal</span></p></div>
+
+<pre class="code p-4 mt-4"><span class="c">// libs/common/src/utils/barcode.util.ts — pure functions ทดสอบได้โดยไม่ต้องมี DB</span>
+
+<span class="c">/** EAN-13/EAN-8/UPC-A ใช้ mod-10 เหมือนกัน: ถ่วง 1,3 สลับจากขวาไปซ้าย */</span>
+<span class="k">export function</span> <span class="t">calculateGs1CheckDigit</span>(digits: <span class="t">string</span>): <span class="t">number</span> {
+  <span class="k">const</span> sum = [...digits].<span class="t">reverse</span>().<span class="t">reduce</span>(
+    (total, digit, index) =&gt; total + <span class="t">Number</span>(digit) * (index % <span class="s">2</span> === <span class="s">0</span> ? <span class="s">3</span> : <span class="s">1</span>),
+    <span class="s">0</span>,
+  );
+  <span class="k">return</span> (<span class="s">10</span> - (sum % <span class="s">10</span>)) % <span class="s">10</span>;
+}
+
+<span class="c">/** ยิงมาเป็น " 885 0123 456 789 " ก็ต้องเจอแถวเดียวกับที่บันทึกไว้ */</span>
+<span class="k">export function</span> <span class="t">normalizeBarcode</span>(raw: <span class="t">string</span>, symbology: <span class="t">BarcodeSymbology</span>): <span class="t">string</span> {
+  <span class="k">const</span> trimmed = raw.<span class="t">trim</span>().<span class="t">toUpperCase</span>();
+  <span class="c">// ชนิดตัวเลขล้วน: ตัดช่องว่าง/ขีดทิ้ง — code128/qr ห้ามตัด (ขีดเป็นส่วนหนึ่งของ SKU)</span>
+  <span class="k">return</span> <span class="t">NUMERIC_SYMBOLOGIES</span>.<span class="t">has</span>(symbology)
+    ? trimmed.<span class="t">replace</span>(/[\s-]/g, <span class="s">''</span>)
+    : trimmed;
+}
+</pre>
+
+<pre class="code p-4 mt-3"><span class="c">// barcode_number_counters — ตัวนับ running number ของ EAN-13 ภายใน (inventory-bc)</span>
+<span class="c">// ตั้งใจ *ไม่* extends DocumentNumberCounterEntity: ตัวนั้นคีย์ด้วย year</span>
+<span class="c">// แต่เลขบาร์โค้ดห้ามรีเซ็ตรายปี (ป้ายที่พิมพ์ไปแล้วอยู่บนของในคลังข้ามปี)</span>
+<span class="d">@Entity</span>({ name: <span class="s">'barcode_number_counters'</span>, database: <span class="t">ErpDatabases</span>.<span class="t">INVENTORY</span> })
+<span class="d">@Unique</span>(<span class="s">'uq_barcode_number_counters_prefix'</span>, [<span class="s">'prefix'</span>])
+<span class="k">export class</span> <span class="t">BarcodeNumberCounter</span> <span class="k">extends</span> <span class="t">BaseEntity</span> {
+  prefix: <span class="t">string</span>;        <span class="c">// '20'..'29' — ตาม BARCODE_INTERNAL_PREFIX</span>
+  last_number: <span class="t">number</span>;   <span class="c">// bigint — อ่านด้วย SELECT ... FOR UPDATE ใน transaction เดียวกับ insert</span>
+}
+
+<span class="c">// 2 (prefix) + 10 (running) + 1 (check digit) = 13 หลัก</span>
+<span class="c">// '20' + '0000000042' + '7'  →  '2000000000427'</span>
+</pre>
+          </div>
+
+          <!-- API -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">REST API &mdash; ขอบเขตงานรอบนี้ (สร้างบาร์โค้ดเท่านั้น)</div>
+            <table class="d">
+              <thead><tr><th style="width:300px">Endpoint</th><th style="width:150px">permission</th><th>หมายเหตุ</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">POST /barcodes</span></td><td><span class="mono text-[12px]">barcode:create</span></td><td>สร้าง 1 ใบ — <span class="mono text-[12px]">generation_strategy</span> ตัดสินว่าต้องส่ง <span class="mono text-[12px]">barcode</span> มาเองหรือให้ระบบสร้าง</td></tr>
+                <tr><td><span class="mono text-[12px]">POST /products/{id}/variant-barcodes</span></td><td><span class="mono text-[12px]">barcode:create</span></td><td>สร้างป้ายหลักให้ <b>ทุก variant</b> ของ template ในครั้งเดียว (ต่อจาก <span class="mono text-[12px]">generate-variants</span>) — <b>idempotent</b>: variant ที่มี primary แล้วให้ข้าม ไม่สร้างซ้ำ</td></tr>
+                <tr><td><span class="mono text-[12px]">GET /barcodes</span> &middot; <span class="mono text-[12px]">GET /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:read</span></td><td>paginate + <span class="mono text-[12px]">@ValidatedQuery</span> · กรองด้วย <span class="mono text-[12px]">filter[]=product_id||$eq||&lt;uuid&gt;</span>, <span class="mono text-[12px]">target_type</span>, <span class="mono text-[12px]">is_active</span></td></tr>
+                <tr><td><span class="mono text-[12px]">PATCH /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:update</span></td><td>แก้ได้เฉพาะ <span class="mono text-[12px]">is_primary</span> / <span class="mono text-[12px]">is_active</span></td></tr>
+                <tr><td><span class="mono text-[12px]">DELETE /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:delete</span></td><td>soft delete — ค่าเดิมกลับมาสร้างใหม่ได้เพราะ unique เป็น partial</td></tr>
+              </tbody>
+            </table>
+            <div class="rulebox mt-4"><div class="rc mb-1">RULE &middot; ค่า barcode แก้ไม่ได้</div><p class="text-[13.5px]">เมื่อบันทึกแล้ว <span class="mono text-[12px]">barcode</span> / <span class="mono text-[12px]">symbology</span> / <span class="mono text-[12px]">target_type</span> / <span class="mono text-[12px]">product_id</span> <b>ห้ามแก้</b> — ป้ายถูกพิมพ์และติดไปกับของแล้ว การแก้ค่าในฐานข้อมูลทำให้ป้ายที่หมุนเวียนอยู่ชี้ผิดสินค้าเงียบ ๆ · ถ้าผิดให้ <span class="mono text-[12px]">DELETE</span> แล้วสร้างใบใหม่ (ประวัติยังอยู่ครบเพราะเป็น soft delete)</p></div>
+          </div>
+
+          <!-- IMPLEMENTATION ORDER -->
+          <div class="card p-6 mb-5">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">ลำดับลงมือ &mdash; <span class="mono">apps/inventory-bc/src/modules/barcode/</span></div>
+            <div class="space-y-2">
+              <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>enums + entity</b> — <span class="mono text-[12px]">BarcodeTargetType</span> · <span class="mono text-[12px]">BarcodeSymbology</span> · <span class="mono text-[12px]">BarcodeSource</span> · <span class="mono text-[12px]">BarcodeGenerationStrategy</span> แล้วเขียน <span class="mono text-[12px]">barcode.entity.ts</span> + <span class="mono text-[12px]">barcode-number-counter.entity.ts</span></p></div>
+              <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>migration</b> — <span class="mono text-[12px]">pnpm run migration:generate:inventory --name=CreateBarcode</span> แล้ว <b>เติมมือ</b> เฉพาะสิ่งที่ generator มองไม่เห็น: partial unique 2 ตัว + <span class="mono text-[12px]">chk_*</span> 2 ตัว</p></div>
+              <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>utils ใน <span class="mono text-[12px]">@lib/common</span></b> — <span class="mono text-[12px]">barcode.util.ts</span> (check digit · normalize · validate ตาม symbology) พร้อม <span class="mono text-[12px]">.spec.ts</span> · pure function ไม่แตะ DB เหมือน <span class="mono text-[12px]">generate-variant-combinations.util.ts</span></p></div>
+              <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>DTO + service + controller</b> — <span class="mono text-[12px]">@ResourceType('barcodes')</span> · <span class="mono text-[12px]">ParseUuidParamPipe</span> ทุก param · prose ของ Swagger อยู่ใน <span class="mono text-[12px]">constants/barcode.swagger.ts</span> · การออกเลขทำใน transaction เดียวกับ insert (<span class="mono text-[12px]">FOR UPDATE</span> บน counter)</p></div>
+              <div class="step"><span class="sn">5</span><p class="text-[13.5px]"><b>ตรวจเป้าหมายก่อนบันทึกเสมอ</b> — โหลด product/item_group จริงมาเทียบกับ <span class="mono text-[12px]">target_type</span> · <span class="mono text-[12px]">pack</span> ต้องเจอ <span class="mono text-[12px]">uom_conversion_factors</span> ที่ตรงกัน มิฉะนั้น 400</p></div>
+              <div class="step"><span class="sn">6</span><p class="text-[13.5px]"><b>seed</b> — เติมป้ายให้สินค้าตัวอย่างใน <span class="mono text-[12px]">libs/database/src/scripts/seed/</span> (เลือกแบบ deterministic ผ่าน <span class="mono text-[12px]">stable-index.util.ts</span> ห้าม random) + เพิ่ม <span class="mono text-[12px]">barcodes</span> ใน <span class="mono text-[12px]">truncates</span></p></div>
+              <div class="step"><span class="sn">7</span><p class="text-[13.5px]"><b>permission</b> — <span class="mono text-[12px]">npm run permissions:sync</span> แล้วเขียน grant migration ให้ policy ที่ต้องใช้ (sync สร้างแค่ catalog ไม่ผูก <span class="mono text-[12px]">statement_actions</span> ให้)</p></div>
+            </div>
+          </div>
+
+          <div class="edge" style="background:rgba(2,132,199,.06);border-color:rgba(2,132,199,.25)"><div class="tag mb-1" style="color:var(--blueprint)">ยังไม่ทำในรอบนี้ (แยกเป็นงานถัดไป)</div><p class="text-[13px]"><b>1)</b> <span class="mono text-[12px]">GET /barcodes/lookup?barcode=</span> + RPC ให้ BC อื่นเรียก (คืน product + จำนวนต่อการยิง + เหตุผลถ้ายิงไม่ได้) &middot; <b>2)</b> การยิงเข้าคลังจริง — ต้องรอ Goods Receipt + stock ledger ใน <b>Phase 3</b> &middot; <b>3)</b> พิมพ์ป้าย/สติ๊กเกอร์ผ่าน report-bc</p></div>
+        </div>
+
+        <!-- 2.4 Setup Sequence & Handoff -->
+        <div class="mb-12">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">04</span><h3 class="text-xl font-semibold">Setup Sequence &amp; Handoff to Inventory · ลำดับตั้งค่า → ส่งต่อ</h3></div>
           <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">ต้องตั้งค่าตาม <b>ลำดับ dependency</b> (อันหลังอ้างอิงอันหน้า) จึงจะเริ่มรับสินค้า (Goods Receipt · Phase 3) ได้</p>
           <div class="card p-6 mb-6">
             <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>UOM</b> — ตั้งหน่วยนับ + ระบุ <span class="mono text-[12px]">is_whole_number</span> (seed ชุดมาตรฐาน)</p></div>
@@ -665,9 +816,9 @@ item_prices: [
           <div class="rulebox ok mt-5"><div class="rc mb-1">GATE · ก่อนเปิด Phase 3</div><p class="text-[13.5px]">ถ้า master ไม่ครบ (เช่น product ไม่มี stock_uom, warehouse เป็น group) → <b>Goods Receipt จะถูกปฏิเสธที่ระดับ service</b> · การเปลี่ยน master ที่ inventory denormalize ไว้ (ชื่อ/หมวด/ยี่ห้อ) จะยิง event <span class="mono text-[12px]">item.updated</span> ไปอัปเดต report-bc</p></div>
         </div>
 
-        <!-- 2.4 Storage -->
+        <!-- 2.5 Storage -->
         <div class="mb-12" id="storage">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">04</span><h3 class="text-xl font-semibold">Storage · MinIO — รูปสินค้า &amp; เอกสารแนบ</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">05</span><h3 class="text-xl font-semibold">Storage · MinIO — รูปสินค้า &amp; เอกสารแนบ</h3></div>
           <div class="rulebox ok mb-5"><div class="rc mb-1">AS-BUILT · schema จริงต่างจากร่างด้านล่าง</div><p class="text-[13.5px]">Implement จริงใช้ตาราง <span class="mono text-[12px]">product_images</span> ใน <span class="mono text-[12px]">erp_inventory</span> (ไม่ใช่ <span class="mono text-[12px]">file_objects</span>/<span class="mono text-[12px]">context_ref</span> ตามร่างเดิม) และรองรับทั้ง presigned upload กับ multipart create — ดูรายละเอียดทั้งหมดที่ <a href="product-image-upload-guide.html" class="underline" style="color:#7C3AED">Product Image Upload Guide →</a></p></div>
           <div class="card p-6 mb-5">
             <div class="mono text-[12px] mb-3" style="color:#7C3AED">file_objects · storage-bc</div>
@@ -690,9 +841,9 @@ item_prices: [
           </div>
         </div>
 
-        <!-- 2.5 ER Diagram -->
+        <!-- 2.6 ER Diagram -->
         <div class="mb-12">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">05</span><h3 class="text-xl font-semibold">ER Diagram · Master Data (i18n flat columns)</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">06</span><h3 class="text-xl font-semibold">ER Diagram · Master Data (i18n flat columns)</h3></div>
           <div class="diagram">
 <pre class="mermaid">
 erDiagram
@@ -800,6 +951,23 @@ erDiagram
         date valid_upto
         int lead_time_days
     }
+    BARCODES {
+        uuid id PK
+        string barcode UK "unique WHERE is_deleted=false"
+        string symbology "ean13/ean8/upc_a/itf14/code128/qr"
+        string target_type "item/variant/pack/bundle/template/item_group"
+        uuid product_id FK "null เมื่อ target=item_group"
+        uuid item_group_id FK "null เมื่อ target อื่น"
+        uuid uom_id FK "เฉพาะ target=pack"
+        boolean is_primary "1 ตัวต่อเป้าหมาย"
+        boolean is_active
+        string source "manual/auto_ean13/auto_code128"
+    }
+    BARCODE_NUMBER_COUNTERS {
+        uuid id PK
+        string prefix UK "20-29 internal GS1"
+        bigint last_number "SELECT ... FOR UPDATE"
+    }
     ITEM_SUPPLIERS {
         uuid id PK
         uuid product_id FK
@@ -823,14 +991,17 @@ erDiagram
     UOMS ||--o{ ITEM_PRICES : "quoted per"
     PRODUCTS ||--o{ ITEM_SUPPLIERS : "supplied via"
     TAX_CATEGORIES ||--o{ PRODUCTS : classifies
+    PRODUCTS ||--o{ BARCODES : "labelled by"
+    ITEM_GROUPS ||--o{ BARCODES : "labelled by"
+    UOMS ||--o{ BARCODES : "pack uom"
 </pre>
           </div>
           <p class="text-[12.5px] mt-2" style="color:var(--muted)">* <span class="mono">suppliers</span> อยู่ใน supplier-bc และ <span class="mono">file_objects</span> อยู่ใน storage-bc — อ้างข้าม BC ด้วย UUID เท่านั้น ไม่มี FK ข้ามฐานข้อมูล · <span class="mono">item_prices.supplier_id</span> / <span class="mono">item_suppliers.supplier_id</span> อ้าง <span class="mono">suppliers.id</span> แบบเดียวกัน · <span class="mono">suppliers.is_vat_registered</span> อยู่ใน supplier-bc เอง (ไม่แสดงในไดอะแกรมนี้เพราะเป็น table คนละ DB)</p>
         </div>
 
-        <!-- 2.6 Dev Guide -->
+        <!-- 2.7 Dev Guide -->
         <div>
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">06</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">07</span><h3 class="text-xl font-semibold">Developer Implementation Guide · คำสั่งจาก SA</h3></div>
           <div class="space-y-3">
             <div class="rulebox"><div class="rc mb-1">RULE · i18n FLAT COLUMNS</div><p class="text-[13.5px]">ฟิลด์ 2 ภาษาเก็บเป็น <span class="mono text-[12px]">name_th / name_en</span> (ไม่ใช้ JSONB) · Response ยุบเป็น <span class="mono text-[12px]">name: { th, en }</span> ผ่าน LocalizationInterceptor · input (DTO) เป็น flat keys</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · BASE ENTITY</div><p class="text-[13.5px]">ทุกตารางสืบทอด <span class="mono text-[12px]">BaseEntity</span> — ได้ <span class="mono text-[12px]">id · created_at/by · updated_at/by · is_deleted · deleted_at/by/reason</span> · การลบเป็น soft-delete เสมอ</p></div>
@@ -845,9 +1016,9 @@ erDiagram
           </div>
         </div>
 
-        <!-- 2.7 Glossary -->
+        <!-- 2.8 Glossary -->
         <div class="mt-14">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">07</span><h3 class="text-xl font-semibold">Glossary · อภิธานศัพท์เทคนิค ERP</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(124,58,237,.14);color:#7C3AED">08</span><h3 class="text-xl font-semibold">Glossary · อภิธานศัพท์เทคนิค ERP</h3></div>
           <p class="text-[13.5px] mb-6" style="color:var(--ink-soft)">ขยายความศัพท์ที่ใช้ในเอกสารนี้ เพื่อให้ทีมธุรกิจและทีมพัฒนาเข้าใจตรงกัน</p>
 
           <h4 class="font-semibold mb-3 text-[14px]" style="color:#7C3AED">สินค้า &amp; หน่วยนับ</h4>
