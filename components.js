@@ -18,6 +18,7 @@ class ErpDocnav extends HTMLElement {
     { href: 'observability-logging-guide.html', icon: '📊', label: 'Observability (Tempo/Loki)', desc: 'OpenTelemetry Traces · pino-http Logs' },
     { href: 'postgresql-pgpool-cluster-guide.html', icon: '🔌', label: 'Connection Pooling (Pgpool-II)', desc: 'HA Cluster Setup · Watchdog Failover · Grafana' },
     { href: 'deployment-guide.html', icon: '🚀', label: 'Deployment Guide', desc: 'On-Premise · Docker Compose · Kong · Cloudflare Tunnel' },
+    { href: 'iam-policy-engine-guide.html', icon: '🛡️', label: 'IAM Policy Engine', desc: 'Invariants · API Contract · Defect Log · ABAC' },
     { href: 'runbook.html', icon: '🚨', label: 'Runbook', desc: 'Incident Response · Symptom → Diagnosis → Fix → Verify' },
   ];
 

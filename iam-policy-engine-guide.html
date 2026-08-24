@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IAM Policy Engine — Invariants &amp; Audit · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="P" title="IAM Policy Engine" subtitle="INVARIANTS · DEFECT LOG" width="280">
+    <nav slot="nav">
+      <a href="#origin"     class="navlink"><span class="n">01</span> ที่มา — คำถามเดียวที่เปิดแผล</a>
+      <a href="#model"      class="navlink"><span class="n">02</span> โมเดลข้อมูล</a>
+      <a href="#invariant"  class="navlink"><span class="n">03</span> กฎแกนกลาง (Invariant)</a>
+      <a href="#contract"   class="navlink"><span class="n">04</span> สัญญา API ที่เปลี่ยน</a>
+      <a href="#defects"    class="navlink"><span class="n">05</span> บั๊กทั้งหมดที่พบ</a>
+      <a href="#antipattern" class="navlink"><span class="n">06</span> Anti-pattern · Grant Migration</a>
+      <a href="#cleanup"    class="navlink"><span class="n">07</span> การล้างข้อมูล</a>
+      <a href="#checklist"  class="navlink"><span class="n">08</span> Checklist สำหรับโค้ดใหม่</a>
+    </nav>
+    <div slot="footnote">
+      <a href="backend-convention.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ Backend Conventions</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="index.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่สารบัญเอกสาร
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Policy / ABAC Engine · Audit &amp; Invariants</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          IAM Policy Engine —<br>
+          <span class="text-[#7FE3DE]">กฎที่ต้องรักษา และบั๊กที่เคยละเมิดมันทั้งหมด</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          เอกสารนี้บันทึกการตรวจสอบโมดูล <span class="mono text-white">policies</span> ของ iam-bc ทั้งชั้น
+          API, Policy Generator (EJS admin) และ ABAC evaluator — พบข้อผิดพลาด <span class="text-white font-medium">13 รายการ</span>
+          และที่สำคัญกว่านั้นคือ <span class="text-white font-medium">กฎแกนกลางที่ schema ไม่เคยบังคับใช้</span>
+          ซึ่งเป็นต้นเหตุให้ข้อมูลสิทธิ์ซ้ำซ้อนสะสมเงียบ ๆ จนกว่าครึ่งของตารางเป็นข้อมูลไร้ความหมาย
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>13 Defects</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>1 Core Invariant</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Breaking Contract Change</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>598 → 512 rows</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 01 ORIGIN ========== -->
+      <section id="origin" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — ที่มา</div>
+        <h2 class="display text-3xl mb-6">คำถามเดียวที่เปิดแผลทั้งหมด</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          จุดเริ่มไม่ใช่ error หรือ alert แต่เป็นคำถามเชิงออกแบบว่า
+          <span class="mono text-[13px] text-[var(--ink)]">policies → policy_statements → statement_actions → permissions</span>
+          แบบนี้ <b>permission หนึ่งตัวควรซ้ำได้กี่แถวในหนึ่ง policy</b> — คำตอบที่ถูกคือ
+          <b class="text-[var(--signal)]">แถวเดียวต่อหนึ่ง effect</b> แต่ของจริงมีถึง 7 แถว
+        </p>
+
+        <div class="card overflow-hidden mb-8">
+          <div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">อาการที่มองเห็น</div>
+              <h3 class="font-semibold mb-2 text-[15px]">ไม่มีเลย</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                ไม่มี error, ไม่มี log, สิทธิ์ยังทำงานถูก — เพราะ evaluator รวม allow ทั้งหมดเป็น union
+                ข้อมูลซ้ำจึงไม่เปลี่ยนผลลัพธ์
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">อาการที่วัดได้</div>
+              <h3 class="font-semibold mb-2 text-[15px]">598 / 268</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                <span class="mono text-[12px]">statement_actions</span> มี 598 แถว
+                แต่คู่ <span class="mono text-[12px]">(policy, permission, effect)</span> ที่ไม่ซ้ำมีเพียง 268
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">ความเสี่ยงจริง</div>
+              <h3 class="font-semibold mb-2 text-[15px]">รอวันระเบิด</h3>
+              <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+                <span class="mono text-[12px]">statement_targets</span> ยังไม่ถูก enforce — วันที่เปิดใช้
+                per-service scoping ข้อมูลเพี้ยนชุดนี้จะกลายเป็นช่องสิทธิ์ทันที
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="edge">
+          <div class="tag mb-1">บทเรียนหลัก</div>
+          <p class="text-[13px]">
+            บั๊กที่อันตรายที่สุดในเอกสารนี้ไม่มีอาการให้สังเกตเลย — มันถูกพบเพราะมี<b>คนตั้งคำถามว่าโมเดลข้อมูลควรเป็นอย่างไร</b>
+            แล้วเอาคำตอบนั้นไป query เทียบกับของจริง ไม่ใช่เพราะระบบร้อง
+            การรู้ว่า "อะไรคือ invariant" จึงมีค่ามากกว่า monitoring ในกรณีนี้
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 MODEL ========== -->
+      <section id="model" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — โมเดลข้อมูล</div>
+        <h2 class="display text-3xl mb-6">โครงสร้างและความหมายของแต่ละชั้น</h2>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+flowchart TD
+  P["policies<br/>code · is_active · valid_from/until"]
+  S["policy_statements<br/><b>effect</b> allow|deny · <b>plane</b> ui|api"]
+  T["statement_targets<br/>service / resource"]
+  A["statement_actions<br/>permission_id"]
+  C["statement_conditions<br/>operator · key · value"]
+  PM["permissions (catalog)<br/>service · permission · plane"]
+
+  P -->|1..n| S
+  S -->|1..n| T
+  S -->|1..n| A
+  S -->|0..n| C
+  A -.->|"uuid, ไม่มี FK จริง"| PM
+</pre>
+        </div>
+
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          หัวใจอยู่ที่ <b>statement เป็นหน่วยของ "ขอบเขต + เงื่อนไข"</b> ไม่ใช่หน่วยของ permission —
+          หนึ่ง statement ถือได้หลาย permission และหลาย target พร้อมกัน
+          ดังนั้นคำถามว่า permission ซ้ำได้ไหม จึงต้องตอบจาก<b>ความหมายของ statement</b> ไม่ใช่จากจำนวนแถว
+        </p>
+
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div class="rulebox">
+            <div class="rc mb-1">AND · ภายใน statement</div>
+            <p class="text-[13.5px]">
+              <span class="mono text-[12px]">conditionsHold()</span> ใช้ <span class="mono text-[12px]">.every()</span>
+              — condition ทุกแถวใน statement เดียวต้องเป็นจริง<b>พร้อมกัน</b>
+            </p>
+          </div>
+          <div class="rulebox">
+            <div class="rc mb-1">OR · ระหว่าง statement</div>
+            <p class="text-[13.5px]">
+              <span class="mono text-[12px]">evaluate()</span> ใช้ <span class="mono text-[12px]">.some()</span>
+              — statement ใด<b>ใดหนึ่ง</b>ผ่านก็พอ (deny ตรวจก่อนและชนะเสมอ)
+            </p>
+          </div>
+        </div>
+
+        <div class="edge mt-5" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)">
+          <div class="tag mb-1" style="color:var(--accent)">ผลที่ตามมา</div>
+          <p class="text-[13px]">
+            เพราะ AND อยู่ในสถานะ "ภายใน" และ OR อยู่ "ระหว่าง" — การเขียนเงื่อนไขแบบ
+            <span class="mono text-[12px]">dept = A <b>หรือ</b> dept = B</span> ทำได้ทางเดียวคือ
+            <b>สร้าง allow สองstatement ที่ถือ permission เดียวกัน</b> นี่คือกรณีเดียวที่การซ้ำมีความหมาย
+            และเป็นเหตุผลที่กฎในหัวข้อถัดไปต้องพูดถึง "ชุด condition" ไม่ใช่แค่ effect
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 INVARIANT ========== -->
+      <section id="invariant" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — กฎแกนกลาง</div>
+        <h2 class="display text-3xl mb-6">Invariant ที่ schema ไม่เคยบังคับใช้</h2>
+
+        <div class="rulebox ok mb-8" style="border-left-width:4px">
+          <div class="rc mb-2">CORE INVARIANT</div>
+          <p class="text-[16px] font-semibold text-[var(--ink)] leading-relaxed">
+            1 policy + 1 permission + 1 effect + 1 ชุด condition = <span class="text-[var(--accent)]">1 แถวเท่านั้น</span>
+          </p>
+          <p class="text-[13.5px] mt-2 text-[var(--ink-soft)]">
+            เมื่อไม่มี condition (สถานะของระบบตอนตรวจ: <span class="mono text-[12px]">statement_conditions</span> = 0 แถวทั้งระบบ)
+            กฎนี้ยุบลงเป็น: <b>allow ได้ 1 แถว · deny ได้ 1 แถว</b> เท่านั้น
+          </p>
+        </div>
+
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          สิ่งที่ทำให้กฎนี้ถูกเข้าใจผิดง่ายคือมันดูเหมือนควรมีข้อยกเว้นสามข้อ — แต่จริง ๆ มีแค่ข้อเดียว
+        </p>
+
+        <div class="space-y-4 mb-8">
+          <div class="rulebox">
+            <div class="rc mb-1">ไม่ใช่ข้อยกเว้น · TARGETS</div>
+            <p class="text-[13.5px]">
+              <span class="mono text-[12px]">(service, resource)</span> เป็น<b>คุณสมบัติของแถว
+              <span class="mono text-[12px]">permissions</span> เอง</b> — permission หนึ่งตัวจึงสังกัด target เดียวโดยธรรมชาติ
+              การที่ <span class="mono text-[12px]">warehouse:view</span> ไปโผล่ใน statement ที่ scope
+              <span class="mono text-[12px]">auth/*</span> คือ<b>ความผิดพลาด ไม่ใช่การ scope</b>
+            </p>
+          </div>
+          <div class="rulebox">
+            <div class="rc mb-1">ไม่ใช่ข้อยกเว้น · PLANE</div>
+            <p class="text-[13.5px]">
+              <span class="mono text-[12px]">permissions.plane</span> ก็เป็นคุณสมบัติของ permission เอง —
+              permission หนึ่งตัวอยู่ได้ plane เดียว การเอา ui-permission ไปใส่ statement
+              <span class="mono text-[12px]">plane: 'api'</span> ไม่ได้ให้สิทธิ์เพิ่ม แต่สร้าง scope ที่ guard ไม่เคย enforce
+            </p>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ข้อยกเว้นเดียวที่แท้จริง · CONDITIONS</div>
+            <p class="text-[13.5px]">
+              statement สองอันที่ต่างกัน<b>เฉพาะชุด condition</b> ต้องแยกกันอยู่ เพราะเป็นวิธีเดียวที่เขียน OR ได้
+              (ดูหัวข้อ 02) — ถ้าบังคับให้ allow เหลือแถวเดียวตายตัว จะเขียน ABAC แบบ
+              "อนุญาตเมื่อ A หรือ B" ไม่ได้เลยตลอดกาล
+            </p>
+          </div>
+        </div>
+
+        <div class="edge mb-8">
+          <div class="tag mb-1">allow + deny คู่กัน มีความหมายเมื่อไร</div>
+          <p class="text-[13px]">
+            <b>เฉพาะเมื่อฝ่ายใดฝ่ายหนึ่งมี condition</b> — ถ้าทั้งคู่ไม่มี condition
+            <span class="mono text-[12px]">computeAllowDenyConditional()</span> ให้ deny ชนะเสมอ
+            แถว allow จึงเป็นขยะที่ไม่มีผลใด ๆ (ไม่อันตราย แต่ไร้ความหมายและทำให้อ่านนโยบายผิด)
+          </p>
+        </div>
+
+        <h3 class="font-semibold text-[17px] mb-4">บังคับใช้ได้ถึงระดับไหน</h3>
+        <div class="card p-1 mb-4">
+          <table class="d">
+            <thead><tr><th>กฎ</th><th>บังคับที่</th><th>ทำได้จริงไหม</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>ซ้ำใน statement เดียวกัน</td>
+                <td>Partial unique index บน <span class="mono text-[12px]">(statement_id, permission_id) WHERE is_deleted = false</span></td>
+                <td>ได้ที่ระดับ DB — ไม่มีข้อเสีย ต้องทำ</td>
+              </tr>
+              <tr>
+                <td>ซ้ำข้าม statement</td>
+                <td><span class="mono text-[12px]">PoliciesService.setStatements()</span> — merge statement ที่ <span class="mono text-[12px]">(effect, plane, targets, conditions)</span> ตรงกัน แล้ว dedupe <span class="mono text-[12px]">permission_ids</span></td>
+                <td>ต้องทำที่ application layer — condition อยู่ตารางลูก DB จึงทำ unique constraint ไม่ได้</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Entity · partial unique index (ต้องอยู่บน entity ไม่ใช่แค่ใน migration)</div>
+        <div class="code p-5">
+<pre><span class="c">// migration-only constraint จะถูก migration:generate รอบหน้า drop ทิ้งเงียบ ๆ</span>
+<span class="d">@Index</span>(
+  <span class="s">'uq_statement_actions_statement_id_permission_id'</span>,
+  [<span class="s">'statement_id'</span>, <span class="s">'permission_id'</span>],
+  { unique: <span class="k">true</span>, where: <span class="s">'is_deleted = false'</span> },
+)
+<span class="k">export class</span> <span class="t">StatementAction</span> <span class="k">extends</span> <span class="t">BaseEntity</span> { <span class="c">/* … */</span> }</pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 CONTRACT ========== -->
+      <section id="contract" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — สัญญา API</div>
+        <h2 class="display text-3xl mb-6">Contract ที่เปลี่ยน (Breaking)</h2>
+
+        <h3 class="font-semibold text-[17px] mb-3">targets เป็น "คู่" ไม่ใช่สองอาร์เรย์</h3>
+        <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
+          รูปแบบเดิมส่ง <span class="mono text-[13px]">service[]</span> และ
+          <span class="mono text-[13px]">resource[]</span> แยกกัน ทำให้ service ฝั่ง backend ต้องประกอบกลับเป็น
+          <b>ผลคูณคาร์ทีเซียน</b> — เลือก 2 คู่ ได้ 4 แถว โดย 2 แถวไม่มีใครเลือก
+        </p>
+
+        <div class="grid sm:grid-cols-2 gap-5 mb-6">
+          <div>
+            <div class="eyebrow text-[var(--signal)] mb-2">✗ เดิม</div>
+            <div class="code p-5">
+<pre>{
+  <span class="s">"service"</span>:  [<span class="s">"iam"</span>, <span class="s">"inventory-bc"</span>],
+  <span class="s">"resource"</span>: [<span class="s">"role"</span>, <span class="s">"warehouse"</span>]
+}
+
+<span class="c">// backend สร้าง 4 targets:</span>
+<span class="c">//   iam/role           ← เลือก</span>
+<span class="c">//   iam/warehouse      ← ไม่ได้เลือก!</span>
+<span class="c">//   inventory-bc/role  ← ไม่ได้เลือก!</span>
+<span class="c">//   inventory-bc/warehouse ← เลือก</span></pre>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow text-[var(--accent)] mb-2">✓ ใหม่</div>
+            <div class="code p-5">
+<pre>{
+  <span class="s">"targets"</span>: [
+    { <span class="s">"service"</span>: <span class="s">"iam"</span>,
+      <span class="s">"resource"</span>: <span class="s">"role"</span> },
+    { <span class="s">"service"</span>: <span class="s">"inventory-bc"</span>,
+      <span class="s">"resource"</span>: <span class="s">"warehouse"</span> }
+  ]
+}
+
+<span class="c">// เก็บตามที่ส่งมาเป๊ะ 2 targets</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-1 mb-6">
+          <table class="d">
+            <thead><tr><th>จุดที่เปลี่ยน</th><th>เดิม</th><th>ใหม่</th></tr></thead>
+            <tbody>
+              <tr><td>PUT :id/statements</td><td><span class="mono text-[12px]">service[]</span> + <span class="mono text-[12px]">resource[]</span></td><td><span class="mono text-[12px]">targets: [{ service, resource }]</span></td></tr>
+              <tr><td>GET :id/statements</td><td>คืนเฉพาะ <span class="mono text-[12px]">permissions[]</span> (string)</td><td>คืน <span class="mono text-[12px]">permission_ids[]</span> ด้วย — client ไม่ต้องเดา id ย้อนกลับ</td></tr>
+              <tr><td>statements</td><td>ส่ง <span class="mono text-[12px]">[]</span> ได้ → ล้างสิทธิ์เงียบ</td><td><span class="mono text-[12px]">@ArrayNotEmpty()</span></td></tr>
+              <tr><td>conditions[].operator</td><td><span class="mono text-[12px]">@IsString()</span></td><td><span class="mono text-[12px]">@IsIn(CONDITION_OPERATORS)</span></td></tr>
+              <tr><td>permission_ids</td><td>ไม่ตรวจอะไร</td><td>ต้องมีจริงใน catalog และ <b>plane ตรงกับ statement</b></td></tr>
+              <tr><td>Permission ที่ใช้</td><td><span class="mono text-[12px]">policy:create</span> คุม update/delete ด้วย</td><td>แยก <span class="mono text-[12px]">policy:update</span> · <span class="mono text-[12px]">policy:delete</span></td></tr>
+              <tr><td>valid_from / valid_until</td><td>คอลัมน์ <span class="mono text-[12px]">date</span></td><td><span class="mono text-[12px]">timestamptz</span> + ต้องส่ง ISO 8601 เต็มรูป</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="edge">
+          <div class="tag mb-1">ทำไม permission_ids ในขา GET จึงสำคัญ</div>
+          <p class="text-[13px]">
+            permission string ไม่ unique เดี่ยว ๆ — unique แค่ระดับ
+            <span class="mono text-[12px]">(service, permission)</span> ตาม
+            <span class="mono text-[12px]">uq_permissions_service_permission</span> ดังนั้นการเดา id
+            ย้อนจาก string ใน statement ที่ scope <span class="mono text-[12px]">service = '*'</span>
+            จะ map ทุก candidate ไปที่แถวเดียวกันแบบสุ่ม → <b>สิทธิ์ของอีก service หายเงียบตอนกด Save</b>
+            การคืน id มาตรง ๆ ทำให้ไม่มีอะไรต้องเดา
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 DEFECTS ========== -->
+      <section id="defects" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Defect Log</div>
+        <h2 class="display text-3xl mb-6">บั๊กทั้งหมดที่พบ (13 รายการ)</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทุกรายการยืนยันด้วยการอ่านโค้ด และรายการที่ทำเครื่องหมาย
+          <span class="mono text-[13px] text-[var(--signal)]">verified</span>
+          ทดสอบซ้ำจริงผ่าน HTTP บนระบบที่ deploy อยู่ แล้วตรวจผลในฐานข้อมูล
+        </p>
+
+        <div class="card p-1 mb-8">
+          <table class="d">
+            <thead><tr><th>#</th><th>อาการ</th><th>ต้นเหตุ</th><th>แก้ที่</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>01 <span class="mono text-[10px] text-[var(--signal)]">verified</span></td>
+                <td>กรอกวันที่ในฟอร์ม = บันทึกไม่ได้เลย (400001)</td>
+                <td><span class="mono text-[12px]">&lt;input type="date"&gt;</span> ส่ง <span class="mono text-[12px]">YYYY-MM-DD</span> แต่ DTO ใช้ <span class="mono text-[12px]">@IsISO8601()</span> ที่ปฏิเสธรูปนั้นโดยเจตนา</td>
+                <td>entity → <span class="mono text-[12px]">timestamptz</span> + helper แปลงสองทางฝั่ง client</td>
+              </tr>
+              <tr>
+                <td>02 <span class="mono text-[10px] text-[var(--signal)]">verified</span></td>
+                <td><span class="mono text-[12px]">StringNotEquals</span> บันทึกได้แต่ประเมินเป็น false ตลอด → <b>deny ไม่ทำงาน (fail-open)</b></td>
+                <td>UI มี operator นี้ · DTO ตรวจแค่ <span class="mono text-[12px]">@IsString()</span> · evaluator ไม่มี <span class="mono text-[12px]">case</span></td>
+                <td>runtime const + <span class="mono text-[12px]">@IsIn</span> + เพิ่ม case</td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td>สร้าง policy สำเร็จแต่ statements ล้ม → กด Save ซ้ำติด 409 ถาวร</td>
+                <td>บันทึกเป็น 2 request แต่ <span class="mono text-[12px]">editingId</span> ยังเป็น null หลัง POST สำเร็จ</td>
+                <td>ตั้ง <span class="mono text-[12px]">editingId</span> ทันทีหลัง POST</td>
+              </tr>
+              <tr>
+                <td>04 <span class="mono text-[10px] text-[var(--signal)]">verified</span></td>
+                <td>เลือก 2 คู่ ได้ 8 target rows — 4 แถวไม่มีใครเลือก</td>
+                <td>Cartesian product จาก <span class="mono text-[12px]">service[].flatMap(resource[])</span></td>
+                <td>เปลี่ยน contract เป็น target pairs</td>
+              </tr>
+              <tr>
+                <td>05 <span class="mono text-[10px] text-[var(--signal)]">verified</span></td>
+                <td>ส่ง statement เหมือนกัน 2 อัน → ได้ 2 statements จริง</td>
+                <td>ไม่มี dedupe/merge ที่ใดเลย และไม่มี unique constraint</td>
+                <td>merge ทั้งฝั่ง service และฝั่ง UI + partial unique index</td>
+              </tr>
+              <tr>
+                <td>06</td>
+                <td>ใครสร้าง policy ได้ = ลบ/เขียนทับ policy ใดก็ได้</td>
+                <td>update / setStatements / delete ใช้ <span class="mono text-[12px]">policy:create</span> ทั้งหมด</td>
+                <td>แยก <span class="mono text-[12px]">policy:update</span> / <span class="mono text-[12px]">policy:delete</span></td>
+              </tr>
+              <tr>
+                <td>07 <span class="mono text-[10px] text-[var(--signal)]">verified</span></td>
+                <td><span class="mono text-[12px]">{"statements": []}</span> → policy เหลือ 0 statement เงียบ ๆ</td>
+                <td>ขาด <span class="mono text-[12px]">@ArrayNotEmpty()</span> ที่ field แม่</td>
+                <td>เพิ่ม validator</td>
+              </tr>
+              <tr>
+                <td>08</td>
+                <td>condition_value ที่มี <span class="mono text-[12px]">(</span> หรือ <span class="mono text-[12px]">[</span> ทำ auth ทั้งก้อนล่ม (500)</td>
+                <td><span class="mono text-[12px]">new RegExp()</span> จากค่าที่ผู้ใช้พิมพ์ โดยไม่ escape</td>
+                <td>escape metachar ทุกตัวยกเว้น <span class="mono text-[12px]">*</span></td>
+              </tr>
+              <tr>
+                <td>09</td>
+                <td>แก้ policy ที่ scope <span class="mono text-[12px]">'*'</span> แล้วสิทธิ์ของ service หนึ่งหายไป</td>
+                <td>เดา permission id ย้อนจาก string (ดูหัวข้อ 04)</td>
+                <td>GET คืน <span class="mono text-[12px]">permission_ids</span> · ลบฟังก์ชันเดาทิ้ง</td>
+              </tr>
+              <tr>
+                <td>10</td>
+                <td>Stored JS injection ผ่าน <span class="mono text-[12px]">policy.code</span> ในหน้า list</td>
+                <td>ใส่ค่าใน <span class="mono text-[12px]">onclick</span> — HTML parser decode <span class="mono text-[12px]">&amp;#39;</span> กลับเป็น <span class="mono text-[12px]">'</span> ก่อน JS parse ทำให้หลุด string literal (และ <span class="mono text-[12px]">.replace(/'/g,…)</span> ที่กันไว้ไม่เคย match)</td>
+                <td>ใช้ <span class="mono text-[12px]">data-*</span> + delegated listener · เพิ่ม <span class="mono text-[12px]">@Matches</span> ที่ DTO</td>
+              </tr>
+              <tr>
+                <td>11 <span class="mono text-[10px] text-[var(--signal)]">verified</span></td>
+                <td>ยัด ui-permission เข้า statement <span class="mono text-[12px]">plane: 'api'</span> ได้</td>
+                <td>ไม่มีการตรวจ plane ที่ไหนเลย (FK กันได้แค่ id ที่ไม่มีจริง)</td>
+                <td><span class="mono text-[12px]">assertPermissionsUsable()</span></td>
+              </tr>
+              <tr>
+                <td>12</td>
+                <td>permission ที่ถูก soft-delete หายเงียบตอน save</td>
+                <td>ขา GET ไม่กรอง <span class="mono text-[12px]">is_deleted</span> แต่ catalog ที่ client ใช้กรอง</td>
+                <td>อ่านผ่าน <span class="mono text-[12px]">findLiveByIds()</span> ทั้งขา read และ write</td>
+              </tr>
+              <tr>
+                <td>13</td>
+                <td>ไม่ส่ง <span class="mono text-[12px]">conditions</span> มาเลย → 500</td>
+                <td><span class="mono text-[12px]">input.conditions.length</span> บน <span class="mono text-[12px]">undefined</span> (field เป็น optional)</td>
+                <td><span class="mono text-[12px]">?? []</span> + unit test</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)">
+          <div class="tag mb-1" style="color:var(--accent)">พบเพิ่มระหว่างทดสอบ</div>
+          <p class="text-[13px]">
+            <span class="mono text-[12px]">POST /policies</span> ตอบ
+            <span class="mono text-[12px]">"2026-09-01T00:00:00+07:00"</span> แต่
+            <span class="mono text-[12px]">GET /policies/:id</span> ของ resource เดียวกันตอบ
+            <span class="mono text-[12px]">"2026-09-01"</span> — field เดียวกัน สองรูปแบบ ขึ้นกับ endpoint
+            เพราะ POST echo ค่า input กลับ ส่วน GET อ่านจากคอลัมน์ <span class="mono text-[12px]">date</span> จริง
+            (การเปลี่ยนเป็น <span class="mono text-[12px]">timestamptz</span> ทำให้ทั้งสองตรงกัน)
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 ANTIPATTERN ========== -->
+      <section id="antipattern" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — Anti-pattern</div>
+        <h2 class="display text-3xl mb-6">Grant migration ที่เลือก statement แบบไม่ดู scope</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          นี่คือ<b>ต้นเหตุที่แท้จริง</b>ของข้อมูลซ้ำ ไม่ใช่ seed และไม่ใช่ UI — และเป็น pattern ที่ถูก
+          copy ต่อกันมาในทุก migration ที่ชื่อ <span class="mono text-[13px]">Grant*PermissionsToMockPolicies</span>
+          ดังนั้นถ้าไม่หยุดที่ pattern ทุก migration ใหม่จะเติมขยะเพิ่มทุกครั้ง
+        </p>
+
+        <div class="eyebrow text-[var(--signal)] mb-2">✗ Anti-pattern — match ทุก allow/api statement ของ policy</div>
+        <div class="code p-5 mb-5">
+<pre><span class="k">INSERT INTO</span> statement_actions (statement_id, permission_id)
+<span class="k">SELECT</span> ps.id, perm.id
+<span class="k">FROM</span> policy_statements ps
+<span class="k">JOIN</span> policies pol <span class="k">ON</span> pol.id = ps.policy_id
+<span class="k">JOIN</span> permissions perm <span class="k">ON</span> perm.permission = <span class="k">ANY</span>($2)
+<span class="k">WHERE</span> pol.code = <span class="k">ANY</span>($1)
+  <span class="k">AND</span> ps.effect = <span class="s">'allow'</span>
+  <span class="k">AND</span> ps.plane  = <span class="s">'api'</span>   <span class="c">-- ← ไม่ดู targets เลย</span>
+
+<span class="c">-- policy หนึ่งมี allow/api ได้หลาย statement (คนละ scope)</span>
+<span class="c">-- → พ่น permission เข้าไปทุกอัน รวมอันที่ scope ผิดความหมาย</span>
+<span class="c">-- → warehouse:* ไปโผล่ใน statement ที่ scope auth/* และ */tax_config</span></pre>
+        </div>
+
+        <div class="eyebrow text-[var(--accent)] mb-2">✓ ที่ถูก — เจาะ statement ที่ถือ sibling permission อยู่แล้ว</div>
+        <div class="code p-5 mb-6">
+<pre><span class="k">INSERT INTO</span> statement_actions (statement_id, permission_id)
+<span class="k">SELECT</span> anchor.statement_id, perm.id
+<span class="k">FROM</span> (
+  <span class="c">-- statement ที่ถือ policy:create อยู่แล้ว = ที่ที่ญาติของมันอยู่</span>
+  <span class="k">SELECT DISTINCT</span> sa.statement_id
+  <span class="k">FROM</span> statement_actions sa
+  <span class="k">JOIN</span> permissions anchor_perm
+    <span class="k">ON</span> anchor_perm.id = sa.permission_id
+   <span class="k">AND</span> anchor_perm.service = <span class="s">'iam'</span>
+   <span class="k">AND</span> anchor_perm.permission = <span class="s">'policy:create'</span>
+  <span class="k">WHERE</span> sa.is_deleted = <span class="k">false</span>
+) anchor
+<span class="k">CROSS JOIN</span> permissions perm
+<span class="k">WHERE</span> perm.service = <span class="s">'iam'</span>
+  <span class="k">AND</span> perm.permission = <span class="k">ANY</span>($1)
+  <span class="k">AND</span> perm.is_deleted = <span class="k">false</span>
+  <span class="k">AND NOT EXISTS</span> (  <span class="c">-- idempotent</span>
+    <span class="k">SELECT</span> 1 <span class="k">FROM</span> statement_actions existing
+    <span class="k">WHERE</span> existing.statement_id = anchor.statement_id
+      <span class="k">AND</span> existing.permission_id = perm.id
+      <span class="k">AND</span> existing.is_deleted = <span class="k">false</span>
+  )</pre>
+        </div>
+
+        <div class="rulebox">
+          <div class="rc mb-1">กฎ</div>
+          <p class="text-[13.5px]">
+            migration ที่ grant permission ต้องระบุ<b>ปลายทางแบบเจาะจงหนึ่ง statement</b> เสมอ —
+            ไม่ว่าจะโดยการอ้าง sibling permission, โดย targets, หรือโดย statement id ตรง ๆ
+            การกรองด้วย <span class="mono text-[12px]">effect</span> + <span class="mono text-[12px]">plane</span>
+            เพียงสองอย่างไม่เคยเพียงพอ และต้องมี <span class="mono text-[12px]">NOT EXISTS</span> เพื่อให้รันซ้ำได้
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 CLEANUP ========== -->
+      <section id="cleanup" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — การล้างข้อมูล</div>
+        <h2 class="display text-3xl mb-6">ล้างเท่าที่พิสูจน์ได้ว่าไม่เสียความหมาย</h2>
+
+        <div class="step">
+          <div class="sn">1</div>
+          <h3 class="font-semibold text-[15.5px] mb-2">ซ้ำใน statement เดียวกัน — lossless</h3>
+          <p class="text-[14px] text-[var(--ink-soft)] leading-relaxed">
+            แถวที่สองไม่ได้ให้สิทธิ์อะไรที่แถวแรกไม่ได้ให้ · เก็บแถวที่เก่าที่สุด ลบที่เหลือ
+            <span class="mono text-[12px]">(12 คู่)</span>
+          </p>
+        </div>
+        <div class="step">
+          <div class="sn">2</div>
+          <h3 class="font-semibold text-[15.5px] mb-2">statement ที่เหมือนกันเป๊ะ — lossless</h3>
+          <p class="text-[14px] text-[var(--ink-soft)] leading-relaxed">
+            เหมือนกันทั้ง <span class="mono text-[12px]">(policy_id, effect, plane, ชุด targets, ชุด conditions)</span>
+            → ย้าย permission ที่ผู้รอดยังไม่มีเข้าไป แล้วลบตัวซ้ำ (FK cascade เก็บลูกให้เอง)
+            <span class="mono text-[12px]">(3 statements)</span>
+          </p>
+        </div>
+        <div class="step">
+          <div class="sn">3</div>
+          <h3 class="font-semibold text-[15.5px] mb-2">สร้าง partial unique index</h3>
+          <p class="text-[14px] text-[var(--ink-soft)] leading-relaxed">
+            การที่ <span class="mono text-[12px]">CREATE UNIQUE INDEX</span> สำเร็จ คือหลักฐานว่าขั้น 1 ล้างครบจริง
+          </p>
+        </div>
+        <div class="step">
+          <div class="sn">—</div>
+          <h3 class="font-semibold text-[15.5px] mb-2">ที่<b>ไม่</b>ล้าง: permission เดียวอยู่หลาย statement ที่ targets ต่างกัน</h3>
+          <p class="text-[14px] text-[var(--ink-soft)] leading-relaxed">
+            การตัดสินว่า statement ไหนควรเป็นเจ้าของเป็นเรื่อง<b>เชิงความหมาย ไม่ใช่เชิงกลไก</b>
+            และวันนี้ไม่มีผลใด ๆ เพราะ evaluator ไม่ enforce targets — ควรทำเป็นรอบเดียว
+            พร้อมกับตอนเปิด per-service scoping
+          </p>
+        </div>
+
+        <h3 class="font-semibold text-[17px] mt-10 mb-4">ผลการตรวจสอบ (dry-run ใน transaction แล้ว rollback)</h3>
+        <div class="card p-1 mb-5">
+          <table class="d">
+            <thead><tr><th>ตัวชี้วัด</th><th>ก่อน</th><th>หลัง</th></tr></thead>
+            <tbody>
+              <tr><td>policy_statements</td><td>22</td><td>19</td></tr>
+              <tr><td>statement_actions</td><td>598</td><td>512</td></tr>
+              <tr><td><b>permission ที่ allow จริง (distinct)</b></td><td><b>118</b></td><td><b>118</b> — ไม่เปลี่ยน</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox ok">
+          <div class="rc mb-1">วิธียืนยันว่าการล้างข้อมูลปลอดภัย</div>
+          <p class="text-[13.5px]">
+            รัน SQL ของ migration ทั้งชุดใน <span class="mono text-[12px]">BEGIN … ROLLBACK</span>
+            บนข้อมูลจริง แล้วเทียบ<b>ตัวเลขที่สื่อความหมายทางธุรกิจ</b> (จำนวน permission ที่ allow จริง)
+            ก่อน–หลัง ถ้าตรงกันแปลว่าลบแต่ความซ้ำ ไม่ได้ลบสิทธิ์ — เป็นการพิสูจน์ที่หนักแน่นกว่าการนับแถว
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 CHECKLIST ========== -->
+      <section id="checklist" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Checklist</div>
+        <h2 class="display text-3xl mb-6">สำหรับโค้ดที่แตะ policy engine ต่อจากนี้</h2>
+
+        <div class="space-y-4">
+          <div class="rulebox ok"><div class="rc mb-1">01 · INVARIANT</div><p class="text-[13.5px]">การเขียน <span class="mono text-[12px]">statement_actions</span> ทุกครั้งต้องผ่าน merge/dedupe — และ statement ซ้ำได้เฉพาะเมื่อชุด condition ต่างกันจริง</p></div>
+          <div class="rulebox ok"><div class="rc mb-1">02 · TARGETS</div><p class="text-[13.5px]">ส่ง/เก็บเป็นคู่ <span class="mono text-[12px]">(service, resource)</span> เสมอ · ห้ามแตกเป็นสองอาร์เรย์แล้วประกอบกลับ</p></div>
+          <div class="rulebox ok"><div class="rc mb-1">03 · OPERATOR</div><p class="text-[13.5px]">เพิ่ม operator ใหม่ต้องแก้ 3 ที่พร้อมกัน: <span class="mono text-[12px]">CONDITION_OPERATORS</span> · <span class="mono text-[12px]">switch</span> ใน evaluator · picker ใน UI — ขาดที่ใดที่หนึ่งคือ deny fail-open</p></div>
+          <div class="rulebox ok"><div class="rc mb-1">04 · PLANE</div><p class="text-[13.5px]">ตรวจ <span class="mono text-[12px]">permission.plane === statement.plane</span> ทุกครั้ง — ไม่มี FK ไหนกันให้</p></div>
+          <div class="rulebox ok"><div class="rc mb-1">05 · CATALOG</div><p class="text-[13.5px]">อ่าน permission ผ่าน <span class="mono text-[12px]">PermissionsService</span> เท่านั้น (ไม่ inject <span class="mono text-[12px]">Repository&lt;Permission&gt;</span>) และให้ขา read กับ write กรอง <span class="mono text-[12px]">is_deleted</span> เหมือนกัน</p></div>
+          <div class="rulebox ok"><div class="rc mb-1">06 · CONSTRAINT</div><p class="text-[13.5px]">unique/check ต้องประกาศบน entity ด้วย ไม่ใช่แค่ใน migration — ไม่งั้น <span class="mono text-[12px]">migration:generate</span> รอบหน้า drop ทิ้งเงียบ ๆ</p></div>
+          <div class="rulebox ok"><div class="rc mb-1">07 · GRANT MIGRATION</div><p class="text-[13.5px]">เจาะ statement ปลายทางแบบเจาะจง + <span class="mono text-[12px]">NOT EXISTS</span> · ห้าม copy pattern ที่กรองด้วย <span class="mono text-[12px]">effect</span>+<span class="mono text-[12px]">plane</span> เท่านั้น</p></div>
+          <div class="rulebox ok"><div class="rc mb-1">08 · ลำดับ DEPLOY</div><p class="text-[13.5px]"><span class="mono text-[12px]">permissions:sync</span> <b>ก่อน</b> แล้วจึง <span class="mono text-[12px]">migration:run</span> — สลับลำดับแล้ว grant migration จะถูกบันทึกว่า applied แต่ match 0 rows</p></div>
+        </div>
+
+        <div class="edge mt-8">
+          <div class="tag mb-1">ข้อควรระวังตอนเพิ่ม validation ย้อนหลัง</div>
+          <p class="text-[13px]">
+            การเพิ่ม <span class="mono text-[12px]">@Matches</span> ให้ <span class="mono text-[12px]">code</span>
+            เกือบทำให้ policy เดิมที่ code เป็นตัวพิมพ์เล็กแก้ไขไม่ได้ (ฟอร์มส่ง <span class="mono text-[12px]">code</span>
+            เดิมกลับไปด้วยทุกครั้ง) — <b>validation ใหม่ต้องเทียบกับข้อมูลที่มีอยู่จริงก่อน</b>
+            ไม่ใช่กับรูปแบบที่ตั้งใจให้เป็นเท่านั้น
+          </p>
+        </div>
+      </section>
+
+      <erp-footer
+        line1="ERP SYSTEM · IAM POLICY ENGINE · AUDIT &amp; INVARIANTS"
+        line2="Core Invariant · API Contract · 13 Defects · Grant-Migration Anti-pattern">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Scroll-spy active nav. Waits for DOMContentLoaded because <erp-sidebar>
+  // renders #nav from components.js, which is `defer` — deferred scripts run
+  // after parsing but before DOMContentLoaded, so the nav exists by then.
+  document.addEventListener('DOMContentLoaded', () => {
+    const links = [...document.querySelectorAll('#nav .navlink')];
+    const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          links.forEach(l => l.classList.remove('active'));
+          const k = map.get(e.target.id);
+          if (k) k.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-15% 0px -75% 0px' });
+    document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+  });
+</script>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>
