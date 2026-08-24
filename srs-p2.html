@@ -261,7 +261,7 @@
                 <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อรายการราคา — unique ที่ name_en</td></tr>
                 <tr><td>currency</td><td><span style="color:#15803D">✓</span></td><td>สกุลเงินของ<b>ทั้งรายการราคา</b> (ISO 4217 เช่น THB) — <b>เจ้าของสกุลเงินหนึ่งเดียว</b>, ไม่เก็บซ้ำที่ item_prices</td></tr>
                 <tr><td>is_buying · is_selling</td><td><span style="color:#15803D">✓</span></td><td>ทิศทางการใช้งาน — <b>อย่างน้อยหนึ่งต้อง true</b> (DB CHECK)</td></tr>
-                <tr><td>is_tax_inclusive</td><td><span style="color:var(--muted)">–</span></td><td>true = <span class="mono text-[12px]">rate</span> ใน item_prices ของ price list นี้ <b>รวม VAT แล้ว</b> (ราคาหน้าร้าน) · false (ค่าเริ่มต้น) = ยังไม่รวมภาษี (ราคา B2B ทั่วไป)</td></tr>
+                <tr><td>is_vat_included</td><td><span style="color:var(--muted)">–</span></td><td>true = <span class="mono text-[12px]">rate</span> ใน item_prices ของ price list นี้ <b>รวม VAT แล้ว</b> (ราคาหน้าร้าน) · false (ค่าเริ่มต้น) = ยังไม่รวมภาษี (ราคา B2B ทั่วไป) — ถูก Quotation snapshot ไปใช้ตอนออกเอกสาร (ดู <a href="srs-p4.html#p4-shared" style="color:#7C3AED;text-decoration:underline">P4 &sect;07 · IVatDocumentHeader</a>)</td></tr>
                 <tr><td>is_active</td><td><span style="color:var(--muted)">–</span></td><td>เปิดใช้งาน (ค่าเริ่มต้น true)</td></tr>
                 <tr><td>description_th · _en</td><td><span style="color:var(--muted)">–</span></td><td>คำอธิบายเพิ่มเติม</td></tr>
               </tbody>
@@ -287,7 +287,7 @@
               </tbody>
             </table>
             <div class="edge mt-4"><div class="tag mb-1">zero_rated ≠ exempt (สำคัญทางบัญชี)</div><p class="text-[13px]">ทั้งคู่คำนวณเป็น 0.00 บาทในบรรทัดเหมือนกัน แต่ <b>zero_rated ยังอยู่ในระบบ VAT</b> — ภาษีซื้อของต้นทุนที่ใช้ผลิต/ขายสินค้านั้นยังขอเครดิตคืนได้ ส่วน <b>exempt อยู่นอกระบบ VAT</b> — ภาษีซื้อที่เกี่ยวข้องขอเครดิตคืนไม่ได้ ต้องแยก <span class="mono text-[12px]">vat_treatment</span> ให้ถูกตั้งแต่ระดับสินค้า ไม่ใช่แค่ "ไม่มี VAT" เฉย ๆ</p></div>
-            <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ขอบเขต — คนละงานกับ TAX_CONFIGS ใน finance-bc</div><p class="text-[13px]"><span class="mono text-[12px]">tax_categories</span> ที่นี่คือ <b>การจัดประเภทสินค้าทางภาษี</b> (item-level) เท่านั้น — ตัวเลขจริงตอนออกใบกำกับภาษี (คำนวณ VAT ต่อบรรทัด, เลขที่ใบกำกับต่อเนื่อง, WHT) เป็นหน้าที่ <span class="mono text-[12px]">TAX_CONFIGS</span> + Tax Invoice ใน <a href="srs-p5.html#p5" style="color:#7C3AED;text-decoration:underline">P5 · Finance</a> ซึ่ง<b>ยังไม่มีโค้ดเลย</b> (ดู workflow เต็มด้านล่าง)</p></div>
+            <div class="edge mt-3" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ขอบเขต — คนละงานกับ TAX_CONFIGS ใน finance-bc</div><p class="text-[13px]"><span class="mono text-[12px]">tax_categories</span> ที่นี่คือ <b>การจัดประเภทสินค้าทางภาษี</b> (item-level) เท่านั้น — ตัวเลขจริงตอนออกใบกำกับภาษี (คำนวณ VAT ต่อบรรทัด, เลขที่ต่อเนื่อง, WHT) เป็นหน้าที่ <span class="mono text-[12px]">TAX_CONFIGS</span> + <span class="mono text-[12px]">Receipt</span> ใน <a href="srs-p5.html#p5" style="color:#7C3AED;text-decoration:underline">P5 · Finance</a> ซึ่ง<b style="color:#15803D">implement แล้ว</b> (ดู workflow เต็มด้านล่าง)</p></div>
           </div>
 
           <!-- ITEM PRICE -->
@@ -388,7 +388,7 @@
 
           <!-- VAT SCENARIOS -->
           <h4 class="font-semibold mt-10 mb-2 text-[16px]">ตัวอย่าง Data &amp; Workflow · การจัดประเภทภาษี VAT (4 กรณีที่ต้องรองรับ)</h4>
-          <div class="card p-4 mb-5 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">ขอบเขตของแต่ละตัวอย่าง:</b> ส่วน "การจัดประเภท" (master data: <span class="mono text-[12px]">tax_categories</span>, <span class="mono text-[12px]">products.tax_category_id</span>, <span class="mono text-[12px]">price_lists.is_tax_inclusive</span>, <span class="mono text-[12px]">suppliers.is_vat_registered</span>) <b style="color:#15803D">implement แล้วจริงในรอบนี้</b> — ส่วน "ตอนออกใบกำกับภาษี" เป็น<b>การออกแบบ workflow ที่ยังไม่มีโค้ด</b> เพราะต้องรอ Tax Invoice ใน finance-bc (P5) ซึ่งยังเป็น 0% (ดู <a href="srs-p4.html#p4" style="color:#7C3AED;text-decoration:underline">P4</a>/<a href="srs-p5.html#p5" style="color:#7C3AED;text-decoration:underline">P5</a>)</div>
+          <div class="card p-4 mb-5 text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">ขอบเขตของแต่ละตัวอย่าง:</b> ส่วน "การจัดประเภท" (master data: <span class="mono text-[12px]">tax_categories</span>, <span class="mono text-[12px]">products.tax_category_id</span>, <span class="mono text-[12px]">price_lists.is_vat_included</span>, <span class="mono text-[12px]">suppliers.is_vat_registered</span>) <b style="color:#15803D">implement แล้วจริงในรอบนี้</b> — ส่วน "ตอนออกใบกำกับภาษี" <b style="color:#15803D">implement แล้วเช่นกัน</b> ใน finance-bc's <span class="mono text-[12px]">Receipt</span> (P5) ที่ต่อ RPC มาอ่าน <span class="mono text-[12px]">tax_category_id</span> จริง ๆ (ดู <a href="srs-p4.html#p4" style="color:#7C3AED;text-decoration:underline">P4</a>/<a href="srs-p5.html#p5" style="color:#7C3AED;text-decoration:underline">P5</a>) — ข้อแตกต่างเดียวคือ <span class="mono text-[12px]">Receipt.is_vat_included</span> เอง<b>ไม่ได้</b>อ่านจาก <span class="mono text-[12px]">price_lists.is_vat_included</span> แต่ derive จาก <span class="mono text-[12px]">document_type</span> ของตัวเอง (มีแต่ <span class="mono text-[12px]">Quotation</span> เท่านั้นที่ snapshot ค่านี้จาก price list ตรง ๆ)</div>
 
           <div class="card p-6 mb-5">
             <div class="flex items-center gap-2 mb-3">
@@ -405,7 +405,7 @@
 <span class="k">PUT</span> /products/{ข้าวเปลือก-id}
 { <span class="s">"tax_category_id"</span>: <span class="s">"tax-exempt-81"</span> }
 
-<span class="c">// 3) [ออกแบบไว้] ตอนออก Tax Invoice — finance-bc อ่าน tax_category_id ผ่าน TCP</span>
+<span class="c">// 3) [implement แล้ว] ตอนออก Receipt — finance-bc อ่าน tax_category_id ผ่าน TCP</span>
 <span class="c">// แล้ว "ไม่แสดงยอด VAT" บรรทัดนี้ในใบกำกับภาษี (ต่างจาก zero_rated ที่ยังต้องแสดง 0.00)</span></pre>
           </div>
 
@@ -432,15 +432,16 @@
             <pre class="code p-4"><span class="c">// ราคาปลีกหน้าร้าน = แสดงราคารวม VAT แล้ว, ราคาส่ง B2B = ไม่รวม (ทำได้จริงตอนนี้)</span>
 <span class="k">POST</span> /price-lists
 { <span class="s">"name_en"</span>: <span class="s">"Retail Selling"</span>, <span class="s">"currency"</span>: <span class="s">"THB"</span>, <span class="s">"is_selling"</span>: true,
-  <span class="s">"is_tax_inclusive"</span>: true }
+  <span class="s">"is_vat_included"</span>: true }
 <span class="c">// → item_prices.rate ใน list นี้ = 107 บาท (ราคาที่ลูกค้าจ่ายจริง รวม VAT 7 บาทแล้ว)</span>
 
 <span class="k">POST</span> /price-lists
 { <span class="s">"name_en"</span>: <span class="s">"Wholesale Selling"</span>, <span class="s">"currency"</span>: <span class="s">"THB"</span>, <span class="s">"is_selling"</span>: true,
-  <span class="s">"is_tax_inclusive"</span>: false }
+  <span class="s">"is_vat_included"</span>: false }
 <span class="c">// → item_prices.rate ใน list นี้ = 100 บาท (ยังไม่รวม VAT — บวก 7% ตอนออกใบกำกับ)</span>
 
-<span class="c">// [ออกแบบไว้] finance-bc อ่าน price_lists.is_tax_inclusive ก่อนคำนวณ:
+<span class="c">// [implement แล้ว] sales-bc's Quotation snapshot price_lists.is_vat_included ลงหัวเอกสารตอนสร้าง —
+// finance-bc's Receipt เองไม่อ่านค่านี้ ใช้ document_type ของตัวเองตัดสินแทน (ดู P5 §07):
 //   inclusive: vat_amount = rate − rate/1.07,        net = rate/1.07
 //   exclusive: vat_amount = rate × 0.07,              net = rate</span></pre>
           </div>
@@ -1117,7 +1118,7 @@ erDiagram
         string currency "ISO 4217"
         boolean is_buying
         boolean is_selling
-        boolean is_tax_inclusive
+        boolean is_vat_included
         boolean is_active
     }
     TAX_CATEGORIES {

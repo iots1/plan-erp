@@ -464,7 +464,7 @@
             </div>
             <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ใบกำกับภาษี, ใบวางบิล และ <b>คำนวณ COGS + กำไร/ขาดทุนแม่นยำต่อ Lot</b></p>
             <div class="flex flex-wrap gap-1.5">
-              <span class="chip">tax_invoices</span><span class="chip">billing_notes</span>
+              <span class="chip" style="color:var(--signal)">receipts</span><span class="chip">billing_notes</span>
               <span class="chip" style="color:var(--signal)">cogs_entries</span>
               <span class="chip" style="color:var(--signal)">profit_loss_records</span>
               <span class="chip">tax_configs</span><span class="chip">ledger_entries</span>
@@ -882,7 +882,7 @@
                 <tr><td><b>SALES</b><br><span class="text-[12px]" style="color:var(--ink-soft)">พนักงานขาย</span></td><td>สร้าง/แก้ <b>ใบเสนอราคา</b> (DRAFT), ส่งให้ลูกค้า, บันทึกว่าลูกค้าตอบรับ</td><td>sales-bc</td><td class="mono text-[12px]">quotation:create · :update · :send · :approve</td></tr>
                 <tr><td><b>SALES MANAGER</b><br><span class="text-[12px]" style="color:var(--ink-soft)">ผู้จัดการขาย</span></td><td>ยกเลิกใบเสนอราคา, คุมส่วนลด/มาร์จิ้นที่เกินกรอบ</td><td>sales-bc</td><td class="mono text-[12px]">quotation:cancel</td></tr>
                 <tr><td><b>WAREHOUSE</b><br><span class="text-[12px]" style="color:var(--ink-soft)">เจ้าหน้าที่คลัง</span></td><td>ยืนยัน <b>ใบส่งของ</b> → ตัดสต็อกแบบ FIFO ต่อล็อต และปล่อย event ต้นทุนจริง</td><td>inventory-bc</td><td class="mono text-[12px]">delivery_note:confirm</td></tr>
-                <tr><td><b>ACCOUNTANT</b><br><span class="text-[12px]" style="color:var(--ink-soft)">นักบัญชี</span></td><td>ออก <b>ใบกำกับภาษี</b> (ออกเลขที่ + ล็อกเอกสาร), ยกเลิกใบกำกับ, ดูแลอัตราภาษี</td><td>finance-bc</td><td class="mono text-[12px]">tax_invoice:create · :issue · :void · tax_config:*</td></tr>
+                <tr><td><b>ACCOUNTANT</b><br><span class="text-[12px]" style="color:var(--ink-soft)">นักบัญชี</span></td><td>ออก <b>ใบเสร็จ/ใบกำกับภาษี/ใบลดหนี้-เพิ่มหนี้</b> (8 document_type, ออกเลขที่ + ล็อกเอกสาร), ยกเลิก, ดูแลอัตราภาษี</td><td>finance-bc</td><td class="mono text-[12px]">receipt:create · :issue · :void · tax_config:*</td></tr>
                 <tr><td><b>AR CLERK</b><br><span class="text-[12px]" style="color:var(--ink-soft)">เจ้าหน้าที่การเงิน</span></td><td>วางบิล, รับชำระ, ตัดหนี้ตามใบกำกับ, ออกใบเสร็จ</td><td>finance-bc</td><td class="mono text-[12px]">billing_note:* · payment_entry:*</td></tr>
                 <tr><td><b>FINANCE MANAGER</b><br><span class="text-[12px]" style="color:var(--ink-soft)">ผู้จัดการการเงิน</span></td><td>อนุมัติเอกสารเกินวงเงิน, ดูกำไรขั้นต้นต่อล็อต, ปิดงวด</td><td>finance-bc · report-bc</td><td class="mono text-[12px]">report:view · period:close</td></tr>
               </tbody>
@@ -969,15 +969,15 @@ sequenceDiagram
             <table class="d">
               <thead><tr><th>จาก → ไป</th><th>ส่งต่อผ่าน</th><th>ข้อมูลที่ส่งต่อ</th><th>สถานะ</th></tr></thead>
               <tbody>
-                <tr><td>Quotation → Sales Order</td><td>แปลงเอกสาร (ใน sales-bc)</td><td>บรรทัดที่ตกลง + <span class="mono text-[12px]">price_list_id</span> + <span class="mono text-[12px]">is_tax_inclusive</span> ที่ snapshot ไว้</td><td><span class="chip">P4 M3</span></td></tr>
+                <tr><td>Quotation → Sales Order</td><td>แปลงเอกสาร (ใน sales-bc)</td><td>บรรทัดที่ตกลง + <span class="mono text-[12px]">price_list_id</span> + <span class="mono text-[12px]">is_vat_included</span> ที่ snapshot ไว้</td><td><span class="chip">P4 M3</span></td></tr>
                 <tr><td>Sales Order → Delivery</td><td>แปลงเอกสาร + ตรวจ <span class="mono text-[12px]">available_qty</span></td><td>บรรทัดที่จะส่ง · bundle ต้อง explode เป็น <span class="mono text-[12px]">packed_items</span></td><td><span class="chip">P4 M3</span></td></tr>
                 <tr><td>Delivery → inventory ledger</td><td>ยืนยันส่งของ (ใน inventory-bc)</td><td>ตัดสต็อก FIFO ต่อล็อต — ได้ <span class="mono text-[12px]">unit_cost</span> จริงของแต่ละล็อต</td><td><span class="chip">P3/P4</span></td></tr>
                 <tr><td>inventory-bc → finance-bc</td><td>event <span class="mono text-[12px]">stock.deducted</span></td><td><b>allocations พร้อม unit_cost จริง</b> — finance ใช้คิด COGS ห้ามเฉลี่ย</td><td><span class="chip">P5</span></td></tr>
-                <tr><td>Delivery → Tax Invoice</td><td><span class="mono text-[12px]">delivery_note_id</span> บนใบกำกับ</td><td>อ้างอิงว่าใบกำกับนี้ออกจากการส่งของครั้งไหน (uuid ข้าม BC ไม่มี FK)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
-                <tr><td>sales-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getCustomerById</span></td><td>ชื่อ + เลขผู้เสียภาษีลูกค้า → <b>snapshot</b> ลงใบกำกับ (§86/4(2) บังคับให้พิมพ์บนเอกสาร)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>Delivery → Receipt</td><td><span class="mono text-[12px]">delivery_note_id</span> บนใบเสร็จ/ใบกำกับ</td><td>อ้างอิงว่าเอกสารนี้ออกจากการส่งของครั้งไหน (uuid ข้าม BC ไม่มี FK)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>sales-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getCustomerById</span></td><td>ชื่อ + เลขผู้เสียภาษีลูกค้า → <b>snapshot</b> ลงเอกสาร (§86/4(2) บังคับให้พิมพ์บนใบกำกับภาษีเต็มรูป/ใบแจ้งหนี้+ใบกำกับ)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>inventory-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getProductById</span></td><td>sku/ชื่อ + <span class="mono text-[12px]">tax_category.vat_treatment</span> → snapshot ต่อบรรทัด</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
-                <tr><td>Tax Invoice → Billing Note</td><td><span class="mono text-[12px]">billing_note_invoices</span> (join table)</td><td>รวมหลายใบกำกับเรียกเก็บรอบเดียว — ใบกำกับต้องมีก่อน</td><td><span class="chip">P5 ถัดไป</span></td></tr>
-                <tr><td>Payment → Tax Invoice</td><td><span class="mono text-[12px]">payment_allocations</span></td><td>1 การชำระตัดได้หลายใบกำกับ · <span class="mono text-[12px]">outstanding = total − Σ allocation</span></td><td><span class="chip">P5 ถัดไป</span></td></tr>
+                <tr><td>Receipt → Billing Note</td><td><span class="mono text-[12px]">billing_note_invoices</span> (join table)</td><td>รวมหลายใบกำกับเรียกเก็บรอบเดียว — ใบกำกับต้องมีก่อน</td><td><span class="chip">P5 ถัดไป</span></td></tr>
+                <tr><td>Payment → Receipt</td><td><span class="mono text-[12px]">payment_allocations</span></td><td>1 การชำระตัดได้หลายใบ · <span class="mono text-[12px]">outstanding = total − Σ allocation</span></td><td><span class="chip">P5 ถัดไป</span></td></tr>
                 <tr><td>finance-bc → report-bc</td><td>events <span class="mono text-[12px]">invoice.issued</span> · <span class="mono text-[12px]">profit.calculated</span></td><td>ยอดขาย/ภาษี/กำไรต่อล็อต — consumer ต้อง idempotent</td><td><span class="chip">P6</span></td></tr>
               </tbody>
             </table>
@@ -1360,7 +1360,7 @@ sequenceDiagram
               </div>
               <div class="eyebrow mb-2" style="color:var(--muted)">ลูกค้าได้รับ</div>
               <ul class="space-y-1.5 text-[13px]" style="color:var(--ink-soft)">
-                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><b>GL double-entry</b> · Tax Invoice + Billing Note · Payment + allocation (AR/AP)</span></li>
+                <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><b>GL double-entry</b> · Receipt (ใบเสร็จ/ใบกำกับภาษี/ใบลดหนี้-เพิ่มหนี้) + Billing Note · Payment + allocation (AR/AP)</span></li>
                 <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span><b>COGS + กำไร/ขาดทุนต่อ Lot</b> (รวม bundle)</span></li>
                 <li class="flex gap-2.5"><span style="color:var(--signal)">→</span><span>VAT + <b>ภาษีหัก ณ ที่จ่าย</b> · credit/debit note</span></li>
               </ul>
