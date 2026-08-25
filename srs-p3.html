@@ -588,7 +588,101 @@ stateDiagram-v2
               </tbody>
             </table>
           </div>
-          <div class="edge mb-10"><div class="tag mb-1">Partial receipt</div><p class="text-[13px]">รับไม่ครบ PO → สร้างล็อตเท่าที่รับจริงในทรานแซกชันนี้ · PO ที่ <b>supplier-bc</b> ยังเปิดค้าง (<span class="mono text-[12px]">PARTIAL</span>) รอ GRN ใบถัดไป — จัดการโดย consumer ของ <span class="mono text-[12px]">goods_receipt.submitted</span></p></div>
+          <div class="edge mb-10"><div class="tag mb-1">Partial receipt</div><p class="text-[13px]">รับไม่ครบ PO → สร้างล็อตเท่าที่รับจริงในทรานแซกชันนี้ · PO ที่ <b>supplier-bc</b> ยังเปิดค้าง (<span class="mono text-[12px]">PARTIAL</span>) รอ GRN ใบถัดไป — ตัดยอดผ่าน RPC sync <span class="mono text-[12px]">applyGoodsReceipt</span> (ไม่ใช่ event async แล้ว ดู A.1)</p></div>
+
+          <!-- ===== A.1 · Sequence Diagram (implemented) ===== -->
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">A.1 · Sequence Diagram <span class="mono text-[11px]" style="color:var(--muted)">(เส้นทางเต็ม รวมการตัดยอดข้าม BC ไปยัง supplier-bc — implement แล้วทั้งหมด)</span></h5>
+          <div class="diagram mb-3">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor WH as เจ้าหน้าที่คลัง
+    actor OPS as ผู้ดูแลระบบ (ซ่อม sync ที่ค้าง)
+    participant INV as inventory-bc · GoodsReceiptsService
+    participant DB as erp_inventory (Postgres)
+    participant SUP as supplier-bc · PurchaseOrdersService
+    participant SDB as erp_supplier (Postgres)
+
+    Note over WH,DB: สร้างใบรับสินค้า (DRAFT)
+    WH->>INV: POST /goods-receipts (po_id, warehouse_id, items[uom_id, qty, import_cost, lot_number])
+    INV->>SUP: getPurchaseOrderById (RPC sync)
+    SUP-->>INV: PO + items (qty, received_qty)
+    Note over INV,SUP: PO ไม่มีจริง / สถานะไม่ใช่ SENT·PARTIAL → 400 · product เป็น template/bundle → 400
+    INV->>DB: ออกเลขที่ GRN-{YYYY}-{00001} + INSERT goods_receipts (DRAFT) + items
+    INV-->>WH: 201 · status=DRAFT
+
+    Note over WH,SDB: ยืนยันรับสินค้า (submit) — ทุกอย่างใน 1 ทรานแซกชันที่ inventory-bc ก่อน
+    WH->>INV: POST /goods-receipts/{id}/submit
+    INV->>DB: SELECT ... FOR UPDATE header — ต้องเป็น DRAFT เท่านั้น
+    INV->>SUP: getPurchaseOrderById (อ่าน received_qty ล่าสุดอีกครั้ง ก่อนคิด over-receipt)
+    SUP-->>INV: PO + items
+    Note over INV,SUP: (qty ที่แปลงเป็นหน่วยสต็อกแล้ว) + received_qty เดิม เกิน allowance ของบรรทัดใด → 409 ยกเลิกทั้งใบ
+    loop ทุกรายการ
+        INV->>DB: INSERT lots (available_qty = qty ที่แปลงหน่วยแล้ว) + stock_movements (RECEIPT, unit_cost snapshot)
+    end
+    INV->>DB: UPDATE status=SUBMITTED, submitted_by/at · po_synced_at = null (ยังไม่ยืนยันฝั่ง PO)
+    INV-->>WH: 200 · SUBMITTED — เห็นเลขล็อตที่สร้างทันที (สต็อกที่นี่คือความจริงแล้ว)
+
+    INV->>SUP: applyGoodsReceipt(po_id, grn_id, APPLY, lines[grn_item_id, po_item_id, qty]) — RPC sync
+    alt supplier-bc ตอบสำเร็จ
+        SUP->>SDB: INSERT purchase_order_receipts (ON CONFLICT DO NOTHING ตาม grn_item_id — กันเรียกซ้ำนับซ้ำ)
+        SUP->>SDB: recompute received_qty = SUM(ledger ที่ยัง reversed_at IS NULL) ต่อบรรทัด
+        SUP->>SDB: สรุปสถานะใหม่จากทุกบรรทัด → SENT/PARTIAL/RECEIVED
+        SUP-->>INV: 200 · PO อัปเดตแล้ว
+        INV->>DB: UPDATE po_synced_at = now()
+    else supplier-bc ไม่ตอบ (ล่ม/เครือข่ายขัดข้อง)
+        SUP--xINV: timeout / unreachable
+        INV->>INV: log warning เท่านั้น — <b>ไม่ rollback</b> การรับสินค้าที่เพิ่ง commit
+        Note over INV,SUP: po_synced_at ยังเป็น null — ฝั่ง PO เห็นตัวเลขเก่าไปก่อน จนกว่าจะ sync สำเร็จ
+    end
+
+    opt ซ่อม sync ที่ค้าง (เรียกกี่ครั้งก็ได้ผลลัพธ์เดิม)
+        OPS->>INV: POST /goods-receipts/{id}/sync-purchase-order
+        INV->>SUP: applyGoodsReceipt(...) — ทิศทาง APPLY/REVERSE derive จากสถานะเอกสารปัจจุบันเอง
+        SUP-->>INV: 200 · ตัดยอดสำเร็จ (แถวใน ledger ถูก INSERT/UPDATE ไปแล้วก็แค่ no-op)
+        INV->>DB: UPDATE po_synced_at = now()
+    end
+
+    Note over WH,SDB: ยกเลิกใบรับสินค้า — เฉพาะล็อตที่ยังไม่มีใครแตะเลย
+    WH->>INV: POST /goods-receipts/{id}/cancel { cancel_reason }
+    INV->>DB: FOR UPDATE header แล้วจึง FOR UPDATE ทุกล็อตที่เกี่ยวข้อง
+    alt available_qty = received_qty ทุกล็อต (ยังไม่เคยถูกเบิกออกเลย)
+        INV->>DB: INSERT stock_movements (ADJUSTMENT, qty ติดลบ) + UPDATE lots.available_qty = 0
+        INV->>DB: UPDATE status=CANCELLED, cancelled_by/at, cancel_reason · po_synced_at = null
+        INV-->>WH: 200 · CANCELLED
+        INV->>SUP: applyGoodsReceipt(..., REVERSE, ...)
+        SUP->>SDB: UPDATE purchase_order_receipts SET reversed_at = now() WHERE grn_item_id = ... AND reversed_at IS NULL
+        SUP->>SDB: recompute received_qty ใหม่ → PO ย้อนกลับ (RECEIVED/PARTIAL → PARTIAL/SENT)
+        SUP-->>INV: 200 · PO อัปเดตแล้ว
+    else มีล็อตที่ถูกเบิกออกไปแล้วแม้แต่หน่วยเดียว
+        INV-->>WH: 409 · ต้องใช้ Purchase Return หรือ Stock Adjustment แทน — ห้ามย้อนเฉพาะส่วนที่เหลือ
+    end
+</pre>
+          </div>
+          <p class="text-[12.5px] mt-2 mb-9" style="color:var(--muted)">เส้น <span class="mono text-[12px]">--&gt;&gt;</span> คือคำตอบกลับแบบ sync สำเร็จ · <span class="mono text-[12px]">--x</span> คือ timeout/เครือข่ายขัดข้อง (ไม่ใช่ error ทาง business) · ทุกจุดที่ INV เขียน DB ของตัวเองอยู่ใน transaction เดียวกับ HTTP response — ส่วนการเรียกไป SUP เกิด<b>หลัง</b> transaction นั้น commit แล้วเสมอ (stock ต้องเป็นความจริงก่อนเสมอ ไม่ผูกกับว่า supplier-bc จะตอบไหว)</p>
+
+          <!-- ===== A.2 · ตัวอย่างเคสจริง ===== -->
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">A.2 · ตัวอย่างเคสจริง <span class="mono text-[11px]" style="color:var(--muted)">(สำหรับผู้อ่านที่ไม่ใช่สายเทค)</span></h5>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">ร้าน <b style="color:var(--ink)">"เกษตรไทยพัฒนา"</b> สั่งซื้อ <b style="color:var(--ink)">ปุ๋ยยูเรีย 46-0-0</b> จาก <b style="color:var(--ink)">บริษัท ปุ๋ยไทย จำกัด</b> — สินค้านี้เก็บสต็อกเป็น <b>"ถุง"</b> (หน่วยสต็อก) แต่โรงงานขนส่งมาเป็น <b>"ลัง"</b> (1 ลัง = 12 ถุง) ตัวอย่างนี้เดินตามใบสั่งซื้อ 2 ใบ เพื่อให้เห็นทั้งกรณีปกติและกรณีที่พบได้จริง</p>
+          </div>
+
+          <div class="card overflow-hidden mb-5">
+            <table class="d">
+              <thead><tr><th>ใบสั่งซื้อ (PO)</th><th>สั่งไว้</th><th>ของที่มาจริง</th><th>ระบบแปลงหน่วยได้</th><th>ผลลัพธ์</th></tr></thead>
+              <tbody>
+                <tr><td><b>PO-2026-00042</b></td><td>120 ถุง</td><td>10 ลัง</td><td>10 × 12 = <b>120 ถุง</b></td><td>ตรงเป๊ะ → PO เปลี่ยนเป็น <span class="mono text-[12px]" style="color:var(--signal)">RECEIVED</span> (รับครบแล้ว)</td></tr>
+                <tr><td><b>PO-2026-00055</b></td><td>150 ถุง</td><td>8 ลัง</td><td>8 × 12 = <b>96 ถุง</b></td><td>ยังไม่ครบ → PO ค้างเป็น <span class="mono text-[12px]" style="color:var(--accent)">PARTIAL</span> (รับแล้วบางส่วน) เหลืออีก 54 ถุงรอใบรับสินค้าถัดไป</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6 mb-5">
+            <div class="rulebox"><div class="rc mb-1">ถ้ารับเกินจำนวนที่สั่ง</div><p class="text-[13.5px]">ระบบตั้งค่าไว้ให้รับเกินได้ไม่เกิน <b>5%</b> ของยอดสั่งซื้อ (ปรับได้ในหน้าตั้งค่าสต็อก) — ถ้าโรงงานส่ง <b>PO-2026-00042</b> มาเกิน <b>126 ถุง</b> (120 × 1.05) ระบบจะ<b>ไม่ยอมให้ยืนยัน</b>ทันที ต้องแก้จำนวนหรือติดต่อโรงงานก่อน ป้องกันการกรอกผิดหรือรับของเกินโดยไม่รู้ตัว</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">ถ้าเน็ตขัดข้องตอนกดยืนยัน</div><p class="text-[13.5px]">ของที่รับเข้าคลังจะ<b>บันทึกสำเร็จเสมอ</b> — เห็นในสต็อกทันที ต่อให้ระบบจัดซื้ออีกฝั่งหนึ่งไม่ตอบกลับชั่วคราว (เช่น เน็ตสะดุด) ใบสั่งซื้อฝั่งนั้นจะเห็นตัวเลขล่าช้าไปก่อน แล้วผู้ดูแลระบบกดปุ่ม "ซิงค์ข้อมูล" ซ้ำได้ทีหลัง <b>กี่ครั้งก็ได้</b> โดยไม่มีทางที่ตัวเลขจะถูกนับซ้ำ</p></div>
+          </div>
+
+          <div class="edge mb-10" style="background:rgba(11,61,145,.06);border-color:rgba(11,61,145,.22)"><div class="tag mb-1" style="color:var(--blueprint)">ถ้ากรอกผิดแล้วอยากยกเลิก</div><p class="text-[13px]">เจ้าหน้าที่คลังเลือกคลังปลายทางผิดในใบรับสินค้า <b>PO-2026-00042</b> แล้วกด "ยกเลิก" <b>ทันที</b> ก่อนมีใครเบิกปุ๋ยล็อตนั้นออกไปเลย — ระบบย้อนสต็อกกลับเป็น 0 ให้อัตโนมัติ และแจ้งฝั่งจัดซื้อลดยอดรับกลับเป็น 0 ด้วย (PO กลับไปเป็น SENT เหมือนไม่เคยรับ) · แต่ถ้ามีใครเบิกปุ๋ยออกไปแล้วแม้แต่ 1 ถุง ระบบจะ<b>ไม่ยอมให้ยกเลิก</b>ใบนี้อีกต่อไป เพราะยกเลิกแล้วปุ๋ยที่เบิกออกไปจะกลายเป็นของที่ "ไม่มีเอกสารรับเข้ารองรับ" — ต้องออกเอกสารแก้ไขสต็อกแยกต่างหากแทน</p></div>
 
           <!-- ===== B · Backend ===== -->
           <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">B</span><h4 class="font-semibold text-[16px]">Backend (NestJS 11 · Fastify · TypeORM) Implementation</h4></div>

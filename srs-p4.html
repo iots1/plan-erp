@@ -202,12 +202,21 @@ erDiagram
     PURCHASE_ORDER_ITEMS {
         uuid id PK
         uuid po_id FK
-        int received_qty "bumped by goods_receipt.submitted"
+        int received_qty "recomputed from PURCHASE_ORDER_RECEIPTS ledger, never incremented in place"
         uuid product_id "ref inventory-bc"
         int qty
         decimal unit_cost
         string discount_type "percent_amount · per_item mode only"
         decimal discount "per_item mode only"
+    }
+    PURCHASE_ORDER_RECEIPTS {
+        uuid id PK
+        uuid po_id FK
+        uuid po_item_id FK
+        uuid grn_id "ref inventory-bc goods_receipts.id — cross-BC, no FK"
+        uuid grn_item_id "ref inventory-bc goods_receipt_items.id — UNIQUE, the idempotency key"
+        int qty "stock UOM, already converted by inventory-bc"
+        timestamp reversed_at "set when the GRN is cancelled · null = still counts"
     }
     INBOUND_SHIPMENTS {
         uuid id PK
@@ -326,6 +335,7 @@ erDiagram
     }
     SUPPLIERS ||--o{ PURCHASE_ORDERS : receives
     PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ITEMS : contains
+    PURCHASE_ORDER_ITEMS ||--o{ PURCHASE_ORDER_RECEIPTS : "received_qty derives from"
     PURCHASE_ORDERS ||--o{ INBOUND_SHIPMENTS : ships
     CUSTOMER_GROUPS ||--o{ CUSTOMERS : groups
     CUSTOMERS ||--o{ QUOTATIONS : requests
@@ -363,7 +373,7 @@ erDiagram
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">06</span><h3 class="text-xl font-semibold">Implementation Status &amp; Testing Guide · ฝั่งซื้อ M1 · ฝั่งขาย M1–M2</h3></div>
 
           <div class="card p-6 mb-8" style="border-left:3px solid var(--blue)">
-            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1 (2026-08)</b> implement เต็มรูปแบบใน <b style="color:var(--ink)">supplier-bc</b>: <span class="mono text-[12px]">PurchaseOrder</span>/<span class="mono text-[12px]">PurchaseOrderItem</span> + state machine 6 สถานะ, การออกเลขที่ <span class="mono text-[12px]">PO-{YYYY}-{00001}</span> แบบ concurrency-safe, TCP validation ข้าม BC ไปยัง inventory-bc (<span class="mono text-[12px]">getProductById</span>), permission <span class="mono text-[12px]">purchase_order:*</span> 6 ตัว · ทดสอบผ่านทั้ง unit test (mock) และ end-to-end จริงผ่าน HTTP + RabbitMQ กับฐานข้อมูล dev — ดู state machine เต็มที่หัวข้อ 02 และ ER diagram ที่หัวข้อ 04 ด้านบน · ยังไม่ implement: Goods Receipt (M2, inventory-bc), Stock Adjustment (M3), Purchase Return (M4)</p>
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1 (2026-08)</b> implement เต็มรูปแบบใน <b style="color:var(--ink)">supplier-bc</b>: <span class="mono text-[12px]">PurchaseOrder</span>/<span class="mono text-[12px]">PurchaseOrderItem</span> + state machine 6 สถานะ, การออกเลขที่ <span class="mono text-[12px]">PO-{YYYY}-{00001}</span> แบบ concurrency-safe, TCP validation ข้าม BC ไปยัง inventory-bc (<span class="mono text-[12px]">getProductById</span>), permission <span class="mono text-[12px]">purchase_order:*</span> 6 ตัว · ทดสอบผ่านทั้ง unit test (mock) และ end-to-end จริงผ่าน HTTP + RabbitMQ กับฐานข้อมูล dev — ดู state machine เต็มที่หัวข้อ 02 และ ER diagram ที่หัวข้อ 04 ด้านบน · M2 (Goods Receipt, inventory-bc) implement แล้ว เช่นกัน — ดูรายละเอียดเต็มที่ <span class="mono text-[12px]">srs-p3.html</span> §07 (Sequence Diagram + Decision Record) · ยังไม่ implement: Stock Adjustment (M3), Purchase Return (M4)</p>
             <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1.1 (2026-08)</b> ปรับให้ใกล้เคียง Quotation: snapshot <span class="mono text-[12px]">supplier_name_th/en</span>/<span class="mono text-[12px]">supplier_tax_id</span> ลงหัวเอกสาร ณ เวลาออกเอกสาร, เพิ่ม <span class="mono text-[12px]">document_date</span> (default = วันนี้ ต้องไม่เกิน <span class="mono text-[12px]">expected_date</span> ถ้าระบุ), ส่วนลดท้ายบิล (<span class="mono text-[12px]">sub_total/discount_type/discount_value/total_discount</span>) และส่วนลดรายบรรทัดบน <span class="mono text-[12px]">PurchaseOrderItem</span> (ของเดิมไม่มีเลย) · <span class="mono text-[12px]">PurchaseOrder</span>/<span class="mono text-[12px]">PurchaseOrderItem</span> ถูก retrofit ให้ extend <span class="mono text-[12px]">SubmittableDocumentEntity</span>/<span class="mono text-[12px]">DocumentLineItemEntity</span> ใน <span class="mono text-[12px]">@lib/common</span> (เค้าโครงเดียวกับ <span class="mono text-[12px]">Quotation</span>/<span class="mono text-[12px]">QuotationItem</span>) และใช้ <span class="mono text-[12px]">DiscountType</span>/<span class="mono text-[12px]">resolveDiscountAmount</span> ร่วมกัน · migration นี้เป็น ALTER จริง (ของเดิม ship ไปแล้ว) และ 3 คอลัมน์ใหม่เป็น NOT NULL ไม่มี default (<span class="mono text-[12px]">supplier_name_th/en</span>, <span class="mono text-[12px]">supplier_tax_id</span>, <span class="mono text-[12px]">document_date</span>) — เนื่องจากยังไม่มีข้อมูลจริงในระบบ (dev เท่านั้น) จึง <span class="mono text-[12px]">TRUNCATE purchase_order_items, purchase_orders</span> ก่อนเพิ่มคอลัมน์ แทนการเขียน backfill logic ให้แถวเก่า — <b>เก็บไว้เป็นข้อควรระวัง:</b> เมื่อระบบมีข้อมูลจริงแล้ว migration ลักษณะนี้ต้องเปลี่ยนไปใช้ backfill-then-`SET NOT NULL` แทน (resolve supplier snapshot จาก join ตาราง suppliers, document_date จาก created_at::date) ไม่ใช่ truncate ทิ้ง · ทดสอบแล้วว่า migration ล้มเหลวถูกต้องถ้า TRUNCATE ทั้งสองตารางไม่อยู่ statement เดียวกัน (FK cross-reference)</p>
             <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1.2 (2026-08)</b> เพิ่ม <span class="mono text-[12px]">document_type</span> (<span class="mono text-[12px]">STANDARD_PO</span>/<span class="mono text-[12px]">BLANKET_PO</span>/<span class="mono text-[12px]">PLANNED_PO</span>/<span class="mono text-[12px]">CONTRACT_PO</span>, default <span class="mono text-[12px]">STANDARD_PO</span>) และ <span class="mono text-[12px]">is_vat_included</span> (boolean, default false, client-supplied — PO ไม่มี price list ให้ snapshot จากแบบ Quotation) ให้ <span class="mono text-[12px]">PurchaseOrder</span> เข้าคอนแทร็กต์เดียวกับ <span class="mono text-[12px]">Receipt</span>/<span class="mono text-[12px]">Quotation</span> ผ่าน <span class="mono text-[12px]">IVatDocumentHeader</span> ใหม่ใน <span class="mono text-[12px]">@lib/common</span> (ดู &sect;07) — <b>document_type ของ PO ไม่ใช้ค่าเดียวกับ Receipt/Quotation</b> โดยตั้งใจ (mirror รูปแบบ status enum ที่แต่ละ BC มีของตัวเอง) เพราะมิติการแบ่งประเภทของแต่ละเอกสารต่างกัน (Receipt แบ่งตามหน้าที่ทางภาษี, Quotation แบ่งตามวัตถุประสงค์การเสนอราคา, PO แบ่งตามลักษณะสัญญาซื้อ — ผูกพันครั้งเดียว/เปิดวงเงิน/ตามแผน/มีสัญญาระยะยาว)</p>
           </div>
@@ -414,13 +424,17 @@ sequenceDiagram
     Note over SUP,INV: po.approved · ยังไม่ emit จริง (ยังไม่มี subscriber) — ตอนนี้แค่ log ไว้
     SUP-->>PUR: 200 · SENT
 
-    Note over WH,INV: M2 · รับสินค้าเข้าคลัง — แผนถัดไป · ยังไม่ implement
-    WH->>INV: บันทึกรับสินค้า Goods Receipt (อ้าง po_id)
-    INV->>SUP: getPurchaseOrderById (RPC) — อ่าน qty/received_qty ไปคิด over-receipt
+    Note over WH,INV: M2 · รับสินค้าเข้าคลัง — implement แล้ว (สรุปย่อ ดูเต็มที่ srs-p3.html &sect;07)
+    WH->>INV: POST /goods-receipts (po_id, items) → submit
+    INV->>SUP: getPurchaseOrderById (RPC sync) — อ่าน qty/received_qty ไปคิด over-receipt
     SUP-->>INV: PO + items
-    INV-)SUP: goods_receipt.submitted (event · async · idempotent ต่อ receipt id)
-    SUP->>DB: bump received_qty รายบรรทัด
-    SUP->>DB: สรุปสถานะ → PARTIAL หรือ RECEIVED
+    INV->>INV: สร้าง lots + stock_movements (RECEIPT) ในทรานแซกชันเดียว
+    INV->>SUP: applyGoodsReceipt(po_id, grn_id, APPLY, lines[grn_item_id, po_item_id, qty]) — RPC sync
+    Note over INV,SUP: ไม่ใช่ event fire-and-forget แล้ว — เรียกหลังสต็อกที่ inventory-bc commit จริง
+    SUP->>DB: INSERT purchase_order_receipts (ON CONFLICT DO NOTHING ตาม grn_item_id) — กันเรียกซ้ำนับซ้ำ
+    SUP->>DB: recompute received_qty = SUM(ledger ที่ยังไม่ reverse) → สรุปสถานะ PARTIAL/RECEIVED
+    SUP-->>INV: 200 · PO อัปเดตแล้ว
+    Note over INV,SUP: SUP ไม่ตอบ (network) → inventory-bc ไม่ rollback สต็อก แค่บันทึกว่า sync ค้าง แล้วให้ operator เรียกซ้ำทีหลังได้ (idempotent)
 
     Note over PUR,DB: เส้นทางทางเลือก · ยกเลิก (M1 — implement แล้ว)
     PUR->>SUP: POST /purchase-orders/{id}/cancel { cancel_reason }
