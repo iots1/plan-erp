@@ -838,6 +838,81 @@ stateDiagram-v2
             </div>
           </div>
         </div>
+
+        <!-- 3.8 Implementation Decision Record (M2 · Inventory Core) -->
+        <div class="mt-14">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">08</span><h3 class="text-xl font-semibold">Implementation Decision Record · บันทึกการตัดสินใจตอน implement</h3></div>
+
+          <div class="card p-6 mb-9" style="border-left:3px solid var(--signal)">
+            <p class="text-[14px]" style="color:var(--ink-soft)">หัวข้อนี้บันทึก <b style="color:var(--ink)">จุดที่โค้ดจริงตัดสินใจต่างจาก/ละเอียดกว่าที่ SRS ระบุไว้</b> ตอน implement <b style="color:var(--ink)">Stock Settings · Lot/Stock Ledger · Goods Receipt (UC-3.1)</b> — เขียนไว้เพื่อให้คนที่อ่านสเปกแล้วไปเปิดโค้ดไม่ต้องเดาว่าทำไมไม่เหมือนกัน และเพื่อให้ decision เหล่านี้ถูก challenge ได้ในภายหลัง แต่ละข้อระบุ <b style="color:var(--ink)">ทางเลือกที่ไม่ได้เลือก</b> และ <b style="color:var(--ink)">ต้นทุนของการเลือกผิด</b> ไว้ด้วยเสมอ</p>
+          </div>
+
+          <!-- ===== D1 · UOM conversion ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D1</span><h4 class="font-semibold text-[16px]">การแปลงหน่วยอยู่ที่ GRN เท่านั้น ไม่ขึ้นไปที่ PO</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> <span class="mono text-[12px]">goods_receipt_items</span> เก็บทั้ง <span class="mono text-[12px]">uom_id</span> + <span class="mono text-[12px]">qty_entered</span> (หน่วยที่เจ้าหน้าที่กรอก เช่น ลัง) และ <span class="mono text-[12px]">qty</span> ที่แปลงเป็น <b>หน่วยสต็อก</b> แล้ว พร้อม snapshot <span class="mono text-[12px]">conversion_factor</span> ที่ใช้ · ส่วน <span class="mono text-[12px]">purchase_order_items</span> <b>ไม่มีคอลัมน์หน่วย</b> — PO สั่งซื้อเป็นหน่วยสต็อกเสมอ</p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ทำไม:</b> จำนวน 3 ตัวต้องเทียบกันได้ตลอดเวลา คือ <span class="mono text-[12px]">goods_receipt_items.qty</span> · <span class="mono text-[12px]">purchase_order_items.received_qty</span> · <span class="mono text-[12px]">lots.received_qty</span> ถ้าปล่อยให้ PO มีหน่วยของตัวเองด้วย ทั้งสามตัวจะอยู่คนละหน่วยได้ทันที แล้ว <b>over-receipt allowance เทียบไม่ได้เลย</b> การบังคับให้จุดแปลงหน่วยมีจุดเดียว (ตอนกรอก GRN) ทำให้ทุกอย่างที่อยู่ถัดจากนั้นเป็นหน่วยสต็อกล้วน ตรงกับที่ SRS เขียนไว้ในหัวข้อ 07 ข้อ 2 พอดี</p>
+            <div class="rulebox"><div class="rc mb-1">RULE · IMPORT COST เป็นต่อหน่วยสต็อกเสมอ</div><p class="text-[13.5px]"><span class="mono text-[12px]">import_cost</span> ที่ client ส่งมาคือ <b>ต้นทุนต่อ 1 หน่วยสต็อก</b> ไม่ใช่ต่อ <span class="mono text-[12px]">uom_id</span> — จงใจไม่ให้หารราคาต่อลังด้วย factor เพราะการหารจะทิ้งเศษทศนิยมเข้าไปใน <span class="mono text-[12px]">lots.import_cost</span> ซึ่งเป็นตัวเลข immutable ที่ COGS ทั้งระบบอ้างอิง (ดู RULE · COST SNAPSHOT) · ผลพลอยได้คือเทียบกับ <span class="mono text-[12px]">purchase_order_items.unit_cost</span> ได้ตรงๆ</p></div>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-9">
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">CONVERSION ROUND CHECK · เข้มกว่าที่ SRS เขียน</div>
+              <p class="text-[13.5px] mb-2">SRS เขียนว่า “ต้องลงตัวถ้า <span class="mono text-[12px]">is_whole_number</span>” แต่โค้ดจริง <b>บังคับให้ลงตัวเสมอ</b> ไม่สนว่า UOM ตั้งค่าไว้ยังไง</p>
+              <p class="text-[13.5px]">เพราะทุกคอลัมน์จำนวนสต็อกในระบบนี้เป็น <span class="mono text-[12px]">int</span> ทั้งหมด (<span class="mono text-[12px]">DocumentLineItemEntity.qty</span>, <span class="mono text-[12px]">lots.received_qty</span>, <span class="mono text-[12px]">lots.available_qty</span>) — ถ้าแปลงแล้วได้ 3.75 มันไม่มีที่เก็บ และจะถูก <b>ตัดทิ้งเงียบๆ</b> เป็น 3 ซึ่งคือสต็อกหายไป 0.75 หน่วยโดยไม่มี movement รองรับ</p>
+            </div>
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">เฉพาะ factor ฝั่ง purchase</div>
+              <p class="text-[13.5px] mb-2">การรับของอ่าน <span class="mono text-[12px]">uom_conversion_factors</span> เฉพาะแถวที่ <span class="mono text-[12px]">uom_type = 'purchase'</span> เท่านั้น</p>
+              <p class="text-[13.5px]">สินค้าที่ <b>ซื้อเป็นลัง (12) แต่ขายเป็นแพ็ค (6)</b> เป็นเรื่องปกติ ถ้าเผลอหยิบ factor ฝั่ง sales มาใช้ตอนรับเข้า สต็อกจะเข้าครึ่งเดียวของจริงโดยที่ไม่มี error ขึ้นเลย</p>
+            </div>
+          </div>
+
+          <!-- ===== D2 · PO sync ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D2</span><h4 class="font-semibold text-[16px]">การตัดยอด PO ข้าม BC — RPC ที่เรียกซ้ำได้ แทน Outbox</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> ยังไม่ทำ Outbox pattern เต็มรูปแบบ (ทั้งระบบยังไม่มี infra นี้เลย — ทุก cross-BC call ปัจจุบันเป็น <span class="mono text-[12px]">sendWithContext</span> แบบ request-response) แต่แก้จุดที่อันตรายจริงแทน คือ <b style="color:var(--ink)">ทำให้การเรียกซ้ำปลอดภัย</b> แล้วเปิดทางให้ retry ได้</p>
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]">supplier-bc เพิ่มตาราง <span class="mono text-[12px]">purchase_order_receipts</span> — 1 แถวต่อ 1 บรรทัด GRN ที่ตัดยอดเข้ามา <b>unique ที่ <span class="mono text-[12px]">grn_item_id</span></b></p></div>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><span class="mono text-[12px]">received_qty</span> ไม่ถูก <b>บวกเพิ่ม</b> อีกต่อไป แต่ <b>คำนวณใหม่ทั้งก้อน</b> จากผลรวมของ ledger นี้ทุกครั้ง (<span class="mono text-[12px]">SUM(qty) WHERE reversed_at IS NULL</span>)</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]">inventory-bc เก็บ <span class="mono text-[12px]">goods_receipts.po_synced_at</span> — เป็น <span class="mono text-[12px]">null</span> ทั้งที่สถานะเป็น SUBMITTED/CANCELLED แปลว่า sync ค้าง</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]">มี endpoint ซ่อม <span class="mono text-[12px]">POST /goods-receipts/{id}/sync-purchase-order</span> ให้ operator กดยิงใหม่ได้ทันที (ทิศทาง APPLY/REVERSE ระบบ derive จากสถานะเอกสารเอง ส่งผิดทางไม่ได้)</p></div>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-4">
+            <div class="rulebox ok"><div class="rc mb-1">ทำไมต้อง idempotent ก่อนเป็นอันดับแรก</div><p class="text-[13.5px]">ถ้ายัง <b>บวก delta</b> อยู่ การ retry จะ <b>นับซ้ำ</b> ทันที แปลว่าออกแบบนี้ <b>retry ไม่ได้เลย</b> ทางเดียวที่เหลือคือให้คนไปไล่แก้มือ · พอเปลี่ยนเป็น ledger + recompute แล้ว การเรียกซ้ำกี่ครั้งก็ได้ผลลัพธ์เดิม — <b>นี่คือเงื่อนไขที่ทำให้ retry/Outbox ในอนาคตต่อยอดได้</b> ไม่ใช่งานที่ต้องรื้อทิ้ง</p></div>
+            <div class="rulebox"><div class="rc mb-1">สต็อกชนะเสมอ ห้าม block</div><p class="text-[13.5px]">ถ้า supplier-bc ล่ม ระบบ <b>ไม่ rollback</b> การรับของ — ของเข้าคลังมาจริงแล้ว การปฏิเสธไม่บันทึกเพราะ network สะดุด ขัดกับหลักของเฟสนี้เองที่ว่า <i>“สต็อกในระบบต้องตรงกับของจริงเสมอ”</i> · ยอมให้ <span class="mono text-[12px]">received_qty</span> ฝั่ง PO ตามทีหลัง (eventual) ดีกว่ายอมให้สต็อกผิด</p></div>
+          </div>
+          <div class="edge mb-9" style="background:rgba(11,61,145,.06);border-color:rgba(11,61,145,.22)"><div class="tag mb-1" style="color:var(--blueprint)">ผลพลอยได้ · traceability</div><p class="text-[13px]">คำถามที่ตอบไม่ได้มาก่อน — <i>“ยอดรับ 40 ชิ้นบนบรรทัด PO นี้ มาจากใบรับสินค้าใบไหนบ้าง?”</i> — ตอบได้จากข้อมูลตรงๆ แล้ว ไม่ต้องไปไล่ log ข้าม service · และการยกเลิก GRN จะ <b>ไม่ลบแถวทิ้ง</b> แต่ set <span class="mono text-[12px]">reversed_at</span> เพราะ “เคยรับแล้วถูกยกเลิก” เป็นข้อมูล audit ที่มีความหมายในตัวมันเอง</p></div>
+
+          <!-- ===== D3 · Cancel policy ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D3</span><h4 class="font-semibold text-[16px]">ยกเลิก GRN — บล็อกทั้งใบ ไม่ย้อนบางส่วน</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> ถ้าล็อตที่ GRN ใบนั้นสร้างไว้ <b>ถูกตัดสต็อกออกไปแล้วแม้แต่หน่วยเดียว</b> (<span class="mono text-[12px]">available_qty ≠ received_qty</span>) → ปฏิเสธการยกเลิกทั้งใบ (409) ไม่ย้อนคืนเท่าที่เหลือ</p>
+            <table class="d">
+              <thead><tr><th style="width:26%">ทางเลือก</th><th>ผลที่ตามมา</th></tr></thead>
+              <tbody>
+                <tr><td><b>ย้อนบางส่วน</b> (ไม่ได้เลือก)</td><td>ของ 60 ชิ้นที่ถูกเบิกออกไปแล้วจะ <b>ไม่มีเอกสารรับเข้ารองรับ</b> เพราะใบที่สร้างล็อตนั้นถูกยกเลิกไปแล้ว → กลายเป็นสต็อกที่ตรวจย้อนกลับไม่ได้ ขัด RULE · LEDGER SINGLE SOURCE โดยตรง · และ <span class="mono text-[12px]">received_qty</span> จะเปลี่ยนความหมายจาก “รับเข้าไปแล้วเท่าไหร่” เป็น “เหลือในสต็อกเท่าไหร่” ซึ่งเป็นคนละเรื่องกัน</td></tr>
+                <tr><td><b>บล็อกทั้งใบ</b> (เลือก)</td><td>ตรงกับหลักที่ <span class="mono text-[12px]">PurchaseOrdersService.cancel()</span> ใช้อยู่แล้ว — เมื่อมีอะไรผูกพันไปแล้ว การแก้ต้องเป็น <b>เอกสารใหม่</b> ไม่ใช่การลบของเดิม</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="rulebox mb-9"><div class="rc mb-1">ช่องว่างที่ยังเปิดอยู่ · ต้องรู้</div><p class="text-[13.5px]">ทุกวันนี้ถ้าล็อตถูกใช้ไปบางส่วนแล้ว <b>ยังไม่มีทางแก้ GRN ใบนั้นผ่าน API เลย</b> — ทางแก้ที่ถูกต้องคือ <b>Purchase Return</b> (เอกสารคนละใบ ยังไม่ได้ทำ) หรือ Stock Adjustment จาก Stock Entry (M3) · จนกว่าจะมีสองตัวนี้ การยกเลิก GRN ใช้ได้จริงเฉพาะกรณีที่ยังไม่มีใครแตะล็อตนั้นเลย</p></div>
+
+          <!-- ===== D4 · เล็กๆ แต่ตั้งใจ ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D4</span><h4 class="font-semibold text-[16px]">จุดเล็กที่จงใจทำต่างจากโมดูลอื่น</h4></div>
+          <table class="d mb-4">
+            <thead><tr><th style="width:24%">จุด</th><th>เหตุผล</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">update()</span> ของ GRN <b>แทนที่รายการทั้งชุด</b></td><td>PO/Quotation ใช้ <span class="mono text-[12px]">planDocumentLineSync()</span> ที่ diff ด้วย <span class="mono text-[12px]">product_id</span> — ใช้กับ GRN ไม่ได้ เพราะ <b>ใบรับสินค้าใบเดียวมีสินค้าตัวเดิมได้หลายบรรทัด</b> (คนละล็อต คนละวันหมดอายุ) ซึ่งเป็นเรื่องปกติมาก · ปลอดภัยเพราะแก้ได้เฉพาะตอน DRAFT ที่ยังไม่มีคอลัมน์ฝั่ง server (<span class="mono text-[12px]">lot_id</span>) ให้เสียหาย</td></tr>
+              <tr><td><span class="mono text-[12px]">stock_settings</span> เป็น <b>แถวเดียว</b> สร้างอัตโนมัติ</td><td>ไม่มี POST/DELETE มีแค่ <span class="mono text-[12px]">GET</span> + <span class="mono text-[12px]">PUT</span> · แถวถูกสร้างพร้อมค่า default ตอน GET ครั้งแรก เพื่อให้ business logic ที่อ่านค่านี้ (เช่น over-receipt) ไม่ต้องเผื่อกรณี “ยังไม่ได้ตั้งค่า” เลยสักจุดเดียว</td></tr>
+              <tr><td><span class="mono text-[12px]">expiry_date</span> เป็น <span class="mono text-[12px]">timestamptz</span></td><td>แม้จะ “รู้สึกเหมือน” เป็นวันที่ล้วน ก็ยังเก็บเป็น instant ตามกฎเดียวกับทั้งโปรเจกต์ — offset ที่ client ส่งมาต้องไม่ถูกทิ้ง และการอ่านเป็นวันตามปฏิทินต้องผ่าน <span class="mono text-[12px]">toBusinessDate()</span> เสมอ</td></tr>
+              <tr><td><span class="mono text-[12px]">chk_lots_available_qty_gte_0</span> ประกาศบน entity</td><td>CHECK ที่เขียนไว้ใน migration อย่างเดียวจะถูก <span class="mono text-[12px]">migration:generate</span> รอบถัดไป <b>สั่ง DROP ทิ้งเงียบๆ</b> เพราะ TypeORM เทียบ constraint จาก metadata ของ entity — จึงต้องมี <span class="mono text-[12px]">@Check()</span> คู่กันเสมอ</td></tr>
+            </tbody>
+          </table>
+
+          <div class="card p-6" style="border-left:3px solid var(--blueprint)">
+            <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">ยังไม่ได้ทำในรอบนี้ · M3 ต่อ</div>
+            <p class="text-[13.5px]">Stock Entry (โอนคลัง/เบิกใช้/แปรรูป) · Stock Reconciliation · Bundle explosion (UC-3.3) · <b>ฝั่งตัดสต็อก FIFO/FEFO</b> (รอบนี้มีแต่ขารับเข้า — <span class="mono text-[12px]">StockPostingService</span> จึงยังไม่ต้องใช้ <span class="mono text-[12px]">SELECT … FOR UPDATE</span> เพราะการ insert ล็อตใหม่ไม่มีอะไรให้แย่งกัน แต่เมธอด issue ต้องใช้แน่นอน ดู RULE · CONCURRENCY LOCK) · Material Receipt แบบไม่อ้าง PO</p>
+          </div>
+        </div>
       </section>
 
       <!-- FOOTER -->
