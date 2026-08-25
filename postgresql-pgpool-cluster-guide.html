@@ -33,7 +33,7 @@
       <a href="#config"       class="navlink"><span class="n">05</span> Config ทุกบรรทัด</a>
       <a href="#quorum"       class="navlink"><span class="n">06</span> Watchdog Quorum &amp; VIP</a>
       <a href="#testing"      class="navlink"><span class="n">07</span> ทดสอบ Step-by-Step</a>
-      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 36 ข้อ</a>
+      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 38 ข้อ</a>
       <a href="#verified"     class="navlink"><span class="n">09</span> ผลทดสอบจริง (Verified)</a>
       <a href="#incident"     class="navlink"><span class="n">10</span> Accident Playbook · Primary ตายจริง</a>
       <a href="#autofailover" class="navlink"><span class="n">11</span> Automatic Failover · repmgr</a>
@@ -63,7 +63,7 @@
         </h1>
         <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
           บันทึกการติดตั้งจริงตั้งแต่ 0 พร้อม config ทุกบรรทัด, แผนภาพสถาปัตยกรรม, กลไก watchdog quorum/VIP failover,
-          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">36 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
+          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">38 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
           ผลการทดสอบ kill-test จริงบน production servers, และการเชื่อม Prometheus/Grafana เข้ามา observe cluster —
           ทุกอย่างในเอกสารนี้ <b class="text-white font-medium">ถูกรันจริงและ verify แล้วบน OVH vRack production</b>
           ไม่ใช่ทฤษฎี
@@ -1507,7 +1507,7 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
 
       <section id="bugs" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">08 — บั๊กที่เจอระหว่าง Implement</div>
-        <h2 class="display text-3xl mb-6">36 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
+        <h2 class="display text-3xl mb-6">38 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           บันทึกไว้ให้ครบเพื่อกันคนถัดไป (หรือตัวเราเองตอน re-provision) เจอปัญหาเดิมซ้ำแบบช้าๆ — ทั้งหมดถูกแก้ฝังอยู่ใน
           <span class="mono text-[13px]">install-postgresql.sh</span>/<span class="mono text-[13px]">install-pgpool.sh</span>
@@ -1772,6 +1772,36 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Cross-Network Restore ลง POC cluster — เจอตอน databasus restore ข้ามเครือข่ายเข้า VIP (#37–38, 2026-08-25)</div>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th style="width:36px">#</th><th>อาการ</th><th>สาเหตุ</th><th>วิธีแก้</th></tr></thead>
+              <tbody>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>37</td>
+                  <td>pgpool log ขึ้น <span class="mono text-[11.5px]">pcp_child: FATAL: authentication failed for user "pgpool_admin"</span> วนทุก ~16 วินาทีไม่หยุดทั้ง 3 node — และ <span class="mono text-[11.5px]">pcp_attach_node</span> ทุกคำสั่ง auth ไม่ผ่าน</td>
+                  <td>สองชั้นซ้อน: (a) <span class="mono text-[11.5px]">pcp.conf</span> ถูก re-generate ด้วย password คนละตัวกับที่ <span class="mono text-[11.5px]">.pcppass</span> (ที่ automation ใช้) ถืออยู่ — md5 hash ไม่ตรงกัน; (b) ตัวที่ยิงวนคือ <span class="mono text-[11.5px]">pgpool-watchdog-exporter.service</span> (timer ทุก 15s) รันเป็น <b>root</b> เรียก <span class="mono text-[11.5px]">pcp_watchdog_info -w</span> แต่ <span class="mono text-[11.5px]">/root/.pcppass</span> ไม่มี (มีแต่ของ <span class="mono text-[11.5px]">/var/lib/postgresql</span>) → ส่ง password ว่าง</td>
+                  <td>Standardize รหัส pcp ให้ตรงกันทั้ง 3 node: เขียน <span class="mono text-[11.5px]">pcp.conf</span> = <span class="mono text-[11.5px]">pgpool_admin:$(pg_md5 P)</span> โดย P = ค่าที่ <span class="mono text-[11.5px]">.pcppass</span> มีอยู่แล้ว + วาง <span class="mono text-[11.5px]">/root/.pcppass</span> (<span class="mono text-[11.5px]">chmod 600</span>) ให้ exporter ที่รันเป็น root อ่านได้ → <span class="mono text-[11.5px]">systemctl reload pgpool2</span> — auth-fail หยุดสนิท (ต่อยอดจากบั๊ก #13: <span class="mono text-[11.5px]">.pcppass</span> ต้องมีให้<b>ทุก user ที่จะเรียก pcp</b> ไม่ใช่แค่ postgres)</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>38</td>
+                  <td>Standby ทั้งสอง (node 1,2) ค้าง <span class="mono text-[11.5px]">status=down</span> มา 3 วัน ทั้งที่ <span class="mono text-[11.5px]">pg_stat_replication</span> = <span class="mono text-[11.5px]">streaming</span> lag 0 — และ node ที่ถือ VIP มอง node 0 (primary จริง) เป็น <span class="mono text-[11.5px]">role=standby</span> ผิด ทำให้ pgpool คิดว่าไม่มี primary. <span class="mono text-[11.5px]">pcp_attach_node</span> ตอบ <span class="mono text-[11.5px]">Command Successful</span> แต่สถานะไม่ขยับเลย</td>
+                  <td>Backend status ของ watchdog cluster ค้างใน <span class="mono text-[11.5px]">pgpool_status</span> (<span class="mono text-[11.5px]">/var/log/postgresql/pgpool_status</span> = <span class="mono text-[11.5px]">up/down/down</span>) — ไฟล์นี้ persist ข้าม restart และตอน node ใด restart เดี่ยว watchdog จะ sync สถานะเก่าจาก majority ที่ยัง running กลับมาทับ → <span class="mono text-[11.5px]">pcp_attach_node</span> ทีละ node เอาไม่อยู่ (ต่อยอดจาก #14: down ที่ค้างลึกกว่าที่ auto_failback/attach เดี่ยวจะเคลียร์ได้)</td>
+                  <td><b>stop pgpool ทั้ง 3 node พร้อมกัน → ลบ (mv) <span class="mono text-[11.5px]">pgpool_status</span> ทุก node → start ใหม่</b> ให้ health-check ตรวจ backend สดทั้งหมด (ยอม VIP หลุด ~10s ทำนอกช่วงที่มี traffic/restore). ผล: node 0 = <span class="mono text-[11.5px]">up/primary</span>, node 1,2 = <span class="mono text-[11.5px]">up/standby</span> ตรงกันทั้ง 3 view + auth-fail = 0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">รูปแบบร่วมของบั๊ก #37–38: config ถูก re-generate โดยไม่ sync กับไฟล์ credential ที่ automation พึ่งอยู่</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ทั้งสองข้อเป็น bug ที่ "cluster ดู active ปกติทุกอย่าง" — <span class="mono text-[12px]">show pool_nodes</span> ตอบได้, VIP ถือ, write เข้า primary ได้ — แต่ HA <b>ไม่ทำงานจริง</b>: load-balance กองที่ node เดียว (select_cnt node 1,2 = 0) และถ้า primary ตายตอนนั้นจะไม่มี standby รับเพราะ pgpool mark ว่า down หมด. #37 คือ credential drift แบบคลาสสิก (ไฟล์ที่ automation อ่าน ≠ ไฟล์ที่ server ตรวจ) — ซ่อนอยู่ใน log ที่ดูเป็น noise เฉยๆ. #38 ตอกย้ำว่า <span class="mono text-[12px]">pgpool_status</span> เป็น source of truth ที่ต้องเคลียร์พร้อมกันทั้ง cluster — attach ทีละ node ไม่พอเมื่อ watchdog ยัง sync สถานะเก่าอยู่. บทเรียน: หลังแตะ pcp/credential ใด ๆ ให้ยืนยันด้วย <span class="mono text-[12px]">pcp_node_info</span> + <span class="mono text-[12px]">show pool_nodes</span> ครบทั้ง 3 view เสมอ ไม่ใช่แค่ดูว่า service active
+          </p>
         </div>
 
         <div class="rulebox" style="border-color:var(--signal)">
@@ -2624,6 +2654,21 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>ย้าย <span class="mono text-[12px]">.env</span> ทั้ง repo และ ovh-dev ไปที่ VIP (172.16.0.226) — <b>ตอนนี้ทำได้แล้ว</b> เพราะ VIP live + ทดสอบ failover แล้ว เป็นขั้นเดียวที่เหลือกว่าจะได้ HA จริง</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><span class="mono text-[12px]">ovh-dev</span> <span class="mono text-[12px]">.env</span> (server จริงที่ pm2 คุมอยู่) — ยังชี้ 172.16.0.221 (ppm ตรง) ข้าม pgpool ไปเลย ต้องเปลี่ยน host + <span class="mono text-[12px]">pm2 delete all && pm2 start ecosystem.config.js</span> — <b style="color:var(--signal)">เร่งด่วนกว่าที่เขียนไว้เดิม</b>: หลัง incident ใน §10 (2026-08-09) 172.16.0.221 ไม่ใช่ primary แล้ว เป็น <span class="mono text-[12px]">ppr1</span> (172.16.0.222) แทน — ถ้า .env นี้ยังไม่แก้ ทุก write จาก ovh-dev กำลังยิงตรงเข้า standby อยู่</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>PostgreSQL primary failover อัตโนมัติ — <span class="mono text-[12px]">scripts/install-repmgr.sh</span> deploy ครบ 3 node จริงแล้ว (2026-08-10) ผ่าน kill-test จริง (§11 Step 4, <b>29 วินาที</b> จาก kill ถึง promote) หลัง incident จริงใน §10 (primary ตายจริง 2026-08-09) เจอบั๊กใหม่ 12 ข้อระหว่าง deploy (#25–36 ใน §08) แก้ครบและฝังอยู่ใน script แล้ว — <b>gap เดิมที่เหลืออยู่ตัวเดียวใน stack นี้ปิดแล้ว</b></span></div>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Cross-Network Restore Incident — 2026-08-25 (databasus → POC cluster)</div>
+        <div class="card p-6 mb-8">
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mb-4">
+            restore <span class="mono text-[12px]">meditech_core_v1</span> (14 GB) จาก databasus (on-prem 192.168.30.35) ข้ามเน็ตเข้ามาที่ VIP <span class="mono text-[12px]">51.79.231.110:9876 → 172.16.0.226</span> ล้มซ้ำ ๆ — ไล่จนเจอทั้ง disk, tuning และ pgpool cluster ที่ค้างอยู่ก่อนแล้ว
+          </p>
+          <div class="space-y-3">
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><b>Disk เต็ม</b> คือสาเหตุ restore ล้ม 2 รอบแรก (<span class="mono text-[12px]">broken pipe</span> / <span class="mono text-[12px]">could not extend file … No space left</span> → primary PANIC + reinit). ขยาย disk ทั้ง 3 node <b>40G → 60G</b> ผ่าน <span class="mono text-[12px]">qm disk resize</span> + <span class="mono text-[12px]">growpart/pvresize/lvextend/resize2fs</span> (online ไม่ reboot) → <span class="mono text-[12px]">/</span> = 58G ว่าง ~47G/node</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><b>WAL bloat</b> ตอน build index (pg_wal พุ่ง 17 GB = 17× ของ <span class="mono text-[12px]">max_wal_size</span>). ปรับ <span class="mono text-[12px]">wal_compression=zstd</span>, <span class="mono text-[12px]">max_wal_size=4GB</span>, <span class="mono text-[12px]">maintenance_work_mem=256MB</span> (ALTER SYSTEM + reload, ไม่ต้อง restart)</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><b>pgvector</b> ติดตั้งครบทั้ง 3 node (<span class="mono text-[12px]">postgresql-18-pgvector 0.8.6</span>) — ก่อนหน้า restore master ข้าม vector objects เงียบ ๆ (<span class="mono text-[12px]">errors ignored: 2</span>)</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><b>pgpool cluster ค้าง (บั๊ก #37–38)</b> — standby ทั้งสองถูก mark down มา 3 วัน + node ที่ถือ VIP มอง primary ผิด + pcp auth-fail วนทุก 16s. แก้: standardize pcp password 3 node + วาง <span class="mono text-[12px]">/root/.pcppass</span> + ลบ <span class="mono text-[12px]">pgpool_status</span> แล้ว restart ทั้ง cluster → 3 view ตรงกัน node0=primary, node1,2=standby ทั้งหมด <span class="mono text-[12px]">up</span></span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">⚠</span><span>สำหรับ bulk restore / DDL หนัก / งาน admin — <b>ต่อตรง primary ไม่ผ่าน VIP/pgpool</b> (pgpool มี <span class="mono text-[12px]">client_idle_limit=60</span> ตัด connection ที่ idle เกิน 60s ระหว่าง stream, และ <span class="mono text-[12px]">failover_on_backend_error=1</span> จะ promote standby กลางคันถ้า primary สะดุด). VIP ไว้ให้ application traffic เท่านั้น</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>Proxmox host RAM overcommit — VM ตั้ง <span class="mono text-[12px]">memory=16384 balloon=2048</span> แต่ host เหลือ RAM ~2G ทำให้ balloon บีบ DB ทั้ง 3 เหลือ ~1.6G/node จริง (restore ช้า, checkpoint ตามไม่ทัน) — ต้องลด VM อื่นหรือเพิ่ม RAM host</span></div>
           </div>
         </div>
       </section>
