@@ -488,8 +488,9 @@ curl -X POST http://localhost:3004/supplier-bc/v1/purchase-orders \
 
           <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">ฝั่งขาย · sales-bc M1 (Customer) + M2 (Quotation)</h4>
           <div class="card p-6 mb-8" style="border-left:3px solid var(--blue)">
-            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1–M2 (2026-08)</b> เป็นการเปิด <b style="color:var(--ink)">sales-bc</b> ครั้งแรก (ก่อนหน้านี้มีแค่ module shell ไม่มี entity/migration เลย) — <span class="mono text-[12px]">CustomerGroup</span>/<span class="mono text-[12px]">Customer</span> master (วงเงินเครดิต, รายการราคาขายเริ่มต้นที่ตรวจ <span class="mono text-[12px]">is_selling</span> ข้าม BC), <span class="mono text-[12px]">Quotation</span>/<span class="mono text-[12px]">QuotationItem</span> + state machine 5 สถานะ, การออกเลขที่ <span class="mono text-[12px]">QT-{YYYY}-{00001}</span> แบบ concurrency-safe (row lock ต่อปี เหมือน PO), RPC validation ข้าม BC ไป inventory-bc (<span class="mono text-[12px]">getProductById</span> · <span class="mono text-[12px]">getPriceListById</span>), snapshot ชื่อ/รหัสสินค้าลงรายการ + snapshot <span class="mono text-[12px]">is_vat_included</span> ลงหัวเอกสาร, permission <span class="mono text-[12px]">customer_group:* · customer:* · quotation:*</span> 12 ตัว · ยังไม่ implement: <b>pricing rule engine</b> (ตอนนี้ผู้ใช้กรอก <span class="mono text-[12px]">unit_price</span> เอง — <span class="mono text-[12px]">price_list_id</span> เก็บไว้บอกที่มาของราคาเท่านั้น), <b>taxes &amp; charges</b> รายบรรทัด, <b>SO conversion</b>, Delivery Note, packed_items</p>
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1–M2 (2026-08)</b> เป็นการเปิด <b style="color:var(--ink)">sales-bc</b> ครั้งแรก (ก่อนหน้านี้มีแค่ module shell ไม่มี entity/migration เลย) — <span class="mono text-[12px]">CustomerGroup</span>/<span class="mono text-[12px]">Customer</span> master (วงเงินเครดิต, รายการราคาขายเริ่มต้นที่ตรวจ <span class="mono text-[12px]">is_selling</span> ข้าม BC), <span class="mono text-[12px]">Quotation</span>/<span class="mono text-[12px]">QuotationItem</span> + state machine 5 สถานะ, การออกเลขที่ <span class="mono text-[12px]">QT-{YYYY}-{00001}</span> แบบ concurrency-safe (row lock ต่อปี เหมือน PO), RPC validation ข้าม BC ไป inventory-bc (<span class="mono text-[12px]">getProductById</span> · <span class="mono text-[12px]">getPriceListById</span>), snapshot ชื่อ/รหัสสินค้าลงรายการ + snapshot <span class="mono text-[12px]">is_vat_included</span> ลงหัวเอกสาร, permission <span class="mono text-[12px]">customer_group:* · customer:* · quotation:*</span> 12 ตัว · ยังไม่ implement: <b>pricing rule engine</b> (ตอนนี้ผู้ใช้กรอก <span class="mono text-[12px]">unit_price</span> เอง — <span class="mono text-[12px]">price_list_id</span> เก็บไว้บอกที่มาของราคาเท่านั้น), <b>taxes &amp; charges</b> รายบรรทัด</p>
             <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M2.1 (2026-08)</b> <span class="mono text-[12px]">is_tax_inclusive</span> เปลี่ยนชื่อเป็น <span class="mono text-[12px]">is_vat_included</span> (ตามชื่อใหม่ของ <span class="mono text-[12px]">price_lists.is_vat_included</span> ต้นทาง) และย้ายไปอยู่บน <span class="mono text-[12px]">SubmittableDocumentEntity</span> ร่วมกับ <span class="mono text-[12px]">Receipt</span>/<span class="mono text-[12px]">PurchaseOrder</span> — เพิ่ม <span class="mono text-[12px]">document_type</span> (<span class="mono text-[12px]">STANDARD_QUOTATION</span>/<span class="mono text-[12px]">REVISED_QUOTATION</span>/<span class="mono text-[12px]">COST_ESTIMATE</span>/<span class="mono text-[12px]">TENDER_QUOTATION</span>, default <span class="mono text-[12px]">STANDARD_QUOTATION</span>) — ค่าชุดนี้แบ่งตาม<b>วัตถุประสงค์การเสนอราคา</b> ไม่ใช่ตามภาษี เพราะใบเสนอราคาเป็นเพียงคำเสนอ (offer) ไม่ก่อภาระภาษี จึงไม่ทับซ้อนกับ <span class="mono text-[12px]">ReceiptDocumentType</span> (มีค่า <span class="mono text-[12px]">VENDOR_QUOTATION</span> ที่พิจารณาแล้วตัดออก เพราะเป็นใบเสนอราคาจาก<b>ฝั่ง supplier-bc</b> ให้ผู้ซื้อ ไม่ใช่ของ sales-bc)</p>
+            <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M3 (2026-08)</b> <span class="mono text-[12px]">SalesOrder</span>/<span class="mono text-[12px]">SalesOrderItem</span> (extend <span class="mono text-[12px]">SubmittableDocumentEntity</span>/<span class="mono text-[12px]">DocumentLineItemEntity</span> เหมือน PO/Quotation) — เอกสารเดียวที่สร้างได้ทางเดียวคือ <span class="mono text-[12px]">POST /quotations/{id}/convert-to-sales-order</span> (ไม่มี <span class="mono text-[12px]">POST /sales-orders</span>) ซึ่ง<b>คัดลอกทุกตัวเลขและทุกบรรทัดจากใบเสนอราคาที่ APPROVED แล้วมาตรงๆ ไม่คำนวณใหม่</b>, ตรวจสต็อกคงเหลือข้าม BC ผ่าน inventory-bc RPC ใหม่ (<span class="mono text-[12px]">StockResources.CheckAvailability</span> — รวมทุกคลังทุกล็อตที่ยังไม่หมดอายุ) ก่อนยืนยันเสมอ, ออกเลขที่ <span class="mono text-[12px]">SO-{YYYY}-{00001}</span> แบบ concurrency-safe เหมือน QT/PO, state machine 4 สถานะ (<span class="mono text-[12px]">CONFIRMED→CANCELLED</span> เป็น transition เดียวที่ user สั่งได้ตรงๆ — <span class="mono text-[12px]">PARTIAL</span>/<span class="mono text-[12px]">CLOSED</span> รอ <span class="mono text-[12px]">recomputeDeliveryStatus()</span> จาก Delivery Note ในเฟสถัดไปเรียกเท่านั้น), permission <span class="mono text-[12px]">sales_order:*</span> 3 ตัว · เหตุผลการตัดสินใจ 3 ข้อ (เลี่ยง module cycle, block-ไม่ใช่-backorder, ขอบเขตเช็คสต็อกทั้งคลัง) ดูที่ &sect;08 ด้านล่าง · ยังไม่ implement: <b>Delivery Note</b> (เอกสารที่ตัดสต็อกจริงและอัปเดต <span class="mono text-[12px]">delivered_qty</span>), packed_items/bundle explosion (UC-3.3)</p>
           </div>
 
           <h4 class="font-semibold mb-3 text-[15px]">Sequence Diagram · เส้นทางใบเสนอราคา (Quotation lifecycle)</h4>
@@ -599,6 +600,75 @@ curl -X POST http://localhost:3005/sales-bc/v1/customers \
           <div class="rulebox ok mt-6"><div class="rc mb-1">Automated coverage · sales-bc</div><p class="text-[13.5px]">unit test 104 เคสใน <span class="mono text-[12px]">apps/sales-bc/test/unit/quotation/quotations.service.spec.ts</span> ครอบคลุม state machine ทุก transition + guard, เลข QT แบบ sequential/row-locked, การคิดส่วนลดทั้งสองแบบ + ขอบเขต, การแยก 400 (ข้อมูลผิด) ออกจาก 503 (inventory-bc ล่ม), lazy expiry ตอน approve, RPC handler ทั้งสองตัว, และ <span class="mono text-[12px]">document_type</span> (ค่า default, เป็นอิสระจาก <span class="mono text-[12px]">is_vat_included</span>, พาร์รามิไตร์ซ์ครบทั้ง 4 ค่า, คงค่าไว้เมื่อ update ไม่ส่งมาด้วย) — รัน <span class="mono text-[12px]">pnpm nx run sales-bc:test</span> ก่อน commit เสมอ</p></div>
 
           <div class="rulebox mt-3"><div class="rc mb-1">ยังไม่ได้ทำ · ตั้งใจ</div><p class="text-[13.5px]"><span class="mono text-[12px]">EXPIRED</span> ถูก set แบบ lazy ตอน approve เท่านั้น (ไม่มี scheduler) — ใบที่หมดอายุแต่ยังไม่มีใครแตะจะยังแสดงสถานะ <span class="mono text-[12px]">SENT</span> ในลิสต์ · เพิ่ม <span class="mono text-[12px]">QuotationJobsController</span> (cron กวาดรายวัน) ได้ภายหลังโดยไม่ต้องแก้ guard เดิม เพราะ guard ตัดสินจาก <span class="mono text-[12px]">valid_until</span> ไม่ใช่จากสถานะ · <span class="mono text-[12px]">seed</span> ยังไม่มี seeder ของ erp_sales — ต้องเพิ่ม <span class="mono text-[12px]">ISeedDatabase</span>/<span class="mono text-[12px]">SEED_DATABASE_ENV</span> ก่อน ถ้าจะ seed ลูกค้าตัวอย่าง</p></div>
+
+          <div class="rule my-10" style="background:var(--line)"></div>
+
+          <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">ฝั่งขาย · sales-bc M3 (Sales Order — แปลงจากใบเสนอราคา)</h4>
+
+          <h4 class="font-semibold mb-3 text-[15px]">Sequence Diagram · แปลงใบเสนอราคาเป็นใบสั่งขาย (Sales Order lifecycle)</h4>
+          <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor REP as พนักงานขาย
+    participant SAL as sales-bc · SalesOrdersService
+    participant DB as erp_sales (Postgres)
+    participant INV as inventory-bc · StockEventsController
+
+    Note over REP,INV: M3 · แปลงใบเสนอราคาที่ลูกค้าอนุมัติแล้วเป็นใบสั่งขาย — implement แล้ว
+    REP->>SAL: POST /quotations/{quotation_id}/convert-to-sales-order
+    SAL->>DB: findById(quotation_id, ['items']) — นอกทรานแซกชัน
+    DB-->>SAL: quotation + items
+    alt status != APPROVED · หรือ sales_order_id != null · หรือ valid_until ผ่านไปแล้ว
+        SAL-->>REP: 400/409 · ยังไม่พร้อมแปลง (ดูเหตุผลที่ &sect;08 D1)
+    end
+    SAL->>INV: StockResources.CheckAvailability (product_id, qty ของทุกบรรทัด — RPC sync)
+    INV->>INV: SUM(lots.available_qty) ต่อ product_id ทุกคลัง ตัดล็อตหมดอายุออก
+    INV-->>SAL: available_qty ต่อ product_id
+    alt inventory-bc ไม่ตอบ (transport fail)
+        SAL-->>REP: 503 · ตรวจสต็อกไม่ได้ ลองใหม่
+    else มีบรรทัดใดบรรทัดหนึ่งสต็อกไม่พอ
+        SAL-->>REP: 409 · บล็อกทั้งใบ (ไม่ backorder บางส่วน — ดู &sect;08 D2)
+    end
+    SAL->>DB: BEGIN · SELECT quotation ... FOR UPDATE (re-check race กับการแปลงซ้ำ/ยกเลิกระหว่างนี้)
+    SAL->>DB: ออกเลขที่ SO-{YYYY}-{00001} (FOR UPDATE บน counter ของปีนั้น)
+    SAL->>DB: INSERT sales_orders + sales_order_items (คัดลอกทุกค่าจาก quotation/quotation_items ตรงๆ)
+    SAL->>DB: UPDATE quotations SET sales_order_id = &lt;new SO id&gt; · COMMIT
+    SAL-->>REP: 201 · status=CONFIRMED · so_number="SO-2026-00001"
+
+    Note over REP,DB: เส้นทางทางเลือก · ยกเลิกใบสั่งขาย (ยังไม่มีบรรทัดใดถูกส่งมอบเลย)
+    REP->>SAL: POST /sales-orders/{id}/cancel { cancel_reason }
+    SAL->>DB: FOR UPDATE header แล้วอ่าน items
+    alt ทุกบรรทัด delivered_qty = 0
+        SAL->>DB: UPDATE status=CANCELLED, cancelled_by/at, cancel_reason
+        SAL->>DB: UPDATE quotations SET sales_order_id = NULL (คืนสิทธิ์แปลงใหม่ได้)
+        SAL-->>REP: 200 · CANCELLED
+    else มีบรรทัดที่ส่งมอบไปแล้ว
+        SAL-->>REP: 409 · ต้องจัดการผ่านเอกสารคืนสินค้าแทน (ยังไม่มีในเฟสนี้)
+    end
+
+    Note over SAL,DB: เฟสถัดไป (ยังไม่ implement) · Delivery Note submit จะเรียก recomputeDeliveryStatus() ภายใน<br/>ทรานแซกชันเดียวกับการตัดสต็อก เพื่ออัปเดต delivered_qty แล้วเลื่อนสถานะเป็น PARTIAL/CLOSED อัตโนมัติ
+</pre>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[15px]">วิธีทดสอบ Sales Order · Testing Guide</h4>
+
+          <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>Permission ต้อง grant ก่อน</b> — <span class="mono text-[12px]">GrantSalesOrderPermissionsToMockPolicies</span> ให้ <span class="mono text-[12px]">sales_order:create/view/cancel</span> แก่ <span class="mono text-[12px]">POL_SUPERADMIN_FULL_ACCESS</span>/<span class="mono text-[12px]">POL_STAFF_GENERAL_ACCESS</span> (รันหลัง <span class="mono text-[12px]">permissions:sync</span> เสมอ — ไม่งั้น grant เข้าไป 0 แถวเงียบๆ) · login ใหม่หลัง grant</p></div>
+
+          <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>เตรียมใบเสนอราคาให้ถึง APPROVED ก่อน</b> — เดินตาม state machine ใน step 3–4 ของ Quotation ด้านบนจนได้ <span class="mono text-[12px]">status=APPROVED</span> และมี <span class="mono text-[12px]">valid_until</span> ที่ยังไม่หมดอายุ แล้วตรวจว่าสินค้าทุกบรรทัดมี <span class="mono text-[12px]">available_qty</span> พอใน inventory-bc จริง (ผ่าน Goods Receipt — <span class="mono text-[12px]">srs-p3.html</span> &sect;07)</p></div>
+
+          <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>แปลงเป็นใบสั่งขาย</b></p></div>
+          <div class="code p-4 mb-4">
+<pre>curl -X POST http://localhost:3005/sales-bc/v1/quotations/&lt;quotation_id&gt;/convert-to-sales-order \
+  -H <span class="s">"Authorization: Bearer $TOKEN"</span> -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{}'</span>
+<span class="c"># -> 201, status=CONFIRMED, so_number="SO-2026-00001"</span>
+<span class="c">#    sub_total/total/items ตรงกับใบเสนอราคาต้นทางทุกตัวเลข</span></pre>
+          </div>
+
+          <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Edge case ที่ต้องทดสอบครบ</b> — แปลงใบที่ยังเป็น <span class="mono text-[12px]">DRAFT</span>/<span class="mono text-[12px]">SENT</span> → 400 · แปลงใบเดิมซ้ำสอง (มี <span class="mono text-[12px]">sales_order_id</span> แล้ว) → 409 · แปลงใบที่ <span class="mono text-[12px]">valid_until</span> ผ่านไปแล้ว → 400 · สินค้าบางบรรทัดสต็อกไม่พอ → 409 พร้อมบอกจำนวนที่ขอ/ที่มี · inventory-bc ดับระหว่างเช็คสต็อก → 503 · cancel ใบที่ไม่ใช่ <span class="mono text-[12px]">CONFIRMED</span> → 409 · quotation_id ไม่มีจริง → 404 · UUID param ผิดรูปแบบ → 400002</p></div>
+
+          <div class="rulebox ok mt-6"><div class="rc mb-1">Automated coverage · Sales Order</div><p class="text-[13.5px]">unit test 17 เคสใน <span class="mono text-[12px]">apps/sales-bc/test/unit/sales-order/sales-orders.service.spec.ts</span> ครอบคลุม <span class="mono text-[12px]">convertFromQuotation()</span> (happy path, ทั้ง 3 guard ความพร้อมของใบเสนอราคา, 503 เมื่อ inventory-bc ล่ม, 409 เมื่อสต็อกไม่พอ, race guard ตอน re-lock ในทรานแซกชัน), <span class="mono text-[12px]">cancel()</span> (happy path + guard สถานะ + guard มีบรรทัดส่งมอบแล้ว), และ <span class="mono text-[12px]">recomputeDeliveryStatus()</span> ทั้ง 4 ทางออก (CONFIRMED/PARTIAL/CLOSED/no-op เมื่อ CANCELLED แล้ว) — บวก 1 เคสใหม่ใน <span class="mono text-[12px]">quotations.service.spec.ts</span> สำหรับ guard ยกเลิกใบที่แปลงเป็น SO แล้วไม่ได้ — รัน <span class="mono text-[12px]">pnpm nx run sales-bc:test</span> ก่อน commit เสมอ</p></div>
         </div>
 
         <!-- 4.7 Shared document engine -->
@@ -639,6 +709,56 @@ curl -X POST http://localhost:3005/sales-bc/v1/customers \
             <div class="rulebox ok"><div class="rc mb-1">RULE · ราคาต้องอยู่ในกรอบของราคาอ้างอิง</div><p class="text-[13.5px]">ตอน POST/PUT ระบบถาม inventory-bc ว่ามีราคาอ้างอิงใน <span class="mono text-[12px]">item_prices</span> สำหรับสินค้านั้นใน scope นี้ไหม (PO ดูตาม <span class="mono text-[12px]">supplier_id</span>, ใบเสนอราคาดูตาม <span class="mono text-[12px]">price_list_id</span>) — <b>เบี่ยงเบนเกิน ±20% → 400 พร้อมบอกช่วงที่รับได้</b> · <b>ไม่มีราคาอ้างอิงในระบบ → ผ่าน</b> ไม่บล็อก เพราะ <span class="mono text-[12px]">unit_cost</span>/<span class="mono text-[12px]">unit_price</span> เป็นราคาที่ <b>ต่อรองกันจริง</b> ไม่ใช่ราคาตายตัวจากแคตตาล็อก · กันเคสพิมพ์ผิด/ทุจริต โดยไม่ขวางการต่อรองปกติ</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · ตัวเลขเงินเป็น numeric(18,4)</div><p class="text-[13.5px]">ทุกคอลัมน์เงิน (<span class="mono text-[12px]">sub_total</span>, <span class="mono text-[12px]">total_discount</span>, <span class="mono text-[12px]">total</span>, <span class="mono text-[12px]">line_total</span>, <span class="mono text-[12px]">unit_cost</span>/<span class="mono text-[12px]">unit_price</span>, <span class="mono text-[12px]">discount_value</span>/<span class="mono text-[12px]">discount</span>) ใช้ <span class="mono text-[12px]">numeric(18,4)</span> ตรงกับความละเอียดของ <span class="mono text-[12px]">roundMoney()</span> — แก้ฝั่งใดฝั่งหนึ่งโดยไม่แก้อีกฝั่ง = ตัดทศนิยมทิ้งเงียบๆ</p></div>
           </div>
+        </div>
+
+        <!-- 4.8 Implementation Decision Record (M3 · Sales Order) -->
+        <div class="mt-14">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">08</span><h3 class="text-xl font-semibold">Implementation Decision Record · บันทึกการตัดสินใจตอน implement</h3></div>
+
+          <div class="card p-6 mb-9" style="border-left:3px solid var(--signal)">
+            <p class="text-[14px]" style="color:var(--ink-soft)">หัวข้อนี้บันทึก <b style="color:var(--ink)">จุดที่โค้ดจริงตัดสินใจต่างจาก/ละเอียดกว่าที่ SRS ระบุไว้</b> ตอน implement <b style="color:var(--ink)">Sales Order (M3 — แปลงจากใบเสนอราคา)</b> — เขียนไว้เพื่อให้คนที่อ่านสเปกแล้วไปเปิดโค้ดไม่ต้องเดาว่าทำไมไม่เหมือนกัน และเพื่อให้ decision เหล่านี้ถูก challenge ได้ในภายหลัง แต่ละข้อระบุ <b style="color:var(--ink)">ทางเลือกที่ไม่ได้เลือก</b> และ <b style="color:var(--ink)">ต้นทุนของการเลือกผิด</b> ไว้ด้วยเสมอ</p>
+          </div>
+
+          <!-- ===== D1 · Module cycle avoidance ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D1</span><h4 class="font-semibold text-[16px]">Quotation ↔ SalesOrder ไม่ import กันเป็นวง</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> <span class="mono text-[12px]">quotations.sales_order_id</span> เป็นคอลัมน์ <span class="mono text-[12px]">uuid | null</span> ธรรมดา <b>ไม่ประกาศ <span class="mono text-[12px]">@ManyToOne</span></b> ในขณะที่ <span class="mono text-[12px]">SalesOrder.quotation_id</span> เป็น relation จริง (<span class="mono text-[12px]">@ManyToOne(() =&gt; Quotation)</span>) — และ <span class="mono text-[12px]">QuotationsService</span> เปิดเมธอดแคบสองตัวให้ <span class="mono text-[12px]">SalesOrdersService</span> เรียก คือ <span class="mono text-[12px]">lockForSalesOrderConversion()</span> กับ <span class="mono text-[12px]">markConvertedToSalesOrder()</span> แทนที่จะให้ <span class="mono text-[12px]">SalesOrderModule</span> reach เข้าไปหา repository ของ Quotation ตรงๆ</p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ทำไม:</b> การแปลงเอกสารต้องเขียนทั้งสองฝั่งในทรานแซกชันเดียว (สร้าง SO + ปักคอลัมน์ <span class="mono text-[12px]">sales_order_id</span> บน Quotation) ซึ่งเป็นการพึ่งพากันแบบสองทิศทางโดยธรรมชาติของ business flow — แต่ backend-convention.html ห้าม <span class="mono text-[12px]">ModuleA ↔ ModuleB</span> import กันเพราะ Nest DI graph resolve วงจรแบบนี้ไม่ได้ ถ้า <span class="mono text-[12px]">Quotation</span> entity ประกาศ <span class="mono text-[12px]">@ManyToOne(() =&gt; SalesOrder)</span> กลับไปด้วย <span class="mono text-[12px]">quotation.entity.ts</span> จะต้อง import <span class="mono text-[12px]">sales-order.entity.ts</span> ย้อนกลับ ทำให้ <span class="mono text-[12px]">QuotationModule</span> ต้อง import <span class="mono text-[12px]">SalesOrderModule</span> ทันที เกิดวงจริง — การตัด relation ฝั่งเดียว (Quotation ไม่รู้จัก SalesOrder ในระดับ TypeORM) พร้อมเปิดเมธอดแคบแทนการเปิด repository เต็มรูป ทำให้ dependency คงทิศทางเดียว: <span class="mono text-[12px]">SalesOrderModule → QuotationModule</span> เท่านั้น</p>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-9">
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">ทำไมไม่ใช้ facade service แทน</div>
+              <p class="text-[13.5px] mb-2">backend-convention.html เสนอ facade service เป็นทางออกที่สองเมื่อ "สองฝั่งต้องการข้อมูล/ตรรกะของกันและกันจริงๆ ทั้งคู่"</p>
+              <p class="text-[13.5px]">แต่ในเคสนี้ การพึ่งพาทางเดียวจริงๆ — SO ต้องอ่าน/ล็อก Quotation เพื่อสร้างตัวเอง แต่ Quotation ไม่เคยต้องรู้จักตรรกะของ SO เลย จึงเลือกทางแรก (nested route/narrow service methods) ซึ่ง <b>ง่ายกว่าและตรงกับรูปแบบการพึ่งพาจริง</b> ไม่ต้องเปิด module ที่สามโดยไม่จำเป็น</p>
+            </div>
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">route อยู่ใต้ /quotations ไม่ใช่ /sales-orders</div>
+              <p class="text-[13.5px] mb-2"><span class="mono text-[12px]">POST /quotations/{id}/convert-to-sales-order</span> ประกาศใน <span class="mono text-[12px]">QuotationConversionController</span> ที่อยู่ใน <span class="mono text-[12px]">sales-order</span> module (mirror <span class="mono text-[12px]">ReorderLevelsController</span>'s <span class="mono text-[12px]">@Controller('products')</span> sub-route)</p>
+              <p class="text-[13.5px]">ถ้า route นี้ประกาศใน <span class="mono text-[12px]">QuotationsController</span> แทน <span class="mono text-[12px]">QuotationModule</span> จะต้อง inject <span class="mono text-[12px]">SalesOrdersService</span> เพื่อสร้างแถว SO จริง — วงจรเดิมกลับมาอีกที่ระดับ module แม้ entity จะไม่มี relation ก็ตาม</p>
+            </div>
+          </div>
+
+          <!-- ===== D2 · Block not backorder ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D2</span><h4 class="font-semibold text-[16px]">สต็อกไม่พอตอนยืนยัน SO — บล็อกทั้งใบ ไม่ backorder บางส่วน</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> ถ้าบรรทัดใดบรรทัดหนึ่งของใบเสนอราคามี <span class="mono text-[12px]">available_qty</span> น้อยกว่าที่ขอ <span class="mono text-[12px]">assertAvailable()</span> โยน <span class="mono text-[12px]">409 ConflictException</span> ทั้งใบทันที — ไม่มีการยืนยันบางส่วนแล้วปล่อยส่วนที่เหลือเป็น backorder</p>
+            <table class="d">
+              <thead><tr><th style="width:26%">ทางเลือก</th><th>ผลที่ตามมา</th></tr></thead>
+              <tbody>
+                <tr><td><b>Backorder บางส่วน</b> (ไม่ได้เลือก)</td><td>ต้องมีฟิลด์ระดับบรรทัดบอกว่า "ยืนยันไปเท่าไหร่ ค้างเท่าไหร่" เพิ่มสถานะย่อยที่ SO ยังไม่มี (ไม่ใช่ <span class="mono text-[12px]">PARTIAL</span>ที่มีอยู่แล้ว ซึ่งหมายถึง "ส่งมอบบางส่วน" คนละความหมายกับ "ยืนยันบางส่วน") และต้องมี flow แจ้งเตือนเมื่อของกลับมามีพอ — เป็น feature ใหม่ทั้งชุดที่ SRS (srs-p4.html) เขียนไว้แค่ว่า "อนุญาต backorder หรือ block" โดยไม่ได้ฟันธง</td></tr>
+                <tr><td><b>บล็อกทั้งใบ</b> (เลือก)</td><td>เป็นค่า default ที่ conservative ที่สุดเมื่อไม่มี <span class="mono text-[12px]">stock_settings</span>-style toggle ให้เลือกพฤติกรรม (ยังไม่มีในเฟสนี้) — ตรงกับหลักที่ <span class="mono text-[12px]">postIssue()</span> ใช้อยู่แล้วสำหรับ <span class="mono text-[12px]">allow_negative_stock</span> คือ "ไม่พอ = ปฏิเสธทั้งก้อน ไม่มี partial write" การเปิด backorder ทีหลังทำได้โดยเพิ่ม toggle ใหม่ ไม่ต้องรื้อ guard นี้ทิ้ง</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="rulebox mb-9"><div class="rc mb-1">503 ≠ 409 — คนละความหมาย คนละ response</div><p class="text-[13.5px]"><span class="mono text-[12px]">assertAvailable()</span> แยกกรณี <b>inventory-bc ไม่ตอบ</b> (proxy คืน <span class="mono text-[12px]">null</span> → <span class="mono text-[12px]">503 ServiceUnavailableException</span>) ออกจาก <b>ตอบแล้วแต่สต็อกไม่พอ</b> (<span class="mono text-[12px]">409 ConflictException</span> พร้อมรายการ product ที่ขาด) — การอ่าน <span class="mono text-[12px]">null</span> เป็น "ไม่มีของเลย" แล้วโยน 409 จะหลอกผู้ใช้ให้เข้าใจผิดว่าสต็อกหมดจริง ทั้งที่ระบบแค่คุยกับ inventory-bc ไม่ได้ชั่วคราว — รูปแบบเดียวกับที่ <span class="mono text-[12px]">QuotationsService.create()</span> แยก 400 (product ไม่มีจริง) ออกจาก 503 (inventory-bc ล่ม) อยู่แล้ว</p></div>
+
+          <!-- ===== D3 · All-warehouse availability scope ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D3</span><h4 class="font-semibold text-[16px]">เช็คสต็อกตอนยืนยัน SO — รวมทุกคลัง ไม่ผูกกับคลังใดคลังหนึ่ง</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> <span class="mono text-[12px]">StockResources.CheckAvailability</span> (RPC ใหม่ที่ <span class="mono text-[12px]">inventory-bc</span>) คำนวณ <span class="mono text-[12px]">SUM(lots.available_qty)</span> ต่อ <span class="mono text-[12px]">product_id</span> ข้าม<b>ทุกคลัง</b>ที่มีล็อตนั้น (ตัดล็อตที่หมดอายุแล้วออกก่อนรวม) — ไม่รับ <span class="mono text-[12px]">warehouse_id</span> เป็นพารามิเตอร์เลย</p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ทำไม:</b> ตอนยืนยัน SO ระบบยังไม่รู้ว่าจะ<b>ส่งมอบจากคลังไหน</b> — การเลือกคลังที่จะตัดสต็อกจริงเป็นการตัดสินใจของ <b>Delivery Note</b> (เฟสถัดไป ยังไม่ implement) ไม่ใช่ของ SO การผูกเช็คสต็อกกับคลังใดคลังหนึ่งตั้งแต่ตอนนี้จะบล็อกออเดอร์ที่มีของพอในภาพรวมแต่กระจายอยู่คนละคลัง ทั้งที่ธุรกิจย้ายสต็อกข้ามคลัง (Stock Entry MATERIAL_TRANSFER) ได้อยู่แล้วก่อนวันส่งจริง</p>
+          </div>
+          <div class="edge mb-9" style="background:rgba(11,61,145,.06);border-color:rgba(11,61,145,.22)"><div class="tag mb-1" style="color:var(--blueprint)">ผลที่ตามมาที่ต้องรู้ไว้ก่อน implement Delivery Note</div><p class="text-[13px]">"SO ยืนยันได้" ไม่ได้แปลว่า <b>คลังใดคลังหนึ่งมีของพอ</b> — Delivery Note ต้องมี guard ของตัวเองตอนเลือกคลังจริง (เรียก <span class="mono text-[12px]">postIssue()</span> ที่มี all-or-nothing check อยู่แล้วในระดับล็อต) และต้องรับมือกรณีที่ของกระจายหลายคลังจนต้องแบ่งส่งมอบเป็นหลายรอบ ซึ่งเป็นเหตุผลที่ <span class="mono text-[12px]">SalesOrderStatus.PARTIAL</span> มีอยู่แล้วในสถานะชุดนี้ตั้งแต่ต้น</p></div>
         </div>
       </section>
 
