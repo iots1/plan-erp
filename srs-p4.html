@@ -290,29 +290,43 @@ erDiagram
         uuid quotation_id FK
         uuid customer_id FK
         string so_number
-        string status "CONFIRMED_PARTIAL_CLOSED"
+        string status "CONFIRMED_PARTIAL_CLOSED_CANCELLED"
     }
     SALES_ORDER_ITEMS {
         uuid id PK
         uuid so_id FK
         uuid product_id "ref inventory-bc"
         int qty
+        int delivered_qty "bumped by DeliveryNotesService.submit()/cancel()"
         decimal unit_price
         decimal discount
     }
     DELIVERY_NOTES {
         uuid id PK
         uuid so_id FK
+        uuid customer_id FK "copied from sales_orders.customer_id"
+        uuid warehouse_id "ref inventory-bc warehouses.id, cross-BC no FK"
         string dn_number
-        string status "PENDING_CONFIRMED"
-        timestamp delivered_at
+        string status "DRAFT_SUBMITTED_CANCELLED"
+        timestamp document_date
+        uuid submitted_by "ref iam"
+        timestamp submitted_at
     }
     DELIVERY_NOTE_ITEMS {
         uuid id PK
         uuid dn_id FK
-        uuid product_id "ref inventory-bc"
+        uuid so_item_id FK "which SO line this fulfils"
+        uuid product_id "ref inventory-bc, copied from so_item_id"
         int qty
-        jsonb lot_allocations "from stock.deducted"
+    }
+    DELIVERY_ISSUES {
+        uuid id PK "inventory-bc — idempotency ledger, not a sales-bc table"
+        uuid source_doc_id "ref sales-bc delivery_note_items.id, UNIQUE, cross-BC no FK"
+        uuid product_id FK
+        uuid warehouse_id FK
+        int qty
+        decimal total_cost "from postIssue().total_cost"
+        timestamp reversed_at "null = still in effect"
     }
     PACKED_ITEMS {
         uuid id PK
@@ -345,6 +359,8 @@ erDiagram
     SALES_ORDERS ||--o{ SALES_ORDER_ITEMS : contains
     SALES_ORDERS ||--o{ DELIVERY_NOTES : fulfills
     DELIVERY_NOTES ||--o{ DELIVERY_NOTE_ITEMS : contains
+    SALES_ORDER_ITEMS ||--o{ DELIVERY_NOTE_ITEMS : "delivered by"
+    DELIVERY_NOTE_ITEMS ||--o| DELIVERY_ISSUES : "confirmed via RPC (cross-BC, no DB FK)"
     SALES_ORDERS ||--o{ PACKED_ITEMS : explodes
     PRICING_RULES ||--o{ SALES_ORDER_ITEMS : "prices"
 </pre>
@@ -490,7 +506,8 @@ curl -X POST http://localhost:3004/supplier-bc/v1/purchase-orders \
           <div class="card p-6 mb-8" style="border-left:3px solid var(--blue)">
             <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1–M2 (2026-08)</b> เป็นการเปิด <b style="color:var(--ink)">sales-bc</b> ครั้งแรก (ก่อนหน้านี้มีแค่ module shell ไม่มี entity/migration เลย) — <span class="mono text-[12px]">CustomerGroup</span>/<span class="mono text-[12px]">Customer</span> master (วงเงินเครดิต, รายการราคาขายเริ่มต้นที่ตรวจ <span class="mono text-[12px]">is_selling</span> ข้าม BC), <span class="mono text-[12px]">Quotation</span>/<span class="mono text-[12px]">QuotationItem</span> + state machine 5 สถานะ, การออกเลขที่ <span class="mono text-[12px]">QT-{YYYY}-{00001}</span> แบบ concurrency-safe (row lock ต่อปี เหมือน PO), RPC validation ข้าม BC ไป inventory-bc (<span class="mono text-[12px]">getProductById</span> · <span class="mono text-[12px]">getPriceListById</span>), snapshot ชื่อ/รหัสสินค้าลงรายการ + snapshot <span class="mono text-[12px]">is_vat_included</span> ลงหัวเอกสาร, permission <span class="mono text-[12px]">customer_group:* · customer:* · quotation:*</span> 12 ตัว · ยังไม่ implement: <b>pricing rule engine</b> (ตอนนี้ผู้ใช้กรอก <span class="mono text-[12px]">unit_price</span> เอง — <span class="mono text-[12px]">price_list_id</span> เก็บไว้บอกที่มาของราคาเท่านั้น), <b>taxes &amp; charges</b> รายบรรทัด</p>
             <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M2.1 (2026-08)</b> <span class="mono text-[12px]">is_tax_inclusive</span> เปลี่ยนชื่อเป็น <span class="mono text-[12px]">is_vat_included</span> (ตามชื่อใหม่ของ <span class="mono text-[12px]">price_lists.is_vat_included</span> ต้นทาง) และย้ายไปอยู่บน <span class="mono text-[12px]">SubmittableDocumentEntity</span> ร่วมกับ <span class="mono text-[12px]">Receipt</span>/<span class="mono text-[12px]">PurchaseOrder</span> — เพิ่ม <span class="mono text-[12px]">document_type</span> (<span class="mono text-[12px]">STANDARD_QUOTATION</span>/<span class="mono text-[12px]">REVISED_QUOTATION</span>/<span class="mono text-[12px]">COST_ESTIMATE</span>/<span class="mono text-[12px]">TENDER_QUOTATION</span>, default <span class="mono text-[12px]">STANDARD_QUOTATION</span>) — ค่าชุดนี้แบ่งตาม<b>วัตถุประสงค์การเสนอราคา</b> ไม่ใช่ตามภาษี เพราะใบเสนอราคาเป็นเพียงคำเสนอ (offer) ไม่ก่อภาระภาษี จึงไม่ทับซ้อนกับ <span class="mono text-[12px]">ReceiptDocumentType</span> (มีค่า <span class="mono text-[12px]">VENDOR_QUOTATION</span> ที่พิจารณาแล้วตัดออก เพราะเป็นใบเสนอราคาจาก<b>ฝั่ง supplier-bc</b> ให้ผู้ซื้อ ไม่ใช่ของ sales-bc)</p>
-            <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M3 (2026-08)</b> <span class="mono text-[12px]">SalesOrder</span>/<span class="mono text-[12px]">SalesOrderItem</span> (extend <span class="mono text-[12px]">SubmittableDocumentEntity</span>/<span class="mono text-[12px]">DocumentLineItemEntity</span> เหมือน PO/Quotation) — เอกสารเดียวที่สร้างได้ทางเดียวคือ <span class="mono text-[12px]">POST /quotations/{id}/convert-to-sales-order</span> (ไม่มี <span class="mono text-[12px]">POST /sales-orders</span>) ซึ่ง<b>คัดลอกทุกตัวเลขและทุกบรรทัดจากใบเสนอราคาที่ APPROVED แล้วมาตรงๆ ไม่คำนวณใหม่</b>, ตรวจสต็อกคงเหลือข้าม BC ผ่าน inventory-bc RPC ใหม่ (<span class="mono text-[12px]">StockResources.CheckAvailability</span> — รวมทุกคลังทุกล็อตที่ยังไม่หมดอายุ) ก่อนยืนยันเสมอ, ออกเลขที่ <span class="mono text-[12px]">SO-{YYYY}-{00001}</span> แบบ concurrency-safe เหมือน QT/PO, state machine 4 สถานะ (<span class="mono text-[12px]">CONFIRMED→CANCELLED</span> เป็น transition เดียวที่ user สั่งได้ตรงๆ — <span class="mono text-[12px]">PARTIAL</span>/<span class="mono text-[12px]">CLOSED</span> รอ <span class="mono text-[12px]">recomputeDeliveryStatus()</span> จาก Delivery Note ในเฟสถัดไปเรียกเท่านั้น), permission <span class="mono text-[12px]">sales_order:*</span> 3 ตัว · เหตุผลการตัดสินใจ 3 ข้อ (เลี่ยง module cycle, block-ไม่ใช่-backorder, ขอบเขตเช็คสต็อกทั้งคลัง) ดูที่ &sect;08 ด้านล่าง · ยังไม่ implement: <b>Delivery Note</b> (เอกสารที่ตัดสต็อกจริงและอัปเดต <span class="mono text-[12px]">delivered_qty</span>), packed_items/bundle explosion (UC-3.3)</p>
+            <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M3 (2026-08)</b> <span class="mono text-[12px]">SalesOrder</span>/<span class="mono text-[12px]">SalesOrderItem</span> (extend <span class="mono text-[12px]">SubmittableDocumentEntity</span>/<span class="mono text-[12px]">DocumentLineItemEntity</span> เหมือน PO/Quotation) — เอกสารเดียวที่สร้างได้ทางเดียวคือ <span class="mono text-[12px]">POST /quotations/{id}/convert-to-sales-order</span> (ไม่มี <span class="mono text-[12px]">POST /sales-orders</span>) ซึ่ง<b>คัดลอกทุกตัวเลขและทุกบรรทัดจากใบเสนอราคาที่ APPROVED แล้วมาตรงๆ ไม่คำนวณใหม่</b>, ตรวจสต็อกคงเหลือข้าม BC ผ่าน inventory-bc RPC ใหม่ (<span class="mono text-[12px]">StockResources.CheckAvailability</span> — รวมทุกคลังทุกล็อตที่ยังไม่หมดอายุ) ก่อนยืนยันเสมอ, ออกเลขที่ <span class="mono text-[12px]">SO-{YYYY}-{00001}</span> แบบ concurrency-safe เหมือน QT/PO, state machine 4 สถานะ (<span class="mono text-[12px]">CONFIRMED→CANCELLED</span> เป็น transition เดียวที่ user สั่งได้ตรงๆ — <span class="mono text-[12px]">PARTIAL</span>/<span class="mono text-[12px]">CLOSED</span> รอ <span class="mono text-[12px]">recomputeDeliveryStatus()</span> จาก Delivery Note ในเฟสถัดไปเรียกเท่านั้น), permission <span class="mono text-[12px]">sales_order:*</span> 3 ตัว · เหตุผลการตัดสินใจ 3 ข้อ (เลี่ยง module cycle, block-ไม่ใช่-backorder, ขอบเขตเช็คสต็อกทั้งคลัง) ดูที่ &sect;08 ด้านล่าง</p>
+            <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M4 (2026-08)</b> <span class="mono text-[12px]">DeliveryNote</span>/<span class="mono text-[12px]">DeliveryNoteItem</span> (extend <span class="mono text-[12px]">SubmittableDocumentEntity</span>/<span class="mono text-[12px]">DocumentLineItemEntity</span> แต่ไม่มีฟิลด์เงินเลยสักตัว — ใบส่งของไม่ตั้งราคาใหม่) — เอกสารที่<b>ตัดสต็อกจริง</b>ที่ inventory-bc ผ่าน RPC ใหม่ 2 ตัว (<span class="mono text-[12px]">StockResources.ConfirmDelivery</span>/<span class="mono text-[12px]">ReverseDelivery</span>, idempotent ต่อบรรทัดผ่าน <span class="mono text-[12px]">DeliveryIssue.source_doc_id</span> — ตาราง <span class="mono text-[12px]">delivery_issues</span> ใหม่ที่ inventory-bc) แล้วอัปเดต <span class="mono text-[12px]">SalesOrderItem.delivered_qty</span>, state machine 3 สถานะตรงตามกฎทั่วไปของเอกสาร submittable ใน backend-convention.html พอดี (<span class="mono text-[12px]">DRAFT→SUBMITTED→CANCELLED</span>, ตัดสต็อกตอน submit ย้อนกลับตอน cancel) — เลือกคลังที่จะส่งมอบจริงตรงนี้ (ไม่ใช่ตอน SO — ดู &sect;08 D3), ออกเลขที่ <span class="mono text-[12px]">DN-{YYYY}-{00001}</span> แบบ concurrency-safe, permission <span class="mono text-[12px]">delivery_note:*</span> 5 ตัว · ลำดับการเรียก apply/reverse <b>สลับทิศทาง</b>กับ Goods Receipt โดยตั้งใจ (ดู &sect;08 D4) · ยังไม่ implement: packed_items/bundle explosion (UC-3.3), pricing rule engine, taxes &amp; charges</p>
           </div>
 
           <h4 class="font-semibold mb-3 text-[15px]">Sequence Diagram · เส้นทางใบเสนอราคา (Quotation lifecycle)</h4>
@@ -668,7 +685,86 @@ sequenceDiagram
 
           <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Edge case ที่ต้องทดสอบครบ</b> — แปลงใบที่ยังเป็น <span class="mono text-[12px]">DRAFT</span>/<span class="mono text-[12px]">SENT</span> → 400 · แปลงใบเดิมซ้ำสอง (มี <span class="mono text-[12px]">sales_order_id</span> แล้ว) → 409 · แปลงใบที่ <span class="mono text-[12px]">valid_until</span> ผ่านไปแล้ว → 400 · สินค้าบางบรรทัดสต็อกไม่พอ → 409 พร้อมบอกจำนวนที่ขอ/ที่มี · inventory-bc ดับระหว่างเช็คสต็อก → 503 · cancel ใบที่ไม่ใช่ <span class="mono text-[12px]">CONFIRMED</span> → 409 · quotation_id ไม่มีจริง → 404 · UUID param ผิดรูปแบบ → 400002</p></div>
 
-          <div class="rulebox ok mt-6"><div class="rc mb-1">Automated coverage · Sales Order</div><p class="text-[13.5px]">unit test 17 เคสใน <span class="mono text-[12px]">apps/sales-bc/test/unit/sales-order/sales-orders.service.spec.ts</span> ครอบคลุม <span class="mono text-[12px]">convertFromQuotation()</span> (happy path, ทั้ง 3 guard ความพร้อมของใบเสนอราคา, 503 เมื่อ inventory-bc ล่ม, 409 เมื่อสต็อกไม่พอ, race guard ตอน re-lock ในทรานแซกชัน), <span class="mono text-[12px]">cancel()</span> (happy path + guard สถานะ + guard มีบรรทัดส่งมอบแล้ว), และ <span class="mono text-[12px]">recomputeDeliveryStatus()</span> ทั้ง 4 ทางออก (CONFIRMED/PARTIAL/CLOSED/no-op เมื่อ CANCELLED แล้ว) — บวก 1 เคสใหม่ใน <span class="mono text-[12px]">quotations.service.spec.ts</span> สำหรับ guard ยกเลิกใบที่แปลงเป็น SO แล้วไม่ได้ — รัน <span class="mono text-[12px]">pnpm nx run sales-bc:test</span> ก่อน commit เสมอ</p></div>
+          <div class="rulebox ok mt-6"><div class="rc mb-1">Automated coverage · Sales Order</div><p class="text-[13.5px]">unit test 22 เคสใน <span class="mono text-[12px]">apps/sales-bc/test/unit/sales-order/sales-orders.service.spec.ts</span> ครอบคลุม <span class="mono text-[12px]">convertFromQuotation()</span> (happy path, ทั้ง 3 guard ความพร้อมของใบเสนอราคา, 503 เมื่อ inventory-bc ล่ม, 409 เมื่อสต็อกไม่พอ, race guard ตอน re-lock ในทรานแซกชัน), <span class="mono text-[12px]">cancel()</span> (happy path + guard สถานะ + guard มีบรรทัดส่งมอบแล้ว), <span class="mono text-[12px]">recomputeDeliveryStatus()</span> ทั้ง 4 ทางออก (CONFIRMED/PARTIAL/CLOSED/no-op เมื่อ CANCELLED แล้ว), และ <span class="mono text-[12px]">applyDeliveredQtyDelta()</span> (bump/guard ขอบเขต, guard บรรทัดไม่มีจริง, ล็อกหัวเอกสารก่อนแตะบรรทัดเสมอ) — บวก 1 เคสใหม่ใน <span class="mono text-[12px]">quotations.service.spec.ts</span> สำหรับ guard ยกเลิกใบที่แปลงเป็น SO แล้วไม่ได้ — รัน <span class="mono text-[12px]">pnpm nx run sales-bc:test</span> ก่อน commit เสมอ</p></div>
+
+          <div class="rule my-10" style="background:var(--line)"></div>
+
+          <h4 class="font-semibold mb-3 text-[15px]" style="color:var(--blueprint)">ฝั่งขาย · sales-bc M4 (Delivery Note — ตัดสต็อกจริง)</h4>
+
+          <h4 class="font-semibold mb-3 text-[15px]">Sequence Diagram · ออกใบส่งของ (Delivery Note lifecycle)</h4>
+          <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor WH as เจ้าหน้าที่คลัง
+    participant SAL as sales-bc · DeliveryNotesService
+    participant DB as erp_sales (Postgres)
+    participant INV as inventory-bc · DeliveryIssuesService
+
+    Note over WH,DB: M4 · สร้างใบส่งของ (ร่าง) — implement แล้ว
+    WH->>SAL: POST /delivery-notes (so_id, warehouse_id, items[so_item_id, qty])
+    SAL->>DB: อ่านใบสั่งขาย + บรรทัด — ต้อง CONFIRMED หรือ PARTIAL เท่านั้น
+    Note over SAL,DB: qty แต่ละบรรทัด ต้องไม่เกิน qty - delivered_qty ของ so_item นั้น (ตรวจซ้ำแบบ lock จริงตอน submit)
+    SAL->>DB: BEGIN · ออกเลขที่ DN-{YYYY}-{00001} (FOR UPDATE บน counter ของปีนั้น)
+    SAL->>DB: INSERT delivery_notes + delivery_note_items (status=DRAFT) · COMMIT
+    SAL-->>WH: 201 · status=DRAFT
+
+    Note over WH,INV: M4 · ยืนยันส่งของ — implement แล้ว (ลำดับการเรียก "สลับทาง" กับ Goods Receipt โดยตั้งใจ - ดู &sect;08 D4)
+    WH->>SAL: POST /delivery-notes/{id}/submit
+    SAL->>SAL: อ่านใบส่งของ + บรรทัด (ยังไม่ล็อก) — ต้อง DRAFT
+    SAL->>INV: StockResources.ConfirmDelivery(warehouse_id, lines[source_doc_id=dn_item_id, product_id, qty]) — RPC sync ไม่มีทรานแซกชัน sales-bc ค้างอยู่
+    INV->>INV: ตรวจ warehouse เป็น stock leaf จริง
+    loop ทุกบรรทัด (ข้ามถ้า source_doc_id เคยบันทึกใน delivery_issues แล้ว — idempotent)
+        INV->>INV: postIssue() FIFO/FEFO ตัดล็อตจริงในทรานแซกชันเดียว ทั้งใบ all-or-nothing
+        INV->>INV: INSERT delivery_issues (source_doc_id UNIQUE)
+    end
+    Note over INV,SAL: ตัดล็อตไม่พอบรรทัดใดบรรทัดหนึ่ง หรือ inventory-bc ไม่ตอบ → ทั้งคำขอ fail ไม่มีอะไรถูกบันทึกที่ไหนเลย (ยังไม่ commit ฝั่ง sales-bc)
+    INV-->>SAL: 200 · confirmed=true (สต็อกตัดจริงและ commit แล้วที่ inventory-bc ณ จุดนี้)
+    SAL->>DB: BEGIN · FOR UPDATE header ใหม่ (เช็ค race กับการ submit/cancel ซ้อน) → UPDATE status=SUBMITTED
+    SAL->>DB: ล็อกใบสั่งขาย (FOR UPDATE) แล้ว UPDATE delivered_qty ทีละบรรทัด + recompute สถานะ SO · COMMIT
+    SAL-->>WH: 200 · SUBMITTED
+
+    Note over WH,INV: เส้นทางทางเลือก · ยกเลิกใบส่งของ (เรียก ReverseDelivery แบบไม่มีเงื่อนไขเสมอ ปลอดภัยแม้ยังเป็น DRAFT)
+    WH->>SAL: POST /delivery-notes/{id}/cancel { cancel_reason }
+    SAL->>INV: StockResources.ReverseDelivery(source_doc_ids[]) — RPC sync
+    INV->>INV: ทุกบรรทัดที่ reversed_at IS NULL → คืนสต็อกกลับล็อตเดิมแบบบวกตรงๆ (ไม่ guard "ยังไม่ถูกแตะ" เพราะเป็นการย้อน ledger ไม่ใช่สร้างสถานะใหม่) แล้ว SET reversed_at
+    INV-->>SAL: 200 · reversed=true (idempotent ถ้าไม่เคยตัดจริงหรือย้อนไปแล้ว จะ no-op)
+    SAL->>DB: FOR UPDATE header ใหม่ → UPDATE status=CANCELLED, cancel_reason
+    alt สถานะที่ล็อกได้จริง (fresh) คือ SUBMITTED
+        SAL->>DB: ลด delivered_qty กลับทีละบรรทัด + recompute สถานะ SO · COMMIT
+    else เป็น DRAFT อยู่แล้ว (ไม่เคยตัดสต็อก)
+        SAL->>DB: COMMIT โดยไม่แตะ delivered_qty เลย
+    end
+    SAL-->>WH: 200 · CANCELLED
+</pre>
+          </div>
+
+          <h4 class="font-semibold mb-3 text-[15px]">วิธีทดสอบ Delivery Note · Testing Guide</h4>
+
+          <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>Permission ต้อง grant ก่อน</b> — <span class="mono text-[12px]">GrantDeliveryNotePermissionsToMockPolicies</span> ให้ <span class="mono text-[12px]">delivery_note:create/view/update/submit/cancel</span> แก่ทั้งสอง policy mock (รันหลัง <span class="mono text-[12px]">permissions:sync</span> เสมอ) · login ใหม่หลัง grant</p></div>
+
+          <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>เตรียมใบสั่งขายให้ถึง CONFIRMED ก่อน</b> — แปลงใบเสนอราคาเป็น SO ตามขั้นตอนด้านบน แล้วเตรียมคลังปลายทาง (<span class="mono text-[12px]">GET /inventory-bc/v1/warehouses</span> — ต้องเป็น leaf ที่ <span class="mono text-[12px]">warehouse_type=stock</span>) ที่มีสต็อกสินค้าบรรทัดนั้นพอจริง</p></div>
+
+          <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>สร้างใบส่งของแล้วยืนยัน</b></p></div>
+          <div class="code p-4 mb-4">
+<pre>curl -X POST http://localhost:3005/sales-bc/v1/delivery-notes \
+  -H <span class="s">"Authorization: Bearer $TOKEN"</span> -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{
+    "so_id": "&lt;uuid ใบสั่งขาย&gt;",
+    "warehouse_id": "&lt;uuid คลัง leaf&gt;",
+    "items": [{ "so_item_id": "&lt;uuid บรรทัด SO&gt;", "qty": 5 }]
+  }'</span>
+<span class="c"># -> 201, status=DRAFT, dn_number="DN-2026-00001"</span>
+
+curl -X POST http://localhost:3005/sales-bc/v1/delivery-notes/&lt;dn_id&gt;/submit \
+  -H <span class="s">"Authorization: Bearer $TOKEN"</span>
+<span class="c"># -> 200, status=SUBMITTED — สต็อกถูกตัดจริงที่ inventory-bc แล้ว</span>
+<span class="c">#    ตรวจต่อได้ที่ GET /inventory-bc/v1/stock-movements?filter[]=source_doc_id||$eq||&lt;dn_item_id&gt;</span></pre>
+          </div>
+
+          <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Edge case ที่ต้องทดสอบครบ</b> — สร้างใบส่งของกับ SO ที่ยังเป็น DRAFT/CLOSED/CANCELLED → 400 · <span class="mono text-[12px]">qty</span> เกินจำนวนที่เหลือของบรรทัด → 409 · <span class="mono text-[12px]">so_item_id</span> ซ้ำในใบเดียว หรือไม่มีจริงบน SO นั้น → 400 · คลังไม่ใช่ stock leaf → 400 · submit ใบที่สต็อกไม่พอในคลังนั้น (แม้ SO ผ่าน check ตอน confirm เพราะเช็ครวมทุกคลัง) → 503 พร้อมข้อความ ไม่มีอะไรถูกบันทึก · submit ซ้ำ (ไม่ใช่ DRAFT) → 409 · cancel ใบที่ CANCELLED แล้ว → 409 · UUID param ผิดรูปแบบ → 400002</p></div>
+
+          <div class="rulebox ok mt-6"><div class="rc mb-1">Automated coverage · Delivery Note</div><p class="text-[13.5px]">unit test 14 เคสใน <span class="mono text-[12px]">apps/sales-bc/test/unit/delivery-note/delivery-notes.service.spec.ts</span> (create guard ครบ, submit สั่ง ConfirmDelivery ก่อนเขียนอะไรในเครื่อง, 503 เมื่อยืนยันสต็อกไม่ได้, cancel เรียก ReverseDelivery แบบไม่มีเงื่อนไขแต่ลด delivered_qty เฉพาะแถวที่ fresh เป็น SUBMITTED จริง) และ 7 เคสใน <span class="mono text-[12px]">apps/inventory-bc/test/unit/stock/delivery-issues.service.spec.ts</span> (idempotent ทั้ง apply/reverse, ตรวจ warehouse, ย้อนสต็อกกลับล็อตเดิมแบบบวกตรงๆ) — รัน <span class="mono text-[12px]">pnpm nx run sales-bc:test</span> / <span class="mono text-[12px]">pnpm nx run inventory-bc:test</span> ก่อน commit เสมอ</p></div>
         </div>
 
         <!-- 4.7 Shared document engine -->
@@ -711,12 +807,12 @@ sequenceDiagram
           </div>
         </div>
 
-        <!-- 4.8 Implementation Decision Record (M3 · Sales Order) -->
+        <!-- 4.8 Implementation Decision Record (M3 · Sales Order, M4 · Delivery Note) -->
         <div class="mt-14">
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">08</span><h3 class="text-xl font-semibold">Implementation Decision Record · บันทึกการตัดสินใจตอน implement</h3></div>
 
           <div class="card p-6 mb-9" style="border-left:3px solid var(--signal)">
-            <p class="text-[14px]" style="color:var(--ink-soft)">หัวข้อนี้บันทึก <b style="color:var(--ink)">จุดที่โค้ดจริงตัดสินใจต่างจาก/ละเอียดกว่าที่ SRS ระบุไว้</b> ตอน implement <b style="color:var(--ink)">Sales Order (M3 — แปลงจากใบเสนอราคา)</b> — เขียนไว้เพื่อให้คนที่อ่านสเปกแล้วไปเปิดโค้ดไม่ต้องเดาว่าทำไมไม่เหมือนกัน และเพื่อให้ decision เหล่านี้ถูก challenge ได้ในภายหลัง แต่ละข้อระบุ <b style="color:var(--ink)">ทางเลือกที่ไม่ได้เลือก</b> และ <b style="color:var(--ink)">ต้นทุนของการเลือกผิด</b> ไว้ด้วยเสมอ</p>
+            <p class="text-[14px]" style="color:var(--ink-soft)">หัวข้อนี้บันทึก <b style="color:var(--ink)">จุดที่โค้ดจริงตัดสินใจต่างจาก/ละเอียดกว่าที่ SRS ระบุไว้</b> ตอน implement <b style="color:var(--ink)">Sales Order (M3 — แปลงจากใบเสนอราคา)</b> และ <b style="color:var(--ink)">Delivery Note (M4 — ตัดสต็อกจริง)</b> — เขียนไว้เพื่อให้คนที่อ่านสเปกแล้วไปเปิดโค้ดไม่ต้องเดาว่าทำไมไม่เหมือนกัน และเพื่อให้ decision เหล่านี้ถูก challenge ได้ในภายหลัง แต่ละข้อระบุ <b style="color:var(--ink)">ทางเลือกที่ไม่ได้เลือก</b> และ <b style="color:var(--ink)">ต้นทุนของการเลือกผิด</b> ไว้ด้วยเสมอ</p>
           </div>
 
           <!-- ===== D1 · Module cycle avoidance ===== -->
@@ -758,7 +854,25 @@ sequenceDiagram
             <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> <span class="mono text-[12px]">StockResources.CheckAvailability</span> (RPC ใหม่ที่ <span class="mono text-[12px]">inventory-bc</span>) คำนวณ <span class="mono text-[12px]">SUM(lots.available_qty)</span> ต่อ <span class="mono text-[12px]">product_id</span> ข้าม<b>ทุกคลัง</b>ที่มีล็อตนั้น (ตัดล็อตที่หมดอายุแล้วออกก่อนรวม) — ไม่รับ <span class="mono text-[12px]">warehouse_id</span> เป็นพารามิเตอร์เลย</p>
             <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ทำไม:</b> ตอนยืนยัน SO ระบบยังไม่รู้ว่าจะ<b>ส่งมอบจากคลังไหน</b> — การเลือกคลังที่จะตัดสต็อกจริงเป็นการตัดสินใจของ <b>Delivery Note</b> (เฟสถัดไป ยังไม่ implement) ไม่ใช่ของ SO การผูกเช็คสต็อกกับคลังใดคลังหนึ่งตั้งแต่ตอนนี้จะบล็อกออเดอร์ที่มีของพอในภาพรวมแต่กระจายอยู่คนละคลัง ทั้งที่ธุรกิจย้ายสต็อกข้ามคลัง (Stock Entry MATERIAL_TRANSFER) ได้อยู่แล้วก่อนวันส่งจริง</p>
           </div>
-          <div class="edge mb-9" style="background:rgba(11,61,145,.06);border-color:rgba(11,61,145,.22)"><div class="tag mb-1" style="color:var(--blueprint)">ผลที่ตามมาที่ต้องรู้ไว้ก่อน implement Delivery Note</div><p class="text-[13px]">"SO ยืนยันได้" ไม่ได้แปลว่า <b>คลังใดคลังหนึ่งมีของพอ</b> — Delivery Note ต้องมี guard ของตัวเองตอนเลือกคลังจริง (เรียก <span class="mono text-[12px]">postIssue()</span> ที่มี all-or-nothing check อยู่แล้วในระดับล็อต) และต้องรับมือกรณีที่ของกระจายหลายคลังจนต้องแบ่งส่งมอบเป็นหลายรอบ ซึ่งเป็นเหตุผลที่ <span class="mono text-[12px]">SalesOrderStatus.PARTIAL</span> มีอยู่แล้วในสถานะชุดนี้ตั้งแต่ต้น</p></div>
+          <div class="edge mb-9" style="background:rgba(11,61,145,.06);border-color:rgba(11,61,145,.22)"><div class="tag mb-1" style="color:var(--blueprint)">ผลที่ตามมาที่ Delivery Note (M4) ต้องรับมือ — และรับมือแล้ว</div><p class="text-[13px]">"SO ยืนยันได้" ไม่ได้แปลว่า <b>คลังใดคลังหนึ่งมีของพอ</b> — Delivery Note มี guard ของตัวเองตอนเลือกคลังจริง (เรียก <span class="mono text-[12px]">postIssue()</span> ที่มี all-or-nothing check อยู่แล้วในระดับล็อต) และรับมือกรณีที่ของกระจายหลายคลังจนต้องแบ่งส่งมอบเป็นหลายรอบได้แล้ว ซึ่งเป็นเหตุผลที่ <span class="mono text-[12px]">SalesOrderStatus.PARTIAL</span> มีอยู่แล้วในสถานะชุดนี้ตั้งแต่ต้น</p></div>
+
+          <!-- ===== D4 · Delivery Note apply/reverse ordering ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D4</span><h4 class="font-semibold text-[16px]">Delivery Note ตัดสต็อกจริง — ลำดับเรียก RPC สลับทางกับ Goods Receipt โดยตั้งใจ</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> <span class="mono text-[12px]">DeliveryNotesService.submit()</span> เรียก <span class="mono text-[12px]">StockResources.ConfirmDelivery</span> (RPC sync ไป inventory-bc) <b>ก่อน</b> เปิดทรานแซกชันของ sales-bc เอง — ตัดสต็อกสำเร็จที่ inventory-bc แล้วค่อยเขียน <span class="mono text-[12px]">status=SUBMITTED</span>/<span class="mono text-[12px]">delivered_qty</span> ในเครื่อง ตรงข้ามกับ <span class="mono text-[12px]">GoodsReceiptsService.submit()</span> ที่ commit ธุรกรรมของตัวเอง (สร้างล็อต) ก่อน แล้วค่อยเรียก <span class="mono text-[12px]">applyGoodsReceipt</span> ไปแจ้ง supplier-bc ทีหลัง</p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ทำไม:</b> คำถามที่ต้องตอบก่อนเสมอคือ <i>"เหตุการณ์ทางกายภาพ (ของจริงเคลื่อนย้าย) เกิดขึ้นฝั่งไหน"</i> — สำหรับ GRN เหตุการณ์นั้นเกิดที่ inventory-bc เอง (สร้างล็อต) จึงเป็น <b>ground truth ที่พร้อมอยู่แล้วในเครื่องตัวเอง</b> commit ก่อนได้เลย ส่วนตัวเลข <span class="mono text-[12px]">received_qty</span> ที่ supplier-bc เป็นเพียงสำเนาสะท้อนกลับ (denormalized) แต่สำหรับ Delivery Note เหตุการณ์ทางกายภาพ (ตัดสต็อกออกจากคลัง) เกิดที่ <b>อีกฝั่งหนึ่งของ BC boundary</b> (inventory-bc) — sales-bc เองไม่มีอะไรที่เป็นความจริงทางกายภาพให้ commit ก่อนเลย ถ้า commit <span class="mono text-[12px]">status=SUBMITTED</span> ก่อนแล้วค่อยเรียกตัดสต็อกทีหลัง และการตัดสต็อกล้มเหลว (สต็อกหมดจากการแย่งกันของอีกใบส่งของที่ตัดไปพร้อมกัน) จะเกิดเอกสารที่<b>อ้างว่าส่งของไปแล้วทั้งที่ของยังไม่ออกจากคลังจริง</b> — เลวร้ายกว่าเคสของ GRN มาก</p>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-9">
+            <div class="rulebox ok"><div class="rc mb-1">ไม่ต้องมี _synced_at หรือ endpoint ซ่อมแยก</div><p class="text-[13.5px]">GRN ต้องมี <span class="mono text-[12px]">po_synced_at</span> + <span class="mono text-[12px]">POST .../sync-purchase-order</span> เพราะฝั่งที่ commit ก่อน (inventory-bc) ไม่มีทางย้อน "ของที่รับเข้ามาแล้ว" ทิ้งได้ — ต้องมีกลไกซ่อมแยกให้ supplier-bc ตามทัน ส่วน Delivery Note <b>ไม่ต้องมี</b> เพราะ <span class="mono text-[12px]">ConfirmDelivery</span>/<span class="mono text-[12px]">ReverseDelivery</span> เป็น idempotent ต่อบรรทัดอยู่แล้ว (<span class="mono text-[12px]">DeliveryIssue.source_doc_id</span> UNIQUE) — ถ้า sales-bc commit ฝั่งตัวเองไม่สำเร็จหลัง inventory-bc ตัดสต็อกไปแล้ว แค่เรียก <span class="mono text-[12px]">submit()</span> ซ้ำก็คือการซ่อมในตัว (inventory-bc no-op แล้วปล่อยให้ sales-bc เขียนส่วนที่ค้างต่อ)</p></div>
+            <div class="rulebox"><div class="rc mb-1">cancel() เรียก ReverseDelivery แบบไม่มีเงื่อนไขเสมอ</div><p class="text-[13.5px]">ไม่เช็คสถานะก่อนว่าจะเรียกหรือไม่ — เรียกทุกครั้งแม้ยังเป็น DRAFT (ไม่เคยตัดสต็อก) เพราะ <span class="mono text-[12px]">reverseDelivery()</span> เป็น no-op อยู่แล้วถ้าไม่พบ <span class="mono text-[12px]">delivery_issues</span> แถวนั้น การจะ "เช็คสถานะก่อนแล้วค่อยตัดสินใจเรียก" ต้องอ่านสถานะแบบ fresh+locked ซึ่งขัดกับกฎห้ามเปิดทรานแซกชันคาบเกี่ยว RPC — เลี่ยงทั้งปัญหาด้วยการเรียกเสมอแล้วให้ idempotency จัดการเอง</p></div>
+          </div>
+
+          <!-- ===== D5 · No separate allocations table for reversal ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D5</span><h4 class="font-semibold text-[16px]">Idempotency ledger ของ Delivery — ไม่มีตาราง allocations แยก</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> <span class="mono text-[12px]">delivery_issues</span> (ตารางใหม่ที่ inventory-bc) เก็บแค่ 1 แถวต่อ 1 บรรทัดใบส่งของ (คีย์ idempotency คือ <span class="mono text-[12px]">source_doc_id</span> UNIQUE) — <b>ไม่มี</b>ตารางลูกเก็บว่าตัดจากล็อตไหนบ้าง ต่างจาก Stock Entry ที่มี <span class="mono text-[12px]">StockEntryItemAllocation</span> แยกต่างหากสำหรับ <span class="mono text-[12px]">MATERIAL_ISSUE</span></p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ทำไม:</b> ทุกครั้งที่ <span class="mono text-[12px]">postIssue()</span> ถูกเรียกจาก <span class="mono text-[12px]">confirmDelivery()</span> จะส่ง <span class="mono text-[12px]">source_doc_type='DELIVERY'</span>/<span class="mono text-[12px]">source_doc_id</span> เดียวกันติดไปกับทุก movement ที่มันเขียน — ข้อมูล "ตัดจากล็อตไหนเท่าไหร่" จึงมีอยู่แล้วครบใน <span class="mono text-[12px]">stock_movements</span> เอง <span class="mono text-[12px]">reverseDelivery()</span> แค่ query กลับด้วย <span class="mono text-[12px]">source_doc_id</span> เดียวกันก็ได้ชุดล็อต+จำนวนที่ต้องคืนแม่นยำเท่ากับมีตารางแยก — สร้างตารางที่สองจะเป็นการเก็บข้อมูลซ้ำที่ sync กันเองได้ (ถ้าวันหนึ่งไม่ตรงกันจะไม่รู้ว่าอันไหนถูก)</p>
+          </div>
         </div>
       </section>
 
