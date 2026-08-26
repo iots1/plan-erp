@@ -1002,9 +1002,44 @@ sequenceDiagram
             </tbody>
           </table>
 
+          <!-- ===== D5 · Stock Entry (UC-3.4) — 3 ของ 4 ประเภท, Repack เลื่อนออก ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D5</span><h4 class="font-semibold text-[16px]">Stock Entry — ทำ 3 ประเภท (Receipt/Transfer/Issue) เลื่อน Repack ออกไปก่อน</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> เอกสารเดียว <span class="mono text-[12px]">stock_entries</span> ตาม UC-3.4 ครอบคลุม <span class="mono text-[12px]">entry_type</span> = <span class="mono text-[12px]">MATERIAL_RECEIPT</span> (รับเข้าไม่ผูก PO) · <span class="mono text-[12px]">MATERIAL_TRANSFER</span> (ย้ายคลัง) · <span class="mono text-[12px]">MATERIAL_ISSUE</span> (เบิกใช้ภายใน ตัด FIFO/FEFO) — <b>ยังไม่ทำ Repack</b> เพราะต้องม้วนต้นทุนจากสินค้าต้นทางหลายตัวเป็นล็อตใหม่ล็อตเดียว ซึ่งเป็นคำถามด้าน valuation ที่ต่างจากอีก 3 แบบโดยสิ้นเชิง สมควรได้รอบทำเดี่ยวๆ ไม่ใช่ยัดเป็นสาขาที่ 4 แบบเร่งรีบ</p>
+            <p class="text-[13.5px]"><b style="color:var(--ink)">RULE · CONCURRENCY LOCK เริ่มมีผลจริงรอบนี้:</b> <span class="mono text-[12px]">StockPostingService.postIssue()</span> เป็นเมธอดแรกที่ต้อง <span class="mono text-[12px]">SELECT ... FOR UPDATE</span> ก่อนอ่าน <span class="mono text-[12px]">available_qty</span> เพราะเป็นเมธอดแรกที่ "เลือกแล้วตัด" ล็อตที่มีอยู่แล้ว (รอบก่อนหน้ามีแต่ <span class="mono text-[12px]">postReceipt</span> ที่ insert ล็อตใหม่ ไม่มีอะไรให้แย่งกัน)</p>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-9">
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">MATERIAL_TRANSFER คงต้นทุนเดิม ไม่ตั้งราคาใหม่</div>
+              <p class="text-[13.5px]">ล็อตปลายทางคัดลอก <span class="mono text-[12px]">import_cost</span>/<span class="mono text-[12px]">lot_number</span>/<span class="mono text-[12px]">expiry_date</span> จากล็อตต้นทางเป๊ะ — client ห้ามส่งค่าพวกนี้มาเอง (service ปฏิเสธถ้าส่งมา) เพราะการโอนคลังคือย้ายที่เก็บ ไม่ใช่ซื้อใหม่ ตรงตาม SRS “คงต้นทุนล็อตเดิม ไม่สร้างกำไร/ขาดทุน”</p>
+            </div>
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">ล็อตปลายทางสร้างใหม่เสมอ ไม่ merge เข้าล็อตเดิม</div>
+              <p class="text-[13.5px]">แม้คลังปลายทางจะมีล็อตรหัสเดียวกันอยู่แล้ว ระบบก็สร้างแถวใหม่เสมอ (ตาม pattern เดียวกับ <span class="mono text-[12px]">postReceipt</span>) — ทำให้ <span class="mono text-[12px]">received_at</span>/<span class="mono text-[12px]">received_qty</span> ของทุกล็อตมีความหมายตรงตัวว่า "1 แถว = 1 เหตุการณ์รับเข้า/ย้ายเข้า" เสมอ ไม่ปนกัน</p>
+            </div>
+          </div>
+
+          <!-- ===== D6 · ยกเลิก Stock Entry — บวกคืนตรงๆ vs ต้องเช็คก่อน ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D6</span><h4 class="font-semibold text-[16px]">ยกเลิก Stock Entry — ทำไมฝั่งรับกับฝั่งตัดใช้กฎคนละแบบ</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px]">การยกเลิกแต่ละ <span class="mono text-[12px]">entry_type</span> ใช้หลักคนละแบบ โดยจงใจ ไม่ใช่ความไม่สม่ำเสมอ:</p>
+          </div>
+          <div class="card overflow-hidden mb-4">
+            <table class="d">
+              <thead><tr><th style="width:26%">ฝั่งที่ย้อนกลับ</th><th style="width:20%">กฎที่ใช้</th><th>เหตุผล</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">MATERIAL_RECEIPT</span> · ล็อตใหม่</td><td><b>ต้องเช็คก่อน</b> (เหมือน GRN)</td><td>ล็อตนี้ "เกิดใหม่" จากเอกสารนี้ล้วนๆ — ถ้ามีคนเบิกออกไปแล้วแม้แต่หน่วยเดียว การลบ (ย้อนเป็น 0) จะทำให้ของที่เบิกไปแล้ว "ไม่มีเอกสารรับเข้ารองรับ" อีกต่อไป</td></tr>
+                <tr><td><span class="mono text-[12px]">MATERIAL_TRANSFER</span> · ปลายทาง</td><td><b>ต้องเช็คก่อน</b></td><td>เหตุผลเดียวกับ RECEIPT เป๊ะ — ล็อตปลายทางก็ "เกิดใหม่" จากการโอนครั้งนี้เหมือนกัน</td></tr>
+                <tr><td><span class="mono text-[12px]">MATERIAL_TRANSFER</span> · ต้นทาง</td><td><b>บวกคืนตรงๆ</b> ไม่ต้องเช็ค</td><td>ล็อตต้นทาง<b>มีอยู่แล้วก่อนเอกสารนี้</b> — คืนเท่าที่เอกสารนี้ตัดไป ถูกต้องเสมอไม่ว่าระหว่างทางจะมีอะไรเกิดขึ้นกับล็อตนั้นอีกก็ตาม (เหมือนการกลับรายการบัญชี: post รายการตรงข้าม ไม่ใช่พยายามคำนวณยอดสุดท้ายใหม่)</td></tr>
+                <tr><td><span class="mono text-[12px]">MATERIAL_ISSUE</span> · ทุกล็อตที่ถูกตัด</td><td><b>บวกคืนตรงๆ</b> ไม่ต้องเช็ค</td><td>เหตุผลเดียวกับต้นทางของ TRANSFER — จึงต้องมีตาราง <span class="mono text-[12px]">stock_entry_item_allocations</span> แยกไว้ (1 รายการอาจตัดมาจากหลายล็อตตาม FIFO/FEFO) เพื่อรู้ว่าจะคืนล็อตไหนเท่าไหร่</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="rulebox ok mb-9"><div class="rc mb-1">ทำไมไม่บล็อกการยกเลิก MATERIAL_ISSUE ไปเลยให้ง่ายกว่านี้</div><p class="text-[13.5px]">ทางเลือกที่ง่ายกว่าคือห้ามยกเลิกใบเบิกใช้เด็ดขาด (บังคับให้แก้ด้วยใบใหม่แทน) — แต่ "เบิกผิด ต้องคืน" เป็นเรื่องที่เกิดขึ้นจริงบ่อย และเมื่อพิสูจน์แล้วว่าการบวกคืนแบบ additive ถูกต้องเสมอโดยไม่ต้องมีเงื่อนไข (ดูตาราง D6) การบันทึก allocation ไว้จึงเป็นต้นทุนที่คุ้มค่ากว่าการบล็อกฟีเจอร์ทิ้งทั้งหมด</p></div>
+
           <div class="card p-6" style="border-left:3px solid var(--blueprint)">
-            <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">ยังไม่ได้ทำในรอบนี้ · M3 ต่อ</div>
-            <p class="text-[13.5px]">Stock Entry (โอนคลัง/เบิกใช้/แปรรูป) · Stock Reconciliation · Bundle explosion (UC-3.3) · <b>ฝั่งตัดสต็อก FIFO/FEFO</b> (รอบนี้มีแต่ขารับเข้า — <span class="mono text-[12px]">StockPostingService</span> จึงยังไม่ต้องใช้ <span class="mono text-[12px]">SELECT … FOR UPDATE</span> เพราะการ insert ล็อตใหม่ไม่มีอะไรให้แย่งกัน แต่เมธอด issue ต้องใช้แน่นอน ดู RULE · CONCURRENCY LOCK) · Material Receipt แบบไม่อ้าง PO</p>
+            <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">ยังไม่ได้ทำ · รอบถัดไป</div>
+            <p class="text-[13.5px]">Repack (แปรรูป — ม้วนต้นทุนจากหลายสินค้าต้นทางเป็นล็อตใหม่) · Bundle explosion (UC-3.3) · Delivery Note / Sales Order (P4 ฝั่งขาย) · valuation strategy override ระดับ item (ตอนนี้ <span class="mono text-[12px]">MATERIAL_ISSUE</span> ใช้ <span class="mono text-[12px]">stock_settings.valuation_method</span> ระดับระบบเดียวเท่านั้น)</p>
           </div>
         </div>
       </section>
