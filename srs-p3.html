@@ -220,8 +220,9 @@
           </div>
 
           <div class="card p-6 mt-6">
-            <div class="mono text-[11px] mb-3" style="color:var(--signal)">UC-3.3 · BUNDLE EXPLOSION (ขายแบบชุด)</div>
-            <p class="text-[13.5px]" style="color:var(--ink-soft)">เมื่อรายการที่จ่ายเป็น <span class="mono text-[12px]">type=bundle</span> ระบบจะ <b>แตกชุด</b> ตาม BOM (<span class="mono text-[12px]">bundle_items</span>) × จำนวนชุด → รวม demand ต่อสินค้าย่อย → ตัด FIFO/FEFO ของแต่ละสินค้าย่อย <b>ในทรานแซกชันเดียว</b>. COGS ของชุด = ผลรวมต้นทุนจากทุกล็อตของทุกสินค้าย่อย</p>
+            <div class="mono text-[11px] mb-3" style="color:var(--signal)">UC-3.3 · BUNDLE EXPLOSION (ขายแบบชุด) — implement แล้ว</div>
+            <p class="text-[13.5px] mb-3" style="color:var(--ink-soft)">เมื่อรายการที่จ่ายเป็น <span class="mono text-[12px]">type=bundle</span> ระบบจะ <b>แตกชุด</b> ตาม BOM (<span class="mono text-[12px]">bundle_items</span>) × จำนวนชุด → รวม demand ต่อสินค้าย่อย → ตัด FIFO/FEFO ของแต่ละสินค้าย่อย <b>ในทรานแซกชันเดียว</b>. COGS ของชุด = ผลรวมต้นทุนจากทุกล็อตของทุกสินค้าย่อย</p>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">การแตกชุดเกิดที่ inventory-bc ฝั่งเดียว</b> — <span class="mono text-[12px]">BundleItemsService.explodeDemands()</span> ถูกเรียกจาก 2 จุดที่ระบบไปแตะสต็อกจริงเท่านั้น คือ <span class="mono text-[12px]">StockResources.CheckAvailability</span> (ตอนยืนยัน SO) และ <span class="mono text-[12px]">ConfirmDelivery</span> (ตอนส่งของ) · sales-bc ไม่เคยรู้ว่าชุดมีสินค้าย่อยอะไรบ้าง เอกสารฝั่งขายเก็บแค่บรรทัดของ "ชุด" ตามที่ลูกค้าสั่ง — ดูเหตุผลเต็มที่ &sect;08 D8</p>
           </div>
 
           <div class="card p-6 mt-6">
@@ -419,9 +420,9 @@ erDiagram
     }
     BUNDLE_ITEMS {
         uuid id PK
-        uuid bundle_product_id FK
-        uuid component_product_id FK
-        int quantity "per one set"
+        uuid bundle_product_id FK "the type=bundle product, CASCADE"
+        uuid component_product_id FK "must be type=single, RESTRICT"
+        int quantity "per one set, in the component stock UOM"
     }
     STOCK_ADJUSTMENTS {
         uuid id PK
@@ -1048,9 +1049,21 @@ sequenceDiagram
             <div class="rulebox"><div class="rc mb-1">ยกเลิกใช้กฎ D6 แยกตามบทบาทของบรรทัด</div><p class="text-[13.5px]">บรรทัด DESTINATION ใช้กฎเดียวกับ MATERIAL_RECEIPT (ต้องยังไม่ถูกแตะเลยจึงยกเลิกได้) เพราะเป็นล็อตที่เกิดใหม่จากเอกสารนี้ ส่วนบรรทัด SOURCE ใช้กฎเดียวกับ MATERIAL_ISSUE (บวกคืนตรงๆ ผ่าน <span class="mono text-[12px]">stock_entry_item_allocations</span> เดิม ไม่มีตารางใหม่) เพราะล็อตต้นทางมีอยู่แล้วก่อนเอกสารนี้ — Repack ไม่ต้องมีกฎยกเลิกของตัวเองเลย เป็นการผสมสองกฎที่มีอยู่แล้วต่อบรรทัด</p></div>
           </div>
 
+          <!-- ===== D8 · Bundle explosion ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D8</span><h4 class="font-semibold text-[16px]">Bundle explosion — แตกชุดที่ inventory-bc ฝั่งเดียว ไม่ denormalize packed_items ลงเอกสารฝั่งขาย</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> srs-p4.html &sect;05 เขียนไว้ว่า "เมื่อขายสินค้า bundle ให้ explode เป็น <span class="mono text-[12px]">packed_items</span> เก็บ denormalized บนเอกสาร (SO/Delivery)" — <b>โค้ดจริงไม่ทำแบบนั้น</b> ไม่มีตาราง <span class="mono text-[12px]">packed_items</span> และเอกสารฝั่งขาย (Quotation/SO/Delivery Note) เก็บแค่บรรทัดของ "ชุด" ตามที่ลูกค้าสั่งจริง การแตกชุดเกิดขึ้น<b>ตอนรันไทม์ที่ inventory-bc</b> ผ่าน <span class="mono text-[12px]">BundleItemsService.explodeDemands()</span> ณ 2 จุดที่แตะสต็อกจริงเท่านั้น (<span class="mono text-[12px]">CheckAvailability</span>, <span class="mono text-[12px]">ConfirmDelivery</span>)</p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ทำไม:</b> เหตุผลเดียวกับ &sect;08 D5 ของ srs-p4 (idempotency ledger ของ Delivery ไม่มีตาราง allocations แยก) — <span class="mono text-[12px]">postIssue()</span> ที่ตัดสินค้าย่อยทุกตัวส่ง <span class="mono text-[12px]">source_doc_id</span> เดียวกัน (คือ <span class="mono text-[12px]">delivery_note_items.id</span>) ติดไปกับทุก movement อยู่แล้ว ข้อมูล "ชุดนี้ตัดสินค้าย่อยตัวไหน จากล็อตไหน ต้นทุนเท่าไหร่" จึงมีครบใน <span class="mono text-[12px]">stock_movements</span> ตั้งแต่แรก — <b>traceability ที่ SRS ต้องการได้มาแล้วโดยไม่ต้องมีตารางที่สอง</b> ส่วนตาราง <span class="mono text-[12px]">packed_items</span> ที่คัดลอก BOM ลงเอกสารจะกลายเป็นข้อมูลซ้ำที่ sync กับ <span class="mono text-[12px]">bundle_items</span> เองไม่ได้ (ถ้าวันหนึ่งไม่ตรงกันจะไม่รู้ว่าอันไหนถูก)</p>
+            <p class="text-[13.5px]"><b style="color:var(--ink)">ผลพลอยได้:</b> sales-bc <b>ไม่ต้องแก้อะไรเลย</b>เพื่อรองรับ bundle — ปลดล็อกแค่ guard เดิมที่ปฏิเสธ <span class="mono text-[12px]">type=bundle</span> ใน <span class="mono text-[12px]">QuotationsService</span> ออกไปเท่านั้น นอกนั้น Quotation→SO→Delivery Note ทำงานกับบรรทัด "ชุด" เหมือนสินค้าเดี่ยวทุกประการ เพราะทุกคำถามที่เกี่ยวกับสต็อกถูกส่งข้าม BC ไปให้ inventory-bc ตอบอยู่แล้ว</p>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-9">
+            <div class="rulebox ok"><div class="rc mb-1">ชุดซ้อนชุดไม่ได้ — กัน cycle เชิงโครงสร้าง ไม่ใช่เชิง runtime</div><p class="text-[13.5px]">สินค้าย่อยต้องเป็น <span class="mono text-[12px]">type=single</span> เสมอ (บวกกับ unique <span class="mono text-[12px]">(bundle_product_id, component_product_id)</span> และ guard ห้ามชุดใส่ตัวเอง) — พอห้ามชุดซ้อนชุด ปัญหาวงจรอ้างอิง (A→B→A) <b>เกิดขึ้นไม่ได้เลย</b> ไม่ต้องมี recursive depth limit หรือ visited-set ให้พลาด และการแตกชุดเป็น flat pass รอบเดียวจบ · ERPNext (Product Bundle) ก็ใช้ข้อจำกัดเดียวกันด้วยเหตุผลเดียวกัน</p></div>
+            <div class="rulebox"><div class="rc mb-1">เช็คสต็อกรวม demand ข้ามบรรทัด ไม่ใช่เช็คทีละบรรทัด</div><p class="text-[13.5px]"><span class="mono text-[12px]">CheckAvailability</span> รวม demand ของสินค้าย่อยจาก<b>ทุกบรรทัด</b>ก่อนเทียบกับสต็อก — ถ้าชุด A กับชุด B ใช้สินค้าย่อยตัวเดียวกัน ทั้งคู่ต้อง<b>แย่งของกันจริง</b> ไม่ใช่ต่างคนต่างผ่านเทียบกับยอดที่มีพอสำหรับคนเดียว · เมื่อสินค้าย่อยตัวใดขาด ทุกบรรทัดที่ใช้ตัวนั้นจะถูก flag พร้อมกัน เพื่อให้ error message ฝั่ง sales-bc บอกครบว่าบรรทัดไหนบ้างที่เกี่ยวข้อง</p></div>
+          </div>
+
           <div class="card p-6" style="border-left:3px solid var(--blueprint)">
             <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">ยังไม่ได้ทำ · รอบถัดไป</div>
-            <p class="text-[13.5px]">Bundle explosion (UC-3.3) · valuation strategy override ระดับ item (ตอนนี้ <span class="mono text-[12px]">MATERIAL_ISSUE</span>/<span class="mono text-[12px]">REPACK</span> ใช้ <span class="mono text-[12px]">stock_settings.valuation_method</span> ระดับระบบเดียวเท่านั้น) · pricing rule engine (P4 ฝั่งขาย)</p>
+            <p class="text-[13.5px]">valuation strategy override ระดับ item (ตอนนี้ <span class="mono text-[12px]">MATERIAL_ISSUE</span>/<span class="mono text-[12px]">REPACK</span> ใช้ <span class="mono text-[12px]">stock_settings.valuation_method</span> ระดับระบบเดียวเท่านั้น) · taxes &amp; charges รายบรรทัด (P4 ฝั่งขาย)</p>
           </div>
         </div>
       </section>
