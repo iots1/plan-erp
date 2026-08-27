@@ -381,7 +381,7 @@ findAll(<span class="d">@ValidatedQuery</span>(<span class="t">QueryParamsDTO</s
             </tbody>
           </table>
         </div>
-        <div class="rulebox mb-4"><div class="rc mb-1">FEATURES · @ValidatedQuery</div><p class="text-[13.5px]">แปลง type อัตโนมัติ (<span class="mono text-[12px]">"123"→123</span>, <span class="mono text-[12px]">"true"→true</span>) · strip property แปลกปลอม (whitelist) · รองรับ nested validation และ array filter syntax <span class="mono text-[12px]">filter[]=field||$eq||value</span></p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">FEATURES · @ValidatedQuery</div><p class="text-[13.5px]">แปลง type อัตโนมัติ (<span class="mono text-[12px]">"123"→123</span>, <span class="mono text-[12px]">"true"→true</span>) · strip property แปลกปลอม (whitelist) · รองรับ nested validation และ filter syntax <span class="mono text-[12px]">filter=field||$eq||value</span> (ส่งซ้ำได้หลายค่าเพื่อ AND — <em>ไม่ใช่</em> <span class="mono text-[12px]">filter[]=...</span> ซึ่งจะโดนปฏิเสธด้วย 400002) · เงื่อนไข OR ใช้ <span class="mono text-[12px]">or=field||$eq||value</span> รูปแบบเดียวกัน</p></div>
         <div class="eyebrow text-[var(--muted)] mb-3">Manual throw · custom validation (query)</div>
         <div class="code p-5">
 <pre><span class="k">import</span> { <span class="t">InvalidParameterException</span> } <span class="k">from</span> <span class="s">'@lib/common/utils/http-exception/invalid-parameter.exception'</span>;

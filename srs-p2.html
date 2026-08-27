@@ -533,8 +533,8 @@ item_prices: [
               <span class="text-[14px] font-semibold">Manufacturing — เทียบราคาวัตถุดิบก่อนออก PO</span>
             </div>
             <p class="text-[13px] mb-3" style="color:var(--ink-soft)">ฝ่ายจัดซื้อต้องเห็นราคาวัตถุดิบจากผู้จัดซื้อทุกรายพร้อมกันก่อนตัดสินใจ — <span class="mono text-[12px]">item_suppliers.is_default</span> ใช้ auto-fill ตอนเปิด PO ใหม่ แต่ยังเลือกรายอื่นแทนได้เสมอ</p>
-            <pre class="code p-4">GET /item-prices?filter[]=product_id||$eq||{เม็ดพลาสติก-PP-id}
-    &amp;filter[]=price_list_id||$eq||{Standard-Buying-id}
+            <pre class="code p-4">GET /item-prices?filter=product_id||$eq||{เม็ดพลาสติก-PP-id}
+    &amp;filter=price_list_id||$eq||{Standard-Buying-id}
 
 <span class="c">// → คืนราคาจากทุกซัพพลายเออร์ที่เคยตั้งไว้ ให้ฝ่ายจัดซื้อเทียบในหน้าเดียว
 // เลือกเจ้าที่ default (is_default=true) เป็นค่าเริ่มต้นในฟอร์ม PO
@@ -781,7 +781,7 @@ item_prices: [
               <tbody>
                 <tr><td><span class="mono text-[12px]">POST /barcodes</span></td><td><span class="mono text-[12px]">barcode:create</span></td><td>สร้าง 1 ใบ — <span class="mono text-[12px]">generation_strategy</span> ตัดสินว่าต้องส่ง <span class="mono text-[12px]">barcode</span> มาเองหรือให้ระบบสร้าง</td></tr>
                 <tr><td><span class="mono text-[12px]">POST /products/{id}/variant-barcodes</span></td><td><span class="mono text-[12px]">product:update</span></td><td>สร้างป้ายหลักให้ <b>ทุก variant</b> ของ template ในครั้งเดียว (ต่อจาก <span class="mono text-[12px]">generate-variants</span>) — <b>idempotent</b>: variant ที่มี primary แล้วให้ข้าม ไม่สร้างซ้ำ · endpoint นี้ประกาศอยู่ใน module <span class="mono text-[12px]">barcode/</span> ไม่ใช่ <span class="mono text-[12px]">product/</span> (ดู &ldquo;Cross-module dependency&rdquo; ด้านล่าง)</td></tr>
-                <tr><td><span class="mono text-[12px]">GET /barcodes</span> &middot; <span class="mono text-[12px]">GET /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:view</span></td><td>paginate + <span class="mono text-[12px]">@ValidatedQuery</span> · กรองด้วย <span class="mono text-[12px]">filter[]=product_id||$eq||&lt;uuid&gt;</span>, <span class="mono text-[12px]">target_type</span>, <span class="mono text-[12px]">is_active</span></td></tr>
+                <tr><td><span class="mono text-[12px]">GET /barcodes</span> &middot; <span class="mono text-[12px]">GET /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:view</span></td><td>paginate + <span class="mono text-[12px]">@ValidatedQuery</span> · กรองด้วย <span class="mono text-[12px]">filter=product_id||$eq||&lt;uuid&gt;</span>, <span class="mono text-[12px]">target_type</span>, <span class="mono text-[12px]">is_active</span></td></tr>
                 <tr><td><span class="mono text-[12px]">PUT /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:update</span></td><td>แก้ได้เฉพาะ <span class="mono text-[12px]">is_primary</span> / <span class="mono text-[12px]">is_active</span></td></tr>
                 <tr><td><span class="mono text-[12px]">DELETE /barcodes/{id}</span></td><td><span class="mono text-[12px]">barcode:update</span></td><td>soft delete — ค่าเดิมกลับมาสร้างใหม่ได้เพราะ unique เป็น partial (delete ใช้ permission เดียวกับ update ตามธรรมเนียมทั้ง inventory-bc)</td></tr>
               </tbody>

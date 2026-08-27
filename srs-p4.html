@@ -781,7 +781,7 @@ sequenceDiagram
 curl -X POST http://localhost:3005/sales-bc/v1/delivery-notes/&lt;dn_id&gt;/submit \
   -H <span class="s">"Authorization: Bearer $TOKEN"</span>
 <span class="c"># -> 200, status=SUBMITTED — สต็อกถูกตัดจริงที่ inventory-bc แล้ว</span>
-<span class="c">#    ตรวจต่อได้ที่ GET /inventory-bc/v1/stock-movements?filter[]=source_doc_id||$eq||&lt;dn_item_id&gt;</span></pre>
+<span class="c">#    ตรวจต่อได้ที่ GET /inventory-bc/v1/stock-movements?filter=source_doc_id||$eq||&lt;dn_item_id&gt;</span></pre>
           </div>
 
           <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>Edge case ที่ต้องทดสอบครบ</b> — สร้างใบส่งของกับ SO ที่ยังเป็น DRAFT/CLOSED/CANCELLED → 400 · <span class="mono text-[12px]">qty</span> เกินจำนวนที่เหลือของบรรทัด → 409 · <span class="mono text-[12px]">so_item_id</span> ซ้ำในใบเดียว หรือไม่มีจริงบน SO นั้น → 400 · คลังไม่ใช่ stock leaf → 400 · submit ใบที่สต็อกไม่พอในคลังนั้น (แม้ SO ผ่าน check ตอน confirm เพราะเช็ครวมทุกคลัง) → 503 พร้อมข้อความ ไม่มีอะไรถูกบันทึก · submit ซ้ำ (ไม่ใช่ DRAFT) → 409 · cancel ใบที่ CANCELLED แล้ว → 409 · UUID param ผิดรูปแบบ → 400002</p></div>
