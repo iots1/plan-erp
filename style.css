@@ -276,12 +276,12 @@ table.d tr:last-child td{ border-bottom:none; }
 
 /* ===== Gantt ===== */
 .gantt-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:14px; background:var(--surface); }
-.gantt{ min-width:940px; }
-.gantt-head{ display:grid; grid-template-columns:290px 1fr; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--surface); z-index:3; }
+.gantt{ min-width:1032px; }
+.gantt-head{ display:grid; grid-template-columns:290px 46px 46px 1fr; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--surface); z-index:3; }
 .gantt-head .corner{ padding:10px 14px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); border-right:1px solid var(--line); }
 .gantt-months{ display:grid; grid-template-columns:repeat(6,1fr); }
 .gantt-months span{ padding:10px 8px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); border-left:1px solid var(--line-soft); text-align:center; }
-.phase-head-row{ display:grid; grid-template-columns:290px 1fr; background:var(--line-soft); border-bottom:1px solid var(--line); cursor:pointer; user-select:none; }
+.phase-head-row{ display:grid; grid-template-columns:290px 46px 46px 1fr; background:var(--line-soft); border-bottom:1px solid var(--line); cursor:pointer; user-select:none; }
 .phase-head-row:hover{ background:var(--line); }
 .phase-head-row .p{ padding:8px 14px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.04em; font-weight:600; color:var(--ink); display:flex; align-items:center; gap:8px; }
 .phase-head-row .p::before{ content:'▾'; font-size:9px; color:var(--muted); display:inline-block; width:10px; transition:transform .15s ease; }
@@ -291,8 +291,28 @@ table.d tr:last-child td{ border-bottom:none; }
 .gbtn{ font-family:'IBM Plex Mono',monospace; font-size:11px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); cursor:pointer; }
 .gbtn:hover{ background:#F1F5FA; color:var(--ink); }
 .phase-head-row .ph-hours{ padding:8px 12px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:10px; }
-.gantt-row{ display:grid; grid-template-columns:290px 1fr; border-bottom:1px solid var(--line-soft); }
+.gantt-row{ display:grid; grid-template-columns:290px 46px 46px 1fr; border-bottom:1px solid var(--line-soft); }
 .gantt-row:hover{ background:var(--line-soft); }
+/* implementation-status cells — the BE/FE columns sitting between
+   .gantt-label and .gantt-track. Colour carries the status (green = done,
+   orange = partial), the glyph repeats it so it survives greyscale print and
+   colour-blind viewing. */
+.gantt-st{ display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:700; line-height:1; border-right:1px solid var(--line); cursor:help; }
+.gantt-st.st-done{ background:rgba(22,163,74,.16); color:#15803D; }
+.gantt-st.st-part{ background:rgba(220,90,22,.18); color:#B4460F; }
+.gantt-st.st-none{ background:rgba(100,116,139,.12); color:#5A6B80; }
+.gantt-st.st-wait{ background:repeating-linear-gradient(45deg, rgba(100,116,139,.09) 0 4px, transparent 4px 8px); color:#8494A8; }
+.gantt-st.st-na{ color:var(--muted); opacity:.35; }
+/* Dark theme: the light-mode fills are tinted *and* the glyph colour is a deep
+   ink that disappears against them once the page background inverts — lift
+   both so the column stays readable at a glance. */
+:root[data-theme="dark"] .gantt-st.st-done{ background:rgba(34,197,94,.18); color:#4ADE80; }
+:root[data-theme="dark"] .gantt-st.st-part{ background:rgba(251,146,60,.20); color:#FB923C; }
+:root[data-theme="dark"] .gantt-st.st-none{ background:rgba(148,163,184,.14); color:#A5B2C4; }
+:root[data-theme="dark"] .gantt-st.st-wait{ color:#94A3B8; }
+/* The phase header repeats the fraction (2/5) rather than a glyph, so it needs
+   to fit 46px — smaller than the per-task cell. */
+.phase-head-row .gantt-st{ font-size:10.5px; font-weight:600; }
 .gantt-label{ padding:8px 14px; font-size:12.5px; display:flex; align-items:center; justify-content:space-between; gap:8px; border-right:1px solid var(--line); }
 .gantt-track{ position:relative; min-height:36px; background-image:repeating-linear-gradient(90deg, transparent, transparent calc(100%/24 - 1px), var(--line-soft) calc(100%/24 - 1px), var(--line-soft) calc(100%/24)); }
 .gbar{ position:absolute; top:8px; height:20px; border-radius:5px; display:flex; align-items:center; padding:0 7px; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#fff; white-space:nowrap; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.12); }
