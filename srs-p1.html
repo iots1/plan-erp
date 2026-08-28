@@ -95,7 +95,7 @@
 
           <div class="edge mt-4" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)">
             <div class="tag mb-1" style="color:#2563EB">iam Admin Console · ระบบแยกต่างหากสำหรับ Security Admin/Superadmin เท่านั้น</div>
-            <p class="text-[13px]">นอกจาก JSON:API ที่ client อื่นเรียก <span class="mono text-[12px]">iam-bc</span> ยังเสิร์ฟเว็บแอดมิน NestJS-rendered EJS (ไม่มี SPA framework) แยกต่างหากที่ <span class="mono text-[12px]">/iam/v1/views/*</span> — เจาะจงให้ <b>Security Admin</b> ใช้จัดการแกนความปลอดภัยล้วน ๆ ไม่ได้มีไว้ให้ End User ทั่วไปเข้า: <span class="mono text-[12px]">dashboard · users · roles · policies · permissions · permission-sync-logs · access-keys · sessions · audit-logs · print-templates · document-types · system-setting</span> (รายละเอียด route/permission แต่ละหน้าดู §08) — โครงสร้างนี้เป็น reference implementation ให้ BC อื่นทำ admin UI ของตัวเองตามได้ ไม่ใช่จุดเดียวที่ทุกบริการต้องพึ่ง</p>
+            <p class="text-[13px]">นอกจาก JSON:API ที่ client อื่นเรียก <span class="mono text-[12px]">iam-bc</span> ยังเสิร์ฟเว็บแอดมิน NestJS-rendered EJS (ไม่มี SPA framework) แยกต่างหากที่ <span class="mono text-[12px]">/iam/v1/views/*</span> — เจาะจงให้ <b>Security Admin</b> ใช้จัดการแกนความปลอดภัยล้วน ๆ ไม่ได้มีไว้ให้ End User ทั่วไปเข้า: <span class="mono text-[12px]">dashboard · users · roles · policies · permissions · permission-sync-logs · access-keys · sessions · audit-logs · print-templates · document-types · uoms · warehouses · system-setting</span> (รายละเอียด route/permission แต่ละหน้าดู §08) — โครงสร้างนี้เป็น reference implementation ให้ BC อื่นทำ admin UI ของตัวเองตามได้ ไม่ใช่จุดเดียวที่ทุกบริการต้องพึ่ง</p>
           </div>
         </div>
 
@@ -108,9 +108,9 @@
             <div class="mono text-[11px] mb-4" style="color:#2563EB">การไล่สิทธิ์ (Resolution chain)</div>
             <div class="flex flex-wrap items-center gap-x-2 gap-y-3 text-[12.5px] mono">
               <span class="pchip" style="background:rgba(37,99,235,.1);color:#2563EB;border:1px solid rgba(37,99,235,.28)">User</span>
-              <span style="color:var(--muted)">─ user_roles →</span>
+              <span style="color:var(--muted)">─ users_roles →</span>
               <span class="pchip" style="background:rgba(37,99,235,.1);color:#2563EB;border:1px solid rgba(37,99,235,.28)">Role</span>
-              <span style="color:var(--muted)">─ role_policies →</span>
+              <span style="color:var(--muted)">─ roles_policies →</span>
               <span class="pchip" style="background:rgba(37,99,235,.1);color:#2563EB;border:1px solid rgba(37,99,235,.28)">Policy</span>
               <span style="color:var(--muted)">→</span>
               <span class="pchip" style="background:rgba(124,58,237,.1);color:#7C3AED;border:1px solid rgba(124,58,237,.28)">Statement[]</span>
@@ -172,7 +172,7 @@
                 <tr><td>description</td><td><span style="color:var(--muted)">–</span></td><td>คำอธิบาย</td></tr>
               </tbody>
             </table>
-            <div class="edge mt-4" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)"><div class="tag mb-1" style="color:#2563EB">เชื่อม</div><p class="text-[13px]"><span class="mono text-[12px]">user_roles</span> (user↔role) · <span class="mono text-[12px]">role_policies</span> (role↔policy) — ผู้ใช้ 1 คนมีได้หลาย role</p></div>
+            <div class="edge mt-4" style="background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.22)"><div class="tag mb-1" style="color:#2563EB">เชื่อม</div><p class="text-[13px]"><span class="mono text-[12px]">users_roles</span> (user↔role) · <span class="mono text-[12px]">roles_policies</span> (role↔policy) — ผู้ใช้ 1 คนมีได้หลาย role</p></div>
           </div>
 
           <div class="card p-6 mb-5" style="border-left:3px solid #2563EB">
@@ -420,15 +420,48 @@ erDiagram
         string permission_name_th
         string permission_name_en
     }
-    USER_ROLES {
-        uuid id PK
-        uuid user_id FK
-        uuid role_id FK
+    USERS_ROLES {
+        uuid user_id PK_FK
+        uuid role_id PK_FK
     }
-    ROLE_POLICIES {
+    ROLES_POLICIES {
+        uuid role_id PK_FK
+        uuid policy_id PK_FK
+    }
+    ACCESS_KEYS {
         uuid id PK
-        uuid role_id FK
-        uuid policy_id FK
+        string name
+        string key_id UK
+        string secret_hash
+        boolean is_active
+        timestamp expires_at
+        timestamp last_used_at
+    }
+    ACCESS_KEYS_POLICIES {
+        uuid access_key_id PK_FK
+        uuid policy_id PK_FK
+    }
+    PERMISSION_SYNC_LOGS {
+        uuid id PK
+        string service
+        int created_count
+        int updated_count
+        int deleted_count
+        timestamp synced_at
+    }
+    USER_ROLE_AUDIT_LOGS {
+        uuid id PK
+        uuid user_id
+        uuid role_id
+        string action "attach_detach"
+        uuid actor_id "ref users"
+    }
+    ROLE_POLICY_AUDIT_LOGS {
+        uuid id PK
+        uuid role_id
+        uuid policy_id
+        string action "attach_detach"
+        uuid actor_id "ref users"
     }
     CREDENTIALS {
         uuid id PK
@@ -451,10 +484,14 @@ erDiagram
         string reason
         timestamp blocked_until
     }
-    USERS ||--o{ USER_ROLES : has
-    ROLES ||--o{ USER_ROLES : "assigned to"
-    ROLES ||--o{ ROLE_POLICIES : attaches
-    POLICIES ||--o{ ROLE_POLICIES : "attached to"
+    USERS ||--o{ USERS_ROLES : has
+    ROLES ||--o{ USERS_ROLES : "assigned to"
+    ROLES ||--o{ ROLES_POLICIES : attaches
+    POLICIES ||--o{ ROLES_POLICIES : "attached to"
+    ACCESS_KEYS ||--o{ ACCESS_KEYS_POLICIES : carries
+    POLICIES ||--o{ ACCESS_KEYS_POLICIES : "granted to"
+    USERS ||--o{ USER_ROLE_AUDIT_LOGS : "role changes logged in"
+    ROLES ||--o{ ROLE_POLICY_AUDIT_LOGS : "policy changes logged in"
     POLICIES ||--o{ POLICY_STATEMENTS : contains
     POLICY_STATEMENTS ||--o{ STATEMENT_TARGETS : on
     POLICY_STATEMENTS ||--o{ STATEMENT_ACTIONS : allows
@@ -512,8 +549,14 @@ erDiagram
                 <tr><td>บทบาท (Roles)</td><td><span class="mono text-[12px]">/views/roles</span></td><td><span class="mono text-[12px]">page:view_roles</span></td><td><span class="mono text-[12px]">role:create</span> <span class="text-[11px]" style="color:var(--muted)">(ปุ่มสร้าง/แก้ไข role — ใช้ api-plane permission ตัวเดียวกับที่ Guard ฝั่ง backend ตรวจ ไม่ได้แยก component:* ใหม่)</span></td></tr>
                 <tr><td>นโยบายความปลอดภัย (Policies)</td><td><span class="mono text-[12px]">/views/policies</span></td><td><span class="mono text-[12px]">page:view_policies</span></td><td><span class="mono text-[12px]">policy:create</span> <span class="text-[11px]" style="color:var(--muted)">(เช่นเดียวกับ roles — reuse api-plane permission)</span></td></tr>
                 <tr><td>จัดการสิทธิ์ (Permissions)</td><td><span class="mono text-[12px]">/views/permissions</span></td><td><span class="mono text-[12px]">page:view_permissions</span></td><td><span class="mono text-[12px]">permission:create</span> · <span class="mono text-[12px]">permission:update</span> · <span class="mono text-[12px]">permission:delete</span> <span class="text-[11px]" style="color:var(--muted)">(ดูรายละเอียด CRUD guard ที่ §09)</span></td></tr>
+                <tr><td>ประวัติการซิงค์สิทธิ์ (Permission Sync Logs)</td><td><span class="mono text-[12px]">/views/permission-sync-logs</span></td><td><span class="mono text-[12px]">page:view_permission_sync_logs</span></td><td><span class="mono text-[12px]">permission_sync:read</span> <span class="text-[11px]" style="color:var(--muted)">(ปุ่ม "Sync Permissions" ที่ยิง POST /permission-syncs อยู่บนหน้า Permissions และใช้ permission_sync:create)</span></td></tr>
                 <tr><td>ประวัติการเข้าใช้งาน (Login History)</td><td><span class="mono text-[12px]">/views/audit-logs</span></td><td><span class="mono text-[12px]">page:view_audit</span></td><td>— (read-only, ไม่มี component gate ย่อย)</td></tr>
                 <tr><td>ผู้ใช้งานที่ออนไลน์ (Active Sessions)</td><td><span class="mono text-[12px]">/views/sessions</span></td><td><span class="mono text-[12px]">page:view_sessions</span></td><td><span class="mono text-[12px]">session:revoke</span> <span class="text-[11px]" style="color:var(--muted)">(ปุ่ม Revoke ต่อแถว — ซ่อนถ้าไม่มีสิทธิ์นี้, ตรวจซ้ำที่ backend เสมอ)</span></td></tr>
+                <tr><td>Access Keys (เครื่อง/ระบบภายนอก)</td><td><span class="mono text-[12px]">/views/access-keys</span> · <span class="mono text-[12px]">/views/access-keys/new</span> · <span class="mono text-[12px]">/views/access-keys/:id/edit</span></td><td><span class="mono text-[12px]">page:view_access_keys</span></td><td><span class="mono text-[12px]">access_key:create</span> <span class="text-[11px]" style="color:var(--muted)">(ปุ่มสร้าง — reuse api-plane permission · dialog "เผย secret ครั้งเดียว" ไม่มี gate แยก)</span></td></tr>
+                <tr><td>เทมเพลตพิมพ์เอกสาร (Print Templates)</td><td><span class="mono text-[12px]">/views/print-templates</span> · <span class="mono text-[12px]">/views/print-templates/new</span> · <span class="mono text-[12px]">/views/print-templates/:id/edit</span></td><td><span class="mono text-[12px]">page:view_print_templates</span></td><td><span class="mono text-[12px]">report:print_template_create</span> · <span class="mono text-[12px]">report:print_template_history_read</span></td></tr>
+                <tr><td>ประเภทเอกสาร (Document Types)</td><td><span class="mono text-[12px]">/views/document-types</span> · <span class="mono text-[12px]">/views/document-types/new</span> · <span class="mono text-[12px]">/views/document-types/:id/edit</span></td><td><span class="mono text-[12px]">page:view_document_types</span></td><td><span class="mono text-[12px]">report:document_type_create</span></td></tr>
+                <tr><td>หน่วยนับ (UOM)</td><td><span class="mono text-[12px]">/views/uoms</span> · <span class="mono text-[12px]">/views/uoms/new</span> · <span class="mono text-[12px]">/views/uoms/:id/edit</span></td><td><span class="mono text-[12px]">page:view_uoms</span></td><td><span class="mono text-[12px]">uom:create</span></td></tr>
+                <tr><td>คลังสินค้า (Warehouses)</td><td><span class="mono text-[12px]">/views/warehouses</span> · <span class="mono text-[12px]">/views/warehouses/new</span> · <span class="mono text-[12px]">/views/warehouses/:id/edit</span></td><td><span class="mono text-[12px]">page:view_warehouses</span></td><td><span class="mono text-[12px]">warehouse:create</span></td></tr>
                 <tr><td>ตั้งค่าระบบ</td><td><span class="mono text-[12px]">/views/system-setting</span></td><td><span class="mono text-[12px]">page:view_settings</span></td><td>— (ยังไม่มี component — placeholder รอ API)</td></tr>
               </tbody>
             </table>
@@ -665,8 +708,8 @@ erDiagram
               <thead><tr><th style="width:230px">Mutation จริง</th><th style="width:170px">Sync method</th><th>ผู้ใช้ที่ได้รับผลกระทบ</th></tr></thead>
               <tbody>
                 <tr><td><span class="mono text-[12px]">UsersService.assignRoles()</span></td><td><span class="mono text-[12px]">syncUser(user_id)</span></td><td>1 คน — user ที่ถูกเปลี่ยน role</td></tr>
-                <tr><td><span class="mono text-[12px]">RolesService.attachPolicies()</span></td><td><span class="mono text-[12px]">syncUsersByRole(role_id)</span></td><td>ทุกคนที่ถือ role นั้น (<span class="mono text-[12px]">user_roles</span> where role_id)</td></tr>
-                <tr><td><span class="mono text-[12px]">PoliciesService.setStatements()</span></td><td><span class="mono text-[12px]">syncUsersByPolicy(policy_id)</span></td><td>ทุกคนที่เชื่อมถึง policy ผ่าน <span class="mono text-[12px]">role_policies → user_roles</span></td></tr>
+                <tr><td><span class="mono text-[12px]">RolesService.attachPolicies()</span></td><td><span class="mono text-[12px]">syncUsersByRole(role_id)</span></td><td>ทุกคนที่ถือ role นั้น (<span class="mono text-[12px]">users_roles</span> where role_id)</td></tr>
+                <tr><td><span class="mono text-[12px]">PoliciesService.setStatements()</span></td><td><span class="mono text-[12px]">syncUsersByPolicy(policy_id)</span></td><td>ทุกคนที่เชื่อมถึง policy ผ่าน <span class="mono text-[12px]">roles_policies → users_roles</span></td></tr>
               </tbody>
             </table>
           </div>
@@ -714,7 +757,7 @@ sequenceDiagram
             <div class="card p-5">
               <div class="mono text-[11px] mb-3" style="color:#2563EB">CASE C · แก้ policy กระทบทีเดียวหลายคน</div>
               <div class="step"><span class="sn">1</span><p class="text-[13px]">Security Admin แก้ <span class="mono text-[12px]">policy_statements</span> ของ <span class="mono text-[12px]">POL_WAREHOUSE_GOODS_RECEIPT</span> — ถอด <span class="mono text-[12px]">goods_receipt:submit</span> ออก</p></div>
-              <div class="step"><span class="sn">2</span><p class="text-[13px]"><span class="mono text-[12px]">syncUsersByPolicy()</span> ไล่จาก <span class="mono text-[12px]">role_policies → user_roles</span> หาทุกคนที่ role เชื่อมถึง policy นี้ — ไม่ใช่แค่ 1 คน</p></div>
+              <div class="step"><span class="sn">2</span><p class="text-[13px]"><span class="mono text-[12px]">syncUsersByPolicy()</span> ไล่จาก <span class="mono text-[12px]">roles_policies → users_roles</span> หาทุกคนที่ role เชื่อมถึง policy นี้ — ไม่ใช่แค่ 1 คน</p></div>
               <div class="step"><span class="sn">3</span><p class="text-[13px]">พนักงานคลังสินค้าทุกคนที่ถือ role นั้น หมดสิทธิ์กด "ยืนยันรับสินค้า" พร้อมกันในคำขอเดียวจาก Admin โดยไม่ต้อง logout ใครเลย</p></div>
             </div>
           </div>

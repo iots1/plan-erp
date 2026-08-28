@@ -33,6 +33,11 @@
       <a href="#errors"     class="navlink"><span class="n">06</span> Error Handling</a>
       <a href="#query"      class="navlink"><span class="n">07</span> Query Params</a>
       <a href="#microservice" class="navlink"><span class="n">08</span> Microservice Calls</a>
+      <a href="#controllers" class="navlink"><span class="n">09</span> Controller Types</a>
+      <a href="#entities"    class="navlink"><span class="n">10</span> Entity &amp; Columns</a>
+      <a href="#boundaries"  class="navlink"><span class="n">11</span> Module Boundaries</a>
+      <a href="#guards"      class="navlink"><span class="n">12</span> Params &amp; Permissions</a>
+      <a href="#migrations"  class="navlink"><span class="n">13</span> Migrations &amp; Seed</a>
     </nav>
     <div slot="footnote">
       <a href="i18n-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ i18n Guide (TH/EN)</a><br>
@@ -485,10 +490,95 @@ microserviceInstance.useGlobalInterceptors(
         <p class="text-[12.5px] mb-2" style="color:var(--muted)">ทั้งสอง gotcha นี้กระทบทุก cross-BC lookup ในระบบเท่ากัน (ไม่ใช่แค่ endpoint ใดหนึ่ง) — ก่อนหน้านี้ <span class="mono text-[13px]">assertValidSupplier</span>/<span class="mono text-[13px]">assertValidProductLine</span> ทุกจุดจะรายงาน "service unavailable" แทน "not found" เสมอเมื่อ reference ไม่มีอยู่จริง หลังแก้ทั้งสองจุด (2026-08) พฤติกรรมถูกต้องทั่วทั้งแพลตฟอร์ม — ตรวจสอบด้วยการยิง RMQ ตรง ๆ ไปยัง handler ก่อน/หลังแก้ ดูตัวอย่างการ probe ใน commit message ของ M1 (Purchase Order)</p>
       </section>
 
+
+      <!-- ========== 09 CONTROLLER TYPES ========== -->
+      <section id="controllers" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — Controller Types</div>
+        <h2 class="display text-3xl mb-6">Controller 3 ชนิด · suffix ต้องบอกว่าใครเรียก</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          controller ของ BC แยกตาม<b>ผู้เรียก</b> ไม่ใช่ตามโดเมน — ชื่อคลาสต้องบอกได้ทันทีว่าไฟล์นี้รับ traffic จากทางไหน
+          และ<b>ห้ามปน HTTP route กับ <span class="mono text-[13px]">@MessagePattern</span> ในคลาสเดียวกัน</b>
+          เพื่อให้กติกา ack ของ RMQ (§08) มีผลกับทั้งไฟล์ ไม่ใช่กับบาง method
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th style="width:230px">Suffix</th><th style="width:180px">Transport / trigger</th><th>Decorator ที่ต้องมี</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">&lt;Resource&gt;Controller</span></td><td>HTTP (REST)</td><td><span class="mono text-[12px]">@Controller('path')</span> + <span class="mono text-[12px]">@ResourceType()</span> + <span class="mono text-[12px]">@RequirePermission()</span> ทุก endpoint</td></tr>
+              <tr><td><span class="mono text-[12px]">&lt;Resource&gt;EventsController</span></td><td>RMQ/TCP ข้าม BC</td><td><span class="mono text-[12px]">@Controller()</span> (ไม่มี path) + <span class="mono text-[12px]">@MessagePattern</span>/<span class="mono text-[12px]">@EventPattern</span> + <b><span class="mono text-[12px]">@UseInterceptors(RmqAckInterceptor)</span></b></td></tr>
+              <tr><td><span class="mono text-[12px]">&lt;Resource&gt;JobsController</span></td><td>งานตามเวลา/คิว</td><td><span class="mono text-[12px]">@Cron</span> หรือ queue processor · ไม่มี HTTP route</td></tr>
+              <tr><td><span class="mono text-[12px]">&lt;Page&gt;ViewController</span></td><td>HTTP (หน้า EJS)</td><td>เป็น controller ชนิด HTTP · render view ของ admin console</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox"><div class="rc mb-1">ชื่อไฟล์ตามชื่อคลาสเสมอ</div><p class="text-[13.5px]"><span class="mono text-[12px]">suppliers.controller.ts</span> · <span class="mono text-[12px]">supplier-events.controller.ts</span> · <span class="mono text-[12px]">supplier-jobs.controller.ts</span> — controller ของ sub-route ที่ผูกกับ resource อื่น (เช่น <span class="mono text-[12px]">POST /products/{id}/bundle-items</span>) ให้อยู่ใน module ของ<b>ลูก</b> แล้วประกาศ <span class="mono text-[12px]">@Controller('products')</span> เอง — ไม่ต้องให้ <span class="mono text-[12px]">ProductModule</span> import module ลูกกลับมา (ดู §11)</p></div>
+      </section>
+
+      <!-- ========== 10 ENTITY & COLUMN RULES ========== -->
+      <section id="entities" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — Entity &amp; Column Rules</div>
+        <h2 class="display text-3xl mb-6">Entity · คอลัมน์ · คลาสฐานร่วม</h2>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · comment ของคอลัมน์ต้องบอกชื่อตารางต้นทางเสมอ</div><p class="text-[13.5px]">FK ใน BC เดียวกัน: <span class="mono text-[12px]">อ้างอิง &lt;table&gt;.id (ตารางเดียวกัน มี FK constraint) / References &lt;table&gt;.id</span> · uuid ข้าม BC (ไม่มี FK จริง): <span class="mono text-[12px]">อ้างอิง &lt;table&gt;.id ใน &lt;bc&gt; (คนละ database ไม่มี FK constraint จริง)</span> · ค่าที่ copy/denormalize มา: <span class="mono text-[12px]">คัดลอกจาก &lt;table&gt;.&lt;column&gt; ณ เวลา…</span> — <b>ชื่อ property ไม่ต้องมี <span class="mono text-[12px]">_snapshot</span> ต่อท้าย</b> comment คือสิ่งที่บันทึกความหมายนี้</p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · วัน/เวลาเป็น timestamptz เท่านั้น ห้าม date/time</div><p class="text-[13.5px]">แม้ค่าที่ "รู้สึกเหมือน" วันที่ล้วน (<span class="mono text-[12px]">document_date</span>, <span class="mono text-[12px]">valid_until</span>, <span class="mono text-[12px]">effective_from</span>, <span class="mono text-[12px]">expiry_date</span>) ก็เป็น <span class="mono text-[12px]">timestamptz</span> / <span class="mono text-[12px]">Date | null</span> — เพราะ <span class="mono text-[12px]">date</span> ทิ้ง offset ของ client ทำให้ backend ต้อง<b>เดา</b>ว่าหมายถึงโซนเวลาไหน · DTO ใช้ <span class="mono text-[12px]">@IsISO8601()</span> ของโปรเจกต์เอง (<b>ไม่ใช่</b> <span class="mono text-[12px]">@IsDateString()</span> ซึ่งรับ <span class="mono text-[12px]">YYYY-MM-DD</span> เปล่า ๆ ผ่าน) · service แปลงด้วย <span class="mono text-[12px]">parseInstant()</span> · การอ่านเป็น "วันตามปฏิทิน" ต้องผ่าน <span class="mono text-[12px]">toBusinessDate()</span>/<span class="mono text-[12px]">businessYearOf()</span>/<span class="mono text-[12px]">todayBusinessDate()</span> ที่ปักหมุด <span class="mono text-[12px]">Asia/Bangkok</span> เสมอ — <span class="mono text-[12px]">.toISOString()</span>/<span class="mono text-[12px]">getFullYear()</span>/<span class="mono text-[12px]">::date</span> ดิบ ๆ ให้วันผิดทุกครั้งที่เหตุการณ์เกิดหลัง 17:00 น. ไทย</p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · คอลัมน์เงินเป็น numeric(18,4) และปัดด้วย roundMoney() เท่านั้น</div><p class="text-[13.5px]"><span class="mono text-[12px]">sub_total</span> · <span class="mono text-[12px]">total_discount</span> · <span class="mono text-[12px]">total</span> · <span class="mono text-[12px]">line_total</span> · <span class="mono text-[12px]">unit_cost</span>/<span class="mono text-[12px]">unit_price</span> · <span class="mono text-[12px]">discount_value</span> — <span class="mono text-[12px]">roundMoney()</span> ใช้ทศนิยม 4 ตำแหน่งตรงกับ scale ของคอลัมน์ เปลี่ยนอย่างใดอย่างหนึ่งโดยไม่เปลี่ยนอีกอย่าง = ตัดเลขทิ้งเงียบ ๆ</p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · CHECK constraint ต้องประกาศบน entity ด้วย @Check()</div><p class="text-[13.5px]">CHECK ที่เขียนไว้ใน migration อย่างเดียวจะถูก <span class="mono text-[12px]">migration:generate</span> รอบถัดไปสั่ง <b>DROP ทิ้งเงียบ ๆ</b> เพราะ TypeORM เทียบ constraint จาก metadata ของ entity เท่านั้น</p></div>
+
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-4 mt-8 leading-[1.85]">
+          <b>คลาสฐานร่วมใน <span class="mono text-[13px]">@lib/common/abstracts/</span></b> — เอกสารที่ submit ได้ทุกใบมีรูปทรงเดียวกัน (หัวเอกสาร + บรรทัด) ส่วนที่<b>เหมือนกันแบบ byte-for-byte</b> เท่านั้นที่ขึ้นไปอยู่บนคลาสฐาน:
+        </p>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:270px">คลาส</th><th>ให้อะไร</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">SubmittableDocumentEntity</span></td><td><span class="mono text-[12px]">remark_th/en</span> · <span class="mono text-[12px]">sent_by/at</span> · <span class="mono text-[12px]">approved_by/at</span> · <span class="mono text-[12px]">cancelled_by/at</span> · <span class="mono text-[12px]">cancel_reason</span> · <span class="mono text-[12px]">is_vat_included</span></td></tr>
+              <tr><td><span class="mono text-[12px]">DocumentLineItemEntity</span></td><td><span class="mono text-[12px]">product_id</span> (ข้าม BC → inventory) · <span class="mono text-[12px]">qty</span> · <span class="mono text-[12px]">line_total</span></td></tr>
+              <tr><td><span class="mono text-[12px]">DocumentNumberCounterEntity</span></td><td><span class="mono text-[12px]">year</span> · <span class="mono text-[12px]">last_number</span> + สัญญาการ lock ด้วย <span class="mono text-[12px]">SELECT … FOR UPDATE</span> · subclass ใส่แค่ <span class="mono text-[12px]">@Entity()</span> + <span class="mono text-[12px]">@Unique('uq_&lt;table&gt;_year', ['year'])</span> ของตัวเอง — <b>หนึ่งตารางต่อ BC เสมอ ห้ามมีตารางตัวนับกลาง</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[12.5px] mb-6" style="color:var(--muted)"><b>ตั้งใจไม่แชร์:</b> <span class="mono text-[12px]">status</span> (แต่ละโดเมนมี enum ของตัวเอง) · เลขที่เอกสาร · reference ของคู่ค้า (<span class="mono text-[12px]">supplier_id</span>/<span class="mono text-[12px]">customer_id</span>) · ฟิลด์เงินเฉพาะโดเมน (<span class="mono text-[12px]">unit_cost</span> vs <span class="mono text-[12px]">unit_price</span>, <span class="mono text-[12px]">received_qty</span>)</p>
+
+        <div class="rulebox"><div class="rc mb-1">RULE · interface ภายในต้องมีไฟล์ของตัวเอง</div><p class="text-[13.5px]">ห้ามประกาศ <span class="mono text-[12px]">interface</span> ไว้ในไฟล์เดียวกับ service/controller ที่ใช้ แม้จะใช้ที่เดียว — วางที่ <span class="mono text-[12px]">&lt;module&gt;/interfaces/&lt;kebab-name&gt;.interface.ts</span> และ export ชื่อขึ้นต้นด้วย <span class="mono text-[12px]">I</span> (<span class="mono text-[12px]">IUserSession</span>, <span class="mono text-[12px]">IResponsePaginatedService</span>) · ใช้กับทั้ง interface ที่ export ออกไปและที่ใช้ภายใน module เท่านั้น</p></div>
+      </section>
+
+      <!-- ========== 11 MODULE BOUNDARIES ========== -->
+      <section id="boundaries" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">11 — Module Boundaries</div>
+        <h2 class="display text-3xl mb-6">ขอบเขต Module · เข้าถึงข้อมูลข้าม module</h2>
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · inject service เจ้าของ ไม่ใช่ repository ของมัน</div><p class="text-[13.5px]">service ที่ต้องอ่าน/ตรวจ entity ของ module อื่น (เช่น ยืนยันว่า <span class="mono text-[12px]">product_id</span> ที่ client ส่งมามีจริง) ให้ <b>inject <span class="mono text-[12px]">*Service</span> ของ module นั้น</b> — ห้าม <span class="mono text-[12px]">@InjectRepository(OtherEntity)</span> · ใช้ <span class="mono text-[12px]">findByIdOrNull()</span> เมื่อต้องการเปลี่ยน "หาไม่เจอ" เป็น <span class="mono text-[12px]">BadRequestException</span> ของตัวเอง (<span class="mono text-[12px]">findById()</span> จะโยน 404 ทั่วไปของ module เจ้าของแทน) · ถ้าต้องการ query เฉพาะทาง ให้<b>เพิ่ม method แคบ ๆ</b> ที่ service เจ้าของ ไม่ใช่เปิด repository ออกมา</p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · ห้าม module import กันไปกลับ (A ↔ B)</div><p class="text-[13.5px]">ทางออกเรียงตามลำดับที่ควรลองก่อน — <b>1)</b> ย้ายที่อยู่ของ route: sub-route ของ resource แม่ประกาศไว้ใน module ลูกได้ (<span class="mono text-[12px]">ReorderLevelsController</span> · <span class="mono text-[12px]">UomConversionFactorsController</span> · <span class="mono text-[12px]">ProductBarcodesController</span> ต่างประกาศ <span class="mono text-[12px]">@Controller('products')</span> จาก module ของตัวเอง โดย <span class="mono text-[12px]">ProductModule</span> ไม่เคย import กลับ) — เคสส่วนใหญ่จบตรงนี้เพราะ dependency จริงเป็นทางเดียวอยู่แล้ว มีแต่ <b>route</b> ที่ดูเหมือนของอีกฝั่ง · <b>2)</b> ถ้าต้องใช้ทั้งสองทางจริง ให้แยก <b>facade service</b> (<span class="mono text-[12px]">&lt;DomainPair&gt;OperationsService</span>) ที่ inject ทั้ง A และ B แล้วอยู่ใน module ที่ import ทั้งคู่ — เส้นใน dependency graph ยังเป็นทางเดียวหมด (<span class="mono text-[12px]">Facade → A</span>, <span class="mono text-[12px]">Facade → B</span>)</p></div>
+        <div class="rulebox"><div class="rc mb-1">RULE · ข้าม BC = uuid เท่านั้น</div><p class="text-[13.5px]">database-per-context — ไม่มี FK ข้ามฐานข้อมูล และห้าม query ข้าม BC ตรง ๆ ทุกกรณี ต้องผ่าน RPC (§08)</p></div>
+      </section>
+
+      <!-- ========== 12 ROUTE PARAMS · PERMISSIONS · REQUEST BODY ========== -->
+      <section id="guards" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">12 — Params · Permissions · Body</div>
+        <h2 class="display text-3xl mb-6">Path param · สิทธิ์ · body ว่าง</h2>
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · path param ที่เป็น UUID ต้องผ่าน ParseUuidParamPipe</div><p class="text-[13.5px]"><span class="mono text-[12px]">@Param('id', ParseUuidParamPipe)</span> ทุกตัว (<span class="mono text-[12px]">:id</span>, <span class="mono text-[12px]">:role_id</span>, param ที่เป็น FK ทุกอัน) — ปฏิเสธ UUID ผิดรูปด้วย <span class="mono text-[12px]">400002</span> ก่อนถึง service/DB · <span class="mono text-[12px]">@Param('id')</span> เปล่า ๆ ถือว่าผิด convention</p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · endpoint ที่ไม่ @Public() ต้องมี @RequirePermission พร้อมชื่อ { th, en }</div><p class="text-[13.5px]"><span class="mono text-[12px]">@RequirePermission('resource:action', { th, en })</span> — <b>ต้องส่งชื่อสองภาษาเสมอ</b> ไม่ใช่แค่สตริง permission · <span class="mono text-[12px]">AuthGuard</span> + <span class="mono text-[12px]">PermissionGuard</span> ลงทะเบียนเป็น <span class="mono text-[12px]">APP_GUARD</span> ใน <span class="mono text-[12px]">CommonModule</span> ทุก BC — endpoint ที่ไม่ public และ<b>ไม่มี</b> <span class="mono text-[12px]">@RequirePermission()</span> จะถูก <b>default-deny</b> · แคตตาล็อก <span class="mono text-[12px]">permissions</span> ไม่ hand-maintain: รัน <span class="mono text-[12px]">npm run permissions:sync</span> หรือกดปุ่ม Sync Permissions ในหน้า admin (<span class="mono text-[12px]">POST /permission-syncs</span>) · sync แตะเฉพาะแคตตาล็อก <b>ไม่ผูก permission เข้า policy ให้</b> — ต้องมี grant migration แยกอีกที</p></div>
+        <div class="rulebox"><div class="rc mb-1">RULE · body ว่างของ action route ถือเป็น {} ไม่ใช่ 400</div><p class="text-[13.5px]"><span class="mono text-[12px]">bootstrap.util.ts</span> แทน content-type parser ของ <span class="mono text-[12px]">application/json</span> ด้วยตัวที่คืน <span class="mono text-[12px]">{}</span> เมื่อ body ยาว 0 ไบต์ (นอกนั้นส่งต่อ parser เดิมของ Fastify ทุกประการ รวมถึง JSON เสีย → 400 เหมือนเดิม) — action route อย่าง <span class="mono text-[12px]">POST /{doc}/{id}/approve</span> จึงเรียกได้โดยไม่ต้องส่ง <span class="mono text-[12px]">{}</span> มาเอง · <b>ลำดับการติดตั้งสำคัญ</b>: ต้องเรียก <span class="mono text-[12px]">await app.init()</span> ก่อน แล้วค่อย <span class="mono text-[12px]">removeContentTypeParser</span> + ลงทะเบียนตัวใหม่ — ติดตั้งก่อนหน้านั้นทุก BC จะ crash-loop ตอน boot ด้วย <span class="mono text-[12px]">FastifyError: Content type parser 'application/json' already present</span></p></div>
+      </section>
+
+      <!-- ========== 13 MIGRATIONS & SEED ========== -->
+      <section id="migrations" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">13 — Migrations &amp; Seed</div>
+        <h2 class="display text-3xl mb-6">Migration ต้อง generate จาก entity · seed ต้องตามให้ทัน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          migration อยู่ที่ <span class="mono text-[13px]">libs/database/src/migrations/erp_&lt;bc&gt;/</span> และรันแยกต่อ BC (<span class="mono text-[13px]">pnpm run migration:run:&lt;bc&gt;</span>) — แต่ละ BC มีตาราง <span class="mono text-[13px]">migrations</span> ของตัวเอง ลำดับเวลาจึงต้องถูกต้อง<b>ภายใน BC เดียวกัน</b>เท่านั้น
+        </p>
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · แก้ที่ entity ก่อน แล้ว generate — ห้ามเขียน SQL schema เอง</div><p class="text-[13.5px]"><span class="mono text-[12px]">pnpm run migration:generate:&lt;bc&gt; --name=&lt;Name&gt;</span> แล้ว<b>อ่าน SQL ที่ได้ก่อน commit</b> (generator อาจ emit DROP/สร้างใหม่สำหรับการ rename และมันอ่าน state ของ DB ที่เครื่องคุณจริง ๆ) · <span class="mono text-[12px]">migration:create</span> (เขียนมือ) ใช้เฉพาะสิ่งที่ generator มองไม่เห็น: backfill, seed, จูน index/constraint, DML ที่ต้องเรียงลำดับ · <span class="mono text-[12px]">synchronize</span> ห้ามเป็น <span class="mono text-[12px]">true</span> ใน BC ที่มี migration แล้ว</p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · timestamp ในชื่อไฟล์ต้องเป็น Date.now() จริง</div><p class="text-[13.5px]">ห้ามคิดเลขกลม ๆ ขึ้นเอง หรือก๊อปของไฟล์ข้างเคียงแล้วบวก 1 — ตัวเลขนี้<b>คือลำดับการรัน</b>และเป็น key ในตาราง <span class="mono text-[12px]">migrations</span> · ไฟล์เขียนมือใช้ <span class="mono text-[12px]">node -e "console.log(Date.now())"</span> · ชื่อไฟล์ <span class="mono text-[12px]">&lt;epoch_ms&gt;-&lt;PascalCaseName&gt;.ts</span> คลาส <span class="mono text-[12px]">&lt;PascalCaseName&gt;&lt;epoch_ms&gt;</span> และ property <span class="mono text-[12px]">name</span> ต้องตรงกับชื่อไฟล์เป๊ะ · <span class="mono text-[12px]">down()</span> ต้อง undo <span class="mono text-[12px]">up()</span> ได้จริง ถ้าทำไม่ได้ให้เขียนบอกไว้ใน docblock อย่าปล่อยเป็น no-op ที่ทำให้เข้าใจผิด · seed ที่ข้าม 2 BC = <b>2 migration แยกกัน ไฟล์ละฐานข้อมูล</b></p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · migration ที่แปลง date → timestamptz ต้องปักที่เที่ยงคืนกรุงเทพฯ</div><p class="text-[13.5px]"><span class="mono text-[12px]">USING (col::timestamp AT TIME ZONE 'Asia/Bangkok')</span> — cast เปล่า ๆ จะเลื่อนวันตามปฏิทินของแถวเดิมทันทีถ้า session ไม่ได้ตั้ง timezone เป็น UTC+7 อยู่แล้ว</p></div>
+        <div class="rulebox"><div class="rc mb-1">RULE · เปลี่ยน schema แล้วต้องไปแก้ seeder ด้วยเสมอ</div><p class="text-[13.5px]">seeder ใน <span class="mono text-[12px]">libs/database/src/scripts/seed/</span> เป็น <span class="mono text-[12px]">pg</span> client เขียน SQL ดิบ <b>ไม่ผ่าน entity/service/DTO</b> จึงไม่มีอะไร type-check ให้ — มันพังตอน runtime บนเครื่องที่ติดตั้งใหม่ นานหลังจากคุณแก้ · ต้องตามแก้เมื่อ: เพิ่ม/เปลี่ยนชื่อคอลัมน์หรือทำให้ <span class="mono text-[12px]">NOT NULL</span> · เปลี่ยน natural key (seeder re-resolve reference จาก DB ด้วย natural key ไม่ได้ถือ id ไว้ในหน่วยความจำ) · เปลี่ยนชื่อ/ลบตาราง หรือมี entity ใหม่เข้ามาใน aggregate ที่ seed อยู่ (แก้ <span class="mono text-[12px]">truncates</span> + <span class="mono text-[12px]">SEEDERS[]</span> พร้อม <span class="mono text-[12px]">depends_on</span>) · BC ใหม่เริ่ม seed ได้ (เพิ่มใน <span class="mono text-[12px]">ISeedDatabase</span> + <span class="mono text-[12px]">SEED_DATABASE_ENV</span>) · tree entity มีแถวเพิ่ม (ต้อง rebuild <span class="mono text-[12px]">lft</span>/<span class="mono text-[12px]">rgt</span>) · seeder ต้อง idempotent + deterministic — สุ่มค่าจาก <span class="mono text-[12px]">stable-index.util.ts</span> (hash ของ SKU) ห้ามใช้ <span class="mono text-[12px]">faker</span>/<span class="mono text-[12px]">Math.random</span> · ตรวจด้วย <span class="mono text-[12px]">npm run seed -- --dry-run</span> และ <span class="mono text-[12px]">--fresh --yes</span> บน DB ทดสอบเมื่อเป็นการเปลี่ยนโครงสร้าง</p></div>
+      </section>
       <!-- FOOTER -->
       <erp-footer
         line1="ERP SYSTEM · BACKEND CONVENTIONS · NESTJS 11 · POSTGRESQL"
-        line2="Naming · JSON:API · Error Handling · Query Params · Microservice Calls">
+        line2="Naming · JSON:API · Errors · Query Params · Microservice · Controllers · Entities · Boundaries · Migrations">
       </erp-footer>
 
     </div>

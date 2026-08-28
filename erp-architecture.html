@@ -383,9 +383,10 @@
         <div class="eyebrow text-[var(--accent)] mb-3">04 — Bounded Contexts</div>
         <h2 class="display text-3xl sm:text-4xl mb-6">การแบ่ง Bounded Contexts</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-9 leading-[1.85]">
-          8 บริการ แต่ละบริการเป็นเจ้าของฐานข้อมูลของตนเอง (<span class="tag-db">db-per-context</span>)
+          8 บริการ — 7 บริการเป็นเจ้าของฐานข้อมูลของตนเอง (<span class="tag-db">db-per-context</span>) ส่วน <span class="mono text-[12px]">storage</span> เป็น stateless wrapper ของ MinIO ไม่มี Postgres เป็นของตัวเอง ·
           entity ที่ระบุด้วย <span class="mono text-[12px] text-[var(--accent)]">uuid→</span> คือการอ้างอิงข้ามบริบท
         </p>
+        <p class="text-[13.5px] text-[var(--muted)] mb-9">รายชื่อตารางด้านล่างตรงกับ entity จริงในโค้ด ณ 2026-08 · chip <span class="chip" style="border-style:dashed;color:var(--muted)">เส้นประ</span> = อยู่ในแผนแต่<b>ยังไม่ implement</b></p>
 
         <div class="grid sm:grid-cols-2 gap-5">
 
@@ -407,11 +408,23 @@
               <div><h3 class="font-semibold text-[17px] mono">iam</h3><p class="text-[13px] text-[var(--muted)]">Identity &amp; Access</p></div>
               <span class="tag-db">db: iam</span>
             </div>
-            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">จัดการผู้ใช้ บทบาท และสิทธิ์ (RBAC) เป็นแหล่งความจริงของ Users</p>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">จัดการผู้ใช้ บทบาท และสิทธิ์ (RBAC + PBAC/ABAC ผ่าน policy/statement) เป็นแหล่งความจริงของ Users · เจ้าของแคตตาล็อก <b>permissions</b> ทั้ง 2 plane (api/ui)</p>
             <div class="flex flex-wrap gap-1.5">
-              <span class="chip">users</span><span class="chip">roles</span>
-              <span class="chip">permissions</span><span class="chip">user_roles</span>
-              <span class="chip">role_permissions</span>
+              <span class="chip">users</span>
+              <span class="chip">roles</span>
+              <span class="chip">users_roles</span>
+              <span class="chip">policies</span>
+              <span class="chip">roles_policies</span>
+              <span class="chip">policy_statements</span>
+              <span class="chip">statement_actions</span>
+              <span class="chip">statement_targets</span>
+              <span class="chip">statement_conditions</span>
+              <span class="chip">permissions</span>
+              <span class="chip">permission_sync_logs</span>
+              <span class="chip">access_keys</span>
+              <span class="chip">access_keys_policies</span>
+              <span class="chip">user_role_audit_logs</span>
+              <span class="chip">role_policy_audit_logs</span>
             </div>
           </div>
 
@@ -422,12 +435,21 @@
             </div>
             <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">หัวใจของระบบ: Lot, วันหมดอายุ, ตัดสต็อก FIFO/FEFO, รับ/จ่าย และปรับสต็อก</p>
             <div class="flex flex-wrap gap-1.5">
-              <span class="chip">products</span><span class="chip">categories</span>
-              <span class="chip">warehouses</span><span class="chip" style="color:var(--signal)">lots</span>
-              <span class="chip">stock_movements</span><span class="chip">goods_receipts</span>
-              <span class="chip">goods_issues</span><span class="chip">stock_adjustments</span>
-              <span class="chip">reorder_levels</span>
-              <span class="chip" style="color:var(--signal)">product_bundles</span>
+              <span class="chip">products</span><span class="chip">product_images</span>
+              <span class="chip">item_groups</span><span class="chip">item_attributes</span>
+              <span class="chip">item_attribute_values</span><span class="chip">item_variant_attributes</span>
+              <span class="chip">brands</span><span class="chip">uoms</span>
+              <span class="chip">uom_conversion_factors</span><span class="chip">barcodes</span>
+              <span class="chip">price_lists</span><span class="chip">item_prices</span>
+              <span class="chip">item_suppliers</span><span class="chip">tax_categories</span>
+              <span class="chip">pricing_rules</span><span class="chip">warehouses</span>
+              <span class="chip" style="color:var(--signal)">lots</span>
+              <span class="chip">stock_movements</span><span class="chip">stock_settings</span>
+              <span class="chip">goods_receipts</span><span class="chip">goods_receipt_items</span>
+              <span class="chip">stock_entries</span><span class="chip">stock_entry_items</span>
+              <span class="chip">stock_entry_item_allocations</span>
+              <span class="chip">stock_adjustments</span><span class="chip">stock_adjustment_items</span>
+              <span class="chip">delivery_issues</span><span class="chip">reorder_levels</span>
               <span class="chip" style="color:var(--signal)">bundle_items</span>
             </div>
           </div>
@@ -439,8 +461,10 @@
             </div>
             <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ผู้จัดซื้อ (Vendor), ใบสั่งซื้อ (PO) และการรับเข้าสินค้า</p>
             <div class="flex flex-wrap gap-1.5">
-              <span class="chip">suppliers</span><span class="chip">purchase_orders</span>
-              <span class="chip">purchase_order_items</span><span class="chip">inbound_shipments</span>
+              <span class="chip">suppliers</span><span class="chip">supplier_groups</span>
+              <span class="chip">purchase_orders</span><span class="chip">purchase_order_items</span>
+              <span class="chip">purchase_order_receipts</span><span class="chip">purchase_order_attachments</span>
+              <span class="chip">purchase_order_number_counters</span>
             </div>
           </div>
 
@@ -451,9 +475,13 @@
             </div>
             <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ลูกค้า, ใบเสนอราคา, ใบสั่งขาย และใบส่งของ (<b>ทริกเกอร์การตัดสต็อก</b>)</p>
             <div class="flex flex-wrap gap-1.5">
-              <span class="chip">customers</span><span class="chip">quotations</span>
+              <span class="chip">customers</span><span class="chip">customer_groups</span>
+              <span class="chip">quotations</span><span class="chip">quotation_items</span>
+              <span class="chip">quotation_attachments</span>
               <span class="chip">sales_orders</span><span class="chip">sales_order_items</span>
-              <span class="chip">delivery_notes</span>
+              <span class="chip">delivery_notes</span><span class="chip">delivery_note_items</span>
+              <span class="chip">quotation_number_counters</span><span class="chip">sales_order_number_counters</span>
+              <span class="chip">delivery_note_number_counters</span>
             </div>
           </div>
 
@@ -464,35 +492,43 @@
             </div>
             <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ใบกำกับภาษี, ใบวางบิล และ <b>คำนวณ COGS + กำไร/ขาดทุนแม่นยำต่อ Lot</b></p>
             <div class="flex flex-wrap gap-1.5">
-              <span class="chip" style="color:var(--signal)">receipts</span><span class="chip">billing_notes</span>
-              <span class="chip" style="color:var(--signal)">cogs_entries</span>
-              <span class="chip" style="color:var(--signal)">profit_loss_records</span>
-              <span class="chip">tax_configs</span><span class="chip">ledger_entries</span>
+              <span class="chip" style="color:var(--signal)">receipts</span><span class="chip">receipt_items</span>
+              <span class="chip">receipt_attachments</span><span class="chip">receipt_number_counters</span>
+              <span class="chip">tax_configs</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">billing_notes</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">cogs_entries</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">profit_loss_records</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">ledger_entries</span>
             </div>
           </div>
 
           <div class="bc-card p-6">
             <div class="flex items-start justify-between mb-3">
-              <div><h3 class="font-semibold text-[17px] mono">report-bc</h3><p class="text-[13px] text-[var(--muted)]">Analytics (CQRS Read)</p></div>
+              <div><h3 class="font-semibold text-[17px] mono">report-bc</h3><p class="text-[13px] text-[var(--muted)]">Printing &amp; Analytics (CQRS Read)</p></div>
               <span class="tag-db">db: report</span>
             </div>
-            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ฟัง Event จากทุกบริการ สร้าง Read Model สำหรับรายงาน (สินค้าใกล้หมด, ลูกค้าแต่ละจังหวัด ฯลฯ)</p>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ปัจจุบันเป็น <b>บริการพิมพ์เอกสาร</b>: เทมเพลตพิมพ์ (เก็บ HTML/JS บน MinIO + เวอร์ชัน/ประวัติ), ประเภทเอกสาร + เลขรันเอกสาร, render เป็น PDF ผ่าน Gotenberg · ส่วน Read Model ของ CQRS (สินค้าใกล้หมด, ลูกค้าแต่ละจังหวัด ฯลฯ) <b>ยังไม่ implement</b> — ดู srs-p6.html</p>
             <div class="flex flex-wrap gap-1.5">
-              <span class="chip">sales_summary</span><span class="chip">inventory_summary</span>
-              <span class="chip">expiry_alerts</span><span class="chip">profit_by_lot</span>
-              <span class="chip">low_stock</span><span class="chip">customer_by_province</span>
+              <span class="chip">print_templates</span><span class="chip">print_template_histories</span>
+              <span class="chip">document_types</span><span class="chip">document_running_numbers</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">sales_summary</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">inventory_summary</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">expiry_alerts</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">profit_by_lot</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">low_stock</span>
+              <span class="chip" style="border-style:dashed;color:var(--muted)">customer_by_province</span>
             </div>
           </div>
 
           <div class="bc-card p-6">
             <div class="flex items-start justify-between mb-3">
               <div><h3 class="font-semibold text-[17px] mono">storage-bc</h3><p class="text-[13px] text-[var(--muted)]">File Management</p></div>
-              <span class="tag-db">db: storage</span>
+              <span class="tag-db">ไม่มี DB</span>
             </div>
-            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">รวมศูนย์ไฟล์บน MinIO: รูปสินค้า, เอกสารแนบ (PO/Invoice) และออก Presigned URL ให้ Frontend</p>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">รวมศูนย์ไฟล์บน MinIO: รูปสินค้า, เอกสารแนบ (PO/Quotation/Receipt) และออก Presigned URL ให้ Frontend · <b>ไม่มีฐานข้อมูลของตัวเอง</b> — BC ที่เป็นเจ้าของไฟล์เก็บแค่ <span class="mono text-[12px]">bucket</span>/<span class="mono text-[12px]">object_key</span> ไว้เอง แล้วขอ signed URL ใหม่ทุกครั้งที่ต้องใช้</p>
             <div class="flex flex-wrap gap-1.5">
-              <span class="chip">file_objects</span><span class="chip">buckets</span>
-              <span class="chip">upload_sessions</span><span class="chip">context_ref (uuid)</span>
+              <span class="chip">— stateless (ไม่มีตาราง Postgres)</span>
+              <span class="chip">bucket / object_key เก็บที่ BC เจ้าของไฟล์</span>
             </div>
           </div>
 
@@ -923,17 +959,17 @@ sequenceDiagram
     SAL->>SLS: POST /quotations/{id}/approve
     Note over SLS: เลย valid_until แล้ว → พลิกเป็น EXPIRED + 409 (ต้องออกใบใหม่)
 
-    Note over SAL,INV: ระยะ 2 · แปลงเป็นใบสั่งขาย + ส่งของ (P4 M3 — ยังไม่ implement)
-    SAL->>SLS: แปลง Quotation → Sales Order
-    SLS->>INV: ตรวจ available_qty
-    SLS->>INV: สร้าง Delivery Note
-    WH->>INV: ยืนยันส่งของ
-    INV->>INV: ตัดสต็อก FIFO ต่อล็อต · CHECK (available_qty >= 0)
-    INV-)FIN: stock.deducted (allocations + unit_cost จริงต่อล็อต)
-    INV-)SLS: delivery.confirmed
+    Note over SAL,INV: ระยะ 2 · แปลงเป็นใบสั่งขาย + ส่งของ (P4 M3–M4 — implement แล้ว)
+    SAL->>SLS: POST /quotations/{id}/convert-to-sales-order
+    SLS->>INV: CheckAvailability (RPC) — แตกชุด bundle แล้วรวม demand ข้ามบรรทัด
+    SAL->>SLS: POST /delivery-notes (so_id, warehouse_id, items[])
+    WH->>SLS: POST /delivery-notes/{id}/submit
+    SLS->>INV: ConfirmDelivery (RPC sync — ไม่ใช่ event)
+    INV->>INV: ตัดสต็อก FIFO/FEFO ต่อล็อต · CHECK (available_qty >= 0) · idempotent ต่อบรรทัดผ่าน delivery_issues
+    Note over INV,FIN: stock.deducted / delivery.confirmed ยังไม่ emit จริง — ยังไม่มี outbox และยังไม่มี subscriber
 
-    Note over ACC,RPT: ระยะ 3 · ออกใบกำกับภาษี (P5 — implement แล้ว)
-    ACC->>FIN: POST /tax-invoices (customer_id, items[], vat_type)
+    Note over ACC,RPT: ระยะ 3 · ออกใบกำกับภาษี/ใบเสร็จ — ตาราง receipts (P5 — implement แล้ว)
+    ACC->>FIN: POST /receipts (customer_id, document_type, items[])
     FIN->>SLS: getCustomerById (RPC) — snapshot ชื่อ + เลขผู้เสียภาษี (§86/4(2))
     SLS-->>FIN: customer (ต้องมี tax_id ไม่งั้น 400)
     FIN->>INV: getProductById (RPC) — พร้อม tax_category.vat_treatment
@@ -941,9 +977,9 @@ sequenceDiagram
     FIN->>FIN: อ่านอัตราจริงจาก tax_configs ตาม document_date (VAT + WHT)
     Note over FIN: การจัดประเภทมาจาก inventory-bc · อัตรามาจาก finance-bc<br/>ไม่รับ vat_treatment จาก client (กันเลี่ยง VAT)
     FIN->>FIN: ปันส่วนลดท้ายบิลลงบรรทัดตามสัดส่วน แล้วจึงคิด VAT
-    FIN-->>ACC: 201 · DRAFT · ยังไม่มี invoice_number
-    ACC->>FIN: POST /tax-invoices/{id}/issue
-    FIN->>FIN: BEGIN · FOR UPDATE counter ปีนั้น · ออกเลข INV-{YYYY}-{00001} · COMMIT
+    FIN-->>ACC: 201 · DRAFT · ยังไม่มี document_number
+    ACC->>FIN: POST /receipts/{id}/issue
+    FIN->>FIN: BEGIN · FOR UPDATE counter (year, document_type) · ออกเลข INV-{YYYY}-{00001} · COMMIT
     Note over FIN: ออกเลขตอน issue ไม่ใช่ตอน create — เลขต้องเรียงไม่ข้าม (§86/4)<br/>หลัง ISSUED แก้ไม่ได้ ต้องออกใบลด/เพิ่มหนี้แทน
     FIN-)RPT: invoice.issued
     FIN-)FIN: คำนวณ COGS ต่อ allocation จาก stock.deducted → กำไรต่อล็อต
@@ -969,10 +1005,10 @@ sequenceDiagram
             <table class="d">
               <thead><tr><th>จาก → ไป</th><th>ส่งต่อผ่าน</th><th>ข้อมูลที่ส่งต่อ</th><th>สถานะ</th></tr></thead>
               <tbody>
-                <tr><td>Quotation → Sales Order</td><td>แปลงเอกสาร (ใน sales-bc)</td><td>บรรทัดที่ตกลง + <span class="mono text-[12px]">price_list_id</span> + <span class="mono text-[12px]">is_vat_included</span> ที่ snapshot ไว้</td><td><span class="chip">P4 M3</span></td></tr>
-                <tr><td>Sales Order → Delivery</td><td>แปลงเอกสาร + ตรวจ <span class="mono text-[12px]">available_qty</span></td><td>บรรทัดที่จะส่ง · bundle ต้อง explode เป็น <span class="mono text-[12px]">packed_items</span></td><td><span class="chip">P4 M3</span></td></tr>
-                <tr><td>Delivery → inventory ledger</td><td>ยืนยันส่งของ (ใน inventory-bc)</td><td>ตัดสต็อก FIFO ต่อล็อต — ได้ <span class="mono text-[12px]">unit_cost</span> จริงของแต่ละล็อต</td><td><span class="chip">P3/P4</span></td></tr>
-                <tr><td>inventory-bc → finance-bc</td><td>event <span class="mono text-[12px]">stock.deducted</span></td><td><b>allocations พร้อม unit_cost จริง</b> — finance ใช้คิด COGS ห้ามเฉลี่ย</td><td><span class="chip">P5</span></td></tr>
+                <tr><td>Quotation → Sales Order</td><td>แปลงเอกสาร (ใน sales-bc)</td><td>บรรทัดที่ตกลง + <span class="mono text-[12px]">price_list_id</span> + <span class="mono text-[12px]">is_vat_included</span> ที่ snapshot ไว้ — <span class="mono text-[12px]">POST /quotations/{id}/convert-to-sales-order</span> เท่านั้น (ไม่มี <span class="mono text-[12px]">POST /sales-orders</span>)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>Sales Order → Delivery</td><td>แปลงเอกสาร + ตรวจ <span class="mono text-[12px]">available_qty</span></td><td>บรรทัดที่จะส่ง · bundle แตกชุดตอนรันไทม์ที่ inventory-bc (<span class="mono text-[12px]">bundle_items</span>) <b>ไม่</b> denormalize ลงเอกสาร — ดู srs-p3.html §08 D8</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>Delivery → inventory ledger</td><td>ยืนยันส่งของ (ใน inventory-bc)</td><td>ตัดสต็อก FIFO/FEFO ต่อล็อต — ได้ <span class="mono text-[12px]">unit_cost</span> จริงของแต่ละล็อต · idempotent ต่อบรรทัดผ่าน <span class="mono text-[12px]">delivery_issues</span></td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>inventory-bc → finance-bc</td><td>event <span class="mono text-[12px]">stock.deducted</span></td><td><b>allocations พร้อม unit_cost จริง</b> — finance ใช้คิด COGS ห้ามเฉลี่ย</td><td><span class="chip">ยังไม่ implement · ยังไม่มี outbox</span></td></tr>
                 <tr><td>Delivery → Receipt</td><td><span class="mono text-[12px]">delivery_note_id</span> บนใบเสร็จ/ใบกำกับ</td><td>อ้างอิงว่าเอกสารนี้ออกจากการส่งของครั้งไหน (uuid ข้าม BC ไม่มี FK)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>sales-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getCustomerById</span></td><td>ชื่อ + เลขผู้เสียภาษีลูกค้า → <b>snapshot</b> ลงเอกสาร (§86/4(2) บังคับให้พิมพ์บนใบกำกับภาษีเต็มรูป/ใบแจ้งหนี้+ใบกำกับ)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>inventory-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getProductById</span></td><td>sku/ชื่อ + <span class="mono text-[12px]">tax_category.vat_treatment</span> → snapshot ต่อบรรทัด</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
@@ -1119,7 +1155,7 @@ sequenceDiagram
             <!-- PHASE 5 -->
             <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--signal)"></span>PHASE 5 · Finance · COGS &amp; P&amp;L</div><div class="ph-hours"><span class="hbadge hb-be">BE 192</span><span class="hbadge hb-fe">FE 120</span><span>· 312 ชม.</span></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>GL double-entry engine (post/cancel · balanced · immutable)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar crit" style="left:62.5%;width:6.25%">1.5w</div></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>finance: tax invoice + billing note (submittable)</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:66.67%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>finance: receipt/tax invoice + billing note (submittable)</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-track"><div class="gbar be" style="left:66.67%;width:6.25%">1.5w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>finance: COGS + P&amp;L per lot (incl. bundle)</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-track"><div class="gbar crit" style="left:66.67%;width:8.33%">2w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>payment entry + allocation to invoices (AR/AP)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-track"><div class="gbar be" style="left:70.83%;width:6.25%">1.5w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>tax configs: VAT (ภาษี 1/2) + withholding (หัก ณ ที่จ่าย)</span><span class="hbadge hb-be">BE 24</span></div><div class="gantt-track"><div class="gbar be" style="left:62.5%;width:4.17%">1w</div></div></div>

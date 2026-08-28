@@ -218,12 +218,6 @@ erDiagram
         int qty "stock UOM, already converted by inventory-bc"
         timestamp reversed_at "set when the GRN is cancelled · null = still counts"
     }
-    INBOUND_SHIPMENTS {
-        uuid id PK
-        uuid po_id FK
-        string status
-        timestamp arrived_at
-    }
     CUSTOMER_GROUPS {
         uuid id PK
         string name_th
@@ -346,12 +340,27 @@ erDiagram
         decimal total_cost "from postIssue().total_cost"
         timestamp reversed_at "null = still in effect"
     }
-    PACKED_ITEMS {
+    PURCHASE_ORDER_ATTACHMENTS {
         uuid id PK
-        uuid parent_doc_id FK "SO_or_delivery"
-        uuid bundle_product_id
-        uuid component_product_id
-        int qty
+        uuid purchase_order_id FK
+        string bucket
+        string object_key
+        string original_name
+        string mime_type
+        string extension
+        int size
+        string etag
+    }
+    QUOTATION_ATTACHMENTS {
+        uuid id PK
+        uuid quotation_id FK
+        string bucket
+        string object_key
+        string original_name
+        string mime_type
+        string extension
+        int size
+        string etag
     }
     PRICING_RULES {
         uuid id PK "inventory-bc — not sales-bc, see &sect;08 D6"
@@ -366,10 +375,11 @@ erDiagram
         int priority "default 0, higher wins on a tie"
         bool is_active "default true"
     }
+    PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ATTACHMENTS : "files on MinIO"
+    QUOTATIONS ||--o{ QUOTATION_ATTACHMENTS : "files on MinIO"
     SUPPLIERS ||--o{ PURCHASE_ORDERS : receives
     PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ITEMS : contains
     PURCHASE_ORDER_ITEMS ||--o{ PURCHASE_ORDER_RECEIPTS : "received_qty derives from"
-    PURCHASE_ORDERS ||--o{ INBOUND_SHIPMENTS : ships
     CUSTOMER_GROUPS ||--o{ CUSTOMERS : groups
     CUSTOMERS ||--o{ QUOTATIONS : requests
     QUOTATIONS ||--o{ QUOTATION_ITEMS : contains
@@ -380,10 +390,10 @@ erDiagram
     DELIVERY_NOTES ||--o{ DELIVERY_NOTE_ITEMS : contains
     SALES_ORDER_ITEMS ||--o{ DELIVERY_NOTE_ITEMS : "delivered by"
     DELIVERY_NOTE_ITEMS ||--o| DELIVERY_ISSUES : "confirmed via RPC (cross-BC, no DB FK)"
-    SALES_ORDERS ||--o{ PACKED_ITEMS : explodes
     PRICING_RULES ||--o{ QUOTATION_ITEMS : "resolves unit_price for (RPC, cross-BC, no DB FK)"
 </pre>
           </div>
+          <p class="text-[12.5px] mt-4" style="color:var(--muted)"><b>หมายเหตุ ER (อัปเดตให้ตรงโค้ด 2026-08):</b> <span class="mono text-[12px]">INBOUND_SHIPMENTS</span> ถูกถอดออก — ไม่เคย implement และการรับของถูกแทนด้วย <span class="mono text-[12px]">goods_receipts</span> (inventory-bc) + ledger <span class="mono text-[12px]">purchase_order_receipts</span> ที่ใช้ recompute <span class="mono text-[12px]">received_qty</span> · <span class="mono text-[12px]">PACKED_ITEMS</span> ถูกถอดออกเช่นกัน — โค้ดจริง<b>ไม่ denormalize BOM ลงเอกสารฝั่งขาย</b> แต่แตกชุดตอนรันไทม์ที่ inventory-bc (<span class="mono text-[12px]">bundle_items</span> + <span class="mono text-[12px]">explodeDemands()</span>) เหตุผลเต็มอยู่ที่ srs-p3.html §08 D8 · ตารางที่ไม่ได้วาดไว้ในแผนภาพเพราะเป็น infrastructure ล้วน: <span class="mono text-[12px]">purchase_order_number_counters</span> · <span class="mono text-[12px]">quotation_number_counters</span> · <span class="mono text-[12px]">sales_order_number_counters</span> · <span class="mono text-[12px]">delivery_note_number_counters</span> (ทุกตัว extend <span class="mono text-[12px]">DocumentNumberCounterEntity</span> — หนึ่งตารางต่อ BC ต่อประเภทเอกสาร)</p>
         </div>
 
         <!-- 4.5 Dev Guide -->
@@ -405,10 +415,10 @@ erDiagram
 
         <!-- 4.6 M1 Status & Testing -->
         <div class="mb-12" id="p4-m1">
-          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">06</span><h3 class="text-xl font-semibold">Implementation Status &amp; Testing Guide · ฝั่งซื้อ M1 · ฝั่งขาย M1–M2</h3></div>
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(11,61,145,.14);color:var(--blue)">06</span><h3 class="text-xl font-semibold">Implementation Status &amp; Testing Guide · ฝั่งซื้อ M1–M3 · ฝั่งขาย M1–M7</h3></div>
 
           <div class="card p-6 mb-8" style="border-left:3px solid var(--blue)">
-            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1 (2026-08)</b> implement เต็มรูปแบบใน <b style="color:var(--ink)">supplier-bc</b>: <span class="mono text-[12px]">PurchaseOrder</span>/<span class="mono text-[12px]">PurchaseOrderItem</span> + state machine 6 สถานะ, การออกเลขที่ <span class="mono text-[12px]">PO-{YYYY}-{00001}</span> แบบ concurrency-safe, TCP validation ข้าม BC ไปยัง inventory-bc (<span class="mono text-[12px]">getProductById</span>), permission <span class="mono text-[12px]">purchase_order:*</span> 6 ตัว · ทดสอบผ่านทั้ง unit test (mock) และ end-to-end จริงผ่าน HTTP + RabbitMQ กับฐานข้อมูล dev — ดู state machine เต็มที่หัวข้อ 02 และ ER diagram ที่หัวข้อ 04 ด้านบน · M2 (Goods Receipt, inventory-bc) implement แล้ว เช่นกัน — ดูรายละเอียดเต็มที่ <span class="mono text-[12px]">srs-p3.html</span> §07 (Sequence Diagram + Decision Record) · ยังไม่ implement: Stock Adjustment (M3), Purchase Return (M4)</p>
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1 (2026-08)</b> implement เต็มรูปแบบใน <b style="color:var(--ink)">supplier-bc</b>: <span class="mono text-[12px]">PurchaseOrder</span>/<span class="mono text-[12px]">PurchaseOrderItem</span> + state machine 6 สถานะ, การออกเลขที่ <span class="mono text-[12px]">PO-{YYYY}-{00001}</span> แบบ concurrency-safe, TCP validation ข้าม BC ไปยัง inventory-bc (<span class="mono text-[12px]">getProductById</span>), permission <span class="mono text-[12px]">purchase_order:*</span> 6 ตัว · ทดสอบผ่านทั้ง unit test (mock) และ end-to-end จริงผ่าน HTTP + RabbitMQ กับฐานข้อมูล dev — ดู state machine เต็มที่หัวข้อ 02 และ ER diagram ที่หัวข้อ 04 ด้านบน · M2 (Goods Receipt, inventory-bc) implement แล้ว เช่นกัน — ดูรายละเอียดเต็มที่ <span class="mono text-[12px]">srs-p3.html</span> §07 (Sequence Diagram + Decision Record)  · <b style="color:var(--ink)">M3 (Stock Adjustment / Stock Reconciliation, inventory-bc) implement แล้ว</b> — เอกสาร <span class="mono text-[12px]">stock_adjustments</span>/<span class="mono text-[12px]">stock_adjustment_items</span>, เลขที่ <span class="mono text-[12px]">ADJ-{YYYY}-{00001}</span>, permission <span class="mono text-[12px]">stock_adjustment:*</span> 5 ตัว — ดูรายละเอียดเต็มที่ <span class="mono text-[12px]">srs-p3.html</span> §08 D9 · <b style="color:var(--ink)">ยังไม่ implement</b>: Purchase Return (M4)</p>
             <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1.1 (2026-08)</b> ปรับให้ใกล้เคียง Quotation: snapshot <span class="mono text-[12px]">supplier_name_th/en</span>/<span class="mono text-[12px]">supplier_tax_id</span> ลงหัวเอกสาร ณ เวลาออกเอกสาร, เพิ่ม <span class="mono text-[12px]">document_date</span> (default = วันนี้ ต้องไม่เกิน <span class="mono text-[12px]">expected_date</span> ถ้าระบุ), ส่วนลดท้ายบิล (<span class="mono text-[12px]">sub_total/discount_type/discount_value/total_discount</span>) และส่วนลดรายบรรทัดบน <span class="mono text-[12px]">PurchaseOrderItem</span> (ของเดิมไม่มีเลย) · <span class="mono text-[12px]">PurchaseOrder</span>/<span class="mono text-[12px]">PurchaseOrderItem</span> ถูก retrofit ให้ extend <span class="mono text-[12px]">SubmittableDocumentEntity</span>/<span class="mono text-[12px]">DocumentLineItemEntity</span> ใน <span class="mono text-[12px]">@lib/common</span> (เค้าโครงเดียวกับ <span class="mono text-[12px]">Quotation</span>/<span class="mono text-[12px]">QuotationItem</span>) และใช้ <span class="mono text-[12px]">DiscountType</span>/<span class="mono text-[12px]">resolveDiscountAmount</span> ร่วมกัน · migration นี้เป็น ALTER จริง (ของเดิม ship ไปแล้ว) และ 3 คอลัมน์ใหม่เป็น NOT NULL ไม่มี default (<span class="mono text-[12px]">supplier_name_th/en</span>, <span class="mono text-[12px]">supplier_tax_id</span>, <span class="mono text-[12px]">document_date</span>) — เนื่องจากยังไม่มีข้อมูลจริงในระบบ (dev เท่านั้น) จึง <span class="mono text-[12px]">TRUNCATE purchase_order_items, purchase_orders</span> ก่อนเพิ่มคอลัมน์ แทนการเขียน backfill logic ให้แถวเก่า — <b>เก็บไว้เป็นข้อควรระวัง:</b> เมื่อระบบมีข้อมูลจริงแล้ว migration ลักษณะนี้ต้องเปลี่ยนไปใช้ backfill-then-`SET NOT NULL` แทน (resolve supplier snapshot จาก join ตาราง suppliers, document_date จาก created_at::date) ไม่ใช่ truncate ทิ้ง · ทดสอบแล้วว่า migration ล้มเหลวถูกต้องถ้า TRUNCATE ทั้งสองตารางไม่อยู่ statement เดียวกัน (FK cross-reference)</p>
             <p class="text-[14px] mt-3" style="color:var(--ink-soft)"><b style="color:var(--ink)">M1.2 (2026-08)</b> เพิ่ม <span class="mono text-[12px]">document_type</span> (<span class="mono text-[12px]">STANDARD_PO</span>/<span class="mono text-[12px]">BLANKET_PO</span>/<span class="mono text-[12px]">PLANNED_PO</span>/<span class="mono text-[12px]">CONTRACT_PO</span>, default <span class="mono text-[12px]">STANDARD_PO</span>) และ <span class="mono text-[12px]">is_vat_included</span> (boolean, default false, client-supplied — PO ไม่มี price list ให้ snapshot จากแบบ Quotation) ให้ <span class="mono text-[12px]">PurchaseOrder</span> เข้าคอนแทร็กต์เดียวกับ <span class="mono text-[12px]">Receipt</span>/<span class="mono text-[12px]">Quotation</span> ผ่าน <span class="mono text-[12px]">IVatDocumentHeader</span> ใหม่ใน <span class="mono text-[12px]">@lib/common</span> (ดู &sect;07) — <b>document_type ของ PO ไม่ใช้ค่าเดียวกับ Receipt/Quotation</b> โดยตั้งใจ (mirror รูปแบบ status enum ที่แต่ละ BC มีของตัวเอง) เพราะมิติการแบ่งประเภทของแต่ละเอกสารต่างกัน (Receipt แบ่งตามหน้าที่ทางภาษี, Quotation แบ่งตามวัตถุประสงค์การเสนอราคา, PO แบ่งตามลักษณะสัญญาซื้อ — ผูกพันครั้งเดียว/เปิดวงเงิน/ตามแผน/มีสัญญาระยะยาว)</p>
           </div>

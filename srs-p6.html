@@ -40,6 +40,7 @@
       <div class="navsub">3 · Data Flow &amp; Events</div>
       <div class="navsub">4 · ER Diagram</div>
       <div class="navsub">5 · Dev Guide</div>
+      <div class="navsub">6 · As-Built (Print Service)</div>
     </nav>
     <div slot="footnote">NESTJS 11 · POSTGRESQL<br>RABBITMQ · TCP · MINIO</div>
   </erp-sidebar>
@@ -57,6 +58,7 @@
             </div>
             <h2 class="display text-2xl sm:text-3xl">Reporting — CQRS Read Models &amp; Executive Dashboards</h2>
             <p class="mt-3 text-[15px]" style="color:var(--ink-soft)">บริโภค event จากทุกบริการเพื่อสร้าง Read Model ที่อ่านเร็ว สำหรับ Dashboard ผู้บริหาร</p>
+            <p class="mt-3 text-[13.5px]" style="color:var(--signal)"><b>สถานะจริง ณ 2026-08:</b> หัวข้อ 01–05 คือ<b>แผน</b> — ยังไม่ได้ implement · สิ่งที่ report-bc ทำอยู่จริงวันนี้คือ<b>บริการพิมพ์เอกสาร</b> (เทมเพลตพิมพ์ · ประเภทเอกสาร · เลขรัน · PDF ผ่าน Gotenberg) ดู <a href="#p6-asbuilt" style="color:var(--signal);text-decoration:underline">หัวข้อ 06 As-Built</a></p>
           </div>
         </div>
 
@@ -188,6 +190,83 @@ erDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · SEPARATE READ DB</div><p class="text-[13.5px]">report-bc มีฐานข้อมูลของตัวเอง แยกจากบริการอื่น <b>สามารถ rebuild ได้จาก replay</b></p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · EVENT-DRIVEN REFRESH</div><p class="text-[13.5px]">อัปเดต summary ตาม event ที่เข้ามา <b>ไม่ใช้ polling</b> · ใช้ index ครบเพื่อให้ query &lt; 200ms</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · SHOW FRESHNESS</div><p class="text-[13.5px]">แสดง <span class="mono text-[12px]">last_updated</span> บน dashboard เพื่อสื่อสาร eventual consistency ให้ผู้ใช้ทราบ</p></div>
+          </div>
+        </div>
+
+        <div class="rule my-14"></div>
+
+        <!-- 6.6 As-Built · Print service -->
+        <div id="p6-asbuilt">
+          <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">06</span><h3 class="text-xl font-semibold">As-Built · สิ่งที่ report-bc เป็นอยู่จริงวันนี้ = บริการพิมพ์เอกสาร</h3></div>
+
+          <div class="card p-6 mb-9" style="border-left:3px solid var(--signal)">
+            <p class="text-[14px]" style="color:var(--ink-soft)"><b style="color:var(--ink)">หัวข้อ 01–05 ด้านบนคือแผนของเฟส 6 (CQRS Read Model) ซึ่ง<u>ยังไม่ได้ implement เลยสักตาราง</u></b> — ไม่มี <span class="mono text-[12px]">sales_summary</span> / <span class="mono text-[12px]">profit_by_lot</span> / <span class="mono text-[12px]">low_stock</span> / <span class="mono text-[12px]">processed_events</span> ในฐานข้อมูล <span class="mono text-[12px]">erp_report</span> และ report-bc ยัง<b>ไม่ได้ subscribe event ใด ๆ</b> (ทั้งระบบยังไม่มี outbox — ทุก cross-BC call เป็น RPC request-response ดู srs-p3.html §08 D2) · สิ่งที่ <span class="mono text-[12px]">erp_report</span> มีจริงตอนนี้คือ <b style="color:var(--ink)">ระบบพิมพ์เอกสาร</b> 4 ตาราง ซึ่งถูกสร้างขึ้นก่อนเพราะเอกสารฝั่งซื้อ/ขาย/การเงิน (P4–P5) ต้องพิมพ์ออกมาให้ลูกค้าได้ตั้งแต่วันแรก · หัวข้อนี้บันทึกของจริงไว้ให้ตรงกับโค้ด ไม่ได้ยกเลิกแผน CQRS ด้านบน</p>
+          </div>
+
+          <div class="card overflow-hidden mb-9">
+            <table class="d">
+              <thead><tr><th style="width:230px">ตาราง (erp_report)</th><th style="width:120px">สถานะ</th><th>หน้าที่</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">print_templates</span></td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td><td>เทมเพลตพิมพ์ 1 แบบ = 1 แถว · <span class="mono text-[12px]">code</span> unique, ชื่อ/คำอธิบาย th+en, <span class="mono text-[12px]">paper_size</span>/<span class="mono text-[12px]">orientation</span>, <span class="mono text-[12px]">parameters</span> (jsonb — คีย์ที่เทมเพลตนี้รับ), <span class="mono text-[12px]">current_version</span></td></tr>
+                <tr><td><span class="mono text-[12px]">print_template_histories</span></td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td><td>ประวัติทุกเวอร์ชันของเทมเพลต · <span class="mono text-[12px]">action</span> = <span class="mono text-[12px]">create</span> | <span class="mono text-[12px]">update</span> | <span class="mono text-[12px]">delete</span> | <span class="mono text-[12px]">restore</span>, <span class="mono text-[12px]">snapshot</span> (jsonb ของทั้งแถว ณ เวอร์ชันนั้น) + ตำแหน่งไฟล์ HTML/JS ของเวอร์ชันนั้นบน MinIO</td></tr>
+                <tr><td><span class="mono text-[12px]">document_types</span></td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td><td>ประเภทเอกสาร · <span class="mono text-[12px]">code</span>, ชื่อ th/en, <span class="mono text-[12px]">print_template_id</span> (ใช้เทมเพลตไหนพิมพ์), <span class="mono text-[12px]">has_running_number</span> + <span class="mono text-[12px]">running_number_format</span></td></tr>
+                <tr><td><span class="mono text-[12px]">document_running_numbers</span></td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td><td>ตัวนับเลขรัน <b>1 แถวต่อ 1 ประเภทเอกสาร</b> (unique ที่ <span class="mono text-[12px]">document_type_id</span>) · <span class="mono text-[12px]">last_running_number</span>, <span class="mono text-[12px]">last_value</span> (เลขเต็มล่าสุด ใช้เทียบ pattern), <span class="mono text-[12px]">last_issued_at</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">A1</span><h4 class="font-semibold text-[16px]">ตัวเทมเพลตไม่ได้อยู่ใน Postgres — HTML/JS อยู่บน MinIO</h4></div>
+          <div class="card p-6 mb-9">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> แถวใน <span class="mono text-[12px]">print_templates</span> เก็บแค่ <b>ที่อยู่</b>ของไฟล์ — <span class="mono text-[12px]">html_bucket</span>/<span class="mono text-[12px]">html_path</span>/<span class="mono text-[12px]">html_hash</span> และ <span class="mono text-[12px]">js_bucket</span>/<span class="mono text-[12px]">js_path</span>/<span class="mono text-[12px]">js_hash</span> (JS เป็น optional) ตัวเนื้อ HTML ถูกอ่านจาก MinIO ตอน <span class="mono text-[12px]">findById()</span> เท่านั้น ไม่ติดไปกับ list/paginated response</p>
+            <p class="text-[13.5px]"><b style="color:var(--ink)">ทำไม:</b> เป็นรูปแบบเดียวกับ <span class="mono text-[12px]">product_images</span> และไฟล์แนบเอกสาร (srs-p2.html §05) — BC เก็บ <span class="mono text-[12px]">bucket</span>/<span class="mono text-[12px]">object_key</span> ไม่เก็บทั้ง blob และไม่เก็บ signed URL · ผลคือรายการเทมเพลตยังเบาแม้เทมเพลตจะยาวเป็นหมื่นบรรทัด และการย้อนเวอร์ชันคือการชี้ไปที่ object เดิม ไม่ต้องคัดลอกเนื้อไฟล์ซ้ำในฐานข้อมูล · <span class="mono text-[12px]">*_hash</span> มีไว้ให้รู้ได้ว่าไฟล์บน MinIO ตรงกับเวอร์ชันที่แถวนี้อ้างจริงหรือไม่</p>
+          </div>
+
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">A2</span><h4 class="font-semibold text-[16px]">สอง render engine ในตารางเดียว — <span class="mono text-[13px]">simple</span> กับ <span class="mono text-[13px]">banded</span></h4></div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-9">
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">template_engine = 'simple' (default)</div>
+              <p class="text-[13.5px] mb-2">HTML เป็นเอกสารแบน แทนที่ <span class="mono text-[12px]">{{key}}</span> ด้วยสตริงตรง ๆ <b>ไม่มีการแบ่งหน้า</b> — เหมาะกับเอกสารหน้าเดียวที่ความยาวคงที่</p>
+              <p class="text-[13.5px]"><span class="mono text-[12px]">layout_config</span> ไม่มีความหมายในโหมดนี้</p>
+            </div>
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">template_engine = 'banded'</div>
+              <p class="text-[13.5px] mb-2">HTML ประกาศ <span class="mono text-[12px]">&lt;template data-band="..."&gt;</span> (page-header / detail-header / detail-row / filler-row / summary / page-footer) แล้ว paginator ในหน้าวัดความสูงจริงของแต่ละแถว<b>แล้วแบ่งหน้าเอง</b> — เหมาะกับเอกสารที่จำนวนบรรทัดไม่แน่นอน (ใบเสนอราคา/ใบกำกับที่มีหลายสิบรายการ)</p>
+              <p class="text-[13.5px]"><span class="mono text-[12px]">layout_config</span> (jsonb) คุมความสูง detail band, พื้นที่กันไว้ให้ summary และ margin</p>
+            </div>
+          </div>
+          <div class="rulebox mb-9"><div class="rc mb-1">RULE · PDF ออกจาก Gotenberg ไม่ใช่ไลบรารีใน process</div><p class="text-[13.5px]">HTML ที่ render เสร็จถูกส่งไปแปลงเป็น PDF ที่ <b>Gotenberg</b> (ตั้งค่าด้วย env <span class="mono text-[12px]">GOTENBERG_URL</span>) · <span class="mono text-[12px]">emulated_media_type</span> ต่อเทมเพลต ส่งต่อเป็น <span class="mono text-[12px]">emulatedMediaType</span> ของ Gotenberg — ค่าปกติคือ <span class="mono text-[12px]">'print'</span> ซึ่ง<b>จำเป็น</b>ถ้าต้องการให้ <span class="mono text-[12px]">thead</span>/<span class="mono text-[12px]">tfoot</span> ซ้ำทุกหน้า · <span class="mono text-[12px]">mock_data</span> ใช้เฉพาะ preview/Generate Test PDF ในหน้า admin เท่านั้น ผู้เรียกจริงส่ง <span class="mono text-[12px]">params</span> ของตัวเองเสมอ</p></div>
+
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">A3</span><h4 class="font-semibold text-[16px]">เลขรันของ <span class="mono text-[13px]">document_types</span> เป็นคนละกลไกกับเลขที่เอกสารของ PO/QT/Receipt</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ต้องไม่สับสน:</b> เลขที่ <span class="mono text-[12px]">PO-{YYYY}-{00001}</span> · <span class="mono text-[12px]">QT-…</span> · <span class="mono text-[12px]">INV-…</span> · <span class="mono text-[12px]">ADJ-…</span> ออกจากตัวนับ<b>ใน BC ของเอกสารนั้นเอง</b> (<span class="mono text-[12px]">*_number_counters</span> ที่ extend <span class="mono text-[12px]">DocumentNumberCounterEntity</span>) — <b>ไม่ได้</b>เรียกมาที่ report-bc · ตัวนับใน <span class="mono text-[12px]">document_running_numbers</span> เป็นบริการเลขรันแบบ<b>ตั้งค่าได้จากหน้าจอ</b> สำหรับประเภทเอกสารที่ admin ประกาศเอง ผ่าน <span class="mono text-[12px]">POST /document-types/{id}/running-number/next</span></p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">รูปแบบที่รองรับ:</b> <span class="mono text-[12px]">{YYYY}</span> · <span class="mono text-[12px]">{YY}</span> · <span class="mono text-[12px]">{MM}</span> · <span class="mono text-[12px]">{DD}</span> · <span class="mono text-[12px]">{SEQ:n}</span> (บังคับมีพอดี 1 ตัว) เช่น <span class="mono text-[12px]">INV-{YYYY}{MM}-{SEQ:5}</span> · การออกเลขอยู่ใน transaction เดียวกับ <span class="mono text-[12px]">SELECT … FOR UPDATE</span> บนแถวตัวนับ (สร้างแถวด้วย <span class="mono text-[12px]">INSERT … ON CONFLICT DO NOTHING</span> ก่อน lock เพื่อไม่ให้ call แรกชนกันเอง)</p>
+            <div class="rulebox"><div class="rc mb-1">RULE · เปลี่ยนงวด = รีเซ็ตเอง ไม่ต้องมีคอลัมน์ปี</div><p class="text-[13.5px]">token วันที่ถูกแทนเป็น<b>ค่าจริง</b> ตอนสร้าง regex ไม่ใช่ <span class="mono text-[12px]">\d{4}</span> — พอขึ้นเดือน/ปีใหม่ <span class="mono text-[12px]">last_value</span> ของงวดก่อนจะ match ไม่ผ่านเอง แล้วลำดับเริ่มที่ 1 ใหม่ · กลไกเดียวกันนี้ครอบคลุมทั้ง "admin แก้ format" และ "ขึ้นงวดใหม่" จึงไม่ต้องมีคอลัมน์ <span class="mono text-[12px]">year</span> แยกแบบตัวนับของ PO/QT</p></div>
+          </div>
+          <div class="rulebox mb-9"><div class="rc mb-1">ช่องว่างที่ยังเปิดอยู่ · timezone ของเลขรัน</div><p class="text-[13.5px]"><span class="mono text-[12px]">running-number-format.util.ts</span> อ่านวัน/เดือน/ปีจาก <span class="mono text-[12px]">new Date()</span> ด้วย <span class="mono text-[12px]">getFullYear()</span>/<span class="mono text-[12px]">getMonth()</span>/<span class="mono text-[12px]">getDate()</span> ซึ่งเป็น<b>เวลาท้องถิ่นของเครื่อง</b> ไม่ใช่ <span class="mono text-[12px]">BUSINESS_TIMEZONE</span> (Asia/Bangkok) ตามกฎของโปรเจกต์ · ถ้า deploy บนเครื่องที่ตั้ง TZ เป็น UTC เอกสารที่ออกหลัง 17:00 น. ไทยจะได้เลขของ<b>วันก่อนหน้า</b> และตอนข้ามปีจะออกเลขปีเก่า — ต้องเปลี่ยนไปใช้ <span class="mono text-[12px]">toBusinessDate()</span>/<span class="mono text-[12px]">businessYearOf()</span> จาก <span class="mono text-[12px]">@lib/common/utils/business-date.util.ts</span> เหมือนตัวนับของ BC อื่น</p></div>
+
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">A4</span><h4 class="font-semibold text-[16px]">Endpoint &amp; Permission ที่มีอยู่จริง</h4></div>
+          <div class="card overflow-hidden mb-9">
+            <table class="d">
+              <thead><tr><th style="width:330px">Endpoint</th><th style="width:290px">Permission</th><th>หมายเหตุ</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">POST /print-templates</span></td><td><span class="mono text-[12px]">report:print_template_create</span></td><td>สร้างเทมเพลต + อัปโหลด HTML/JS ขึ้น MinIO</td></tr>
+                <tr><td><span class="mono text-[12px]">GET /print-templates</span> · <span class="mono text-[12px]">GET /print-templates/{id}</span></td><td><span class="mono text-[12px]">report:print_template_read</span></td><td>เฉพาะ <span class="mono text-[12px]">{id}</span> เท่านั้นที่ดึงเนื้อ HTML จาก MinIO มาด้วย</td></tr>
+                <tr><td><span class="mono text-[12px]">PUT /print-templates/{id}</span></td><td><span class="mono text-[12px]">report:print_template_update</span></td><td>บันทึกเวอร์ชันใหม่ + เขียนแถวใน <span class="mono text-[12px]">print_template_histories</span></td></tr>
+                <tr><td><span class="mono text-[12px]">DELETE /print-templates/{id}</span></td><td><span class="mono text-[12px]">report:print_template_delete</span></td><td>—</td></tr>
+                <tr><td><span class="mono text-[12px]">POST /print-templates/preview</span> · <span class="mono text-[12px]">POST /print-templates/{id}/render</span></td><td><span class="mono text-[12px]">report:print_template_render</span></td><td><span class="mono text-[12px]">preview</span> render จาก payload ที่ส่งมาสด ๆ (ยังไม่ต้องบันทึก) · <span class="mono text-[12px]">render</span> ใช้เทมเพลตที่บันทึกแล้ว</td></tr>
+                <tr><td><span class="mono text-[12px]">POST /print-templates/{id}/histories/{historyId}/restore</span></td><td><span class="mono text-[12px]">report:print_template_restore</span></td><td>ย้อนกลับไปเวอร์ชันเดิม — บันทึกเป็น <span class="mono text-[12px]">action=restore</span> แถวใหม่ ไม่ลบประวัติ</td></tr>
+                <tr><td><span class="mono text-[12px]">GET /print-template-histories</span> · <span class="mono text-[12px]">GET /print-template-histories/{id}</span></td><td><span class="mono text-[12px]">report:print_template_history_read</span></td><td>—</td></tr>
+                <tr><td><span class="mono text-[12px]">POST · GET · PUT · DELETE /document-types</span></td><td><span class="mono text-[12px]">report:document_type_create</span> / <span class="mono text-[12px]">_read</span> / <span class="mono text-[12px]">_update</span> / <span class="mono text-[12px]">_delete</span></td><td>—</td></tr>
+                <tr><td><span class="mono text-[12px]">GET /document-types/{id}/running-number</span></td><td><span class="mono text-[12px]">report:document_type_running_number_read</span></td><td>ดูสถานะตัวนับ (ไม่กินเลข)</td></tr>
+                <tr><td><span class="mono text-[12px]">POST /document-types/{id}/running-number/next</span></td><td><span class="mono text-[12px]">report:document_type_running_number_generate</span></td><td><b>กินเลขจริง</b> — ประเภทที่ <span class="mono text-[12px]">has_running_number=false</span> จะได้ 400</td></tr>
+                <tr><td><span class="mono text-[12px]">POST /invoices/mock-pdf</span></td><td><span class="mono text-[12px]">report:print_invoice</span></td><td>endpoint ตัวอย่าง/ทดสอบสายพิมพ์แบบครบวงจร ยังไม่ผูกกับเอกสารจริงจาก sales-bc/finance-bc</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid lg:grid-cols-2 gap-6">
+            <div class="rulebox ok"><div class="rc mb-1">หน้าจอ admin ของ report-bc อยู่ที่ iam</div><p class="text-[13.5px]">report-bc <b>ไม่มี view ของตัวเอง</b> — หน้าจัดการเทมเพลตและประเภทเอกสารเป็น EJS ใน iam admin console (<span class="mono text-[12px]">/views/print-templates</span> · <span class="mono text-[12px]">/views/document-types</span>, permission <span class="mono text-[12px]">page:view_print_templates</span> / <span class="mono text-[12px]">page:view_document_types</span>) ที่ยิง API ข้ามมาที่ report-bc — ดู srs-p1.html §08</p></div>
+            <div class="rulebox"><div class="rc mb-1">ยังไม่ได้ทำ · รอบถัดไป</div><p class="text-[13.5px]">Read Model ทั้ง 6 ตัวในหัวข้อ 04 · ตาราง <span class="mono text-[12px]">processed_events</span> · การ subscribe event (ต้องมี outbox ที่ฝั่ง producer ก่อน) · ผูก <span class="mono text-[12px]">document_types</span> เข้ากับการออกเลขจริงของเอกสาร P4/P5 (วันนี้ยังต่างคนต่างนับ) · แก้ timezone ของเลขรันตามกล่องเตือนใน A3</p></div>
           </div>
         </div>
       </section>

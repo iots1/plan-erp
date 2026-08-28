@@ -426,10 +426,26 @@ erDiagram
     }
     STOCK_ADJUSTMENTS {
         uuid id PK
+        string adjustment_number "ADJ-{YYYY}-{00001} unique"
+        string status "DRAFT_SUBMITTED_CANCELLED"
+        uuid warehouse_id FK
+        timestamptz document_date
+        uuid submitted_by "ref iam"
+        timestamptz submitted_at
+        string remark_th
+        string remark_en
+        uuid cancelled_by "ref iam"
+        timestamptz cancelled_at
+        string cancel_reason
+    }
+    STOCK_ADJUSTMENT_ITEMS {
+        uuid id PK
+        uuid adjustment_id FK
         uuid lot_id FK
-        int qty_delta
-        string reason
-        uuid approved_by "ref iam"
+        uuid product_id "denormalized from lot"
+        int counted_qty "client-supplied"
+        int system_qty "server snapshot at submit"
+        int qty "signed delta = counted - system"
     }
     STOCK_ENTRIES {
         uuid id PK
@@ -500,7 +516,8 @@ erDiagram
     GOODS_RECEIPTS ||--o{ GOODS_RECEIPT_ITEMS : contains
     GOODS_RECEIPT_ITEMS ||--|| LOTS : creates
     PRODUCTS ||--o{ BUNDLE_ITEMS : "bundle of"
-    LOTS ||--o{ STOCK_ADJUSTMENTS : adjusts
+    STOCK_ADJUSTMENTS ||--|{ STOCK_ADJUSTMENT_ITEMS : contains
+    LOTS ||--o{ STOCK_ADJUSTMENT_ITEMS : adjusts
     STOCK_ENTRIES ||--o{ STOCK_ENTRY_ITEMS : contains
     LOTS ||--o{ STOCK_ENTRY_ITEMS : "moves / repacks"
     WAREHOUSES ||--o{ STOCK_ENTRIES : "from / to"
@@ -939,7 +956,7 @@ sequenceDiagram
           <div class="part-label mb-5"><span class="part-num" style="background:rgba(220,90,22,.14);color:var(--signal)">08</span><h3 class="text-xl font-semibold">Implementation Decision Record · บันทึกการตัดสินใจตอน implement</h3></div>
 
           <div class="card p-6 mb-9" style="border-left:3px solid var(--signal)">
-            <p class="text-[14px]" style="color:var(--ink-soft)">หัวข้อนี้บันทึก <b style="color:var(--ink)">จุดที่โค้ดจริงตัดสินใจต่างจาก/ละเอียดกว่าที่ SRS ระบุไว้</b> ตอน implement <b style="color:var(--ink)">Stock Settings · Lot/Stock Ledger · Goods Receipt (UC-3.1)</b> — เขียนไว้เพื่อให้คนที่อ่านสเปกแล้วไปเปิดโค้ดไม่ต้องเดาว่าทำไมไม่เหมือนกัน และเพื่อให้ decision เหล่านี้ถูก challenge ได้ในภายหลัง แต่ละข้อระบุ <b style="color:var(--ink)">ทางเลือกที่ไม่ได้เลือก</b> และ <b style="color:var(--ink)">ต้นทุนของการเลือกผิด</b> ไว้ด้วยเสมอ</p>
+            <p class="text-[14px]" style="color:var(--ink-soft)">หัวข้อนี้บันทึก <b style="color:var(--ink)">จุดที่โค้ดจริงตัดสินใจต่างจาก/ละเอียดกว่าที่ SRS ระบุไว้</b> ตอน implement <b style="color:var(--ink)">Stock Settings · Lot/Stock Ledger · Goods Receipt (UC-3.1) · Stock Entry ทั้ง 4 ประเภทรวม Repack (UC-3.4) · Bundle explosion (UC-3.3) · Stock Adjustment</b> — เขียนไว้เพื่อให้คนที่อ่านสเปกแล้วไปเปิดโค้ดไม่ต้องเดาว่าทำไมไม่เหมือนกัน และเพื่อให้ decision เหล่านี้ถูก challenge ได้ในภายหลัง แต่ละข้อระบุ <b style="color:var(--ink)">ทางเลือกที่ไม่ได้เลือก</b> และ <b style="color:var(--ink)">ต้นทุนของการเลือกผิด</b> ไว้ด้วยเสมอ</p>
           </div>
 
           <!-- ===== D1 · UOM conversion ===== -->
@@ -989,7 +1006,7 @@ sequenceDiagram
               </tbody>
             </table>
           </div>
-          <div class="rulebox mb-9"><div class="rc mb-1">ช่องว่างที่ยังเปิดอยู่ · ต้องรู้</div><p class="text-[13.5px]">ทุกวันนี้ถ้าล็อตถูกใช้ไปบางส่วนแล้ว <b>ยังไม่มีทางแก้ GRN ใบนั้นผ่าน API เลย</b> — ทางแก้ที่ถูกต้องคือ <b>Purchase Return</b> (เอกสารคนละใบ ยังไม่ได้ทำ) หรือ Stock Adjustment จาก Stock Entry (M3) · จนกว่าจะมีสองตัวนี้ การยกเลิก GRN ใช้ได้จริงเฉพาะกรณีที่ยังไม่มีใครแตะล็อตนั้นเลย</p></div>
+          <div class="rulebox mb-9"><div class="rc mb-1">ช่องว่างที่ยังเปิดอยู่ · ต้องรู้</div><p class="text-[13.5px]">ทุกวันนี้ถ้าล็อตถูกใช้ไปบางส่วนแล้ว <b>ยังไม่มีทางแก้ GRN ใบนั้นผ่าน API เลย</b> — ทางแก้ที่ถูกต้องคือ <b>Purchase Return</b> (เอกสารคนละใบ <b>ยังไม่ได้ทำ</b>) หรือ <b>Stock Adjustment</b> ซึ่ง<b>ทำแล้ว</b> — แต่เป็นเอกสารแยกของตัวเอง ไม่ใช่ประเภทหนึ่งของ Stock Entry อย่างที่เคยวางไว้ (ดู D9) · จนกว่าจะมี Purchase Return การยกเลิก GRN ใช้ได้จริงเฉพาะกรณีที่ยังไม่มีใครแตะล็อตนั้นเลย</p></div>
 
           <!-- ===== D4 · เล็กๆ แต่ตั้งใจ ===== -->
           <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D4</span><h4 class="font-semibold text-[16px]">จุดเล็กที่จงใจทำต่างจากโมดูลอื่น</h4></div>
@@ -1061,9 +1078,29 @@ sequenceDiagram
             <div class="rulebox"><div class="rc mb-1">เช็คสต็อกรวม demand ข้ามบรรทัด ไม่ใช่เช็คทีละบรรทัด</div><p class="text-[13.5px]"><span class="mono text-[12px]">CheckAvailability</span> รวม demand ของสินค้าย่อยจาก<b>ทุกบรรทัด</b>ก่อนเทียบกับสต็อก — ถ้าชุด A กับชุด B ใช้สินค้าย่อยตัวเดียวกัน ทั้งคู่ต้อง<b>แย่งของกันจริง</b> ไม่ใช่ต่างคนต่างผ่านเทียบกับยอดที่มีพอสำหรับคนเดียว · เมื่อสินค้าย่อยตัวใดขาด ทุกบรรทัดที่ใช้ตัวนั้นจะถูก flag พร้อมกัน เพื่อให้ error message ฝั่ง sales-bc บอกครบว่าบรรทัดไหนบ้างที่เกี่ยวข้อง</p></div>
           </div>
 
+
+          <!-- ===== D9 · Stock Adjustment ===== -->
+          <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D9</span><h4 class="font-semibold text-[16px]">Stock Adjustment — เอกสารของตัวเอง ไม่ใช่ entry_type ที่ 5 ของ Stock Entry</h4></div>
+          <div class="card p-6 mb-4">
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> การกระทบยอด/ปรับสต็อก (Stock Reconciliation ตาม &sect;06 <b>RULE · ABSOLUTE RECONCILIATION</b>) เป็นโมดูลและตารางแยกของตัวเอง — <span class="mono text-[12px]">stock_adjustments</span> / <span class="mono text-[12px]">stock_adjustment_items</span> / <span class="mono text-[12px]">stock_adjustment_number_counters</span> (เลขที่ <span class="mono text-[12px]">ADJ-{YYYY}-{00001}</span>) — <b>ไม่ใช่</b> <span class="mono text-[12px]">entry_type</span> ที่ 5 ของ <span class="mono text-[12px]">stock_entries</span> · state machine 3 สถานะ <span class="mono text-[12px]">DRAFT → SUBMITTED → CANCELLED</span> · permission <span class="mono text-[12px]">stock_adjustment:*</span> 5 ตัว (view/create/update/submit/cancel) · header <span class="mono text-[12px]">extends SubmittableDocumentEntity</span> และบรรทัด <span class="mono text-[12px]">extends DocumentLineItemEntity</span> เหมือนเอกสาร submittable ตัวอื่น</p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ทำไมไม่ยัดเข้า Stock Entry:</b> อีก 4 <span class="mono text-[12px]">entry_type</span> ล้วนรับ <b>จำนวนที่เคลื่อนไหว</b> (delta) จากผู้ใช้ตรง ๆ แต่ใบปรับสต็อกรับ <b>จำนวนที่นับได้จริง</b> (absolute) แล้วให้ระบบคำนวณ delta เอง — สองอย่างนี้ตีความ input คนละแบบบนคอลัมน์ชื่อเดียวกัน (<span class="mono text-[12px]">qty</span>) ถ้าอยู่ตารางเดียวกันจะกลายเป็นกับดักที่อ่านโค้ดแล้วบอกไม่ได้ว่าเลขในบรรทัดหมายถึงอะไรจนกว่าจะไปดู <span class="mono text-[12px]">entry_type</span> ก่อนทุกครั้ง · อีกข้อคือใบปรับสต็อก<b>อ้างล็อตโดยตรง</b> (<span class="mono text-[12px]">lot_id</span> บังคับ ไม่ใช่ให้ FIFO/FEFO เลือกให้) เพราะการนับของนับที่ล็อตจริงบนชั้น ไม่ใช่ที่ยอดรวมของสินค้า</p>
+            <div class="rulebox"><div class="rc mb-1">RULE · qty บนบรรทัดคือ delta ที่ server คำนวณ ไม่ใช่ค่าที่ client ส่ง</div><p class="text-[13.5px]">client ส่งได้แค่ <span class="mono text-[12px]">lot_id</span> + <span class="mono text-[12px]">counted_qty</span> · ตอน <span class="mono text-[12px]">submit()</span> ระบบ lock ล็อต อ่าน <span class="mono text-[12px]">available_qty</span> สด ๆ เก็บลง <span class="mono text-[12px]">system_qty</span> แล้วเขียน <span class="mono text-[12px]">qty = counted_qty − system_qty</span> (ติดลบได้) — ตัวเลขที่เห็นตอน DRAFT จึงเป็นแค่ preview ถ้าล็อตขยับระหว่าง create กับ submit ใบนี้จะปรับตาม<b>ยอดจริง ณ เวลา submit</b> ไม่ใช่ยอดตอนกรอก · <span class="mono text-[12px]">line_total</span> เป็น 0 เสมอ (สืบทอดมาแต่ไม่ใช้ — ใบปรับสต็อกไม่มีมิติเงิน)</p></div>
+          </div>
+          <div class="grid lg:grid-cols-2 gap-6 mb-9">
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">ยกเลิกได้เฉพาะตอนที่ยังไม่มีใครแตะล็อตต่อ</div>
+              <p class="text-[13.5px] mb-2"><span class="mono text-[12px]">cancel()</span> คืนล็อตกลับไปที่ <span class="mono text-[12px]">system_qty</span> เดิม แต่ทำได้ก็ต่อเมื่อ <span class="mono text-[12px]">lot.available_qty</span> ยังเท่ากับ <span class="mono text-[12px]">counted_qty</span> ที่ใบนี้ตั้งไว้เป๊ะ ไม่งั้น <b>409</b> พร้อมบอกยอดที่เจอกับยอดที่คาด</p>
+              <p class="text-[13.5px]">เป็นกฎเดียวกับ <span class="mono text-[12px]">GoodsReceiptsService.cancel()</span> (D3) — "ย้อนได้เฉพาะสิ่งที่ยังไม่ถูกแตะต่อ" · ถ้าแตะไปแล้ว ทางแก้ที่ถูกต้องคือ<b>ออกใบปรับสต็อกใบใหม่</b> ไม่ใช่ย้อนใบเดิมบางส่วน</p>
+            </div>
+            <div class="card p-6">
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">ไม่มีการอ้างข้าม BC เลยสักจุด</div>
+              <p class="text-[13.5px] mb-2">ต่างจาก <span class="mono text-[12px]">GoodsReceipt</span> ที่ต้องคุยกับ supplier-bc ตลอด — ใบปรับสต็อกเป็นเรื่องภายใน inventory-bc ล้วน จึงไม่มี RPC, ไม่มี sync ค้าง, ไม่มี <span class="mono text-[12px]">*_synced_at</span> ให้ต้องซ่อม</p>
+              <p class="text-[13.5px]">คอลัมน์ที่สืบทอดมาแต่ไม่ใช้: <span class="mono text-[12px]">sent_by/at</span> · <span class="mono text-[12px]">approved_by/at</span> · <span class="mono text-[12px]">is_vat_included</span> — ใบนี้ไม่มีขั้นส่ง/อนุมัติ และไม่มีภาษี (เหตุผลเดียวกับ <span class="mono text-[12px]">GoodsReceipt</span>)</p>
+            </div>
+          </div>
           <div class="card p-6" style="border-left:3px solid var(--blueprint)">
             <div class="mono text-[11px] mb-3" style="color:var(--blueprint)">ยังไม่ได้ทำ · รอบถัดไป</div>
-            <p class="text-[13.5px]">valuation strategy override ระดับ item (ตอนนี้ <span class="mono text-[12px]">MATERIAL_ISSUE</span>/<span class="mono text-[12px]">REPACK</span> ใช้ <span class="mono text-[12px]">stock_settings.valuation_method</span> ระดับระบบเดียวเท่านั้น) · taxes &amp; charges รายบรรทัด (P4 ฝั่งขาย)</p>
+            <p class="text-[13.5px]">valuation strategy override ระดับ item (ตอนนี้ <span class="mono text-[12px]">MATERIAL_ISSUE</span>/<span class="mono text-[12px]">REPACK</span> ใช้ <span class="mono text-[12px]">stock_settings.valuation_method</span> ระดับระบบเดียวเท่านั้น) · <b>Purchase Return</b> — ช่องว่างเดียวที่เหลือของ D3 · outbox / domain event จริง (<span class="mono text-[12px]">stock.deducted</span> · <span class="mono text-[12px]">lot.created</span> ยังไม่ถูก emit ออกไปจริง) <span class="text-[11px]" style="color:var(--muted)">(taxes &amp; charges รายบรรทัดฝั่งขาย ทำเสร็จแล้วใน P4 M7 · Stock Adjustment ทำเสร็จแล้ว ดู D9)</span></p>
           </div>
         </div>
       </section>
