@@ -372,6 +372,7 @@ erDiagram
         string email UK
         string department
         string status "active/pending/suspended"
+        timestamptz expired_at "null = never expires"
     }
     ROLES {
         uuid id PK
