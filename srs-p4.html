@@ -697,7 +697,7 @@ sequenceDiagram
         SAL-->>REP: 409 · ต้องจัดการผ่านเอกสารคืนสินค้าแทน (ยังไม่มีในเฟสนี้)
     end
 
-    Note over SAL,DB: เฟสถัดไป (ยังไม่ implement) · Delivery Note submit จะเรียก recomputeDeliveryStatus() ภายใน<br/>ทรานแซกชันเดียวกับการตัดสต็อก เพื่ออัปเดต delivered_qty แล้วเลื่อนสถานะเป็น PARTIAL/CLOSED อัตโนมัติ
+    Note over SAL,DB: implement แล้ว (M4) · Delivery Note submit เรียก recomputeDeliveryStatus() ภายใน<br/>ทรานแซกชันเดียวกับการตัดสต็อก เพื่ออัปเดต delivered_qty แล้วเลื่อนสถานะเป็น PARTIAL/CLOSED อัตโนมัติ
 </pre>
           </div>
 
