@@ -14,6 +14,7 @@ class ErpDocnav extends HTMLElement {
     { href: 'i18n-guide.html', icon: '🌐', label: 'i18n Guide (TH/EN)', desc: 'แนวทางพัฒนาระบบ 2 ภาษา' },
     { href: 'backend-convention.html', icon: '⚙️', label: 'Backend Conventions', desc: 'Naming · JSON:API · Error · Query Params' },
     { href: 'product-image-upload-guide.html', icon: '🖼️', label: 'Product Image Upload Guide', desc: 'Presigned Upload · Multipart Create · MinIO' },
+    { href: 'api-workflow-guide.html', icon: '🧭', label: 'Workflow & API Guide', desc: 'Flow ทั้งระบบ · Endpoint · Payload สำหรับ Frontend' },
     { href: 'nextjs-permission-guide.html', icon: '🔐', label: 'Next.js Integration Guide', desc: 'Frontend Integration · Permission System' },
     { href: 'observability-logging-guide.html', icon: '📊', label: 'Observability (Tempo/Loki)', desc: 'OpenTelemetry Traces · pino-http Logs' },
     { href: 'postgresql-pgpool-cluster-guide.html', icon: '🔌', label: 'Connection Pooling (Pgpool-II)', desc: 'HA Cluster Setup · Watchdog Failover · Grafana' },

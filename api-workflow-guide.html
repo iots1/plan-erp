@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workflow &amp; API Sequence Guide — สำหรับทีม Frontend · ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="W" title="Workflow &amp; API" subtitle="FRONTEND INTEGRATION GUIDE" width="290">
+    <nav slot="nav">
+      <a href="#overview"   class="navlink"><span class="n">01</span> ภาพรวม · มีกี่ Flow</a>
+      <a href="#roles"      class="navlink"><span class="n">02</span> Role → Flow → สิทธิ์</a>
+      <a href="#getting-started" class="navlink"><span class="n">03</span> เริ่มต้นเรียก API</a>
+      <a href="#flow-buy"   class="navlink"><span class="n">04</span> กลุ่ม A · จัดซื้อ &amp; รับของ</a>
+      <a href="#flow-sell"  class="navlink"><span class="n">05</span> กลุ่ม B · ขาย &amp; ส่งของ</a>
+      <a href="#flow-money" class="navlink"><span class="n">06</span> กลุ่ม C · การเงิน &amp; บัญชี</a>
+      <a href="#flow-stock" class="navlink"><span class="n">07</span> กลุ่ม D · คลังภายใน</a>
+      <a href="#flow-report" class="navlink"><span class="n">08</span> กลุ่ม E · รายงาน &amp; พิมพ์</a>
+      <a href="#master"     class="navlink"><span class="n">09</span> Master Data &amp; Settings</a>
+      <a href="#index"      class="navlink"><span class="n">10</span> Endpoint Index ทั้งหมด</a>
+    </nav>
+    <div slot="footnote">
+      <a href="erp-architecture.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่เอกสารสถาปัตยกรรม</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[1000px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="erp-architecture.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่เอกสารสถาปัตยกรรม (Executive Overview)
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Frontend Integration Guide</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Workflow &amp; API Sequence<br>
+          <span class="text-[#7FE3DE]">ทั้งระบบมีกี่ Flow · แต่ละ Flow ยิง Endpoint ไหน</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          เอกสารนี้ตอบคำถามเดียว — <span class="text-white font-medium">“ผู้ใช้คนนี้กดปุ่มนี้ ต้องยิงไปที่ไหน ด้วย payload อะไร แล้วได้อะไรกลับมา”</span>
+          เรียงตามลำดับการทำงานจริงของแต่ละบทบาท พร้อมตัวอย่าง payload และสถานะเอกสารที่เปลี่ยนในแต่ละขั้น
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip">16 Business Flows</span>
+          <span class="chip">271 REST Endpoints</span>
+          <span class="chip">8 Bounded Contexts</span>
+          <span class="chip">JSON:API Envelope</span>
+        </div>
+        <p class="mt-7 mono text-[11px] text-[#7B8CA6]">
+          endpoint ทุกเส้นในเอกสารนี้ดึงจากโค้ดจริงใน <span class="text-[#9FB0C6]">iots1/erp-api</span> ไม่ได้เขียนจากแผน · ปรับปรุงล่าสุด 2026-08-29
+        </p>
+      </div>
+    </header>
+
+    <div class="max-w-[1000px] mx-auto px-6 sm:px-10">
+
+      <!-- ============ 01 OVERVIEW ============ -->
+      <section id="overview" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — Overview</div>
+        <h2 class="display text-3xl mb-6">ภาพรวม · ทั้งระบบมีกี่ Flow</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ระบบแบ่งเป็น <b>5 กลุ่มงาน</b> รวม <b>16 flow</b> ที่ผู้ใช้จับต้องได้จริง ทุก flow เป็นเอกสารที่มีสถานะ
+          (<span class="mono text-[12px]">DRAFT → …</span>) และ <b>สต็อก/บัญชีจะเคลื่อนก็ต่อเมื่อกดยืนยันเท่านั้น</b> —
+          ตอนสร้างร่างยังไม่มีอะไรเกิดขึ้นในระบบหลังบ้าน
+        </p>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+flowchart LR
+  subgraph A["กลุ่ม A · จัดซื้อ"]
+    A2["PO<br/>ใบสั่งซื้อ"] --> A3["GRN<br/>ใบรับสินค้า"]
+  end
+  subgraph D["กลุ่ม D · คลัง"]
+    D1["Stock Entry<br/>โอน/เบิก/แปรรูป"]
+    D2["Stock Adjustment<br/>ปรับยอด"]
+  end
+  subgraph B["กลุ่ม B · ขาย"]
+    B1["Quotation<br/>ใบเสนอราคา"] --> B2["Sales Order<br/>ใบสั่งขาย"] --> B3["Delivery Note<br/>ใบส่งของ"]
+  end
+  subgraph C["กลุ่ม C · การเงิน"]
+    C1["Receipt / Tax Invoice<br/>ใบกำกับภาษี"] --> C3["Billing Note<br/>ใบวางบิล"] --> C4["Payment Entry<br/>รับชำระ"]
+    C1 --> C2["CN / DN<br/>ใบลด-เพิ่มหนี้"]
+  end
+  A3 -->|"สต็อกเข้า"| STOCK[(สต็อก · Lot)]
+  D1 --> STOCK
+  D2 --> STOCK
+  STOCK -->|"สต็อกออก"| B3
+  B3 -->|"stock.deducted"| GL[(บัญชีแยกประเภท<br/>COGS · P&amp;L)]
+  B3 --> C1
+  C1 --> GL
+  C4 --> GL
+</pre>
+        </div>
+
+        <div class="rulebox mb-6">
+          <div class="rc mb-1">กฎข้อเดียวที่ FE ต้องจำให้ขึ้นใจ</div>
+          <p class="text-[13.5px]">
+            ทุกเอกสารสร้างมาเป็น <span class="mono text-[12px]">DRAFT</span> ก่อนเสมอ และ <b>แก้ไข/ลบได้เฉพาะตอนเป็น DRAFT</b>
+            เท่านั้น · พอกด <span class="mono text-[12px]">submit</span>/<span class="mono text-[12px]">issue</span> แล้ว
+            เอกสารจะถูกล็อก เลขที่เอกสารถูกออก และสต็อก/บัญชีเคลื่อนทันที · การแก้ไขหลังจากนั้นทำได้ทางเดียวคือ
+            <b>ยกเลิกแล้วออกใหม่</b> หรือ <b>ออกใบลด/เพิ่มหนี้</b> — ปุ่ม “แก้ไข” บนหน้าจอจึงต้องซ่อนเมื่อสถานะไม่ใช่ DRAFT
+          </p>
+        </div>
+
+        <div class="card overflow-hidden mb-8">
+          <table class="d">
+            <thead><tr><th style="width:64px">#</th><th>Flow</th><th>บทบาทหลัก</th><th>เอกสาร · สถานะ</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">A1</td><td>ตั้งค่าข้อมูลหลัก</td><td>Master Data Admin</td><td>ไม่มีสถานะ (CRUD ตรง)</td></tr>
+              <tr><td class="mono">A2</td><td>สั่งซื้อสินค้า</td><td>Procurement / จัดซื้อ</td><td>PO · DRAFT→APPROVED→SENT→PARTIAL→RECEIVED</td></tr>
+              <tr><td class="mono">A3</td><td>รับสินค้าเข้าคลัง</td><td>Warehouse Staff / QC</td><td>GRN · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">B1</td><td>เสนอราคา</td><td>Sales Rep</td><td>Quotation · DRAFT→SENT→APPROVED</td></tr>
+              <tr><td class="mono">B2</td><td>แปลงเป็นใบสั่งขาย</td><td>Sales Manager</td><td>SO · CONFIRMED→PARTIAL→CLOSED</td></tr>
+              <tr><td class="mono">B3</td><td>ส่งของ</td><td>Warehouse Staff</td><td>DN · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">C1</td><td>ออกใบกำกับภาษี/ใบเสร็จ</td><td>Accountant</td><td>Receipt · DRAFT→ISSUED→VOID</td></tr>
+              <tr><td class="mono">C2</td><td>ใบลดหนี้ / ใบเพิ่มหนี้</td><td>Accountant</td><td>Receipt (CN/DN) · DRAFT→ISSUED</td></tr>
+              <tr><td class="mono">C3</td><td>วางบิล</td><td>AR Clerk</td><td>Billing Note · DRAFT→ISSUED→CANCELLED</td></tr>
+              <tr><td class="mono">C4</td><td>รับ/จ่ายชำระเงิน</td><td>AR / AP Clerk</td><td>Payment · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">C5</td><td>กำหนดงวดชำระ</td><td>AR Clerk</td><td>ไม่มีสถานะ (แทนที่ทั้งชุด)</td></tr>
+              <tr><td class="mono">D1</td><td>โอน / เบิก / แปรรูป</td><td>Warehouse Staff</td><td>Stock Entry · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">D2</td><td>ปรับยอดสต็อก</td><td>Warehouse Manager</td><td>Stock Adjustment · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">E1</td><td>รายงานสต็อก</td><td>Warehouse Manager</td><td>อ่านอย่างเดียว</td></tr>
+              <tr><td class="mono">E2</td><td>รายงานบัญชี &amp; กำไร</td><td>Accountant / Executive</td><td>อ่านอย่างเดียว</td></tr>
+              <tr><td class="mono">E3</td><td>พิมพ์เอกสาร (PDF)</td><td>ทุกบทบาท</td><td>เรียก render</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ 02 ROLES ============ -->
+      <section id="roles" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Roles</div>
+        <h2 class="display text-3xl mb-6">Role → Flow → สิทธิ์ที่ต้องมี</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          สิทธิ์ในระบบเป็นรูปแบบ <span class="mono text-[12px]">resource:action</span> และ backend บังคับทุก endpoint
+          โดยอัตโนมัติ · FE ใช้รายการนี้ตัดสินว่า<b>จะแสดงเมนู/ปุ่มไหน</b> — ถ้าไม่มีสิทธิ์แล้วยิงไป จะได้
+          <span class="mono text-[12px]">403</span> กลับมาเสมอ (ดูวิธีอ่านสิทธิ์จาก token ใน
+          <a href="nextjs-permission-guide.html" class="underline">Next.js Integration Guide</a>)
+        </p>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>บทบาท</th><th>ทำ Flow ไหน</th><th>สิทธิ์กลุ่มหลัก</th></tr></thead>
+            <tbody>
+              <tr><td><b>Master Data Admin</b><br><span class="mono text-[11px]">ผู้ดูแลข้อมูลหลัก</span></td><td class="mono text-[12px]">A1</td><td class="mono text-[11.5px]">product:* · item_group:* · brand:* · uom:* · warehouse:* · price_list:* · item_price:*</td></tr>
+              <tr><td><b>Procurement</b><br><span class="mono text-[11px]">ฝ่ายจัดซื้อ</span></td><td class="mono text-[12px]">A2</td><td class="mono text-[11.5px]">supplier:* · purchase_order:create/view/update/send/approve/cancel</td></tr>
+              <tr><td><b>Warehouse Staff</b><br><span class="mono text-[11px]">เจ้าหน้าที่คลัง</span></td><td class="mono text-[12px]">A3 · B3 · D1</td><td class="mono text-[11.5px]">goods_receipt:* · delivery_note:* · stock_entry:* · lot:view</td></tr>
+              <tr><td><b>Warehouse Manager</b><br><span class="mono text-[11px]">ผู้จัดการคลัง</span></td><td class="mono text-[12px]">D2 · E1</td><td class="mono text-[11.5px]">stock_adjustment:* · stock_balance:view · stock_ledger:view · expiry_alert:view · stock_setting:*</td></tr>
+              <tr><td><b>Sales Rep</b><br><span class="mono text-[11px]">พนักงานขาย</span></td><td class="mono text-[12px]">B1</td><td class="mono text-[11.5px]">customer:* · quotation:create/view/update/send/cancel</td></tr>
+              <tr><td><b>Sales Manager</b><br><span class="mono text-[11px]">ผู้จัดการขาย</span></td><td class="mono text-[12px]">B2</td><td class="mono text-[11.5px]">quotation:approve · sales_order:create/view/cancel</td></tr>
+              <tr><td><b>Accountant</b><br><span class="mono text-[11px]">นักบัญชี</span></td><td class="mono text-[12px]">C1 · C2 · E2</td><td class="mono text-[11.5px]">receipt:* · tax_config:* · ledger_entry:view · trial_balance:view · cogs_entry:view</td></tr>
+              <tr><td><b>AR / AP Clerk</b><br><span class="mono text-[11px]">เจ้าหน้าที่การเงิน</span></td><td class="mono text-[12px]">C3 · C4 · C5</td><td class="mono text-[11.5px]">billing_note:* · payment_entry:* · payment_schedule:*</td></tr>
+              <tr><td><b>Executive</b><br><span class="mono text-[11px]">ผู้บริหาร</span></td><td class="mono text-[12px]">E1 · E2</td><td class="mono text-[11.5px]">*:view (อ่านอย่างเดียวทุก BC)</td></tr>
+              <tr><td><b>Security / User Admin</b><br><span class="mono text-[11px]">ผู้ดูแลระบบ</span></td><td class="mono text-[12px]">—</td><td class="mono text-[11.5px]">user:* · role:* · policy:* · access_key:* · permission_sync:*</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ 03 GETTING STARTED ============ -->
+      <section id="getting-started" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — Getting Started</div>
+        <h2 class="display text-3xl mb-6">เริ่มต้นเรียก API</h2>
+
+        <h3 class="display text-xl mt-2 mb-4">3.1 · Base URL ต่อ Bounded Context</h3>
+        <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
+          ทุก BC อยู่หลัง API Gateway เดียวกัน แยกกันด้วย path prefix — FE ตั้ง base URL เป็นโดเมนเดียว
+          แล้วต่อ prefix ตามตารางนี้
+        </p>
+        <div class="card overflow-hidden mb-8">
+          <table class="d">
+            <thead><tr><th>Bounded Context</th><th>Path Prefix</th><th>ดูแลอะไร</th><th>จำนวน endpoint</th></tr></thead>
+            <tbody>
+              <tr><td>auth</td><td class="mono text-[12px]">/auth/v1</td><td>เข้าสู่ระบบ · session · เปลี่ยนรหัสผ่าน</td><td class="mono">9</td></tr>
+              <tr><td>iam</td><td class="mono text-[12px]">/iam/v1</td><td>ผู้ใช้ · บทบาท · นโยบายสิทธิ์ · access key</td><td class="mono">29</td></tr>
+              <tr><td>inventory-bc</td><td class="mono text-[12px]">/inventory-bc/v1</td><td>สินค้า · คลัง · ล็อต · รับเข้า · ปรับยอด · รายงานสต็อก</td><td class="mono">120</td></tr>
+              <tr><td>supplier-bc</td><td class="mono text-[12px]">/supplier-bc/v1</td><td>ผู้ขาย · ใบสั่งซื้อ</td><td class="mono">24</td></tr>
+              <tr><td>sales-bc</td><td class="mono text-[12px]">/sales-bc/v1</td><td>ลูกค้า · ใบเสนอราคา · ใบสั่งขาย · ใบส่งของ</td><td class="mono">35</td></tr>
+              <tr><td>finance-bc</td><td class="mono text-[12px]">/finance-bc/v1</td><td>ใบกำกับภาษี · วางบิล · รับชำระ · บัญชีแยกประเภท · COGS</td><td class="mono">43</td></tr>
+              <tr><td>report-bc</td><td class="mono text-[12px]">/report-bc/v1</td><td>เทมเพลตพิมพ์ · ประเภทเอกสาร · เลขรัน · PDF</td><td class="mono">16</td></tr>
+              <tr><td>storage</td><td class="mono text-[12px]">/storage/v1</td><td>ไฟล์แนบ (เรียกผ่าน BC เจ้าของเอกสาร ไม่เรียกตรง)</td><td class="mono">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">3.2 · เข้าสู่ระบบ</h3>
+        <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>Login</b> — <span class="mono text-[12px]">POST /auth/v1/auth/login</span> · เป็น <b>public</b> ไม่ต้องมี token</p></div>
+        <div class="step"><span class="sn">2</span><p class="text-[13.5px]">เก็บ <span class="mono text-[12px]">access_token</span> แล้วแนบทุก request เป็น <span class="mono text-[12px]">Authorization: Bearer &lt;token&gt;</span></p></div>
+        <div class="step"><span class="sn">3</span><p class="text-[13.5px]">token หมดอายุ → <span class="mono text-[12px]">POST /auth/v1/auth/refresh</span> (public เช่นกัน ใช้ <span class="mono text-[12px]">refresh_token</span>)</p></div>
+        <div class="step"><span class="sn">4</span><p class="text-[13.5px]">ถ้า <span class="mono text-[12px]">must_change_password</span> เป็น <span class="mono text-[12px]">true</span> ต้องพาไปหน้าเปลี่ยนรหัสผ่านก่อนใช้งานต่อ — <span class="mono text-[12px]">POST /auth/v1/auth/change-password</span></p></div>
+
+        <div class="code p-5 mt-5 mb-3">
+<pre><span class="c">// POST /auth/v1/auth/login</span>
+{ <span class="s">"username"</span>: <span class="s">"somchai.s"</span>, <span class="s">"password"</span>: <span class="s">"••••••••"</span> }
+
+<span class="c">// 200 — status.code 200000</span>
+{
+  <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">200000</span>, <span class="s">"message"</span>: <span class="s">"Request Succeeded"</span> },
+  <span class="s">"data"</span>: { <span class="s">"type"</span>: <span class="s">"auth"</span>, <span class="s">"attributes"</span>: {
+    <span class="s">"access_token"</span>: <span class="s">"eyJhbGciOi…"</span>,
+    <span class="s">"refresh_token"</span>: <span class="s">"eyJhbGciOi…"</span>,
+    <span class="s">"csrf_token"</span>: <span class="s">"…"</span>,
+    <span class="s">"token_type"</span>: <span class="s">"Bearer"</span>,
+    <span class="s">"expires_in"</span>: <span class="t">3600</span>,
+    <span class="s">"must_change_password"</span>: <span class="k">false</span>
+  } },
+  <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"2026-08-29T02:36:57.000Z"</span> }
+}</pre>
+        </div>
+        <div class="card overflow-hidden mb-8">
+          <table class="d">
+            <thead><tr><th>Method</th><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ตอนไหน</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">POST</td><td class="mono text-[12px]">/auth/v1/auth/login</td><td><span class="chip">public</span></td><td>เข้าสู่ระบบ</td></tr>
+              <tr><td class="mono">POST</td><td class="mono text-[12px]">/auth/v1/auth/refresh</td><td><span class="chip">public</span></td><td>ต่ออายุ token</td></tr>
+              <tr><td class="mono">POST</td><td class="mono text-[12px]">/auth/v1/auth/logout</td><td>—</td><td>ออกจากระบบ (เพิกถอน session ทันที)</td></tr>
+              <tr><td class="mono">GET</td><td class="mono text-[12px]">/auth/v1/auth/me</td><td>—</td><td>ข้อมูลผู้ใช้ปัจจุบัน + สิทธิ์</td></tr>
+              <tr><td class="mono">POST</td><td class="mono text-[12px]">/auth/v1/auth/change-password</td><td>—</td><td>เปลี่ยนรหัสผ่านตัวเอง</td></tr>
+              <tr><td class="mono">GET</td><td class="mono text-[12px]">/auth/v1/auth/sessions</td><td class="mono text-[11.5px]">session:read</td><td>ใครออนไลน์อยู่บ้าง</td></tr>
+              <tr><td class="mono">GET</td><td class="mono text-[12px]">/auth/v1/auth/login-histories</td><td class="mono text-[11.5px]">login_history:read</td><td>ประวัติการเข้าสู่ระบบ</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">3.3 · รูปแบบ Response ที่ได้เสมอ</h3>
+        <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
+          ทุก endpoint ห่อด้วย JSON:API envelope เดียวกัน — มี <span class="mono text-[12px]">data</span> หรือ
+          <span class="mono text-[12px]">errors</span> อย่างใดอย่างหนึ่ง <b>ไม่มีทางมีทั้งคู่</b> ·
+          <span class="mono text-[12px]">status.code</span> เป็นเลข 6 หลัก = HTTP status × 1000 + ลำดับ
+        </p>
+        <div class="code p-5 mb-5">
+<pre><span class="c">// รายการแบบแบ่งหน้า — GET /inventory-bc/v1/products?page=1&amp;limit=20</span>
+{
+  <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">200000</span>, <span class="s">"message"</span>: <span class="s">"Request Succeeded"</span> },
+  <span class="s">"data"</span>: [
+    { <span class="s">"type"</span>: <span class="s">"products"</span>, <span class="s">"id"</span>: <span class="s">"1b7f1e24-…"</span>, <span class="s">"attributes"</span>: {
+        <span class="s">"sku"</span>: <span class="s">"FERT-CHM-T01-25KG"</span>,
+        <span class="c">// i18n: backend รวม name_th/name_en ให้เป็น object อัตโนมัติ</span>
+        <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"ปุ๋ยยูเรีย 46-0-0"</span>, <span class="s">"en"</span>: <span class="s">"Urea Fertilizer"</span> }
+    } }
+  ],
+  <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"…"</span>,
+    <span class="s">"pagination"</span>: { <span class="s">"page"</span>: <span class="t">1</span>, <span class="s">"page_size"</span>: <span class="t">20</span>, <span class="s">"total"</span>: <span class="t">87</span>, <span class="s">"total_pages"</span>: <span class="t">5</span> } },
+  <span class="s">"links"</span>: { <span class="s">"self"</span>: <span class="s">"/inventory-bc/v1/products?page=1&amp;limit=20"</span> }
+}
+
+<span class="c">// เมื่อผิดพลาด — data หายไป มีแต่ errors</span>
+{
+  <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">400</span>, <span class="s">"message"</span>: <span class="s">"Allocations total 400 but this payment only settles 360.8"</span> },
+  <span class="s">"errors"</span>: [ { <span class="s">"code"</span>: <span class="s">"BAD_REQUEST"</span>, <span class="s">"title"</span>: <span class="s">"Bad Request"</span>, <span class="s">"detail"</span>: <span class="s">"…"</span> } ],
+  <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"…"</span> }
+}</pre>
+        </div>
+
+        <div class="rulebox mb-6">
+          <div class="rc mb-1">i18n · สิ่งที่ FE มักพลาด</div>
+          <p class="text-[13.5px]">
+            <b>ตอนส่งเข้า (request body) ใช้คีย์แยก</b> — <span class="mono text-[12px]">name_th</span>,
+            <span class="mono text-[12px]">name_en</span>, <span class="mono text-[12px]">remark_th</span> ·
+            <b>ตอนรับกลับ (response) จะกลายเป็น object</b> — <span class="mono text-[12px]">name: { th, en }</span> ·
+            อย่าส่ง <span class="mono text-[12px]">{ th, en }</span> กลับเข้ามาเด็ดขาด backend จะไม่รับ ·
+            รายละเอียดเต็ม: <a href="i18n-guide.html" class="underline">i18n Guide</a>
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">3.4 · ค้นหา · แบ่งหน้า · เรียงลำดับ</h3>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th>Query param</th><th>ตัวอย่าง</th><th>หมายเหตุ</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[12px]">page · limit</td><td class="mono text-[11.5px]">?page=2&amp;limit=50</td><td>ค่าเริ่มต้น 1 / 10</td></tr>
+              <tr><td class="mono text-[12px]">sort</td><td class="mono text-[11.5px]">?sort=created_at:desc</td><td>หลายเงื่อนไขคั่นด้วย <span class="mono">,</span></td></tr>
+              <tr><td class="mono text-[12px]">filter</td><td class="mono text-[11.5px]">?filter=status||$eq||DRAFT</td><td><b>ห้ามใช้ <span class="mono">filter[]=</span></b> จะได้ 400002 · ใส่ซ้ำหลายตัวได้ = AND</td></tr>
+              <tr><td class="mono text-[12px]">or</td><td class="mono text-[11.5px]">?or=status||$eq||SENT</td><td>รูปแบบเดียวกับ filter แต่รวมแบบ OR</td></tr>
+              <tr><td class="mono text-[12px]">relations</td><td class="mono text-[11.5px]">?relations=items,attachments</td><td>โหลดข้อมูลลูกมาด้วย · แต่ละ resource อนุญาตไม่เท่ากัน</td></tr>
+              <tr><td class="mono text-[12px]">fields</td><td class="mono text-[11.5px]">?fields=id,sku,name_th</td><td>เลือกเฉพาะคอลัมน์ที่ใช้</td></tr>
+              <tr><td class="mono text-[12px]">ignore_limit</td><td class="mono text-[11.5px]">?ignore_limit=true</td><td>สำหรับ dropdown ที่ข้อมูลน้อย · บาง endpoint ปิดไว้</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-6">
+          <div class="rc mb-1">รหัสข้อผิดพลาดที่เจอบ่อย</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">400001</span> body ผิดรูปแบบ (validation) ·
+            <span class="mono text-[12px]">400002</span> query param ผิด (เช่นใช้ <span class="mono">filter[]=</span> หรือ UUID ไม่ถูกต้อง) ·
+            <span class="mono text-[12px]">401</span> ไม่มี/หมดอายุ token ·
+            <span class="mono text-[12px]">403</span> ไม่มีสิทธิ์ ·
+            <span class="mono text-[12px]">409</span> สถานะเอกสารไม่อนุญาต (เช่น submit ใบที่ submit ไปแล้ว) หรือข้อมูลซ้ำ ·
+            <span class="mono text-[12px]">503</span> BC ปลายทางไม่ตอบ — <b>ลองใหม่ได้</b>
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 04 FLOW A ============ -->
+      <section id="flow-buy" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — กลุ่ม A</div>
+        <h2 class="display text-3xl mb-6">จัดซื้อ &amp; รับของเข้าคลัง</h2>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor P as ฝ่ายจัดซื้อ
+  actor W as เจ้าหน้าที่คลัง
+  participant SUP as supplier-bc
+  participant INV as inventory-bc
+  P->>SUP: POST /purchase-orders (DRAFT)
+  P->>SUP: POST /purchase-orders/{id}/approve
+  P->>SUP: POST /purchase-orders/{id}/send
+  Note over SUP: PO = SENT · พร้อมรับของ
+  W->>INV: GET /goods-receipts (ดูใบที่ค้าง)
+  W->>INV: POST /goods-receipts (DRAFT · อ้าง po_id)
+  W->>INV: POST /goods-receipts/{id}/submit
+  INV->>INV: สร้าง Lot + ลง Stock Ledger
+  INV->>SUP: ตัดยอด received_qty (อัตโนมัติ)
+  Note over SUP: PO → PARTIAL หรือ RECEIVED
+</pre>
+        </div>
+
+        <h3 class="display text-xl mt-2 mb-4">A2 · สั่งซื้อสินค้า <span class="mono text-[13px] text-[var(--muted)]">— Procurement</span></h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /supplier-bc/v1/suppliers</td><td class="mono text-[11px]">supplier:view</td><td>เลือกผู้ขาย</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/products</td><td class="mono text-[11px]">product:view</td><td>เลือกสินค้า (บล็อกสินค้าแม่แบบ/ชุด)</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders</td><td class="mono text-[11px]">purchase_order:create</td><td><b>DRAFT</b> · ได้เลขที่ PO</td></tr>
+              <tr><td class="mono">4</td><td class="mono text-[11.5px]">PUT /supplier-bc/v1/purchase-orders/{id}</td><td class="mono text-[11px]">purchase_order:update</td><td>แก้ไขได้เฉพาะ DRAFT</td></tr>
+              <tr><td class="mono">5</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders/{id}/approve</td><td class="mono text-[11px]">purchase_order:approve</td><td>DRAFT → <b>APPROVED</b></td></tr>
+              <tr><td class="mono">6</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders/{id}/send</td><td class="mono text-[11px]">purchase_order:send</td><td>APPROVED → <b>SENT</b> · เริ่มรับของได้</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders/{id}/cancel</td><td class="mono text-[11px]">purchase_order:cancel</td><td>ยกเลิกได้จนถึง PARTIAL · <b>RECEIVED ยกเลิกไม่ได้</b></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders/{id}/attachments/presigned-url</td><td class="mono text-[11px]">purchase_order:update</td><td>ขอ URL แนบไฟล์ (ดูหัวข้อ 3.5 ในคู่มือรูปภาพ)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /supplier-bc/v1/purchase-orders</span>
+{
+  <span class="s">"supplier_id"</span>: <span class="s">"a3f1…"</span>,
+  <span class="s">"document_type"</span>: <span class="s">"PURCHASE_ORDER"</span>,
+  <span class="s">"is_vat_included"</span>: <span class="k">false</span>,      <span class="c">// ราคายังไม่รวม VAT</span>
+  <span class="s">"document_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,   <span class="c">// ISO 8601 เต็มรูปแบบเสมอ</span>
+  <span class="s">"expected_date"</span>: <span class="s">"2026-09-05T00:00:00+07:00"</span>,
+  <span class="s">"remark_th"</span>: <span class="s">"สั่งล็อตประจำเดือน"</span>,
+  <span class="s">"remark_en"</span>: <span class="k">null</span>,
+  <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,   <span class="c">// none | header | per_item — เลือกได้อย่างเดียว</span>
+  <span class="s">"discount_type"</span>: <span class="s">"amount"</span>,
+  <span class="s">"discount_value"</span>: <span class="t">0</span>,
+  <span class="s">"items"</span>: [
+    { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">100</span>, <span class="s">"unit_cost"</span>: <span class="t">450</span>,
+      <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> }
+  ]
+}</pre>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ส่วนลด · เลือกได้โหมดเดียว ห้ามผสม</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">discount_mode</span> ตัดสินทั้งใบ —
+            <span class="mono text-[12px]">none</span> ไม่มีส่วนลด ·
+            <span class="mono text-[12px]">header</span> ลดที่ยอดรวม (ต้องส่ง <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span>) ·
+            <span class="mono text-[12px]">per_item</span> ลดรายบรรทัด · <b>ส่วนลดที่ส่งมาผิดโหมดจะถูกทิ้ง</b> ไม่ error
+            เช่นส่ง <span class="mono text-[12px]">discount</span> รายบรรทัดมาตอน <span class="mono text-[12px]">header</span> — FE ควรซ่อนช่องที่ไม่เกี่ยวไว้เลย
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">A3 · รับสินค้าเข้าคลัง <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Staff</span></h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /supplier-bc/v1/purchase-orders?filter=status||$eq||SENT</td><td class="mono text-[11px]">purchase_order:view</td><td>หา PO ที่รอรับของ</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/warehouses</td><td class="mono text-[11px]">warehouse:view</td><td>เลือกคลังปลายทาง (ต้องเป็นคลังใบ ประเภท stock)</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /inventory-bc/v1/goods-receipts</td><td class="mono text-[11px]">goods_receipt:create</td><td><b>DRAFT</b> · ยังไม่กระทบสต็อก</td></tr>
+              <tr><td class="mono">4</td><td class="mono text-[11.5px]">POST /inventory-bc/v1/goods-receipts/{id}/submit</td><td class="mono text-[11px]">goods_receipt:submit</td><td><b>สร้าง Lot จริง + ลงบัญชีสต็อก + ตัดยอด PO</b></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /inventory-bc/v1/goods-receipts/{id}/cancel</td><td class="mono text-[11px]">goods_receipt:cancel</td><td>คืนสต็อก · <b>ทำไม่ได้ถ้าล็อตถูกเบิกไปแล้วแม้ชิ้นเดียว (409)</b></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /inventory-bc/v1/goods-receipts/{id}/sync-purchase-order</td><td class="mono text-[11px]">goods_receipt:sync</td><td>ซ่อมกรณีตัดยอด PO ค้าง (<span class="mono">po_synced_at</span> เป็น null)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /inventory-bc/v1/goods-receipts</span>
+{
+  <span class="s">"po_id"</span>: <span class="s">"7c21…"</span>,
+  <span class="s">"warehouse_id"</span>: <span class="s">"9f04…"</span>,
+  <span class="s">"document_date"</span>: <span class="s">"2026-08-29T09:00:00+07:00"</span>,
+  <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
+  <span class="s">"items"</span>: [
+    { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>,
+      <span class="s">"po_item_id"</span>: <span class="s">"e2df…"</span>,   <span class="c">// ต้องเป็นบรรทัดของ PO ใบนี้จริง</span>
+      <span class="s">"uom_id"</span>: <span class="s">"4a55…"</span>,       <span class="c">// รับเป็นหน่วยไหน ระบบแปลงเป็นหน่วยสต็อกให้</span>
+      <span class="s">"qty"</span>: <span class="t">100</span>,
+      <span class="s">"import_cost"</span>: <span class="t">450</span>,      <span class="c">// ต้นทุนต่อหน่วยของล็อตนี้ · ใช้คิด COGS ตลอดอายุล็อต</span>
+      <span class="s">"lot_number"</span>: <span class="s">"LOT-2608-01"</span>,
+      <span class="s">"expiry_date"</span>: <span class="s">"2027-08-29T00:00:00+07:00"</span>   <span class="c">// null ได้ถ้าไม่มีวันหมดอายุ</span>
+    }
+  ]
+}</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">สิ่งที่ทำให้ submit ไม่ผ่าน (409)</div>
+          <p class="text-[13.5px]">
+            รับเกินจำนวนใน PO เกินเปอร์เซ็นต์ที่ตั้งไว้ (<span class="mono text-[12px]">stock_settings.over_receipt_allowance</span>) ·
+            เอกสารไม่ใช่ DRAFT · ใบไม่มีบรรทัด · PO ไม่อยู่ในสถานะ SENT/PARTIAL — ทั้งหมดคืน
+            <span class="mono text-[12px]">409</span> พร้อมข้อความบอกตัวเลขที่เกินจริง FE เอาไปแสดงได้ตรง ๆ
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">ยอดรับค้าง PO อัปเดตเองแบบ eventual</div>
+          <p class="text-[13.5px]">
+            หลัง submit สำเร็จ สต็อกเข้าทันที แต่การตัดยอด <span class="mono text-[12px]">received_qty</span> ฝั่ง PO เป็นการเรียกข้าม BC
+            ที่เกิด<b>หลัง</b> transaction · ถ้า supplier-bc ล่มชั่วคราว สต็อกยังถูกต้องแต่ PO จะตามทีหลัง —
+            FE ไม่ต้องรอ และ<b>ไม่ควร</b>ถือว่า submit ล้มเหลว · ถ้าค้างจริงให้ผู้ใช้กด sync-purchase-order ได้
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 05 FLOW B ============ -->
+      <section id="flow-sell" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — กลุ่ม B</div>
+        <h2 class="display text-3xl mb-6">ขาย &amp; ส่งของ</h2>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor S as พนักงานขาย
+  actor M as ผู้จัดการขาย
+  actor W as เจ้าหน้าที่คลัง
+  participant SAL as sales-bc
+  participant INV as inventory-bc
+  participant FIN as finance-bc
+  S->>SAL: POST /quotations (DRAFT)
+  S->>SAL: POST /quotations/{id}/send
+  M->>SAL: POST /quotations/{id}/approve
+  M->>SAL: POST /quotations/{id}/convert-to-sales-order
+  Note over SAL: SO = CONFIRMED (สร้างทางนี้ทางเดียว)
+  W->>SAL: POST /delivery-notes (DRAFT)
+  W->>SAL: POST /delivery-notes/{id}/submit
+  SAL->>INV: ตัดสต็อก FIFO/FEFO
+  INV-->>FIN: stock.deducted → COGS + กำไรต่อล็อต
+  Note over SAL: SO → PARTIAL หรือ CLOSED
+</pre>
+        </div>
+
+        <h3 class="display text-xl mt-2 mb-4">B1 · เสนอราคา <span class="mono text-[13px] text-[var(--muted)]">— Sales Rep</span></h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /sales-bc/v1/customers</td><td class="mono text-[11px]">customer:view</td><td>เลือกลูกค้า</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/price-lists</td><td class="mono text-[11px]">price_list:view</td><td>เลือกรายการราคา (ไม่บังคับ)</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations</td><td class="mono text-[11px]">quotation:create</td><td><b>DRAFT</b></td></tr>
+              <tr><td class="mono">4</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/send</td><td class="mono text-[11px]">quotation:send</td><td>DRAFT → <b>SENT</b> · ล็อกการแก้ไข</td></tr>
+              <tr><td class="mono">5</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/approve</td><td class="mono text-[11px]">quotation:approve</td><td>SENT → <b>APPROVED</b> (ลูกค้าตกลง)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/cancel</td><td class="mono text-[11px]">quotation:cancel</td><td>ยกเลิก</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /sales-bc/v1/quotations</span>
+{
+  <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,
+  <span class="s">"document_type"</span>: <span class="s">"QUOTATION"</span>,
+  <span class="s">"document_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,
+  <span class="s">"valid_until"</span>: <span class="s">"2026-09-29T00:00:00+07:00"</span>,
+  <span class="s">"price_list_id"</span>: <span class="k">null</span>,
+  <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
+  <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,
+  <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount_value"</span>: <span class="t">0</span>,
+  <span class="s">"items"</span>: [
+    { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">10</span>, <span class="s">"unit_price"</span>: <span class="t">520</span>,
+      <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> }
+  ]
+}</pre>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ราคาขายมีเพดาน ±20%</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">unit_price</span> ถูกตรวจกับราคาอ้างอิงใน <span class="mono text-[12px]">item_prices</span> ·
+            ถ้าตั้งราคาห่างเกิน ±20% จะโดนปฏิเสธ <span class="mono text-[12px]">400</span> —
+            FE ควรดึงราคาอ้างอิงมาแสดงเป็นค่าเริ่มต้นให้ผู้ใช้ตั้งแต่แรก จะได้ไม่ต้องลองผิดลองถูก
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">B2 · แปลงเป็นใบสั่งขาย <span class="mono text-[13px] text-[var(--muted)]">— Sales Manager</span></h3>
+        <div class="rulebox mb-5">
+          <div class="rc mb-1">ไม่มี POST /sales-orders</div>
+          <p class="text-[13.5px]">
+            ใบสั่งขาย <b>สร้างได้ทางเดียว</b> คือแปลงจากใบเสนอราคาที่ APPROVED แล้ว — ตั้งใจให้ทุก SO
+            สืบย้อนกลับไปหาข้อเสนอที่ลูกค้าตกลงได้เสมอ · FE จึงไม่มีหน้า “สร้างใบสั่งขายใหม่” มีแต่ปุ่มบนใบเสนอราคา
+          </p>
+        </div>
+        <div class="card overflow-hidden mb-8">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{quotation_id}/convert-to-sales-order</td><td class="mono text-[11px]">sales_order:create</td><td>สร้าง SO สถานะ <b>CONFIRMED</b> · คัดลอกราคาจากใบเสนอราคาทั้งหมด ไม่คิดราคาใหม่</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /sales-bc/v1/sales-orders?relations=items</td><td class="mono text-[11px]">sales_order:view</td><td>ดูยอดค้างส่ง (<span class="mono">qty</span> − <span class="mono">delivered_qty</span>)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/sales-orders/{id}/cancel</td><td class="mono text-[11px]">sales_order:cancel</td><td>ยกเลิกทั้งใบ</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">B3 · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Staff</span></h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /sales-bc/v1/sales-orders?relations=items</td><td class="mono text-[11px]">sales_order:view</td><td>หาบรรทัดที่ยังส่งไม่ครบ</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes</td><td class="mono text-[11px]">delivery_note:create</td><td><b>DRAFT</b> · ยังไม่ตัดสต็อก</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/submit</td><td class="mono text-[11px]">delivery_note:submit</td><td><b>ตัดสต็อก FIFO/FEFO + บวก delivered_qty + ยิง COGS</b></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/cancel</td><td class="mono text-[11px]">delivery_note:cancel</td><td>คืนสต็อกเข้าล็อตเดิม + กลับรายการ COGS</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /sales-bc/v1/delivery-notes</span>
+{
+  <span class="s">"so_id"</span>: <span class="s">"098e…"</span>,
+  <span class="s">"warehouse_id"</span>: <span class="s">"9f04…"</span>,     <span class="c">// ตัดจากคลังไหน</span>
+  <span class="s">"document_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,
+  <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
+  <span class="s">"items"</span>: [
+    { <span class="s">"so_item_id"</span>: <span class="s">"e2df…"</span>, <span class="s">"qty"</span>: <span class="t">3</span> }   <span class="c">// ส่งบางส่วนได้ ระบบตรวจไม่ให้เกินยอดค้าง</span>
+  ]
+}</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">สต็อกไม่พอ = ไม่ตัดเลยแม้แต่ชิ้นเดียว</div>
+          <p class="text-[13.5px]">
+            ระบบตัดแบบ <b>all-or-nothing</b> · ถ้ารวมทุกล็อตแล้วไม่พอจะคืน error ทั้งใบ ไม่ตัดบางส่วนทิ้งไว้ ·
+            ล็อตที่<b>หมดอายุแล้วจะถูกข้าม</b>ไม่นำมาขาย และสินค้าชุด (bundle) จะถูกแตกเป็นสินค้าย่อยตอนตัดจริง —
+            ถ้าย่อยตัวใดไม่พอ ก็ตกทั้งชุด
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">COGS มาทีหลังไม่กี่วินาที — FE อย่ารอ</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">submit</span> ตอบกลับทันทีเมื่อตัดสต็อกเสร็จ · ส่วนต้นทุนขายและกำไรต่อล็อต
+            เดินทางไป finance-bc ผ่าน event และใช้เวลา <b>ประมาณ 1–5 วินาที</b> · หน้าจอกำไรจึงควรรีเฟรชทีหลัง
+            หรือมีปุ่มโหลดใหม่ ไม่ควร block ผู้ใช้รอ
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 06 FLOW C ============ -->
+      <section id="flow-money" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — กลุ่ม C</div>
+        <h2 class="display text-3xl mb-6">การเงิน &amp; บัญชี</h2>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor A as นักบัญชี
+  actor R as เจ้าหน้าที่การเงิน
+  participant FIN as finance-bc
+  A->>FIN: POST /receipts (DRAFT · document_type)
+  A->>FIN: POST /receipts/{id}/issue
+  Note over FIN: ออกเลขที่ + ลงบัญชี Dr ลูกหนี้ / Cr รายได้ + ภาษีขาย
+  R->>FIN: PUT /receipts/{id}/payment-schedules (งวดชำระ)
+  R->>FIN: POST /billing-notes (รวมหลายใบ)
+  R->>FIN: POST /billing-notes/{id}/issue
+  R->>FIN: POST /payment-entries (ระบุใบที่ตัด)
+  R->>FIN: POST /payment-entries/{id}/submit
+  Note over FIN: Dr เงินสด + ภาษีถูกหัก / Cr ลูกหนี้
+</pre>
+        </div>
+
+        <h3 class="display text-xl mt-2 mb-4">C1 · ออกใบกำกับภาษี / ใบเสร็จ <span class="mono text-[13px] text-[var(--muted)]">— Accountant</span></h3>
+        <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
+          ใช้ endpoint ชุดเดียวกันทั้ง <b>8 ประเภทเอกสาร</b> — ต่างกันที่ <span class="mono text-[12px]">document_type</span>
+          ซึ่งเป็นตัวตัดสินพฤติกรรม VAT ทั้งใบ · FE เลือกประเภทตั้งแต่หน้าสร้าง แล้ว backend จัดการภาษีเอง
+          <b>ห้ามให้ผู้ใช้กรอก VAT เอง</b>
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>document_type</th><th>ชื่อไทย</th><th>VAT</th><th>หมายเหตุ</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">RECEIPT</td><td>ใบเสร็จรับเงิน</td><td>ไม่มี</td><td>หลักฐานว่าได้รับเงินแล้ว</td></tr>
+              <tr><td class="mono text-[11.5px]">INVOICE</td><td>ใบแจ้งหนี้</td><td>ไม่มี</td><td>เรียกเก็บเงิน (ยังไม่ถึงจุดเสียภาษี)</td></tr>
+              <tr><td class="mono text-[11.5px]">PROFORMA_INVOICE</td><td>ใบแจ้งหนี้ชั่วคราว</td><td>ไม่มี</td><td>ประมาณการ · <b>ไม่ลงบัญชีเลย</b></td></tr>
+              <tr><td class="mono text-[11.5px]">FULL_TAX_INVOICE</td><td>ใบกำกับภาษีเต็มรูป</td><td>บวกเพิ่ม</td><td>ต้องมีเลขผู้เสียภาษีของลูกค้า</td></tr>
+              <tr><td class="mono text-[11.5px]">INV_TAX_INVOICE</td><td>ใบแจ้งหนี้/ใบกำกับภาษี</td><td>บวกเพิ่ม</td><td>เอกสารรวม · ต้องมีเลขผู้เสียภาษี</td></tr>
+              <tr><td class="mono text-[11.5px]">ABB_TAX_INVOICE</td><td>ใบกำกับภาษีอย่างย่อ</td><td><b>รวมในราคาแล้ว</b></td><td>ค้าปลีก · ไม่ต้องมีเลขผู้เสียภาษี</td></tr>
+              <tr><td class="mono text-[11.5px]">CREDIT_NOTE</td><td>ใบลดหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span></td></tr>
+              <tr><td class="mono text-[11.5px]">DEBIT_NOTE</td><td>ใบเพิ่มหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">1</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts</td><td class="mono text-[11px]">receipt:create</td><td><b>DRAFT</b> · ยังไม่มีเลขที่ · คำนวณ VAT/ยอดรวมให้แล้ว</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">PUT /finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:update</td><td>แก้ได้เฉพาะ DRAFT</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/issue</td><td class="mono text-[11px]">receipt:issue</td><td><b>ออกเลขที่แบบไม่ข้ามลำดับ + ลงบัญชี</b> · ล็อกถาวร</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/void</td><td class="mono text-[11px]">receipt:void</td><td>ยกเลิกใบที่ออกแล้ว · <b>เก็บเลขไว้ ไม่นำกลับมาใช้ซ้ำ</b></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">DELETE /finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:update</td><td>ลบได้เฉพาะ DRAFT (ไม่มีเลข = ไม่มีตัวตนทางกฎหมาย)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /finance-bc/v1/receipts</span>
+{
+  <span class="s">"document_type"</span>: <span class="s">"FULL_TAX_INVOICE"</span>,
+  <span class="s">"reference_receipt_id"</span>: <span class="k">null</span>,   <span class="c">// บังคับเมื่อเป็น CREDIT_NOTE / DEBIT_NOTE</span>
+  <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,
+  <span class="s">"delivery_note_id"</span>: <span class="s">"e018…"</span>,   <span class="c">// อ้างใบส่งของ (ไม่บังคับ)</span>
+  <span class="s">"document_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,
+  <span class="s">"wht_config_code"</span>: <span class="k">null</span>,        <span class="c">// เช่น "WHT3_SERVICE" ถ้ามีหัก ณ ที่จ่าย</span>
+  <span class="s">"currency"</span>: <span class="s">"THB"</span>, <span class="s">"currency_rate"</span>: <span class="t">1</span>,
+  <span class="s">"currency_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,
+  <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
+  <span class="s">"discount_mode"</span>: <span class="s">"none"</span>,
+  <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount_value"</span>: <span class="t">0</span>,
+  <span class="s">"items"</span>: [
+    { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">10</span>, <span class="s">"unit_price"</span>: <span class="t">520</span>,
+      <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> }
+  ]
+}
+<span class="c">// response จะมี sub_total · total_discount · net_amount · vat_amount · total</span>
+<span class="c">// และ 3 ถังภาษี: total_standard_vat_price / total_zero_vat_price / total_exempt_vat_price</span></pre>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ภาษีหัก ณ ที่จ่าย ไม่ลดยอดหนี้</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">total_wht</span> <b>ไม่ถูกหักออกจาก</b> <span class="mono text-[12px]">total</span> ·
+            ยอดที่ลูกค้าต้องจ่ายจริงคือ <span class="mono text-[12px]">total − total_wht</span> ซึ่ง FE คำนวณเองตอนแสดงผล ·
+            เพราะการถูกหักภาษีคือ<b>เงินสดที่ได้น้อยลง ไม่ใช่หนี้ที่น้อยลง</b> — ตอนรับชำระจะเห็นชัดว่าปิดหนี้ได้เต็มจำนวน
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">C3 · ใบวางบิล <span class="mono text-[13px] text-[var(--muted)]">— AR Clerk</span></h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/billing-notes</td><td class="mono text-[11px]">billing_note:create</td><td><b>DRAFT</b> · รวมใบกำกับที่ยังค้างของลูกค้ารายเดียว</td></tr>
+              <tr><td class="mono text-[11.5px]">PATCH /finance-bc/v1/billing-notes/{id}</td><td class="mono text-[11px]">billing_note:update</td><td>แก้รายการใบที่รวม (DRAFT เท่านั้น)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/billing-notes/{id}/issue</td><td class="mono text-[11px]">billing_note:issue</td><td>ออกเลข <span class="mono">BN-{ปี}-{ลำดับ}</span> + ตรึงยอด</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/billing-notes/{id}/cancel</td><td class="mono text-[11px]">billing_note:cancel</td><td>ยกเลิก · เก็บเลขไว้</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /finance-bc/v1/billing-notes</span>
+{
+  <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,
+  <span class="s">"due_date"</span>: <span class="s">"2026-09-28T00:00:00+07:00"</span>,
+  <span class="s">"receipt_ids"</span>: [ <span class="s">"72aa…"</span>, <span class="s">"eae5…"</span> ],   <span class="c">// ต้อง ISSUED · ลูกค้าเดียวกัน · ยังมียอดค้าง</span>
+  <span class="s">"remark_th"</span>: <span class="s">"วางบิลรอบสิ้นเดือน"</span>
+}</pre>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">ใบวางบิลไม่ลงบัญชี — ตั้งใจ</div>
+          <p class="text-[13.5px]">
+            หนี้ถูกรับรู้ไปแล้วตอนออกใบกำกับ · ใบวางบิลแค่<b>ทวงเงินที่ค้างอยู่แล้ว</b> ไม่ได้สร้างหนี้ใหม่
+            ถ้าลงบัญชีซ้ำลูกหนี้จะเด้งเป็นสองเท่า · ยอดในใบเป็น <b>snapshot ณ วันที่ออก</b> ไม่ใช่ยอดค้างสด —
+            ลูกค้าจ่ายทีหลังแล้วใบวางบิลจะยังแสดงยอดเดิม ซึ่งถูกต้องเพราะเป็นเอกสารประวัติ
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">C4 · รับ / จ่ายชำระเงิน <span class="mono text-[13px] text-[var(--muted)]">— AR / AP Clerk</span></h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/payment-entries</td><td class="mono text-[11px]">payment_entry:create</td><td><b>DRAFT</b> · ยังไม่ถือว่าใบกำกับถูกชำระ</td></tr>
+              <tr><td class="mono text-[11.5px]">PATCH /finance-bc/v1/payment-entries/{id}</td><td class="mono text-[11px]">payment_entry:update</td><td>แก้ยอด/ใบที่ตัด (DRAFT เท่านั้น)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/payment-entries/{id}/submit</td><td class="mono text-[11px]">payment_entry:submit</td><td>ออกเลข <span class="mono">PMT-…</span> + <b>ลงบัญชีเงินสด</b> + ตัดหนี้จริง</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/payment-entries/{id}/cancel</td><td class="mono text-[11px]">payment_entry:cancel</td><td>กลับรายการบัญชี + ปล่อยยอดที่ตัดคืน</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /finance-bc/v1/payment-entries</span>
+<span class="c">// ตัวอย่าง: ใบกำกับ 360.80 · ลูกค้าโอนมา 340.80 · หัก ณ ที่จ่ายไว้ 20.00</span>
+{
+  <span class="s">"payment_type"</span>: <span class="s">"RECEIVE"</span>,        <span class="c">// RECEIVE = รับจากลูกค้า · PAY = จ่ายผู้ขาย</span>
+  <span class="s">"party_id"</span>: <span class="s">"57d7…"</span>,             <span class="c">// ลูกค้า (RECEIVE) หรือผู้ขาย (PAY)</span>
+  <span class="s">"payment_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,
+  <span class="s">"payment_method"</span>: <span class="s">"BANK_TRANSFER"</span>,  <span class="c">// CASH | BANK_TRANSFER | CHEQUE | CREDIT_CARD | OTHER</span>
+  <span class="s">"reference"</span>: <span class="s">"TRF-88213"</span>,
+  <span class="s">"paid_amount"</span>: <span class="t">340.80</span>,           <span class="c">// เงินสดที่เข้าจริง</span>
+  <span class="s">"wht_amount"</span>: <span class="t">20.00</span>,              <span class="c">// ภาษีที่ลูกค้าหักไว้</span>
+  <span class="s">"allocations"</span>: [
+    { <span class="s">"receipt_id"</span>: <span class="s">"eae5…"</span>, <span class="s">"allocated_amount"</span>: <span class="t">360.80</span> }
+  ]
+}</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ยอดที่ตัดได้ = paid_amount + wht_amount</div>
+          <p class="text-[13.5px]">
+            <b>ไม่ใช่ <span class="mono text-[12px]">paid_amount</span> อย่างเดียว</b> — เงินสด 340.80 + ภาษีถูกหัก 20.00
+            ปิดหนี้ได้เต็ม 360.80 · ถ้า FE คิดเพดานเป็น <span class="mono text-[12px]">paid_amount</span> ผู้ใช้จะตัดหนี้ไม่หมด
+            และใบกำกับจะค้างเท่ากับภาษีตลอดไป · ส่วนที่เหลือหลังตัดจะกลายเป็น
+            <span class="mono text-[12px]">unallocated_amount</span> = เครดิตของลูกค้าไว้ใช้รอบหน้า
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ข้อจำกัดปัจจุบันที่ FE ต้องรู้</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">PAY</span> (จ่ายผู้ขาย) <b>ยังตัดใบไม่ได้</b> ต้องส่ง
+            <span class="mono text-[12px]">allocations: []</span> — เพราะระบบยังไม่มีตารางใบแจ้งหนี้ฝั่งซื้อ
+            เงินสดกับเจ้าหนี้ยังลงบัญชีปกติ · ถ้าส่ง allocations มาจะได้ <span class="mono text-[12px]">400</span>
+            พร้อมข้อความอธิบาย · และ<b>ยังไม่รองรับหลายสกุลเงิน</b> การชำระตัดกับยอด THB ของใบเสมอ
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">C5 · งวดชำระ (เครดิตเทอม) <span class="mono text-[13px] text-[var(--muted)]">— AR Clerk</span></h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">PUT /finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:update</td><td><b>แทนที่ทั้งชุด</b> · ผลรวมต้องเท่ายอดใบพอดี</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:view</td><td>แต่ละงวดพร้อม <span class="mono">settled</span> / <span class="mono">outstanding</span> / <span class="mono">is_overdue</span></td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE /finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:delete</td><td>ลบงวดทั้งชุด</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// PUT /finance-bc/v1/receipts/{receipt_id}/payment-schedules</span>
+<span class="c">// "เครดิต 30 วัน" = ส่งงวดเดียวเต็มจำนวน · "30/60" = สองงวด</span>
+{
+  <span class="s">"instalments"</span>: [
+    { <span class="s">"due_date"</span>: <span class="s">"2026-09-28T00:00:00+07:00"</span>, <span class="s">"amount"</span>: <span class="t">180.40</span> },
+    { <span class="s">"due_date"</span>: <span class="s">"2026-10-28T00:00:00+07:00"</span>, <span class="s">"amount"</span>: <span class="t">180.40</span> }
+  ]
+}
+<span class="c">// ผลรวมไม่เท่ายอดใบ → 400 พร้อมบอกส่วนต่าง</span>
+<span class="c">// เงินที่ชำระเข้ามาจะถูกปันลงงวด "เก่าก่อน" อัตโนมัติ</span></pre>
+        </div>
+      </section>
+
+      <!-- ============ 07 FLOW D ============ -->
+      <section id="flow-stock" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — กลุ่ม D</div>
+        <h2 class="display text-3xl mb-6">คลังภายใน</h2>
+
+        <h3 class="display text-xl mt-2 mb-4">D1 · โอน / เบิก / แปรรูป <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Staff</span></h3>
+        <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
+          ใช้ endpoint ชุดเดียว แยกพฤติกรรมด้วย <span class="mono text-[12px]">entry_type</span> — FE ควรทำเป็น
+          4 เมนูแยกกัน แต่ยิงไป endpoint เดียวกัน
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>entry_type</th><th>ความหมาย</th><th>ต้องระบุคลัง</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">MATERIAL_RECEIPT</td><td>รับเข้าโดยไม่มี PO (ของแถม · ตั้งต้น)</td><td>ปลายทาง</td></tr>
+              <tr><td class="mono text-[11.5px]">MATERIAL_TRANSFER</td><td>โอนระหว่างคลัง — <b>ต้นทุนล็อตไม่เปลี่ยน</b></td><td>ต้นทาง + ปลายทาง</td></tr>
+              <tr><td class="mono text-[11.5px]">MATERIAL_ISSUE</td><td>เบิกออก (ใช้ภายใน · ตัดจำหน่าย)</td><td>ต้นทาง</td></tr>
+              <tr><td class="mono text-[11.5px]">REPACK</td><td>แปรรูป/แบ่งบรรจุ — ตัดของเก่า สร้างล็อตใหม่</td><td>ต้นทาง + ปลายทาง</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card overflow-hidden mb-8">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-entries</td><td class="mono text-[11px]">stock_entry:create</td><td>DRAFT</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT /inventory-bc/v1/stock-entries/{id}</td><td class="mono text-[11px]">stock_entry:update</td><td>แก้ได้เฉพาะ DRAFT</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-entries/{id}/submit</td><td class="mono text-[11px]">stock_entry:submit</td><td><b>สต็อกเคลื่อนจริง</b></td></tr>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-entries/{id}/cancel</td><td class="mono text-[11px]">stock_entry:cancel</td><td>กลับรายการ</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">D2 · ปรับยอดสต็อก <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Manager</span></h3>
+        <div class="rulebox mb-5">
+          <div class="rc mb-1">ส่งยอดนับจริง ไม่ใช่ส่วนต่าง</div>
+          <p class="text-[13.5px]">
+            บรรทัดของใบปรับยอดให้ส่ง <b>จำนวนที่นับได้จริง</b> แล้วระบบคำนวณส่วนต่างเอง —
+            FE ไม่ต้องคิดว่าต้องบวกหรือลบเท่าไหร่ แค่ให้ผู้ใช้กรอกตัวเลขที่เห็นบนชั้นวาง
+          </p>
+        </div>
+        <div class="card overflow-hidden mb-8">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-adjustments</td><td class="mono text-[11px]">stock_adjustment:create</td><td>DRAFT</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-adjustments/{id}/submit</td><td class="mono text-[11px]">stock_adjustment:submit</td><td>ปรับยอดจริง + ลง ledger</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-adjustments/{id}/cancel</td><td class="mono text-[11px]">stock_adjustment:cancel</td><td>กลับรายการ</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ 08 FLOW E ============ -->
+      <section id="flow-report" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — กลุ่ม E</div>
+        <h2 class="display text-3xl mb-6">รายงาน &amp; พิมพ์เอกสาร</h2>
+
+        <h3 class="display text-xl mt-2 mb-4">E1 · รายงานสต็อก</h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-balances</td><td class="mono text-[11px]">stock_balance:view</td><td>ยอดคงเหลือ + มูลค่าคงคลัง · <span class="mono">group_by=product|product_warehouse|lot</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-ledger-entries</td><td class="mono text-[11px]">stock_ledger:view</td><td>ไล่การเคลื่อนไหวพร้อมยอดสะสม · <b>ต้องส่ง <span class="mono">product_id</span></b></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td><td>ล็อตใกล้/เลยหมดอายุ · <span class="mono">within_days</span> ปรับได้</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/lots</td><td class="mono text-[11px]">lot:view</td><td>ล็อตดิบ ไม่รวมยอด</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-movements</td><td class="mono text-[11px]">stock_movement:view</td><td>รายการเคลื่อนไหวดิบ</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// GET /inventory-bc/v1/stock-balances?group_by=lot&amp;warehouse_id=…&amp;search=RICE</span>
+{ <span class="s">"data"</span>: [ { <span class="s">"type"</span>: <span class="s">"stock-balances"</span>, <span class="s">"attributes"</span>: {
+  <span class="s">"product_sku"</span>: <span class="s">"FERT-CHM-T01-25KG"</span>,
+  <span class="s">"product_name"</span>: { <span class="s">"th"</span>: <span class="s">"ปุ๋ยยูเรีย"</span>, <span class="s">"en"</span>: <span class="s">"Urea"</span> },
+  <span class="s">"warehouse_name"</span>: { <span class="s">"th"</span>: <span class="s">"คลังหลัก"</span>, <span class="s">"en"</span>: <span class="s">"Main"</span> },
+  <span class="s">"lot_number"</span>: <span class="s">"LOT-2608-01"</span>, <span class="s">"expiry_date"</span>: <span class="s">"2027-08-29T…"</span>,
+  <span class="s">"total_qty"</span>: <span class="t">140</span>, <span class="s">"total_value"</span>: <span class="t">41500</span>,
+  <span class="s">"lot_count"</span>: <span class="t">2</span>, <span class="s">"expired_qty"</span>: <span class="t">0</span>, <span class="s">"near_expiry_qty"</span>: <span class="t">0</span>
+} } ] }
+
+<span class="c">// GET /inventory-bc/v1/stock-ledger-entries?product_id=…&amp;date_from=…&amp;date_to=…</span>
+<span class="c">// balance_before/after = ยอดสะสมของ "ขอบเขต" ที่ถาม (สินค้า×คลัง×ล็อต)</span>
+<span class="c">// lot_balance_after  = ยอดของ "ล็อตนั้น" — ต่างกันเมื่อขอบเขตกินหลายล็อต</span></pre>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">E2 · รายงานบัญชี &amp; กำไร</h3>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td><td>งบทดลอง · มีธง <span class="mono">is_balanced</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td><td>บัญชีแยกประเภท · กรองด้วย <span class="mono">journal_id</span> หรือ <span class="mono">ref_doc_id</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td><td>ต้นทุนขายต่อล็อต</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td><td>กำไรขั้นต้นต่อล็อต · <b>ติดลบได้</b> เมื่อขายต่ำกว่าทุน</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/profit-loss-reconciliations</td><td class="mono text-[11px]">profit_loss_record:reconcile</td><td>เติมรายการกำไรที่ค้าง (ตอน sales-bc ไม่ตอบ)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">กำไรอาจมาช้ากว่าต้นทุน — เป็นเรื่องปกติ</div>
+          <p class="text-[13.5px]">
+            ต้นทุน (<span class="mono text-[12px]">cogs-entries</span>) ลงทันทีจาก event · แต่กำไรต้องถามราคาขายจาก sales-bc
+            ถ้าตอนนั้นเรียกไม่ได้ ระบบจะ<b>ลงต้นทุนไว้ก่อนแล้วเว้นกำไรไว้</b> ·
+            หน้าจอควรมีปุ่ม “เติมรายการกำไรที่ค้าง” ที่ยิงไป <span class="mono text-[12px]">POST /profit-loss-reconciliations</span>
+            ซึ่งเรียกซ้ำได้ไม่จำกัด
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">E3 · พิมพ์เอกสาร (PDF)</h3>
+        <div class="card overflow-hidden mb-8">
+          <table class="d">
+            <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/print-templates</td><td class="mono text-[11px]">report:print_template_read</td><td>รายการเทมเพลต</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /report-bc/v1/print-templates/{id}/render</td><td class="mono text-[11px]">report:print_template_render</td><td><b>สร้าง PDF</b> จากข้อมูลเอกสาร</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_read</td><td>ประเภทเอกสาร + รูปแบบเลขรัน</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /report-bc/v1/document-types/{id}/running-number/next</td><td class="mono text-[11px]">report:document_type_running_number_generate</td><td>ขอเลขรันถัดไป</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/print-template-histories</td><td class="mono text-[11px]">report:print_template_history_read</td><td>ประวัติเวอร์ชันเทมเพลต</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ 09 MASTER ============ -->
+      <section id="master" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — Master Data</div>
+        <h2 class="display text-3xl mb-6">ข้อมูลหลัก &amp; การตั้งค่า</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทุกตัวเป็น CRUD มาตรฐาน — <span class="mono text-[12px]">GET</span> (list) ·
+          <span class="mono text-[12px]">GET /{id}</span> · <span class="mono text-[12px]">POST</span> ·
+          <span class="mono text-[12px]">PUT /{id}</span> · <span class="mono text-[12px]">DELETE /{id}</span>
+          (soft delete) · สิทธิ์เป็น <span class="mono text-[12px]">&lt;resource&gt;:create|view|update</span>
+          โดย <span class="mono text-[12px]">DELETE</span> ใช้สิทธิ์ <span class="mono text-[12px]">:update</span>
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>BC</th><th>Resource path</th><th>ใช้ตอนไหน</th></tr></thead>
+            <tbody>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/products · /item-groups · /brands · /item-attributes</td><td>ตั้งค่าสินค้า · หมวดหมู่ (โครงสร้างต้นไม้) · ยี่ห้อ · คุณลักษณะ</td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/uoms · /products/{id}/uom-conversions</td><td>หน่วยนับ + อัตราแปลงต่อสินค้า</td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/warehouses</td><td>คลัง (โครงสร้างต้นไม้ · รับของได้เฉพาะคลังใบ)</td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/price-lists · /item-prices · /pricing-rules</td><td>รายการราคา · ราคาต่อสินค้า (มีช่วงวันมีผล) · กฎส่วนลด</td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/item-suppliers · /tax-categories · /bundles</td><td>ผู้ขายต่อสินค้า · ประเภทภาษีต่อสินค้า · สินค้าชุด</td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/products/{id}/reorder-levels · /products/{id}/variant-barcodes</td><td>จุดสั่งซื้อซ้ำ · บาร์โค้ด</td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/stock-settings</td><td><b>GET/PUT เท่านั้น</b> · FIFO/FEFO · วันแจ้งเตือนหมดอายุ · % รับเกิน</td></tr>
+              <tr><td>supplier</td><td class="mono text-[11.5px]">/suppliers · /supplier-groups</td><td>ผู้ขาย + กลุ่ม</td></tr>
+              <tr><td>sales</td><td class="mono text-[11.5px]">/customers · /customer-groups</td><td>ลูกค้า + กลุ่ม (วงเงินเครดิต · price list เริ่มต้น)</td></tr>
+              <tr><td>finance</td><td class="mono text-[11.5px]">/tax-configs</td><td>อัตรา VAT / หัก ณ ที่จ่าย · <b>ห้ามช่วงวันซ้อนกันใน code เดียว</b></td></tr>
+              <tr><td>iam</td><td class="mono text-[11.5px]">/users · /roles · /policies · /permissions · /access-keys</td><td>ผู้ใช้ · บทบาท · นโยบายสิทธิ์ · คีย์สำหรับระบบภายนอก</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-6">
+          <div class="rc mb-1">ไฟล์แนบ — ใช้ presigned upload ทุกที่</div>
+          <p class="text-[13.5px]">
+            Quotation · Purchase Order · Receipt รองรับไฟล์แนบด้วยรูปแบบเดียวกัน:
+            <span class="mono text-[12px]">POST …/attachments/presigned-url</span> → FE อัปโหลดไฟล์<b>ตรงไปที่ storage</b> →
+            <span class="mono text-[12px]">POST …/attachments</span> เพื่อยืนยัน · ไฟล์ไม่วิ่งผ่าน backend ·
+            ขอ URL สำหรับดาวน์โหลดที่ <span class="mono text-[12px]">GET …/attachments/{id}/url</span> ทุกครั้ง
+            (URL หมดอายุใน 1 ชม. <b>ห้ามเก็บลง state ยาว</b>) · รายละเอียด:
+            <a href="product-image-upload-guide.html" class="underline">Product Image Upload Guide</a>
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ 10 INDEX ============ -->
+      <section id="index" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — Reference</div>
+        <h2 class="display text-3xl mb-6">Endpoint Index ทั้งหมด</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          รายการ REST endpoint ทุกเส้นที่เปิดให้เรียก ดึงจากโค้ดจริงทั้งหมด · ช่อง <b>สิทธิ์</b> คือค่าที่ต้องมีใน token
+          ถึงจะเรียกผ่าน · <span class="mono text-[12px]">—</span> หมายถึงต้อง login แต่ไม่ต้องมีสิทธิ์เฉพาะ
+        </p>
+        <h3 class="display text-xl mt-10 mb-4">auth · เข้าสู่ระบบ &amp; session <span class="mono text-[13px] text-[var(--muted)]">— 4 endpoints</span></h3>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/auth/v1/auth/login-histories</td><td class="mono text-[11px]">login_history:read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/auth/v1/auth/logout</td><td class="mono text-[11px]">—</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/auth/v1/auth/sessions</td><td class="mono text-[11px]">session:read</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/auth/v1/auth/sessions/users/{user_id}</td><td class="mono text-[11px]">session:read</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 class="display text-xl mt-10 mb-4">iam · ผู้ใช้ · บทบาท · สิทธิ์ <span class="mono text-[13px] text-[var(--muted)]">— 29 endpoints</span></h3>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/access-keys</td><td class="mono text-[11px]">access_key:read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/iam/v1/access-keys</td><td class="mono text-[11px]">access_key:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/access-keys/{id}</td><td class="mono text-[11px]">access_key:read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/access-keys/{id}</td><td class="mono text-[11px]">access_key:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/iam/v1/access-keys/{id}/revoke</td><td class="mono text-[11px]">access_key:revoke</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/permission-syncs</td><td class="mono text-[11px]">permission_sync:read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/iam/v1/permission-syncs</td><td class="mono text-[11px]">permission_sync:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/permission-syncs/{id}</td><td class="mono text-[11px]">permission_sync:read</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/permissions</td><td class="mono text-[11px]">permission:read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/iam/v1/permissions</td><td class="mono text-[11px]">permission:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/permissions/{id}</td><td class="mono text-[11px]">permission:read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/permissions/{id}</td><td class="mono text-[11px]">permission:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/policies</td><td class="mono text-[11px]">policy:read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/iam/v1/policies</td><td class="mono text-[11px]">policy:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/policies/{id}</td><td class="mono text-[11px]">policy:read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/policies/{id}</td><td class="mono text-[11px]">policy:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/policies/{id}/statements</td><td class="mono text-[11px]">policy:read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/policies/{id}/statements</td><td class="mono text-[11px]">policy:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/roles</td><td class="mono text-[11px]">role:read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/iam/v1/roles</td><td class="mono text-[11px]">role:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/roles/{id}</td><td class="mono text-[11px]">role:read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/roles/{id}</td><td class="mono text-[11px]">role:update</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/roles/{id}/policies</td><td class="mono text-[11px]">role:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/users</td><td class="mono text-[11px]">user_account:read</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/iam/v1/users/{id}</td><td class="mono text-[11px]">user_account:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/users/{id}</td><td class="mono text-[11px]">user_account:read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/users/{id}</td><td class="mono text-[11px]">user_account:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/users/test-graceful-shutdown</td><td class="mono text-[11px]">user_account:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/views</td><td class="mono text-[11px]"><span class="chip">public</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 class="display text-xl mt-10 mb-4">inventory-bc · สินค้า · คลัง · สต็อก <span class="mono text-[13px] text-[var(--muted)]">— 120 endpoints</span></h3>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/barcodes</td><td class="mono text-[11px]">barcode:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/barcodes</td><td class="mono text-[11px]">barcode:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/barcodes/{id}</td><td class="mono text-[11px]">barcode:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/barcodes/{id}</td><td class="mono text-[11px]">barcode:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/barcodes/{id}</td><td class="mono text-[11px]">barcode:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/brands</td><td class="mono text-[11px]">brand:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/brands</td><td class="mono text-[11px]">brand:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/brands/{id}</td><td class="mono text-[11px]">brand:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/brands/{id}</td><td class="mono text-[11px]">brand:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/brands/{id}</td><td class="mono text-[11px]">brand:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts</td><td class="mono text-[11px]">goods_receipt:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts</td><td class="mono text-[11px]">goods_receipt:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts/{id}</td><td class="mono text-[11px]">goods_receipt:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts/{id}</td><td class="mono text-[11px]">goods_receipt:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts/{id}</td><td class="mono text-[11px]">goods_receipt:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts/{id}/cancel</td><td class="mono text-[11px]">goods_receipt:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts/{id}/submit</td><td class="mono text-[11px]">goods_receipt:submit</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts/{id}/sync-purchase-order</td><td class="mono text-[11px]">goods_receipt:sync</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes</td><td class="mono text-[11px]">item_attribute:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes</td><td class="mono text-[11px]">item_attribute:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes/{attribute_id}/values</td><td class="mono text-[11px]">item_attribute:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes/{attribute_id}/values</td><td class="mono text-[11px]">item_attribute:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes/{attribute_id}/values/{value_id}</td><td class="mono text-[11px]">item_attribute:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes/{attribute_id}/values/{value_id}</td><td class="mono text-[11px]">item_attribute:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes/{attribute_id}/values/{value_id}</td><td class="mono text-[11px]">item_attribute:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes/{id}</td><td class="mono text-[11px]">item_attribute:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes/{id}</td><td class="mono text-[11px]">item_attribute:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-attributes/{id}</td><td class="mono text-[11px]">item_attribute:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-groups</td><td class="mono text-[11px]">item_group:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-groups</td><td class="mono text-[11px]">item_group:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-groups/{id}</td><td class="mono text-[11px]">item_group:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-groups/{id}</td><td class="mono text-[11px]">item_group:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-groups/{id}</td><td class="mono text-[11px]">item_group:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-prices</td><td class="mono text-[11px]">item_price:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-prices</td><td class="mono text-[11px]">item_price:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-prices/{id}</td><td class="mono text-[11px]">item_price:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-prices/{id}</td><td class="mono text-[11px]">item_price:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-prices/{id}</td><td class="mono text-[11px]">item_price:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-suppliers</td><td class="mono text-[11px]">item_supplier:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-suppliers</td><td class="mono text-[11px]">item_supplier:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-suppliers/{id}</td><td class="mono text-[11px]">item_supplier:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-suppliers/{id}</td><td class="mono text-[11px]">item_supplier:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/item-suppliers/{id}</td><td class="mono text-[11px]">item_supplier:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/lots</td><td class="mono text-[11px]">lot:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/lots/{id}</td><td class="mono text-[11px]">lot:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/price-lists</td><td class="mono text-[11px]">price_list:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/price-lists</td><td class="mono text-[11px]">price_list:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/price-lists/{id}</td><td class="mono text-[11px]">price_list:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/price-lists/{id}</td><td class="mono text-[11px]">price_list:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/price-lists/{id}</td><td class="mono text-[11px]">price_list:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules</td><td class="mono text-[11px]">pricing_rule:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules</td><td class="mono text-[11px]">pricing_rule:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules/{id}</td><td class="mono text-[11px]">pricing_rule:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules/{id}</td><td class="mono text-[11px]">pricing_rule:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules/{id}</td><td class="mono text-[11px]">pricing_rule:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}/generate-variants</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}/variant-barcodes</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/bundle-items</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/bundle-items</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/bundle-items/{bundle_item_id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/bundle-items/{bundle_item_id}</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/bundle-items/{bundle_item_id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/images</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/images</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/images/{image_id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/images/{image_id}</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/images/{image_id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/images/{image_id}/url</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/images/presigned-url</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/reorder-levels</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/reorder-levels</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/reorder-levels/{reorder_level_id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/reorder-levels/{reorder_level_id}</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/reorder-levels/{reorder_level_id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/uom-conversions</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/uom-conversions</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/uom-conversions/{conversion_id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/uom-conversions/{conversion_id}</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/uom-conversions/{conversion_id}</td><td class="mono text-[11px]">product:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{product_id}/variant-attributes</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments</td><td class="mono text-[11px]">stock_adjustment:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments</td><td class="mono text-[11px]">stock_adjustment:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}</td><td class="mono text-[11px]">stock_adjustment:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}</td><td class="mono text-[11px]">stock_adjustment:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}</td><td class="mono text-[11px]">stock_adjustment:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}/cancel</td><td class="mono text-[11px]">stock_adjustment:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}/submit</td><td class="mono text-[11px]">stock_adjustment:submit</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-balances</td><td class="mono text-[11px]">stock_balance:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-entries</td><td class="mono text-[11px]">stock_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-entries</td><td class="mono text-[11px]">stock_entry:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-entries/{id}</td><td class="mono text-[11px]">stock_entry:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-entries/{id}</td><td class="mono text-[11px]">stock_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-entries/{id}</td><td class="mono text-[11px]">stock_entry:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-entries/{id}/cancel</td><td class="mono text-[11px]">stock_entry:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-entries/{id}/submit</td><td class="mono text-[11px]">stock_entry:submit</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-ledger-entries</td><td class="mono text-[11px]">stock_ledger:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-movements</td><td class="mono text-[11px]">stock_movement:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-movements/{id}</td><td class="mono text-[11px]">stock_movement:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-settings</td><td class="mono text-[11px]">stock_setting:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-settings</td><td class="mono text-[11px]">stock_setting:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/tax-categories</td><td class="mono text-[11px]">tax_category:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/tax-categories</td><td class="mono text-[11px]">tax_category:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/tax-categories/{id}</td><td class="mono text-[11px]">tax_category:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/tax-categories/{id}</td><td class="mono text-[11px]">tax_category:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/tax-categories/{id}</td><td class="mono text-[11px]">tax_category:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/uoms</td><td class="mono text-[11px]">uom:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/uoms</td><td class="mono text-[11px]">uom:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/uoms/{id}</td><td class="mono text-[11px]">uom:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/uoms/{id}</td><td class="mono text-[11px]">uom:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/uoms/{id}</td><td class="mono text-[11px]">uom:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/warehouses</td><td class="mono text-[11px]">warehouse:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/warehouses</td><td class="mono text-[11px]">warehouse:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/warehouses/{id}</td><td class="mono text-[11px]">warehouse:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/warehouses/{id}</td><td class="mono text-[11px]">warehouse:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/warehouses/{id}</td><td class="mono text-[11px]">warehouse:update</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 class="display text-xl mt-10 mb-4">supplier-bc · ผู้ขาย · ใบสั่งซื้อ <span class="mono text-[13px] text-[var(--muted)]">— 24 endpoints</span></h3>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders</td><td class="mono text-[11px]">purchase_order:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{id}</td><td class="mono text-[11px]">purchase_order:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{id}</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{id}</td><td class="mono text-[11px]">purchase_order:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{id}/approve</td><td class="mono text-[11px]">purchase_order:approve</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{id}/cancel</td><td class="mono text-[11px]">purchase_order:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{id}/send</td><td class="mono text-[11px]">purchase_order:send</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments</td><td class="mono text-[11px]">purchase_order:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments/{attachment_id}</td><td class="mono text-[11px]">purchase_order:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments/{attachment_id}</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments/{attachment_id}/url</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments/presigned-url</td><td class="mono text-[11px]">purchase_order:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-groups</td><td class="mono text-[11px]">supplier_group:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-groups</td><td class="mono text-[11px]">supplier_group:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-groups/{id}</td><td class="mono text-[11px]">supplier_group:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-groups/{id}</td><td class="mono text-[11px]">supplier_group:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-groups/{id}</td><td class="mono text-[11px]">supplier_group:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers</td><td class="mono text-[11px]">supplier:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers</td><td class="mono text-[11px]">supplier:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers/{id}</td><td class="mono text-[11px]">supplier:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers/{id}</td><td class="mono text-[11px]">supplier:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers/{id}</td><td class="mono text-[11px]">supplier:update</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 35 endpoints</span></h3>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/customer-groups</td><td class="mono text-[11px]">customer_group:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/customer-groups</td><td class="mono text-[11px]">customer_group:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/sales-bc/v1/customer-groups/{id}</td><td class="mono text-[11px]">customer_group:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/customer-groups/{id}</td><td class="mono text-[11px]">customer_group:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/customer-groups/{id}</td><td class="mono text-[11px]">customer_group:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/customers</td><td class="mono text-[11px]">customer:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/customers</td><td class="mono text-[11px]">customer:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}</td><td class="mono text-[11px]">customer:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}</td><td class="mono text-[11px]">customer:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}</td><td class="mono text-[11px]">customer:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes</td><td class="mono text-[11px]">delivery_note:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes</td><td class="mono text-[11px]">delivery_note:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}</td><td class="mono text-[11px]">delivery_note:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}</td><td class="mono text-[11px]">delivery_note:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}</td><td class="mono text-[11px]">delivery_note:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}/cancel</td><td class="mono text-[11px]">delivery_note:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}/submit</td><td class="mono text-[11px]">delivery_note:submit</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations</td><td class="mono text-[11px]">quotation:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations</td><td class="mono text-[11px]">quotation:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}</td><td class="mono text-[11px]">quotation:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}</td><td class="mono text-[11px]">quotation:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}</td><td class="mono text-[11px]">quotation:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}/approve</td><td class="mono text-[11px]">quotation:approve</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}/cancel</td><td class="mono text-[11px]">quotation:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}/send</td><td class="mono text-[11px]">quotation:send</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/attachments</td><td class="mono text-[11px]">quotation:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/attachments</td><td class="mono text-[11px]">quotation:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/attachments/{attachment_id}</td><td class="mono text-[11px]">quotation:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/attachments/{attachment_id}</td><td class="mono text-[11px]">quotation:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/attachments/{attachment_id}/url</td><td class="mono text-[11px]">quotation:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/attachments/presigned-url</td><td class="mono text-[11px]">quotation:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/convert-to-sales-order</td><td class="mono text-[11px]">sales_order:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders</td><td class="mono text-[11px]">sales_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders/{id}</td><td class="mono text-[11px]">sales_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders/{id}/cancel</td><td class="mono text-[11px]">sales_order:cancel</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 43 endpoints</span></h3>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes</td><td class="mono text-[11px]">billing_note:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes</td><td class="mono text-[11px]">billing_note:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes/{id}</td><td class="mono text-[11px]">billing_note:delete</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes/{id}</td><td class="mono text-[11px]">billing_note:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PATCH</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes/{id}</td><td class="mono text-[11px]">billing_note:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes/{id}/cancel</td><td class="mono text-[11px]">billing_note:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes/{id}/issue</td><td class="mono text-[11px]">billing_note:issue</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/cogs-entries/{id}</td><td class="mono text-[11px]">cogs_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ledger-entries/{id}</td><td class="mono text-[11px]">ledger_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/payment-entries</td><td class="mono text-[11px]">payment_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/payment-entries</td><td class="mono text-[11px]">payment_entry:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/payment-entries/{id}</td><td class="mono text-[11px]">payment_entry:delete</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/payment-entries/{id}</td><td class="mono text-[11px]">payment_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PATCH</td><td class="mono text-[11.5px]">/finance-bc/v1/payment-entries/{id}</td><td class="mono text-[11px]">payment_entry:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/payment-entries/{id}/cancel</td><td class="mono text-[11px]">payment_entry:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/payment-entries/{id}/submit</td><td class="mono text-[11px]">payment_entry:submit</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/profit-loss-records/{id}</td><td class="mono text-[11px]">profit_loss_record:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/profit-loss-reconciliations</td><td class="mono text-[11px]">profit_loss_record:reconcile</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts</td><td class="mono text-[11px]">receipt:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts</td><td class="mono text-[11px]">receipt:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}/issue</td><td class="mono text-[11px]">receipt:issue</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}/void</td><td class="mono text-[11px]">receipt:void</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/attachments</td><td class="mono text-[11px]">receipt:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/attachments</td><td class="mono text-[11px]">receipt:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/attachments/{attachment_id}</td><td class="mono text-[11px]">receipt:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/attachments/{attachment_id}</td><td class="mono text-[11px]">receipt:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/attachments/{attachment_id}/url</td><td class="mono text-[11px]">receipt:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/attachments/presigned-url</td><td class="mono text-[11px]">receipt:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:delete</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs</td><td class="mono text-[11px]">tax_config:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs</td><td class="mono text-[11px]">tax_config:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 class="display text-xl mt-10 mb-4">report-bc · เทมเพลต · เลขรัน · PDF <span class="mono text-[13px] text-[var(--muted)]">— 16 endpoints</span></h3>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}</td><td class="mono text-[11px]">report:document_type_delete</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}</td><td class="mono text-[11px]">report:document_type_read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}</td><td class="mono text-[11px]">report:document_type_update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}/running-number</td><td class="mono text-[11px]">report:document_type_running_number_read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}/running-number/next</td><td class="mono text-[11px]">report:document_type_running_number_generate</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/print-template-histories</td><td class="mono text-[11px]">report:print_template_history_read</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/print-template-histories/{id}</td><td class="mono text-[11px]">report:print_template_history_read</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/print-templates</td><td class="mono text-[11px]">report:print_template_read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/print-templates</td><td class="mono text-[11px]">report:print_template_create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/report-bc/v1/print-templates/{id}</td><td class="mono text-[11px]">report:print_template_delete</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/print-templates/{id}</td><td class="mono text-[11px]">report:print_template_read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/report-bc/v1/print-templates/{id}</td><td class="mono text-[11px]">report:print_template_update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/print-templates/{id}/histories/{historyId/restore</td><td class="mono text-[11px]">report:print_template_restore</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/print-templates/{id}/render</td><td class="mono text-[11px]">report:print_template_render</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 271 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+      </section>
+
+      <!-- ============ CLOSING ============ -->
+      <section class="section pt-10 pb-20">
+        <div class="rulebox">
+          <div class="rc ok mb-1">สรุปสิ่งที่ FE ต้องยึด 5 ข้อ</div>
+          <p class="text-[13.5px] leading-[1.9]">
+            <b>1.</b> ทุกเอกสารเริ่มที่ <span class="mono text-[12px]">DRAFT</span> · แก้/ลบได้เฉพาะตอนนั้น — ซ่อนปุ่มแก้ไขทันทีที่สถานะเปลี่ยน<br>
+            <b>2.</b> วันที่ส่งเป็น ISO 8601 <b>เต็มรูปแบบพร้อม offset</b> เสมอ (<span class="mono text-[12px]">2026-08-29T00:00:00+07:00</span>) — ส่ง <span class="mono text-[12px]">2026-08-29</span> เปล่า ๆ จะไม่ผ่าน<br>
+            <b>3.</b> i18n ส่งเข้าใช้ <span class="mono text-[12px]">name_th</span>/<span class="mono text-[12px]">name_en</span> · รับกลับเป็น <span class="mono text-[12px]">name: {'{'} th, en {'}'}</span><br>
+            <b>4.</b> อย่าให้ผู้ใช้กรอก VAT · ต้นทุน · ราคาอ้างอิงเอง — backend คำนวณและตรวจให้หมดแล้ว<br>
+            <b>5.</b> งานข้ามระบบ (ตัดยอด PO · COGS · กำไร) เป็น <b>eventual</b> ใช้เวลาไม่กี่วินาที — ตอบ 200 แล้วให้รีเฟรชทีหลัง อย่า block ผู้ใช้
+          </p>
+        </div>
+        <p class="text-[var(--ink-soft)] text-[14px] mt-8 leading-[1.9]">
+          เอกสารเกี่ยวข้อง —
+          <a href="nextjs-permission-guide.html" class="underline">Next.js Integration &amp; Permission</a> ·
+          <a href="i18n-guide.html" class="underline">i18n (TH/EN)</a> ·
+          <a href="backend-convention.html" class="underline">Backend Conventions</a> ·
+          <a href="product-image-upload-guide.html" class="underline">การอัปโหลดไฟล์</a> ·
+          <a href="core-feature.html" class="underline">SRS รายเฟส</a>
+        </p>
+      </section>
+
+    </div>
+
+    <erp-footer></erp-footer>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    er:{ useMaxWidth:true },
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>
