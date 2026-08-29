@@ -493,15 +493,18 @@
               <div><h3 class="font-semibold text-[17px] mono text-[var(--signal)]">finance-bc</h3><p class="text-[13px] text-[var(--muted)]">Accounting</p></div>
               <span class="tag-db" style="background:var(--signal-soft);color:var(--signal)">db: finance</span>
             </div>
-            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ใบกำกับภาษี, ใบวางบิล และ <b>คำนวณ COGS + กำไร/ขาดทุนแม่นยำต่อ Lot</b></p>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ใบกำกับภาษี, ใบวางบิล, รับ/จ่ายชำระ และ <b>คำนวณ COGS + กำไร/ขาดทุนแม่นยำต่อ Lot</b> · GL double-entry + ล็อกงวดบัญชี</p>
             <div class="flex flex-wrap gap-1.5">
               <span class="chip" style="color:var(--signal)">receipts</span><span class="chip">receipt_items</span>
               <span class="chip">receipt_attachments</span><span class="chip">receipt_number_counters</span>
               <span class="chip">tax_configs</span>
-              <span class="chip" style="border-style:dashed;color:var(--muted)">billing_notes</span>
-              <span class="chip" style="border-style:dashed;color:var(--muted)">cogs_entries</span>
-              <span class="chip" style="border-style:dashed;color:var(--muted)">profit_loss_records</span>
-              <span class="chip" style="border-style:dashed;color:var(--muted)">ledger_entries</span>
+              <span class="chip">billing_notes</span><span class="chip">billing_note_invoices</span>
+              <span class="chip">billing_note_number_counters</span>
+              <span class="chip">payment_entries</span><span class="chip">payment_allocations</span>
+              <span class="chip">payment_entry_number_counters</span><span class="chip">payment_schedules</span>
+              <span class="chip">cogs_entries</span><span class="chip">profit_loss_records</span>
+              <span class="chip" style="color:var(--signal)">ledger_entries</span>
+              <span class="chip">finance_settings</span>
             </div>
           </div>
 
@@ -1188,7 +1191,7 @@ sequenceDiagram
 
             <!-- PHASE 5 -->
             <div class="phase-head-row"><div class="p"><span class="w-2 h-2 rounded-full" style="background:var(--signal)"></span>PHASE 5 · Finance · COGS &amp; P&amp;L</div><div class="gantt-st st-done" title="BE 6/6 task เสร็จ (ตรวจกับโค้ดจริง 2026-08-30)">6/6</div><div class="gantt-st st-wait" title="รอทีม FE มาอัปเดต">?</div><div class="ph-hours"><span class="hbadge hb-be">BE 192</span><span class="hbadge hb-fe">FE 120</span><span>· 312 ชม.</span></div></div>
-            <div class="gantt-row"><div class="gantt-label"><span>GL double-entry engine (post/cancel · balanced · immutable)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-st st-done" title="เสร็จแล้ว — ledger_entries (append-only, debit=credit) + งบทดลอง /trial-balances · โพสต์จาก receipt/payment/COGS ทั้ง 3 ทาง">&#10003;</div><div class="gantt-st st-na" title="ไม่ใช่งานของฝั่งนี้">&#183;</div><div class="gantt-track"><div class="gbar crit" style="left:62.5%;width:6.25%">1.5w</div></div></div>
+            <div class="gantt-row"><div class="gantt-label"><span>GL double-entry engine (post/cancel · balanced · immutable)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-st st-done" title="เสร็จแล้ว — ledger_entries (append-only, debit=credit) + งบทดลอง /trial-balances · โพสต์จาก receipt/payment/COGS ทั้ง 3 ทาง · ล็อกงวดบัญชี (period:close, one-way ratchet) กันโพสต์/ย้อนกลับเข้างวดที่ปิดแล้ว เพิ่ม 2026-08-30">&#10003;</div><div class="gantt-st st-na" title="ไม่ใช่งานของฝั่งนี้">&#183;</div><div class="gantt-track"><div class="gbar crit" style="left:62.5%;width:6.25%">1.5w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>finance: receipt/tax invoice + billing note (submittable)</span><span class="hbadge hb-be">BE 40</span></div><div class="gantt-st st-done" title="เสร็จแล้ว — receipts ครบ 8 document_type + เลข gapless แยกต่อประเภท · billing note (รวมหลายใบกำกับ) ทำแล้ว">&#10003;</div><div class="gantt-st st-na" title="ไม่ใช่งานของฝั่งนี้">&#183;</div><div class="gantt-track"><div class="gbar be" style="left:66.67%;width:6.25%">1.5w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>finance: COGS + P&amp;L per lot (incl. bundle)</span><span class="hbadge hb-be">BE 48</span></div><div class="gantt-st st-done" title="เสร็จแล้ว — cogs_entries + profit_loss_records คิดจาก allocation ต่อล็อตใน stock.deducted (มี outbox แล้ว) · reverse ได้เมื่อยกเลิกส่งของ">&#10003;</div><div class="gantt-st st-na" title="ไม่ใช่งานของฝั่งนี้">&#183;</div><div class="gantt-track"><div class="gbar crit" style="left:66.67%;width:8.33%">2w</div></div></div>
             <div class="gantt-row"><div class="gantt-label"><span>payment entry + allocation to invoices (AR/AP)</span><span class="hbadge hb-be">BE 32</span></div><div class="gantt-st st-done" title="เสร็จแล้ว — payment_entries + payment_allocations (1 การชำระตัดได้หลายใบ) · โพสต์ GL · WHT ลดเงินสดไม่ลดหนี้">&#10003;</div><div class="gantt-st st-na" title="ไม่ใช่งานของฝั่งนี้">&#183;</div><div class="gantt-track"><div class="gbar be" style="left:70.83%;width:6.25%">1.5w</div></div></div>
