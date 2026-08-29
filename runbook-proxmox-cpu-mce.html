@@ -32,6 +32,8 @@
       <a href="#rootcause"  class="navlink"><span class="n">4</span> สาเหตุ</a>
       <a href="#fix"        class="navlink"><span class="n">5</span> การแก้ไข</a>
       <a href="#verify"     class="navlink"><span class="n">6</span> ยืนยัน + ป้องกัน</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <a href="#cpu-ref"    class="navlink"><span class="n" style="color:var(--signal)">A</span> คู่มือจัดการ CPU core</a>
     </nav>
     <div slot="footnote">
       <a href="runbook.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ Runbook Index</a>
@@ -618,6 +620,251 @@ cat /sys/devices/system/cpu/offline                    <span class="c"># core �
             <b>มี</b> kernel panic trace = คนละเคส (software panic ไม่ใช่ hardware MCE) ให้ไปไล่จาก stack trace แทน ·
             ถ้า EDAC <span class="mono text-[12px]">ce_count</span> ขึ้นเรื่อยๆ = RAM เสีย ให้เปลี่ยน DIMM ไม่ใช่ CPU ·
             ถ้า <span class="mono text-[12px]">Power Supply AC lost</span> = ตรวจสายไฟ/PDU ก่อน
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== A · CPU CORE REFERENCE ========== -->
+      <section id="cpu-ref" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--signal)] mb-3">ภาคผนวก A — คู่มือจัดการ CPU core</div>
+        <h2 class="display text-3xl mb-6">สำรวจ · แมปเลข · เปิด/ปิด core ด้วยตัวเอง</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ส่วนนี้แยกออกมาเป็นอ้างอิงทั่วไป ใช้ได้กับงาน CPU hotplug ทุกแบบ ไม่จำกัดเฉพาะเคส MCE
+          — <b class="text-[var(--ink)]">อ่านข้อ A.4 ก่อนปิด core เสมอ</b> เพราะข้อมูลบางอย่างหายถาวรหลังปิดไปแล้ว
+        </p>
+
+        <!-- A.1 -->
+        <div class="step">
+          <span class="sn">A1</span>
+          <h3 class="font-semibold text-[16px] mb-2">สำรวจสถานะภาพรวม</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            4 ไฟล์นี้อยู่ระดับ system บอกภาพรวมทั้งเครื่องในบรรทัดเดียว
+          </p>
+          <div class="code p-5">
+<pre><span class="k">for</span> f <span class="k">in</span> present online offline possible<span class="k">;</span> <span class="k">do</span>
+  <span class="k">printf</span> <span class="s">'%-10s %s\n'</span> <span class="s">"$f"</span> <span class="s">"$(cat /sys/devices/system/cpu/$f)"</span>
+<span class="k">done</span></pre>
+          </div>
+          <div class="card overflow-hidden mt-3">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>ไฟล์</th><th>ความหมาย</th><th>ตัวอย่างผลลัพธ์</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono text-[12px]">possible</td><td>สูงสุดที่ kernel รองรับ</td><td class="mono text-[12px]">0-63</td></tr>
+                  <tr><td class="mono text-[12px]">present</td><td>มีอยู่จริงทางฮาร์ดแวร์</td><td class="mono text-[12px]">0-63</td></tr>
+                  <tr><td class="mono text-[12px]">online</td><td>ใช้งานอยู่ (scheduler ใช้ได้)</td><td class="mono text-[12px]">0-15,17-47,49-63</td></tr>
+                  <tr><td class="mono text-[12px]">offline</td><td><b>ปิดไว้</b></td><td class="mono text-[12px]">16,48</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+            ดูแบบตาราง (แสดง core ที่ปิดอยู่ด้วย) — <span class="mono text-[12px]">lscpu -e</span> คือเครื่องมือหลัก:
+          </p>
+          <div class="code p-5 mt-2">
+<pre>lscpu -e=CPU,NODE,SOCKET,CORE,ONLINE
+
+<span class="c">CPU NODE SOCKET CORE ONLINE</span>
+<span class="c">  0    0      0    0    yes</span>
+<span class="c"> 16    -      -    -     no      ← ปิดอยู่: NODE/SOCKET/CORE กลายเป็น "-"</span>
+<span class="c"> 17    1      1   16    yes</span>
+<span class="c"> 48    -      -    -     no</span></pre>
+          </div>
+        </div>
+
+        <!-- A.2 -->
+        <div class="step">
+          <span class="sn">A2</span>
+          <h3 class="font-semibold text-[16px] mb-2">เข้าใจ "เลข" 5 ชุดที่ไม่ใช่อันเดียวกัน</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            นี่คือจุดที่พลาดกันบ่อยที่สุด — เลขพวกนี้หน้าตาคล้ายกันแต่คนละความหมาย
+          </p>
+          <div class="card overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>เลข</th><th>มาจากไหน</th><th>หมายถึง</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td class="mono text-[12px]">cpu16</td>
+                    <td><span class="mono text-[12px]">/proc/cpuinfo</span> → <span class="mono text-[12px]">processor</span></td>
+                    <td><b>เลขของ Linux</b> — ใช้กับ <span class="mono text-[12px]">taskset</span>, <span class="mono text-[12px]">online</span>, affinity</td>
+                  </tr>
+                  <tr>
+                    <td class="mono text-[12px]">apicid</td>
+                    <td>firmware / BERT / MCE</td>
+                    <td><b>เลขของฮาร์ดแวร์</b> — ค่าที่ BERT รายงาน ไม่เท่ากับเลข Linux เสมอไป</td>
+                  </tr>
+                  <tr>
+                    <td class="mono text-[12px]">physical_package_id</td>
+                    <td><span class="mono text-[12px]">topology/</span></td>
+                    <td><b>socket</b> — ซีพียูตัวที่เท่าไรบนเมนบอร์ด (0 = CPU1, 1 = CPU2)</td>
+                  </tr>
+                  <tr>
+                    <td class="mono text-[12px]">core_id</td>
+                    <td><span class="mono text-[12px]">topology/</span></td>
+                    <td>core ในซ็อกเก็ตนั้น — <b class="text-[var(--ink)]">ไม่ unique ทั้งเครื่อง</b> (มี core 8 ทั้ง socket 0 และ 1)</td>
+                  </tr>
+                  <tr>
+                    <td class="mono text-[12px]">CORE (lscpu -e)</td>
+                    <td><span class="mono text-[12px]">lscpu</span></td>
+                    <td>เลข index ที่ lscpu สร้างเอง — <b>คนละค่ากับ <span class="mono text-[12px]">core_id</span></b> อย่าเอามาปนกัน</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="rulebox mt-4" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">อ้างถึง core ต้องบอก socket ด้วยเสมอ</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              พูดว่า "core 8" เฉยๆ กำกวม เพราะมีทั้ง <span class="mono text-[12px]">socket 0 core 8</span> (= cpu16/48)
+              และ <span class="mono text-[12px]">socket 1 core 8</span> (= cpu17/49) — คนละชิ้นกันคนละซีพียู
+            </p>
+          </div>
+        </div>
+
+        <!-- A.3 -->
+        <div class="step">
+          <span class="sn">A3</span>
+          <h3 class="font-semibold text-[16px] mb-2">แมป APIC ID → cpu / socket / core และหา HT sibling</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เมื่อ BERT ให้ค่า <span class="mono text-[12px]">processor_id</span> มา (เป็น APIC ID) ใช้คำสั่งนี้แปลง
+            — เปลี่ยนเลข <span class="mono text-[12px]">16</span> เป็นค่าที่ได้จริง
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># APIC ID -> Linux cpu / socket / core</span>
+awk <span class="s">'/^processor/{p=$3} /^physical id/{s=$4} /^core id/{c=$4}
+     /^apicid/{ if($3==16) printf "APIC %s -> cpu%s socket=%s core=%s\n",$3,p,s,c }'</span> /proc/cpuinfo
+
+<span class="c"># หา HT sibling (สอง thread ที่ใช้ core ฟิสิคัลเดียวกัน)</span>
+cat /sys/devices/system/cpu/cpu16/topology/thread_siblings_list
+<span class="c"># → 16,48   = ต้องปิดทั้งคู่ถึงจะปิด core นั้นจริง</span>
+
+<span class="c"># ดู core ทั้งหมดในซ็อกเก็ตเดียวกัน</span>
+cat /sys/devices/system/cpu/cpu16/topology/core_siblings_list</pre>
+          </div>
+          <div class="rulebox mt-3">
+            <div class="rc mb-1">ปิดแค่ thread เดียวไม่พอ</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              HT ทำให้ 1 core ฟิสิคัลปรากฏเป็น 2 cpu ใน Linux — ถ้าปิดแค่ตัวเดียว งานยังถูก schedule
+              ลงบน core นั้นผ่านอีก thread ได้อยู่ดี ต้องปิด<b>ทั้งคู่</b>ตามที่
+              <span class="mono text-[12px]">thread_siblings_list</span> บอก
+            </p>
+          </div>
+        </div>
+
+        <!-- A.4 -->
+        <div class="step">
+          <span class="sn">A4</span>
+          <h3 class="font-semibold text-[16px] mb-2">⚠️ จดข้อมูลไว้ก่อนปิด — พอปิดแล้วดูย้อนหลังไม่ได้</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            นี่คือกับดักที่ทำให้เสียเวลาโดยไม่จำเป็น — เมื่อ cpu ถูก offline ข้อมูลของมัน<b>หายจาก
+            หลายที่พร้อมกัน</b>
+          </p>
+          <div class="card overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>แหล่งข้อมูล</th><th>หลังปิด core</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono text-[12px]">/proc/cpuinfo</td><td>❌ <b>หายทั้ง block</b> — แมป apicid ไม่ได้อีก (64 → 62 รายการ)</td></tr>
+                  <tr><td class="mono text-[12px]">/sys/.../cpuNN/topology/</td><td>❌ <b>โฟลเดอร์หายไปเลย</b> — ดู sibling/socket ไม่ได้</td></tr>
+                  <tr><td class="mono text-[12px]">lscpu -e</td><td>✅ ยังแสดง (ONLINE = no) — <b>ทางเดียวที่ยังเห็น</b></td></tr>
+                  <tr><td class="mono text-[12px]">/sys/.../cpu/offline</td><td>✅ ยังบอกได้ว่าปิดตัวไหนไว้</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="mt-4 text-sm" style="color:var(--ink-soft)">
+            ก่อนปิด ให้เก็บ snapshot ไว้ก่อน — จะได้ไม่ต้อง re-online เพื่อกลับมาดูทีหลัง:
+          </p>
+          <div class="code p-5 mt-2">
+<pre>lscpu -e &gt; /root/cpu-topology-before.txt
+cp /proc/cpuinfo /root/cpuinfo-before.txt
+<span class="k">for</span> c <span class="k">in</span> $(seq 0 63)<span class="k">;</span> <span class="k">do</span>
+  t=/sys/devices/system/cpu/cpu$c/topology
+  [ -d <span class="s">"$t"</span> ] &amp;&amp; <span class="k">echo</span> <span class="s">"cpu$c socket=$(cat $t/physical_package_id) core=$(cat $t/core_id) ht=$(cat $t/thread_siblings_list)"</span>
+<span class="k">done</span> &gt; /root/cpu-map.txt</pre>
+          </div>
+        </div>
+
+        <!-- A.5 -->
+        <div class="step">
+          <span class="sn">A5</span>
+          <h3 class="font-semibold text-[16px] mb-2">ปิด / เปิด core</h3>
+          <div class="code p-5">
+<pre><span class="c"># ปิด (ต้องปิด HT sibling ด้วยเสมอ)</span>
+<span class="k">echo</span> 0 | sudo tee /sys/devices/system/cpu/cpu16/online
+<span class="k">echo</span> 0 | sudo tee /sys/devices/system/cpu/cpu48/online
+
+<span class="c"># เปิดกลับ</span>
+<span class="k">echo</span> 1 | sudo tee /sys/devices/system/cpu/cpu16/online
+<span class="k">echo</span> 1 | sudo tee /sys/devices/system/cpu/cpu48/online
+
+<span class="c"># ยืนยัน</span>
+nproc                                      <span class="c"># จำนวนที่ใช้งานได้</span>
+cat /sys/devices/system/cpu/offline        <span class="c"># ตัวที่ปิดอยู่</span>
+lscpu -e=CPU,SOCKET,CORE,ONLINE | grep no  <span class="c"># รายการที่ปิด</span></pre>
+          </div>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">cpu0 ปิดไม่ได้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              บน x86 ปกติจะ<b>ไม่มีไฟล์</b> <span class="mono text-[12px]">/sys/devices/system/cpu/cpu0/online</span>
+              เลย เพราะ cpu0 เป็น boot CPU ที่ผูกกับงานระดับ firmware/timer — ถ้า BERT ชี้มาที่ cpu0
+              (หรือ HT sibling ของมัน) workaround นี้<b>ใช้ไม่ได้</b> ต้องเปลี่ยน CPU อย่างเดียว
+            </p>
+          </div>
+          <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
+            การเปลี่ยนแปลงมีผล<b>ทันที</b> ไม่ต้อง reboot และไม่ต้องหยุด service — kernel จะย้าย
+            task ที่รันอยู่บน core นั้นไปที่อื่นให้เอง แต่ <b>ไม่ persist ข้าม reboot</b>
+            ดูวิธีทำ systemd unit ที่ <a href="#fix" class="underline" style="color:var(--accent)">§5 ข้อ 3</a>
+          </p>
+        </div>
+
+        <!-- A.6 -->
+        <div class="step">
+          <span class="sn">A6</span>
+          <h3 class="font-semibold text-[16px] mb-2">ผลกระทบที่ต้องเช็คหลังปิด</h3>
+          <div class="card overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>เรื่อง</th><th>ต้องทำอะไร</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td>VM / container ที่ pin CPU ไว้</td>
+                    <td>ถ้า affinity list มี cpu ที่เพิ่งปิด จะ start ไม่ขึ้นหรือ error — ตรวจด้วย
+                        <span class="mono text-[12px]">qm config &lt;vmid&gt; | grep affinity</span> แล้วแก้ list</td>
+                  </tr>
+                  <tr>
+                    <td>งานที่อ่าน <span class="mono text-[12px]">nproc</span></td>
+                    <td>build system (nx, make -j, jest) จะเห็นจำนวนน้อยลง — ปกติดีอยู่แล้ว แต่ถ้ามี
+                        hard-code เลขไว้ต้องแก้</td>
+                  </tr>
+                  <tr>
+                    <td>NUMA balance</td>
+                    <td>ปิด core ฝั่งเดียวทำให้สองซ็อกเก็ตมีกำลังไม่เท่ากัน — ตรวจด้วย
+                        <span class="mono text-[12px]">lscpu -e=CPU,NODE,ONLINE | grep yes | awk '{print $2}' | sort | uniq -c</span></td>
+                  </tr>
+                  <tr>
+                    <td>License ที่คิดตาม core</td>
+                    <td>ซอฟต์แวร์บางตัวคิดค่าตามจำนวน core ที่เห็น — ปิด core อาจกระทบ (มักเป็นผลดี)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="rulebox ok mt-8">
+          <div class="rc mb-1">สรุปลำดับการทำงานที่ปลอดภัย</div>
+          <p class="text-[13.5px]" style="color:var(--ink-soft)">
+            <b>1)</b> อ่าน BERT ได้ <span class="mono text-[12px]">processor_id</span> →
+            <b>2)</b> เก็บ snapshot topology (A4) →
+            <b>3)</b> แมป APIC → cpu + หา HT sibling (A3) →
+            <b>4)</b> ปิดทั้งคู่ (A5) →
+            <b>5)</b> ทำ systemd unit ให้ persist (§5 ข้อ 3) →
+            <b>6)</b> เช็คผลกระทบ VM affinity (A6) →
+            <b>7)</b> ทดสอบซ้ำ 5–6 รอบพร้อมจด baseline SEL/BERT/EDAC
           </p>
         </div>
       </section>
