@@ -323,6 +323,9 @@ table.d tr:last-child td{ border-bottom:none; }
 .hbadge{ font-family:'IBM Plex Mono',monospace; font-size:10px; padding:1px 6px; border-radius:5px; line-height:1.5; white-space:nowrap; }
 .hb-be{ background:rgba(14,124,134,.12); color:var(--accent); }
 .hb-fe{ background:rgba(79,99,196,.13); color:#4F63C4; }
+/* Work that was built but never estimated — carries no man-hours and no
+   timeline bar, so it must not read as a planned task. */
+.hb-extra{ background:transparent; color:var(--muted); border:1px dashed var(--line); }
 .pchip{ font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.03em; padding:2px 8px; border-radius:5px; white-space:nowrap; display:inline-block; }
 
 /* ===== global doc nav (current page + dropdown to jump) ===== */
