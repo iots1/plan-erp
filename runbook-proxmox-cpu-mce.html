@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Runbook: Proxmox Host รีบูตเอง (CPU Machine Check) — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="R" title="Runbook" subtitle="PROXMOX · CPU MACHINE CHECK" width="280">
+    <nav slot="nav">
+      <a href="#symptom"    class="navlink"><span class="n">1</span> อาการ</a>
+      <a href="#impact"     class="navlink"><span class="n">2</span> ผลกระทบ</a>
+      <a href="#diagnosis"  class="navlink"><span class="n">3</span> วินิจฉัย</a>
+      <a href="#rootcause"  class="navlink"><span class="n">4</span> สาเหตุ</a>
+      <a href="#fix"        class="navlink"><span class="n">5</span> การแก้ไข</a>
+      <a href="#verify"     class="navlink"><span class="n">6</span> ยืนยัน + ป้องกัน</a>
+    </nav>
+    <div slot="footnote">
+      <a href="runbook.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ Runbook Index</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="runbook.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Runbook Index
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Runbook · Hypervisor / Hardware</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Proxmox Host รีบูตเอง<br>
+          <span class="text-[#7FE3DE]">CPU Machine Check Exception</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          เครื่อง hypervisor ดับเองโดยไม่มี shutdown log · VM ทุกตัวตายพร้อมกัน · ไม่มี kernel panic ให้ดู
+          — และ <span class="text-white font-medium">Linux ไม่ได้บันทึกอะไรไว้เลย</span> เพราะฮาร์ดแวร์รีเซ็ตเครื่องก่อนที่ kernel จะเขียน log ทัน
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9635E"></span>Severity: Critical (Host + ทุก VM ดับ)</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>ไม่มี software fix — ต้องเปลี่ยนฮาร์ดแวร์</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>วินิจฉัยได้ใน ~10 นาที</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 1 SYMPTOM ========== -->
+      <section id="symptom" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">1 — อาการ (Symptom)</div>
+        <h2 class="display text-3xl mb-6">เครื่องหายไปเฉยๆ แล้วกลับมาเอง</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ลายเซ็นหลักคือ <b class="text-[var(--ink)]">ไม่มีร่องรอยอะไรเลย</b> — ไม่ใช่ OOM, ไม่ใช่ panic, ไม่ใช่ watchdog
+          ที่พอจะเห็นใน log เครื่องแค่หยุดกลางประโยคแล้ว boot ใหม่
+        </p>
+
+        <div class="code p-5">
+<pre><span class="c"># last -x จะทำเครื่องหมาย "crash" ให้ boot ที่ไม่เคยบันทึก shutdown</span>
+reboot   system boot  <span class="t">6.x.x-x-pve</span>    Sat Aug 29 19:49 - still running
+reboot   system boot  <span class="t">6.x.x-x-pve</span>    Sat Aug 29 19:24 - <span class="d">crash</span>
+reboot   system boot  <span class="t">6.x.x-x-pve</span>    Sat Aug 29 19:12 - <span class="d">crash</span>
+reboot   system boot  <span class="t">6.x.x-x-pve</span>    Sat Aug 29 16:31 - <span class="d">crash</span></pre>
+        </div>
+
+        <p class="mt-6 text-[var(--ink-soft)] text-[15.5px] max-w-3xl leading-[1.85]">
+          <span class="mono text-[13px]">journalctl -b -1</span> (log ของ boot ที่ตาย) จะจบกลางอากาศ — บรรทัดสุดท้ายเป็น log ธรรมดา
+          ไม่มีคำว่า error/panic/shutdown อะไรเลย:
+        </p>
+        <div class="code p-5">
+<pre><span class="c">Aug 29 19:22:03 pve pvedaemon[1760]: &lt;user@pam&gt; successful auth for user</span>
+<span class="c">Aug 29 19:22:05 pve pvedaemon[1759]: VM 100 qga command failed - got timeout</span>
+<span class="c"># ...จบแค่นี้ ไม่มีอะไรต่อ</span></pre>
+        </div>
+
+        <div class="rulebox mt-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">อาการหลอกที่ทำให้ไล่ผิดทาง</div>
+          <p class="text-[13.5px]" style="color:var(--ink-soft)">
+            ถ้าเข้า host ผ่าน Cloudflare Tunnel จะเจอ error <b>สองแบบสลับกันแบบสุ่ม</b> จนดูเหมือน tunnel เสียเอง —
+            <span class="mono text-[12px]">websocket: bad handshake</span> (= เครื่องดับสนิท cloudflared ไม่ได้ลงทะเบียนกับ edge)
+            สลับกับ <span class="mono text-[12px]">Connection timed out during banner exchange</span> (= เครื่องกำลัง boot,
+            cloudflared ขึ้นแล้วแต่ sshd ยังไม่พร้อม) <b class="text-[var(--ink)]">อย่าเสียเวลาแก้ tunnel config</b> —
+            ทั้งสองอย่างคืออาการของเครื่องที่กำลังวน crash-reboot อยู่
+          </p>
+        </div>
+
+        <div class="rulebox mt-4" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">อาการหลอกอีกอย่าง: CI/CD job รายงานเป็น timeout</div>
+          <p class="text-[13.5px]" style="color:var(--ink-soft)">
+            ถ้ามี GitHub Actions self-hosted runner อยู่บน VM ของ host นี้ job จะรายงานว่า
+            <span class="mono text-[12px]">The job has exceeded the maximum execution time</span> — ซึ่งชวนให้ไปเพิ่ม
+            <span class="mono text-[12px]">timeout-minutes</span> ในไฟล์ workflow <b class="text-[var(--ink)]">แต่ job ไม่ได้ช้า</b>
+            เครื่องตายคาที่ runner จึงไม่เคยรายงานผลกลับ GitHub เลยตัดจบด้วย timeout เอง
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 2 IMPACT ========== -->
+      <section id="impact" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">2 — ผลกระทบ (Impact)</div>
+        <h2 class="display text-3xl mb-6">ทุก VM บน host ดับพร้อมกัน ไม่มีการเตือนล่วงหน้า</h2>
+        <div class="grid sm:grid-cols-3 gap-5">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">SCOPE</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ทุก guest บนเครื่องนั้น</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              hypervisor ถูกรีเซ็ตระดับฮาร์ดแวร์ — VM/LXC ทุกตัวถูกตัดไฟพร้อมกันโดยไม่มี graceful shutdown
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">SEVERITY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">Critical — และจะถี่ขึ้นเรื่อยๆ</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              เคสจริงที่เจอ: ห่างกัน 2 วัน → 2.6 ชม. → 22 นาที → 9 นาที ภายในวันเดียว ยิ่งปล่อยยิ่งแย่
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DATA SAFETY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">เสี่ยง — unclean shutdown ทุกครั้ง</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              DB ที่รันใน guest จะถูกตัดกลาง write ทุกรอบ ต้องพึ่ง WAL/journal recovery ล้วนๆ — ย้าย workload สำคัญออกก่อน
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 3 DIAGNOSIS ========== -->
+      <section id="diagnosis" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">3 — วินิจฉัย (Diagnosis)</div>
+        <h2 class="display text-3xl mb-6">หาหลักฐานจากที่ที่ OS เข้าไม่ถึง</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          หัวใจของเคสนี้: <b class="text-[var(--ink)]">อย่าเสียเวลาหาใน Linux log ของ boot ที่ตาย</b> — มันไม่มีอะไรอยู่จริงๆ
+          ต้องไปดู 2 แหล่งที่อยู่นอก OS แทน คือ <b>BERT</b> (firmware เขียนไว้ให้ kernel อ่านตอน boot ถัดไป) และ
+          <b>BMC/iDRAC System Event Log</b> (ฮาร์ดแวร์บันทึกเอง ไม่พึ่ง OS)
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยืนยันก่อนว่าเป็น crash จริง ไม่ใช่ reboot ปกติ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ถ้าเห็นคำว่า <span class="mono text-[12px]">crash</span> = ไม่เคยมี clean shutdown record = ถูกตัดไฟหรือรีเซ็ตระดับฮาร์ดแวร์
+          </p>
+          <div class="code p-5">
+<pre>last -x | head -12
+journalctl --list-boots</pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">อ่าน BERT — ขั้นตอนที่ให้คำตอบตรงที่สุด</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ACPI <b>BERT (Boot Error Record Table)</b> คือกลไกที่ออกแบบมาสำหรับ error ที่ฆ่าเครื่องก่อน OS จะ log ทันพอดี —
+            firmware เก็บ record ไว้ใน NVRAM แล้ว kernel อ่านออกมาให้ <b class="text-[var(--ink)]">ตอน boot รอบถัดไป</b>
+            (ไม่ใช่ boot ที่ตาย) จึงต้องดูด้วย <span class="mono text-[12px]">-b 0</span> ไม่ใช่ <span class="mono text-[12px]">-b -1</span>
+          </p>
+          <div class="code p-5">
+<pre>journalctl -b 0 -k | grep -A12 <span class="s">'BERT: Error records'</span></pre>
+          </div>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ลายเซ็นของเคสนี้</div>
+            <div class="code p-5 mt-2" style="background:transparent;border:0">
+<pre><span class="c">BERT: Error records from previous boot:</span>
+[Hardware Error]: event severity: <span class="d">fatal</span>
+[Hardware Error]:  Error 0, type: <span class="d">fatal</span>
+[Hardware Error]:   section_type: <span class="d">general processor error</span>
+[Hardware Error]:   processor_type: 0, IA32/X64
+[Hardware Error]:   error_type: <span class="d">0x08</span>
+[Hardware Error]:   <span class="d">micro-architectural error</span>
+[Hardware Error]:   processor_id: <span class="d">0x0000000000000010</span>
+BERT: Total records found: 1</pre>
+            </div>
+          </div>
+          <div class="card overflow-hidden mt-4">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>ฟิลด์</th><th>ความหมาย</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono text-[12px]">section_type: general processor error</td><td>ความผิดพลาดอยู่ที่ CPU — ไม่ใช่ memory, ไม่ใช่ PCIe, ไม่ใช่ storage</td></tr>
+                  <tr><td class="mono text-[12px]">error_type: 0x01</td><td>cache error</td></tr>
+                  <tr><td class="mono text-[12px]">error_type: 0x02</td><td>TLB error</td></tr>
+                  <tr><td class="mono text-[12px]">error_type: 0x04</td><td>bus error</td></tr>
+                  <tr><td class="mono text-[12px]">error_type: 0x08</td><td><b>micro-architectural error</b> — ตรรกะภายในตัว CPU เอง</td></tr>
+                  <tr><td class="mono text-[12px]">processor_id</td><td><b>APIC ID</b> ของ core ที่ error — ใช้แมปหา socket/core จริงในขั้นถัดไป</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="rulebox mt-4">
+            <div class="rc mb-1">ข้อจำกัดที่ต้องรู้: BERT เก็บได้แค่ record เดียว</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              firmware เขียนทับทุกครั้งที่ crash — จะเห็นแค่ครั้งล่าสุดเสมอ ถ้าอยากได้ประวัติว่า core เดิมทุกครั้งไหม
+              ต้อง archive ออกมาทุก boot (ดู §6)
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">แมป APIC ID → socket / core จริง</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">processor_id</span> คือ APIC ID ซึ่งไม่ตรงกับเลข CPU ของ Linux เสมอไป — ต้องแมปจาก
+            <span class="mono text-[12px]">/proc/cpuinfo</span> เอง (แทน <span class="mono text-[12px]">16</span> ด้วยค่าที่ได้จาก BERT)
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># APIC ID นี้ = cpu ไหน / socket ไหน / core ไหน</span>
+awk <span class="s">'/^processor/{p=$3} /^physical id/{s=$4} /^core id/{c=$4}
+     /^apicid/{ if($3==16) printf "APIC %s -> cpu%s socket=%s core=%s\n", $3,p,s,c }'</span> /proc/cpuinfo
+
+<span class="c"># HT sibling ของ cpu นั้น (ต้องปิดคู่กันถ้าจะ offline)</span>
+cat /sys/devices/system/cpu/cpu16/topology/thread_siblings_list</pre>
+          </div>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ผลที่ได้จากเคสจริง</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">APIC 16 → cpu16  socket=0  core=8</span> · thread siblings =
+              <span class="mono text-[12px]">16,48</span> — แปลว่า <b>CPU ตัวที่ 1 (socket 0) core ที่ 8</b> คือตัวที่มีปัญหา
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยืนยันซ้ำจาก BMC/iDRAC System Event Log</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            SEL เป็นของฮาร์ดแวร์ ไม่พึ่ง OS — จึงบันทึกได้แม้เครื่องตายไปแล้ว (ติดตั้งก่อนถ้ายังไม่มี:
+            <span class="mono text-[12px]">apt install ipmitool</span>)
+          </p>
+          <div class="code p-5">
+<pre>ipmitool sel elist | grep -iE <span class="s">'Machine Chk|Additional Info'</span></pre>
+          </div>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ลายเซ็น: MSR Info Log ตามด้วย CPU Machine Chk ทุกครั้ง</div>
+            <div class="code p-5 mt-2" style="background:transparent;border:0">
+<pre><span class="c">4f | 08/29/2026 | 07:22:17 PM | Unknown MSR Info Log       | Asserted</span>
+<span class="c">53 | 08/29/2026 | 07:23:26 PM | Unknown Additional Info    | Asserted</span>
+<span class="c">54 | 08/29/2026 | 07:23:26 PM | Processor CPU Machine Chk  | Transition to Non-recoverable</span></pre>
+            </div>
+            <p class="text-[13.5px] mt-2" style="color:var(--ink-soft)">
+              เวลาใน SEL จะตรงกับวินาทีสุดท้ายของ journal — ใช้ยืนยันว่าเป็นเหตุการณ์เดียวกัน
+              <br><span class="mono text-[12px]">Unknown MSR Info Log</span> คือ record OEM ที่ <span class="mono text-[12px]">ipmitool</span>
+              ถอดรหัสไม่ได้ ต้องดูใน <b>iDRAC Lifecycle Log</b> (web UI → Maintenance → Lifecycle Log) ถึงจะได้ข้อความภาษาคนพร้อมชื่อชิ้นส่วน
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">5</span>
+          <h3 class="font-semibold text-[16px] mb-2">ตัดสาเหตุอื่นออกให้หมด ก่อนสรุปว่าเป็น CPU</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ทั้ง 6 อย่างนี้ต้อง "สะอาด" ถึงจะสรุปได้ — ถ้ามีข้อไหนผิดปกติ แปลว่าเป็นคนละเคส
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># RAM — ECC error สะสมไหม (ต้องเป็น 0 ทั้งหมด)</span>
+<span class="k">for</span> mc <span class="k">in</span> /sys/devices/system/edac/mc/mc*<span class="k">;</span> <span class="k">do</span>
+  <span class="k">echo</span> <span class="s">"$(basename $mc): ce=$(cat $mc/ce_count) ue=$(cat $mc/ue_count)"</span>
+<span class="k">done</span>
+ras-mc-ctl --summary          <span class="c"># ต้องขึ้น "No Memory errors"</span>
+
+<span class="c"># OOM — ต้องได้ 0</span>
+journalctl -b -1 | grep -ci <span class="s">'oom-killer\|out of memory'</span>
+
+<span class="c"># ความร้อน / ไฟ — ต้องอยู่ในเกณฑ์ปกติ</span>
+ipmitool sdr type Temperature
+ipmitool sdr type <span class="s">'Power Supply'</span>
+
+<span class="c"># ดิสก์ — ต้องไม่มี event และ SMART ต้องสะอาด</span>
+ipmitool sel elist | grep -icE <span class="s">'drive|disk|storage|raid'</span>
+smartctl -a -d megaraid,0 /dev/sda | grep -E <span class="s">'Reallocated|Media Error'</span>
+
+<span class="c"># kernel panic — pstore ต้องว่าง (ถ้ามี = คนละเคส ไปดู dump แทน)</span>
+ls /sys/fs/pstore/</pre>
+          </div>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ผลที่คาดหวังในเคสนี้ — สะอาดหมดทุกข้อ</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              EDAC <span class="mono text-[12px]">ce=0 ue=0</span> · OOM = 0 · CPU ~55°C · PSU ปกติ · SMART
+              <span class="mono text-[12px]">Reallocated_Sector_Ct = 0</span> · pstore ว่าง
+              — ทุกอย่างปกติแต่เครื่องยังดับ <b class="text-[var(--ink)]">นั่นแหละคือลายเซ็นของ CPU MCE</b>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 4 ROOT CAUSE ========== -->
+      <section id="rootcause" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">4 — สาเหตุ (Root Cause)</div>
+        <h2 class="display text-3xl mb-6">CPU ส่ง CATERR แล้ว BMC รีเซ็ตเครื่องทันที — OS ไม่มีโอกาสเขียนอะไร</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เมื่อ CPU เจอ uncorrectable machine check ในบริบทที่กู้ไม่ได้ มันจะ assert สัญญาณ
+          <b>CATERR (Catastrophic Error)</b> ออกมาที่ระดับฮาร์ดแวร์ BMC เห็นสัญญาณนี้แล้วสั่งรีเซ็ตทั้งเครื่องทันที
+          — เร็วกว่าที่ kernel จะเขียน panic log หรือ flush journal ลงดิสก์ได้ นี่คือเหตุผลที่ทุกอย่างฝั่ง Linux ดู "สะอาด" ผิดปกติ
+        </p>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+    participant W as Workload (เช่น CI/CD job)
+    participant C as CPU core ที่เสีย
+    participant B as BMC / iDRAC
+    participant K as Linux kernel
+    participant F as UEFI firmware
+
+    W->>C: รันงานที่ไปแตะ core นี้
+    C->>C: uncorrectable machine check<br/>(micro-architectural error)
+    C->>B: assert CATERR
+    Note over K: kernel ไม่ได้รับโอกาสทำอะไรเลย<br/>ไม่มี panic, ไม่มี log, pstore ว่าง
+    B->>B: บันทึกลง SEL (MSR Info Log + CPU Machine Chk)
+    B->>F: สั่ง hard reset ทั้งเครื่อง
+    F->>F: เก็บ error record ลง NVRAM (BERT)
+    F->>K: boot ใหม่
+    K->>K: อ่าน BERT ออกมา log ให้ตอน boot<br/>= หลักฐานชิ้นเดียวที่ OS มองเห็น
+</pre>
+        </div>
+
+        <div class="rulebox">
+          <div class="rc mb-1">ทำไมมันถึงเกิดๆ หายๆ ไม่ใช่ทุกครั้ง (probabilistic)</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ในเคสจริงที่เก็บข้อมูลไว้: workload เดียวกันเป๊ะ (CPU peak 8–9%, load ~3, memory เท่ากัน) บางรอบเครื่องตาย
+            บางรอบรอด — นับได้ <b>ดับ 6 ครั้ง / รอด 7 ครั้ง</b> ในวันเดียว นี่คือพฤติกรรมปกติของ CPU ที่กำลังเสื่อม:
+            error เกิดเมื่อเงื่อนไขภายในบังเอิญมาบรรจบกัน จึงเป็นเรื่องความน่าจะเป็น <b class="text-[var(--ink)]">อย่าใช้
+            "ลองรันแล้วไม่ดับ 1 ครั้ง" มาสรุปว่าแก้หายแล้ว</b> ต้องทดสอบซ้ำหลายรอบ
+          </p>
+        </div>
+
+        <div class="rulebox mt-4">
+          <div class="rc mb-1">โหลดไม่ใช่ตัวแปรเรื่องปริมาณ แต่เป็นเรื่อง "ไปแตะอะไร"</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            เครื่องในเคสจริงดับตอน CPU แค่ <b>4–7%</b> กินไฟ 98W อุณหภูมิ 53°C — คือแทบ idle
+            แต่ช่วง idle จริงๆ (ไม่มี job) กลับอยู่ได้ 20+ นาทีติดกัน ตัวแปรจึงไม่ใช่ความหนักของงาน
+            แต่เป็นการที่ workload ไป schedule ลงบน core ที่เสียหรือเปล่า — ซึ่งเป็นเรื่องของ scheduler ล้วนๆ
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 5 FIX ========== -->
+      <section id="fix" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">5 — การแก้ไข (Fix)</div>
+        <h2 class="display text-3xl mb-6">ไม่มี software fix — มีแค่หยุดเลือด แล้วเปลี่ยนของ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทำตามลำดับนี้ ข้อ 1 ก่อนเสมอ เพราะทุกนาทีที่ปล่อยไว้คือความเสี่ยงที่ DB ใน guest จะถูกตัดกลาง write อีกรอบ
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">หยุด workload ที่กระตุ้นให้เกิด</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ถ้าระบุได้ว่างานประเภทไหนมักตามด้วย crash (เช่น CI/CD job) ปิดมันก่อนเป็นอันดับแรก
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># ตัวอย่าง: ปิด GitHub Actions runner ที่รันอยู่ใน guest</span>
+sudo systemctl stop <span class="s">'actions.runner.*'</span>
+sudo systemctl disable <span class="s">'actions.runner.*'</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ย้าย workload สำคัญออกจากเครื่องนี้</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            migrate VM ไป node อื่นถ้ามี cluster — ถ้าไม่มี อย่างน้อยให้ backup แล้วเตรียม restore ที่อื่นไว้
+            อย่ารอให้ crash รอบหน้าทำ filesystem เสียหาย
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">(workaround ชั่วคราว) ปิด core ที่เสีย</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ถ้าต้องใช้เครื่องต่อระหว่างรออะไหล่ ลอง offline core ที่ BERT ชี้ พร้อม HT sibling ของมัน —
+            Linux จะไม่ schedule งานลงไปอีก (แทนเลข cpu ด้วยค่าที่ได้จาก §3 ข้อ 3)
+          </p>
+          <div class="code p-5">
+<pre><span class="k">echo</span> 0 | sudo tee /sys/devices/system/cpu/cpu16/online
+<span class="k">echo</span> 0 | sudo tee /sys/devices/system/cpu/cpu48/online
+<span class="c"># ย้อนกลับ: echo 1 | sudo tee /sys/devices/system/cpu/cpuNN/online</span></pre>
+          </div>
+          <div class="rulebox mt-3">
+            <div class="rc mb-1">ข้อควรระวัง 3 ข้อ</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              (ก) ไม่ persist ข้าม reboot — ต้องทำเป็น systemd unit ถ้าจะใช้จริง ·
+              (ข) BERT มี record เดียว crash ครั้งอื่นอาจเป็น core อื่นก็ได้ ·
+              (ค) เป็นแบบ probabilistic ต้องทดสอบซ้ำ <b>5–10 รอบ</b> ถึงจะบอกได้ว่าช่วยจริง — นี่คือการซื้อเวลา ไม่ใช่การแก้
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">เก็บหลักฐานส่งเคลม</h3>
+          <div class="code p-5">
+<pre>ipmitool sel elist &gt; sel-full.txt        <span class="c"># ประวัติ MCE ทั้งหมด</span>
+ipmitool sel save sel-raw.bin            <span class="c"># ไฟล์ดิบสำหรับผู้ผลิต</span>
+journalctl -b 0 -k | grep -A12 <span class="s">'BERT'</span> &gt; bert.txt
+journalctl --list-boots &gt; boots.txt
+dmidecode &gt; dmidecode.txt</pre>
+          </div>
+          <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
+            แจ้งผู้ให้บริการ/ผู้ผลิตด้วย <b>service tag/serial</b> + ข้อความว่า
+            <i>"CPU Machine Check Exception ทำให้เครื่องรีเซ็ตเอง N ครั้ง ความถี่เพิ่มขึ้น · BERT ระบุ fatal
+            micro-architectural error ที่ APIC ID &lt;x&gt; (socket &lt;s&gt; core &lt;c&gt;) · RAM/ดิสก์/ความร้อน/ไฟ ปกติทั้งหมด"</i>
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 6 VERIFY / PREVENT ========== -->
+      <section id="verify" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">6 — ยืนยัน + ป้องกัน (Verify / Prevent)</div>
+        <h2 class="display text-3xl mb-6">ทำให้ครั้งหน้าวินิจฉัยได้ใน 2 นาที ไม่ใช่ทั้งวัน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ปัญหาของ crash แบบนี้คือหลักฐานหายไปพร้อมเครื่อง — ติดตั้ง 4 อย่างนี้ไว้ล่วงหน้าบน
+          <b class="text-[var(--ink)]">ตัว host เอง ไม่ใช่ใน guest</b> (guest เป็นเหยื่อ ไม่ใช่สาเหตุ — มันมองไม่เห็นอะไรเลย)
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">rasdaemon — จับ correctable error ก่อนจะกลายเป็น fatal</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เก็บลง sqlite ข้ามการ reboot และ decode ให้ว่าเป็น CPU ตัวไหน/DIMM แท่งไหน — เป็นตัวเดียวที่อาจเตือนล่วงหน้าได้
+          </p>
+          <div class="code p-5">
+<pre>apt-get install -y rasdaemon
+systemctl enable --now rasdaemon
+ras-mc-ctl --summary          <span class="c"># DB: /var/lib/rasdaemon/ras-mc_event.db</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">archive BERT ทุก boot — ก่อนถูกเขียนทับ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            firmware เก็บ BERT ได้แค่ record ล่าสุด การ copy ออกมาทุก boot คือวิธีเดียวที่จะรู้ว่า
+            "core เดิมทุกครั้ง" หรือ "กระจายหลาย core" — ซึ่งเปลี่ยนข้อสรุปว่าควรเปลี่ยน CPU ตัวไหน
+          </p>
+          <div class="code p-5">
+<pre>cat &gt; /etc/systemd/system/bert-capture.service &lt;&lt;<span class="s">'UNIT'</span>
+[Unit]
+Description=Archive the BERT record read at boot before the next crash overwrites it
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'journalctl -b 0 -k --no-pager \
+  | grep -A12 "BERT: Error records" \
+  &gt; /var/log/crash-reports/bert-$(date +%%Y%%m%%d-%%H%%M%%S).txt 2&gt;/dev/null; true'
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+mkdir -p /var/log/crash-reports
+systemctl daemon-reload &amp;&amp; systemctl enable --now bert-capture</pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">sampler ที่ fsync ทุกบรรทัด — ให้วินาทีสุดท้ายรอด</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เครื่องตายแบบไม่มี shutdown = ทุกอย่างที่ค้างใน page cache หายหมด ต้อง
+            <span class="mono text-[12px]">sync</span> ทุกบรรทัดถึงจะได้ข้อมูลวินาทีสุดท้ายจริงๆ
+            ซึ่งเป็นตัวบอกว่าตอนตายเครื่องกำลังทำอะไรอยู่
+          </p>
+          <div class="code p-5">
+<pre><span class="c">#!/usr/bin/env bash</span>
+<span class="c"># /usr/local/bin/crash-watch.sh — เก็บทุก 1 วินาที</span>
+LOG=/var/log/crash-watch.log
+<span class="k">while</span> <span class="k">true</span><span class="k">;</span> <span class="k">do</span>
+  load=$(cut -d<span class="s">' '</span> -f1-3 /proc/loadavg)
+  mem=$(awk <span class="s">'/MemAvailable/{printf "%.1fG", $2/1048576}'</span> /proc/meminfo)
+  <span class="k">printf</span> <span class="s">'%s load=%s memavail=%s\n'</span> <span class="s">"$(date '+%F %T')"</span> <span class="s">"$load"</span> <span class="s">"$mem"</span> &gt;&gt; <span class="s">"$LOG"</span>
+  sync -f <span class="s">"$LOG"</span>          <span class="c"># ← จุดสำคัญ: ถ้าไม่ sync บรรทัดสุดท้ายจะหาย</span>
+  sleep 1
+<span class="k">done</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">iDRAC/BMC email alert — ทนทานที่สุด</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            BMC ทำงานแยกจาก OS โดยสิ้นเชิง ต่อให้เครื่องตายสนิทมันก็ยังส่งอีเมลได้ ตั้งครั้งเดียวจบ:
+            web UI → <b>Configuration → System Settings → Alert Configuration</b> → เปิด Alerts + ตั้ง SMTP
+            → เลือกอย่างน้อย <span class="mono text-[12px]">Critical</span>, <span class="mono text-[12px]">Processor</span>,
+            <span class="mono text-[12px]">Power Supply</span>, <span class="mono text-[12px]">Memory</span>
+          </p>
+        </div>
+
+        <div class="rulebox ok mt-8">
+          <div class="rc mb-1">ยืนยันว่าติดตั้งครบแล้ว</div>
+          <div class="code p-5 mt-2" style="background:transparent;border:0">
+<pre><span class="k">for</span> u <span class="k">in</span> rasdaemon bert-capture crash-watch<span class="k">;</span> <span class="k">do</span>
+  <span class="k">printf</span> <span class="s">'%-16s %s\n'</span> <span class="s">"$u"</span> <span class="s">"$(systemctl is-active $u)"</span>
+<span class="k">done</span>
+ls /sys/firmware/acpi/tables/ | grep -E <span class="s">'BERT|HEST|ERST'</span>   <span class="c"># ต้องมีครบ</span></pre>
+          </div>
+        </div>
+
+        <div class="rulebox mt-4">
+          <div class="rc mb-1">สิ่งที่ runbook นี้ "ไม่" ครอบคลุม</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ถ้า <span class="mono text-[12px]">/sys/fs/pstore/</span> <b>มี</b> ไฟล์ หรือ journal ของ boot ที่ตาย
+            <b>มี</b> kernel panic trace = คนละเคส (software panic ไม่ใช่ hardware MCE) ให้ไปไล่จาก stack trace แทน ·
+            ถ้า EDAC <span class="mono text-[12px]">ce_count</span> ขึ้นเรื่อยๆ = RAM เสีย ให้เปลี่ยน DIMM ไม่ใช่ CPU ·
+            ถ้า <span class="mono text-[12px]">Power Supply AC lost</span> = ตรวจสายไฟ/PDU ก่อน
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · RUNBOOK · PROXMOX CPU MACHINE CHECK"
+        line2="BERT → APIC ID → socket/core · verified 2026-08-29">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
