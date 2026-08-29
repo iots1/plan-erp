@@ -61,6 +61,7 @@
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9635E"></span>Severity: Critical (Host + ทุก VM ดับ)</span>
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>ไม่มี software fix — ต้องเปลี่ยนฮาร์ดแวร์</span>
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>วินิจฉัยได้ใน ~10 นาที</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#8FD694"></span>มี workaround ประคองระหว่างรออะไหล่</span>
         </div>
       </div>
     </header>
@@ -394,22 +395,86 @@ sudo systemctl disable <span class="s">'actions.runner.*'</span></pre>
 
         <div class="step">
           <span class="sn">3</span>
-          <h3 class="font-semibold text-[16px] mb-2">(workaround ชั่วคราว) ปิด core ที่เสีย</h3>
+          <h3 class="font-semibold text-[16px] mb-2">(workaround ชั่วคราว) ปิด core ที่เสีย — ทดสอบแล้วว่าได้ผล</h3>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
-            ถ้าต้องใช้เครื่องต่อระหว่างรออะไหล่ ลอง offline core ที่ BERT ชี้ พร้อม HT sibling ของมัน —
+            ถ้าต้องใช้เครื่องต่อระหว่างรออะไหล่ ให้ offline core ที่ BERT ชี้ พร้อม HT sibling ของมัน —
             Linux จะไม่ schedule งานลงไปอีก (แทนเลข cpu ด้วยค่าที่ได้จาก §3 ข้อ 3)
           </p>
           <div class="code p-5">
 <pre><span class="k">echo</span> 0 | sudo tee /sys/devices/system/cpu/cpu16/online
 <span class="k">echo</span> 0 | sudo tee /sys/devices/system/cpu/cpu48/online
-<span class="c"># ย้อนกลับ: echo 1 | sudo tee /sys/devices/system/cpu/cpuNN/online</span></pre>
+nproc   <span class="c"># ยืนยันว่าลดลง 2</span></pre>
           </div>
-          <div class="rulebox mt-3">
-            <div class="rc mb-1">ข้อควรระวัง 3 ข้อ</div>
+
+          <p class="text-sm mt-5 mb-3" style="color:var(--ink-soft)">
+            <b class="text-[var(--ink)]">ต้องทำให้รอดข้าม reboot ด้วยเสมอ</b> — ระหว่างทดสอบเครื่องอาจ crash อีก
+            ถ้า core กลับมา online เองตอน boot รอบทดสอบถัดไปจะไม่ได้ทดสอบอะไรเลย และจะสรุปผลผิด
+          </p>
+          <div class="code p-5">
+<pre>cat &gt; /etc/systemd/system/offline-faulty-core.service &lt;&lt;<span class="s">'UNIT'</span>
+[Unit]
+Description=Offline the CPU core BERT identified as failing
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'for c in 16 48; do echo 0 &gt; /sys/devices/system/cpu/cpu$c/online || true; done'
+ExecStop=/bin/sh -c 'for c in 16 48; do echo 1 &gt; /sys/devices/system/cpu/cpu$c/online || true; done'
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload &amp;&amp; systemctl enable --now offline-faulty-core.service</pre>
+          </div>
+
+          <div class="rulebox ok mt-4">
+            <div class="rc mb-1">ผลจากเคสจริง — เปลี่ยนจากดับ 7/7 เป็นไม่ดับเลย</div>
+            <div class="card overflow-hidden mt-3">
+              <div class="overflow-x-auto">
+                <table class="d">
+                  <thead><tr><th>ตัวชี้วัด</th><th>ก่อนปิด core (4.5 ชม.)</th><th>หลังปิด core</th></tr></thead>
+                  <tbody>
+                    <tr><td>CPU ที่ใช้งาน</td><td>64 threads</td><td><b>62 threads</b></td></tr>
+                    <tr><td>เครื่องดับ</td><td><b>7 ครั้ง</b> (16 วิ–2m36s หลัง job เริ่ม)</td><td><b>0 ครั้ง</b></td></tr>
+                    <tr><td>Job นานสุดที่รอด</td><td>2 นาที 22 วิ</td><td><b>8 นาที 52 วิ</b></td></tr>
+                    <tr><td>load สูงสุด</td><td>~3.4</td><td><b>5.05</b> (หนักกว่าเดิม)</td></tr>
+                    <tr><td>MCE ใหม่ใน SEL</td><td>+10 entries ทุกครั้ง</td><td><b>ไม่มีเลย</b></td></tr>
+                    <tr><td>BERT record ใหม่</td><td>เพิ่มทุก crash</td><td><b>ไม่มีเลย</b></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <p class="text-[13.5px] mt-3" style="color:var(--ink-soft)">
+              รัน CI/CD job ผ่านติดกัน 3 ตัว (8m52s · 47s · 4m12s) โดย <span class="mono text-[12px]">SEL</span>,
+              <span class="mono text-[12px]">BERT</span> และ EDAC counter ไม่ขยับเลยแม้แต่นิดเดียว
+            </p>
+          </div>
+
+          <div class="rulebox mt-4">
+            <div class="rc mb-1">วิธีวัดผลให้ถูก — อย่าสรุปจากรอบเดียว</div>
             <p class="text-[13.5px]" style="color:var(--ink-soft)">
-              (ก) ไม่ persist ข้าม reboot — ต้องทำเป็น systemd unit ถ้าจะใช้จริง ·
-              (ข) BERT มี record เดียว crash ครั้งอื่นอาจเป็น core อื่นก็ได้ ·
-              (ค) เป็นแบบ probabilistic ต้องทดสอบซ้ำ <b>5–10 รอบ</b> ถึงจะบอกได้ว่าช่วยจริง — นี่คือการซื้อเวลา ไม่ใช่การแก้
+              จดค่า 3 ตัวนี้ไว้เป็น baseline ก่อนเริ่ม แล้วเทียบหลังทุกรอบ — ถ้าตัวใดตัวหนึ่งขยับ = ยังไม่หาย
+            </p>
+            <div class="code p-5 mt-2" style="background:transparent;border:0">
+<pre>ipmitool sel info | grep Entries                    <span class="c"># ห้ามเพิ่ม</span>
+ls /var/log/crash-reports/bert-*.txt | wc -l        <span class="c"># ห้ามเพิ่ม</span>
+<span class="k">for</span> m <span class="k">in</span> /sys/devices/system/edac/mc/mc*<span class="k">;</span> <span class="k">do</span> cat $m/ce_count $m/ue_count<span class="k">;</span> <span class="k">done</span></pre>
+            </div>
+            <p class="text-[13.5px] mt-3" style="color:var(--ink-soft)">
+              ความผิดพลาดนี้เป็น <b class="text-[var(--ink)]">probabilistic</b> — ในเคสจริงเคยมี job รัน 2m22s
+              แล้วรอด <b>ทั้งที่ยังไม่ได้ปิด core อะไรเลย</b> ดังนั้นต้องผ่านให้ครบ <b>5–6 รอบ</b> ถึงจะเชื่อได้
+            </p>
+          </div>
+
+          <div class="rulebox mt-4" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ข้อจำกัดที่ต้องเข้าใจ</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              (ก) <b>นี่คือการซื้อเวลา ไม่ใช่การแก้</b> — CPU ที่ throw fatal MCE แล้วจะเสื่อมต่อไปเรื่อยๆ ยังต้องเปลี่ยนอยู่ดี ·
+              (ข) ถ้ายังดับอีกและ BERT ชี้ <b>APIC อื่น</b> = จุดเสียกว้างกว่า 1 core ต้องเปลี่ยนทั้ง CPU ·
+              (ค) ผลการทดสอบนี้ <b>คือหลักฐานเคลมชั้นดี</b> — เป็น controlled experiment ที่แสดงว่าปิด core เดียว
+              แล้วอาการหายสนิทหลังจากดับ 7 ครั้งติด ให้แนบไปกับเคสด้วย (ดูข้อ 4)
             </p>
           </div>
         </div>
@@ -421,14 +486,34 @@ sudo systemctl disable <span class="s">'actions.runner.*'</span></pre>
 <pre>ipmitool sel elist &gt; sel-full.txt        <span class="c"># ประวัติ MCE ทั้งหมด</span>
 ipmitool sel save sel-raw.bin            <span class="c"># ไฟล์ดิบสำหรับผู้ผลิต</span>
 journalctl -b 0 -k | grep -A12 <span class="s">'BERT'</span> &gt; bert.txt
+cp /var/log/crash-reports/bert-*.txt .   <span class="c"># ทุก crash ที่ archive ไว้ (ดู §6)</span>
 journalctl --list-boots &gt; boots.txt
 dmidecode &gt; dmidecode.txt</pre>
           </div>
           <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
-            แจ้งผู้ให้บริการ/ผู้ผลิตด้วย <b>service tag/serial</b> + ข้อความว่า
-            <i>"CPU Machine Check Exception ทำให้เครื่องรีเซ็ตเอง N ครั้ง ความถี่เพิ่มขึ้น · BERT ระบุ fatal
-            micro-architectural error ที่ APIC ID &lt;x&gt; (socket &lt;s&gt; core &lt;c&gt;) · RAM/ดิสก์/ความร้อน/ไฟ ปกติทั้งหมด"</i>
+            แจ้งผู้ให้บริการ/ผู้ผลิตด้วย <b>service tag/serial</b> + ข้อความประมาณนี้:
           </p>
+          <div class="rulebox mt-3">
+            <div class="rc mb-1">โครงข้อความแจ้งเคลม</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <i>เครื่องรีเซ็ตเองโดยไม่มี OS shutdown <b>N ครั้ง</b> ความถี่เพิ่มขึ้นเรื่อยๆ ·
+              iDRAC SEL บันทึก <span class="mono text-[12px]">Processor CPU Machine Chk — Transition to
+              Non-recoverable</span> ทุกครั้ง · ACPI BERT จาก crash หลายครั้งชี้ตรงกันที่
+              <span class="mono text-[12px]">severity: fatal · error_type: 0x08 (micro-architectural) ·
+              processor_id: 0x&lt;x&gt;</span> = <b>socket &lt;s&gt; core &lt;c&gt;</b> ·
+              ตัดสาเหตุอื่นออกครบแล้ว: RAM (EDAC 0 error), ดิสก์ (SMART สะอาด, 0 storage event),
+              ความร้อน, ไฟ, OOM, software · <b>ขอเปลี่ยน CPU ตัวที่ระบุ</b></i>
+            </p>
+          </div>
+          <div class="rulebox ok mt-4">
+            <div class="rc mb-1">แนบผลการทดลองปิด core ไปด้วย — เป็นหลักฐานที่ปฏิเสธยาก</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              ถ้าทำข้อ 3 แล้วอาการหาย นั่นคือ <b class="text-[var(--ink)]">controlled experiment</b> ที่แสดงว่า
+              "ปิด core ที่ BERT ชี้เพียง core เดียว แล้ว workload เดิมที่เคยทำเครื่องดับ 7/7 ครั้ง
+              กลับรันผ่านได้ทั้งหมด" — แข็งแรงกว่าการส่งแค่ log เฉยๆ มาก เพราะเป็นการพิสูจน์เชิงสาเหตุ
+              ไม่ใช่แค่ความสัมพันธ์
+            </p>
+          </div>
         </div>
       </section>
 
@@ -518,10 +603,11 @@ LOG=/var/log/crash-watch.log
         <div class="rulebox ok mt-8">
           <div class="rc mb-1">ยืนยันว่าติดตั้งครบแล้ว</div>
           <div class="code p-5 mt-2" style="background:transparent;border:0">
-<pre><span class="k">for</span> u <span class="k">in</span> rasdaemon bert-capture crash-watch<span class="k">;</span> <span class="k">do</span>
-  <span class="k">printf</span> <span class="s">'%-16s %s\n'</span> <span class="s">"$u"</span> <span class="s">"$(systemctl is-active $u)"</span>
+<pre><span class="k">for</span> u <span class="k">in</span> rasdaemon bert-capture crash-watch offline-faulty-core<span class="k">;</span> <span class="k">do</span>
+  <span class="k">printf</span> <span class="s">'%-22s %s\n'</span> <span class="s">"$u"</span> <span class="s">"$(systemctl is-active $u)"</span>
 <span class="k">done</span>
-ls /sys/firmware/acpi/tables/ | grep -E <span class="s">'BERT|HEST|ERST'</span>   <span class="c"># ต้องมีครบ</span></pre>
+ls /sys/firmware/acpi/tables/ | grep -E <span class="s">'BERT|HEST|ERST'</span>   <span class="c"># ต้องมีครบ</span>
+cat /sys/devices/system/cpu/offline                    <span class="c"># core ที่ปิดไว้ (ถ้าใช้ workaround)</span></pre>
           </div>
         </div>
 
