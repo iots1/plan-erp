@@ -62,13 +62,13 @@
           เรียงตามลำดับการทำงานจริงของแต่ละบทบาท พร้อมตัวอย่าง payload และสถานะเอกสารที่เปลี่ยนในแต่ละขั้น
         </p>
         <div class="mt-9 flex flex-wrap gap-2.5">
-          <span class="chip">18 Business Flows</span>
-          <span class="chip">282 REST Endpoints</span>
+          <span class="chip">19 Business Flows</span>
+          <span class="chip">290 REST Endpoints</span>
           <span class="chip">8 Bounded Contexts</span>
           <span class="chip">JSON:API Envelope</span>
         </div>
         <p class="mt-7 mono text-[11px] text-[#7B8CA6]">
-          endpoint ทุกเส้นในเอกสารนี้ดึงจากโค้ดจริงใน <span class="text-[#9FB0C6]">iots1/erp-api</span> ไม่ได้เขียนจากแผน · ปรับปรุงล่าสุด 2026-08-30
+          endpoint ทุกเส้นในเอกสารนี้ดึงจากโค้ดจริงใน <span class="text-[#9FB0C6]">iots1/erp-api</span> ไม่ได้เขียนจากแผน · ปรับปรุงล่าสุด 2026-08-31
         </p>
       </div>
     </header>
@@ -90,7 +90,7 @@
 flowchart LR
   subgraph A["กลุ่ม A · จัดซื้อ"]
     A2["PO<br/>ใบสั่งซื้อ"] --> A3["GRN<br/>ใบรับสินค้า"] --> A4["PRN<br/>ส่งคืนสินค้า"]
-    A3 -.->|"ยังไม่มี"| APINV["AP Invoice<br/>(ตั้งหนี้ผู้ขาย)"]
+    A3 --> A5["AP Invoice<br/>ตั้งหนี้ผู้ขาย"]
   end
   subgraph D["กลุ่ม D · คลัง"]
     D1["Stock Entry<br/>โอน/เบิก/แปรรูป"]
@@ -112,7 +112,8 @@ flowchart LR
   B3 --> C1
   C1 --> GL
   C4 --> GL
-  APINV -.->|"ยังไม่มี — ตอนนี้ PAY จ่ายตรง ไม่ผูกใบไหนเลย"| C4
+  A5 -->|"จ่ายตัดใบนี้ (type=PAY)"| C4
+  A5 --> GL
 </pre>
         </div>
 
@@ -139,6 +140,7 @@ flowchart LR
             <tbody>
               <tr><td>A3 GRN</td><td class="mono text-[12px]">cancel</td><td>คืนล็อตที่สร้างไว้กลับเป็น 0</td><td>ล็อตถูกเบิกไปแล้วแม้ชิ้นเดียว (409) — ให้ใช้ A4 (Purchase Return) แทน</td></tr>
               <tr><td>A4 PRN</td><td class="mono text-[12px]">cancel</td><td>คืนจำนวนกลับเข้าล็อตเดิม</td><td>ไม่มี (คืนได้เสมอ — ล็อตยังอยู่ต่อให้ว่างแล้ว)</td></tr>
+              <tr><td>A5 AP Invoice</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL (ล้างหนี้ + ภาษีซื้อที่ตั้งไว้)</td><td>มีใบจ่ายเงินตัดใบนี้อยู่ (409) — ยกเลิกใบจ่ายก่อน · งวดบัญชีปิดแล้ว</td></tr>
               <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td>ไม่มี guard พิเศษ — คืนได้เสมอ</td></tr>
               <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ</td></tr>
               <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td>ไม่มี guard พิเศษ</td></tr>
@@ -157,8 +159,9 @@ flowchart LR
               <tr><td class="mono">A2</td><td>สั่งซื้อสินค้า</td><td>Procurement / จัดซื้อ</td><td>PO · DRAFT→APPROVED→SENT→PARTIAL→RECEIVED</td></tr>
               <tr><td class="mono">A3</td><td>รับสินค้าเข้าคลัง</td><td>Warehouse Staff / QC</td><td>GRN · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">A4</td><td>ส่งคืนสินค้าให้ผู้ขาย</td><td>Warehouse Staff</td><td>PRN · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">A5</td><td>ตั้งหนี้ผู้ขาย (3-way match)</td><td>AR / AP Clerk</td><td>AP Invoice · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">B1</td><td>เสนอราคา</td><td>Sales Rep</td><td>Quotation · DRAFT→SENT→APPROVED</td></tr>
-              <tr><td class="mono">B2</td><td>แปลงเป็นใบสั่งขาย</td><td>Sales Manager</td><td>SO · CONFIRMED→PARTIAL→CLOSED</td></tr>
+              <tr><td class="mono">B2</td><td>แปลงเป็นใบสั่งขาย</td><td>Sales Rep · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>SO · <b>PENDING_APPROVAL</b>→CONFIRMED→PARTIAL→CLOSED</td></tr>
               <tr><td class="mono">B3</td><td>ส่งของ</td><td>Warehouse Staff</td><td>DN · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">C1</td><td>ออกใบกำกับภาษี/ใบเสร็จ</td><td>Accountant</td><td>Receipt · DRAFT→ISSUED→VOID</td></tr>
               <tr><td class="mono">C2</td><td>ใบลดหนี้ / ใบเพิ่มหนี้</td><td>Accountant</td><td>Receipt (CN/DN) · DRAFT→ISSUED</td></tr>
@@ -196,9 +199,9 @@ flowchart LR
               <tr><td><b>Warehouse Staff</b><br><span class="mono text-[11px]">เจ้าหน้าที่คลัง</span></td><td class="mono text-[12px]">A3 · A4 · B3 · D1</td><td class="mono text-[11.5px]">goods_receipt:* · purchase_return:* · delivery_note:* · stock_entry:* · lot:view · barcode:lookup</td></tr>
               <tr><td><b>Warehouse Manager</b><br><span class="mono text-[11px]">ผู้จัดการคลัง</span></td><td class="mono text-[12px]">D2 · E1</td><td class="mono text-[11.5px]">stock_adjustment:* · stock_balance:view · stock_ledger:view · expiry_alert:view · stock_setting:*</td></tr>
               <tr><td><b>Sales Rep</b><br><span class="mono text-[11px]">พนักงานขาย</span></td><td class="mono text-[12px]">B1</td><td class="mono text-[11.5px]">customer:* · quotation:create/view/update/send/cancel</td></tr>
-              <tr><td><b>Sales Manager</b><br><span class="mono text-[11px]">ผู้จัดการขาย</span></td><td class="mono text-[12px]">B2</td><td class="mono text-[11.5px]">quotation:approve · sales_order:create/view/cancel</td></tr>
+              <tr><td><b>Sales Manager</b><br><span class="mono text-[11px]">ผู้จัดการขาย</span></td><td class="mono text-[12px]">B2</td><td class="mono text-[11.5px]">quotation:approve · sales_order:create/view/cancel/<b>approve</b></td></tr>
               <tr><td><b>Accountant</b><br><span class="mono text-[11px]">นักบัญชี</span></td><td class="mono text-[12px]">C1 · C2 · E2</td><td class="mono text-[11.5px]">receipt:* · tax_config:* · ledger_entry:view · trial_balance:view · cogs_entry:view · period:view</td></tr>
-              <tr><td><b>AR / AP Clerk</b><br><span class="mono text-[11px]">เจ้าหน้าที่การเงิน</span></td><td class="mono text-[12px]">C3 · C4 · C5</td><td class="mono text-[11.5px]">billing_note:* · payment_entry:* · payment_schedule:*</td></tr>
+              <tr><td><b>AR / AP Clerk</b><br><span class="mono text-[11px]">เจ้าหน้าที่การเงิน</span></td><td class="mono text-[12px]">A5 · C3 · C4 · C5</td><td class="mono text-[11.5px]">billing_note:* · payment_entry:* · payment_schedule:* · ap_invoice:*</td></tr>
               <tr><td><b>Finance Manager</b><br><span class="mono text-[11px]">ผู้จัดการการเงิน</span></td><td class="mono text-[12px]">C6 · E2</td><td class="mono text-[11.5px]">period:view/close · report:view</td></tr>
               <tr><td><b>Executive</b><br><span class="mono text-[11px]">ผู้บริหาร</span></td><td class="mono text-[12px]">E1 · E2</td><td class="mono text-[11.5px]">*:view (อ่านอย่างเดียวทุก BC)</td></tr>
               <tr><td><b>Security / User Admin</b><br><span class="mono text-[11px]">ผู้ดูแลระบบ</span></td><td class="mono text-[12px]">—</td><td class="mono text-[11.5px]">user:* · role:* · policy:* · access_key:* · permission_sync:*</td></tr>
@@ -513,6 +516,66 @@ sequenceDiagram
             (<span class="mono text-[12px]">received_qty − returned_qty</span>) อาจทำให้ PO ที่เคย RECEIVED กลับเป็น PARTIAL ได้หลัง submit
           </p>
         </div>
+
+        <h3 class="display text-xl mt-10 mb-4">A5 · ตั้งหนี้ผู้ขาย (3-way match) <span class="mono text-[13px] text-[var(--muted)]">— AR / AP Clerk</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          เพิ่มเข้ามา 2026-08-30 — เอกสารที่<b>ปิดวงจรฝั่งเจ้าหนี้</b>: เดิม PO → GRN แล้วข้ามไปจ่ายเงินเลย โดยระบบไม่รู้ว่าเป็นหนี้เท่าไหร่และจ่ายไปตัดใบไหน
+          · AP Clerk เป็นคนสร้างเอง<b>เมื่อใบแจ้งหนี้กระดาษของผู้ขายมาถึง</b> (ไม่ใช่ตอนรับของ — ของมาถึงกับใบแจ้งหนี้มาถึงคนละเวลากัน และราคาบนใบแจ้งหนี้อาจไม่ตรงกับตอนรับ)
+          · หลัง submit จึงจ่ายเงินตัดใบนี้ได้ด้วย <span class="mono text-[12px]">POST /payment-entries</span> ที่ <span class="mono text-[12px]">type=PAY</span> (ดู C4)
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/goods-receipts?filter=status||$eq||SUBMITTED</td><td class="mono text-[11px]">goods_receipt:view</td><td>หา GRN ที่ยังไม่ได้ตั้งหนี้</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/ap-invoices</td><td class="mono text-[11px]">ap_invoice:create</td><td><b>DRAFT</b> · ได้เลขภายใน APINV-{ปี}-{ลำดับ} · ยังไม่กระทบบัญชี</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /finance-bc/v1/ap-invoices/{id}/submit</td><td class="mono text-[11px]">ap_invoice:submit</td><td><b>รับรู้หนี้ + โพสต์ GL</b> (Dr สินค้าคงเหลือ + ภาษีซื้อ / Cr เจ้าหนี้การค้า)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">PUT /finance-bc/v1/ap-invoices/{id}</td><td class="mono text-[11px]">ap_invoice:update</td><td>แก้ได้เฉพาะ DRAFT · เปลี่ยน supplier_id ไม่ได้</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /finance-bc/v1/ap-invoices/{id}/cancel</td><td class="mono text-[11px]">ap_invoice:cancel</td><td>โพสต์ GL กลับด้าน · <b>ทำไม่ได้ถ้ามีการจ่ายตัดใบนี้ไปแล้ว</b> (ยกเลิกใบจ่ายก่อน)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /finance-bc/v1/ap-invoices</span>
+{
+  <span class="s">"supplier_id"</span>: <span class="s">"a3f1…"</span>,
+  <span class="s">"vendor_document_number"</span>: <span class="s">"INV-2026-8842"</span>,   <span class="c">// เลขบนใบกระดาษของผู้ขาย — คนละเลขกับ APINV ของเรา</span>
+  <span class="s">"document_date"</span>: <span class="s">"2026-08-30T00:00:00+07:00"</span>, <span class="c">// วันที่บนใบผู้ขาย ไม่ใช่วันที่เรากรอก — กำหนดงวดบัญชี + อัตรา VAT</span>
+  <span class="s">"is_vat_included"</span>: <span class="k">false</span>,               <span class="c">// ราคาบนใบผู้ขายรวม VAT แล้วหรือยัง — AP Clerk เป็นคนตอบ</span>
+  <span class="s">"discount_mode"</span>: <span class="s">"none"</span>,
+  <span class="s">"items"</span>: [
+    { <span class="s">"grn_item_id"</span>: <span class="s">"e2df…"</span>,          <span class="c">// อ้างรายการรับเข้า — ที่เหลือระบบ derive ให้หมด</span>
+      <span class="s">"qty"</span>: <span class="t">100</span>,                       <span class="c">// ตั้งหนี้บางส่วนได้ ไม่ต้องเต็มจำนวนที่รับ</span>
+      <span class="s">"unit_cost"</span>: <span class="t">450</span>                  <span class="c">// ราคาบนใบผู้ขาย · ต้องอยู่ในกรอบ ±20% ของ import_cost ตอนรับเข้า</span>
+    }
+  ]
+}</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">3-way match · สิ่งที่ระบบตรวจให้อัตโนมัติ</div>
+          <p class="text-[13.5px]">
+            FE ส่งมาแค่ <span class="mono text-[12px]">grn_item_id</span> + จำนวน + ราคา — <b>สินค้า/ชื่อ/SKU/ประเภทภาษี/PO/GRN ระบบดึงจากรายการรับเข้าให้เอง</b> ส่งมาเองไม่ได้
+            (กันการประกาศประเภทภาษีเองแบบเดียวกับฝั่งขาย) · ระบบเทียบ 3 ทาง: <b>PO</b> (ผ่าน GRN) · <b>GRN</b> (ต้อง SUBMITTED และเป็นผู้ขายรายเดียวกับหัวเอกสาร)
+            · <b>ใบแจ้งหนี้</b> (จำนวน + ราคาที่กรอก)
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">สิ่งที่ทำให้ create/submit ไม่ผ่าน</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">400</span> — GRN ไม่ใช่ SUBMITTED · GRN เป็นของผู้ขายคนอื่น · หา grn_item_id ไม่เจอ (หรือ inventory-bc ไม่ตอบ) ·
+            ราคาเกิน ±20% ของ <span class="mono text-[12px]">import_cost</span> · อ้าง grn_item_id ซ้ำในใบเดียวกัน<br>
+            <span class="mono text-[12px]">409</span> — ตั้งหนี้เกินจำนวนที่ยังไม่ถูกตั้งหนี้ของรายการรับเข้านั้น (มีใบอื่นตั้งไปแล้ว) · ใบไม่มีบรรทัด · เอกสารไม่ใช่ DRAFT ·
+            <span class="mono text-[12px]">document_date</span> ตกในงวดบัญชีที่ปิดแล้ว (ดู C6)
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">1 ใบตั้งหนี้ ผูกได้หลาย GRN</div>
+          <p class="text-[13.5px]">
+            ผู้ขายส่งของหลายรอบแล้วเก็บเงินทีเดียวเป็นเรื่องปกติ — เพราะ match เกิดที่<b>ระดับบรรทัด</b> (แต่ละบรรทัดมี grn_item_id ของตัวเอง) ไม่ใช่ที่หัวเอกสาร
+            หน้าจอจึงควรให้เลือกรายการรับเข้าข้ามหลาย GRN มารวมในใบเดียวได้ · <span class="mono text-[12px]">wht_rate</span>/<span class="mono text-[12px]">total_wht</span>
+            บนใบตั้งหนี้<b>ยังไม่ใช้งาน</b> — การหัก ณ ที่จ่ายจริงเกิดตอนจ่ายเงินที่ C4 เท่านั้น
+          </p>
+        </div>
       </section>
 
       <!-- ============ 05 FLOW B ============ -->
@@ -595,11 +658,24 @@ sequenceDiagram
           <table class="d">
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
-              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{quotation_id}/convert-to-sales-order</td><td class="mono text-[11px]">sales_order:create</td><td>สร้าง SO สถานะ <b>CONFIRMED</b> · คัดลอกราคาจากใบเสนอราคาทั้งหมด ไม่คิดราคาใหม่</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{quotation_id}/convert-to-sales-order</td><td class="mono text-[11px]">sales_order:create</td><td>สร้าง SO สถานะ <b>CONFIRMED</b> — หรือ <b>PENDING_APPROVAL</b> ถ้าเกินวงเงินเครดิต · คัดลอกราคาจากใบเสนอราคาทั้งหมด ไม่คิดราคาใหม่</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/sales-orders/{id}/approve</td><td class="mono text-[11px]">sales_order:approve</td><td>ปลดล็อกใบที่ติด PENDING_APPROVAL → <b>CONFIRMED</b> · เฉพาะ Sales Manager</td></tr>
               <tr><td class="mono text-[11.5px]">GET /sales-bc/v1/sales-orders?relations=items</td><td class="mono text-[11px]">sales_order:view</td><td>ดูยอดค้างส่ง (<span class="mono">qty</span> − <span class="mono">delivered_qty</span>)</td></tr>
               <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/sales-orders/{id}/cancel</td><td class="mono text-[11px]">sales_order:cancel</td><td>ยกเลิกทั้งใบ</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">วงเงินเครดิต · soft-block ตอนยืนยัน SO</div>
+          <p class="text-[13.5px]">
+            เพิ่มเข้ามา 2026-08-30 — เดิม <span class="mono text-[12px]">customers.credit_limit</span> มีคอลัมน์แต่<b>ไม่มีอะไรตรวจ</b> ·
+            ตอนแปลงใบเสนอราคา ระบบคิด<b>ยอดใช้เครดิตจริง</b> = (หนี้ค้างชำระใน finance-bc ผ่าน RPC) + (มูลค่า SO ที่ยังไม่ได้ส่ง = Σ (qty − delivered_qty) × ราคาต่อหน่วย)
+            — ใช้ยอด<b>ค้างส่ง</b> ไม่ใช่ยอดทั้งใบ เพราะของที่ส่งแล้วจะกลายเป็นหนี้ในครึ่งแรกอยู่ดี ถ้านับทั้งใบจะนับซ้ำ<br>
+            เกินวงเงิน → SO ไม่ถูกปฏิเสธ แต่ไปอยู่สถานะ <b>PENDING_APPROVAL</b> (ส่งของไม่ได้ ออกบิลไม่ได้ จนกว่าจะอนุมัติ) ·
+            ค่า <span class="mono text-[12px]">credit_limit_snapshot</span> / <span class="mono text-[12px]">credit_exposure_snapshot</span> ถูกเก็บไว้บนใบ
+            เพื่อให้ผู้อนุมัติเห็นตัวเลข ณ ตอนที่ระบบตัดสิน ไม่ใช่ตัวเลขวันนี้<br>
+            ไม่ตั้งวงเงิน (<span class="mono text-[12px]">null</span>) = ไม่จำกัด · finance-bc ไม่ตอบ RPC = <b>ปล่อยผ่าน</b> ไม่บล็อกการขายเพราะระบบบัญชีล่ม
+          </p>
         </div>
 
         <h3 class="display text-xl mt-10 mb-4">B3 · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Staff</span></h3>
@@ -800,13 +876,22 @@ sequenceDiagram
             <span class="mono text-[12px]">unallocated_amount</span> = เครดิตของลูกค้าไว้ใช้รอบหน้า
           </p>
         </div>
+        <div class="rulebox mb-4">
+          <div class="rc ok mb-1">PAY ตัดใบตั้งหนี้ได้แล้ว (2026-08-30)</div>
+          <p class="text-[13.5px]">
+            เดิม <span class="mono text-[12px]">PAY</span> ต้องส่ง <span class="mono text-[12px]">allocations: []</span> เพราะยังไม่มีตารางใบแจ้งหนี้ฝั่งซื้อ ·
+            ตอนนี้มี AP Invoice แล้ว (ดู A5) จึงตัดได้ — แต่<b>ผูกข้ามฝั่งไม่ได้</b>:
+            <span class="mono text-[12px]">RECEIVE</span> ตัดได้เฉพาะ <span class="mono text-[12px]">receipt_id</span> ·
+            <span class="mono text-[12px]">PAY</span> ตัดได้เฉพาะ <span class="mono text-[12px]">ap_invoice_id</span> ·
+            แต่ละบรรทัดต้องมีอย่างใดอย่างหนึ่ง<b>เท่านั้น</b> (บังคับด้วย CHECK constraint ที่ระดับ DB ไม่ใช่แค่โค้ด) ·
+            ส่งผิดฝั่งได้ <span class="mono text-[12px]">400</span>
+          </p>
+        </div>
         <div class="rulebox mb-8">
           <div class="rc mb-1">ข้อจำกัดปัจจุบันที่ FE ต้องรู้</div>
           <p class="text-[13.5px]">
-            <span class="mono text-[12px]">PAY</span> (จ่ายผู้ขาย) <b>ยังตัดใบไม่ได้</b> ต้องส่ง
-            <span class="mono text-[12px]">allocations: []</span> — เพราะระบบยังไม่มีตารางใบแจ้งหนี้ฝั่งซื้อ
-            เงินสดกับเจ้าหนี้ยังลงบัญชีปกติ · ถ้าส่ง allocations มาจะได้ <span class="mono text-[12px]">400</span>
-            พร้อมข้อความอธิบาย · และ<b>ยังไม่รองรับหลายสกุลเงิน</b> การชำระตัดกับยอด THB ของใบเสมอ
+            <b>ยังไม่รองรับหลายสกุลเงิน</b> — การชำระตัดกับยอด THB ของใบเสมอ ·
+            ใบตั้งหนี้ที่ถูกจ่ายตัดไปแล้ว <b>ยกเลิกไม่ได้</b> ต้องยกเลิกใบจ่ายก่อน
           </p>
         </div>
 
@@ -1289,7 +1374,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 35 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 36 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1328,15 +1413,23 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/convert-to-sales-order</td><td class="mono text-[11px]">sales_order:create</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders</td><td class="mono text-[11px]">sales_order:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders/{id}</td><td class="mono text-[11px]">sales_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders/{id}/approve</td><td class="mono text-[11px]">sales_order:approve</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders/{id}/cancel</td><td class="mono text-[11px]">sales_order:cancel</td></tr>
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 45 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 52 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
             <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices</td><td class="mono text-[11px]">ap_invoice:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices</td><td class="mono text-[11px]">ap_invoice:create</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices/{id}</td><td class="mono text-[11px]">ap_invoice:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices/{id}</td><td class="mono text-[11px]">ap_invoice:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices/{id}</td><td class="mono text-[11px]">ap_invoice:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices/{id}/cancel</td><td class="mono text-[11px]">ap_invoice:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices/{id}/submit</td><td class="mono text-[11px]">ap_invoice:submit</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes</td><td class="mono text-[11px]">billing_note:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes</td><td class="mono text-[11px]">billing_note:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes/{id}</td><td class="mono text-[11px]">billing_note:delete</td></tr>
@@ -1409,7 +1502,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 282 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 290 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->
