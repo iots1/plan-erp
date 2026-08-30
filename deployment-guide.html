@@ -30,7 +30,7 @@
       <a href="#hardware"      class="navlink"><span class="n">02</span> Hardware / OS Requirement</a>
       <a href="#provision"     class="navlink"><span class="n">03</span> เตรียม VM (Proxmox)</a>
       <a href="#datastores"    class="navlink"><span class="n">04</span> Datastores (infra-erp)</a>
-      <a href="#app"           class="navlink"><span class="n">05</span> Deploy Apps (pm2)</a>
+      <a href="#app"           class="navlink"><span class="n">05</span> Deploy Apps · CI/CD</a>
       <a href="#kong"          class="navlink"><span class="n">06</span> Kong API Gateway</a>
       <a href="#tunnel"        class="navlink"><span class="n">07</span> Cloudflare Tunnel</a>
       <a href="#production-env" class="navlink"><span class="n">08</span> Production .env Checklist</a>
@@ -262,7 +262,7 @@ docker compose up -d</pre>
 
       <!-- ========== 05 APP ========== -->
       <section id="app" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">05 — Deploy Apps</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Deploy Apps &amp; CI/CD</div>
         <h2 class="display text-3xl mb-6">Build + รันด้วย pm2</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
           เครื่องเดียวรัน <b>2 repo</b> — <span class="mono text-[12px]">erp-api</span> (8 BC) และ
@@ -367,16 +367,149 @@ pm2 save</pre>
 
         <div class="step">
           <span class="sn">4</span>
-          <h3 class="font-semibold text-[16px] mb-2">Deploy รอบถัดไป — <span class="mono text-[13px]">scripts/deploy-ovh-dev.sh</span></h3>
+          <h3 class="font-semibold text-[16px] mb-2">Deploy รอบถัดไป — มี 2 ทาง</h3>
+          <p class="text-sm mb-4" style="color:var(--ink-soft)">
+            ขั้นตอนข้างบนคือการตั้งเครื่อง<b>ครั้งแรก</b>เท่านั้น หลังจากนั้น deploy ได้ 2 ทาง —
+            <b>ทางปกติคือ CI/CD</b> (push แล้วจบ) ส่วน <span class="mono text-[12px]">scripts/deploy-ovh-dev.sh</span>
+            รันมือเก็บไว้ใช้ตอน<b>ฉุกเฉิน</b>หรือเวลาต้องเจาะจงกว่าที่ CI ตัดสินใจให้ ทั้งสองทาง
+            <b>ลงเอยที่ pipeline ฝั่ง server ตัวเดียวกัน</b> (ตัว script เดียวกันด้วย) ต่างกันแค่
+            <b>build ที่ไหน</b> กับ <b>ใครสั่ง</b>
+          </p>
+
+          <table class="d mb-6">
+            <thead><tr><th></th><th>① CI/CD · self-hosted runner</th><th>② manual · deploy-ovh-dev.sh</th></tr></thead>
+            <tbody>
+              <tr><td>สั่งด้วย</td><td>push <span class="mono text-[12px]">main</span>/<span class="mono text-[12px]">develop</span> หรือกด Run workflow</td><td>รันคำสั่งจากเครื่อง dev</td></tr>
+              <tr><td>build ที่ไหน</td><td><b>บน runner</b> — ติด nx cache ข้ามรอบ</td><td>เครื่อง dev (default) หรือบน server (<span class="mono text-[12px]">--checks=server</span>)</td></tr>
+              <tr><td>ส่งของยังไง</td><td><span class="mono text-[12px]">rsync</span> artifact ขึ้นไป (<span class="mono text-[12px]">--prebuilt</span>)</td><td>ไม่ส่ง — server build เอง</td></tr>
+              <tr><td>ขอบเขต</td><td>คิดให้อัตโนมัติจาก diff (<span class="mono text-[12px]">resolve-deploy-scope.mjs</span>)</td><td>ระบุเอง <span class="mono text-[12px]">--only</span> / <span class="mono text-[12px]">--migrate</span></td></tr>
+              <tr><td>lint / test</td><td>อยู่คนละ workflow (<span class="mono text-[12px]">ci.yml</span>)</td><td>รันในตัว script ก่อน ssh</td></tr>
+              <tr><td>ใช้เมื่อ</td><td><b>ทุกวัน — ทางหลัก</b></td><td>runner/GitHub ล่ม · redeploy เจาะจง · ไล่ปัญหา</td></tr>
+            </tbody>
+          </table>
+
+          <h4 class="font-semibold text-[15px] mb-2 mt-6">① CI/CD — GitHub Actions + self-hosted runner</h4>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
-            ขั้นตอนข้างบนคือการตั้งเครื่อง<b>ครั้งแรก</b>เท่านั้น หลังจากนั้นทุก deploy รันจากเครื่อง dev
-            คำสั่งเดียว — script ssh เข้าไปทำงานทั้งหมดบน server ใน session เดียว
+            workflow คือ <span class="mono text-[12px]">.github/workflows/deploy.yml</span> แยกเป็น 2 job —
+            <span class="mono text-[12px]">resolve</span> หาว่า push นี้แตะอะไรบ้าง แล้ว
+            <span class="mono text-[12px]">deploy</span> build + ส่งของ ทั้งคู่รันบน runner เครื่องเดียวกัน
           </p>
         <div class="code p-5 mb-4">
-<pre>./scripts/deploy-ovh-dev.sh                    <span class="c"># redeploy branch ที่ server อยู่</span>
-./scripts/deploy-ovh-dev.sh main               <span class="c"># checkout + reset ไป origin/main</span>
-./scripts/deploy-ovh-dev.sh --skip-migrations  <span class="c"># deploy เฉพาะโค้ด ไม่แตะ DB</span></pre>
+<pre>push main / develop  (หรือ workflow_dispatch)
+  │
+  ├─ job <b>resolve</b>   node scripts/resolve-deploy-scope.mjs &lt;before&gt; &lt;sha&gt;
+  │                  → apps=... migrate=... full=true|false
+  │
+  └─ job <b>deploy</b>    (environment: main→production, อื่น→development)
+       ├ pnpm install --frozen-lockfile
+       ├ <b>pnpm nx run-many -t build --all</b>   <span class="c"># app ที่ไม่เปลี่ยน replay จาก .nx/cache</span>
+       ├ npm run build:assets:iam            <span class="c"># esbuild — nest build ไม่ทำให้</span>
+       ├ เขียน ~/.ssh/config  ProxyCommand cloudflared access ssh --hostname %h
+       ├ ssh -T ovh-dev 'echo ssh-ok'        <span class="c"># gate: ต่อไม่ได้ก็จบตรงนี้ ยังไม่แตะ server</span>
+       └ ./scripts/deploy-ovh-dev.sh <b>--prebuilt</b> &lt;branch&gt; [--only=… --migrate=…]
+            ├ rsync dist/apps/&lt;app&gt;/ → server:&lt;repo&gt;/.deploy-staging/dist/apps/&lt;app&gt;/
+            └ ssh → pipeline ฝั่ง server (ดูแผนผังท้ายหัวข้อ)</pre>
         </div>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <b>runner ไม่ได้เปิด port เข้า server</b> — มันต่อผ่าน Cloudflare Tunnel ตัวเดียวกับที่ §07 ตั้งไว้
+            โดยใช้ <span class="mono text-[12px]">cloudflared access ssh</span> เป็น
+            <span class="mono text-[12px]">ProxyCommand</span> ดังนั้น server ยังไม่มี inbound port ใด ๆ เปิดออกเน็ต
+          </p>
+
+          <table class="d mb-4">
+            <thead><tr><th>ตั้งที่ไหน</th><th>ชื่อ</th><th>ค่า / default</th></tr></thead>
+            <tbody>
+              <tr><td rowspan="2">Environment <b>secret</b><br><span class="text-[12px]">(Settings → Environments → <span class="mono text-[11px]">production</span>/<span class="mono text-[11px]">development</span>)</span></td><td><span class="mono text-[12px]">OVH_SSH_HOSTNAME</span></td><td>hostname ที่ผูกกับ tunnel เช่น <span class="mono text-[12px]">ovh-dev-ssh.example.com</span></td></tr>
+              <tr><td><span class="mono text-[12px]">OVH_SSH_USER</span></td><td>user บนเครื่อง เช่น <span class="mono text-[12px]">root</span></td></tr>
+              <tr><td rowspan="2">Environment <b>variable</b> (ไม่ลับ)</td><td><span class="mono text-[12px]">DEPLOY_DIR</span></td><td>default <span class="mono text-[12px]">/root/erp-api</span></td></tr>
+              <tr><td><span class="mono text-[12px]">OVH_SSH_KEY_PATH</span></td><td>default <span class="mono text-[12px]">~/.ssh/github_iots1</span> — path <b>บน runner</b></td></tr>
+              <tr><td>บนเครื่อง runner</td><td>private key</td><td><b>ไม่เคยเป็น GitHub secret</b> — ไฟล์อยู่บน runner, public half อยู่ใน <span class="mono text-[12px]">authorized_keys</span> ของ server</td></tr>
+            </tbody>
+          </table>
+          <p class="text-sm mb-4" style="color:var(--ink-soft)">
+            การเก็บ key ไว้บน runner แทนที่จะยัดเป็น secret ทำให้การ rotate key เป็นเรื่องของเครื่อง runner
+            เครื่องเดียว — ไม่มี secret ให้ตามอัปเดต และไม่มี private key ก้อนไหนไหลผ่าน GitHub เลย
+          </p>
+
+          <div class="edge mb-4">
+            <div class="tag mb-1">จด runner ที่ระดับ <b>organization</b> ไม่ใช่ระดับ repo</div>
+            <p class="text-[13px]">
+              runner ที่จดกับ repo เดียวจะรับงาน<b>เฉพาะ repo นั้น</b> ต่อให้เป็นเครื่องเดียวกันทางกายภาพ —
+              <span class="mono text-[12px]">erp-frontend</span> จะไม่มีใครรับงานเลยทั้งที่ runner ว่างอยู่
+              จดที่ระดับ org ทีเดียวแล้วทุก repo ใน org ใช้ร่วมกันได้ ส่วน workflow ใช้
+              <span class="mono text-[12px]">runs-on: self-hosted</span> เหมือนเดิมไม่ต้องแก้
+            </p>
+          </div>
+          <div class="edge mb-4">
+            <div class="tag mb-1">environment secret <b>ไม่ข้าม repo</b> — ต้องตั้งซ้ำทุก repo</div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">OVH_SSH_HOSTNAME</span> ที่ตั้งไว้ใน environment
+              <span class="mono text-[12px]">production</span> ของ <span class="mono text-[12px]">erp-api</span>
+              <b>ไม่ถูกมองเห็นจาก</b> <span class="mono text-[12px]">erp-frontend</span> เลย ต่อให้ชื่อ environment
+              และเครื่องปลายทางเดียวกันเป๊ะ — อาการคือ deploy ตายที่ step ตรวจ secret ว่า
+              <span class="mono text-[12px]">secret ... is not set</span> ทั้งที่ "ตั้งไปแล้ว" (คนละ repo)
+              และอย่าลืมว่า push ขึ้น <span class="mono text-[12px]">develop</span> จะไป resolve เป็น environment
+              <span class="mono text-[12px]">development</span> ซึ่งต้องตั้ง secret ชุดเดียวกันอีกรอบ
+              ถ้าอยากตั้งที่เดียวจบให้ใช้ <b>organization secret</b> แทน (แต่ environment secret จะ override เสมอ)
+            </p>
+          </div>
+          <div class="edge mb-4">
+            <div class="tag mb-1">build ทุก app แต่ <b>ส่งเฉพาะ app ที่อยู่ใน scope</b></div>
+            <p class="text-[13px]">
+              CI build <span class="mono text-[12px]">--all</span> เพราะนั่นคือสิ่งที่ทำให้ nx cache อุ่นสำหรับรอบถัดไป
+              (app ที่ไม่เปลี่ยน replay จาก cache ในไม่กี่วินาที) แต่ตอน rsync จะส่งเฉพาะ app ที่ deploy รอบนี้
+              จะ reload จริง — ถ้าส่งทั้งหมดทั้งที่ reload แค่บางตัว ไฟล์บนดิสก์กับโค้ดที่ pm2 โหลดไว้จะ
+              <b>ไม่ตรงกันแบบเงียบ ๆ</b> แล้วไปโผล่ตอน restart ครั้งถัดไปด้วยโค้ดที่ไม่เคยผ่าน health check
+            </p>
+          </div>
+
+          <h4 class="font-semibold text-[15px] mb-2 mt-6">② manual — <span class="mono text-[13px]">scripts/deploy-ovh-dev.sh</span></h4>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            คำสั่งเดียวจากเครื่อง dev — script ssh เข้าไปทำงานทั้งหมดบน server ใน session เดียว
+            ใช้ตอน runner หรือ GitHub ล่ม, ตอนอยาก redeploy เฉพาะบาง app, หรือตอนไล่ปัญหาที่อยากคุมทุกขั้นเอง
+          </p>
+        <div class="code p-5 mb-4">
+<pre>./scripts/deploy-ovh-dev.sh                   <span class="c"># redeploy branch ที่ server อยู่</span>
+./scripts/deploy-ovh-dev.sh main              <span class="c"># checkout + reset ไป origin/main</span>
+./scripts/deploy-ovh-dev.sh --skip-migrations <span class="c"># ไม่แตะ DB + permissions catalog</span>
+./scripts/deploy-ovh-dev.sh --only=iam,auth   <span class="c"># build+reload+health เฉพาะ app นี้</span>
+./scripts/deploy-ovh-dev.sh --migrate=finance <span class="c"># migration:run เฉพาะ BC นี้</span>
+./scripts/deploy-ovh-dev.sh --checks=server   <span class="c"># lint/test/build ไปรันบน server</span>
+./scripts/deploy-ovh-dev.sh --help            <span class="c"># flag ทั้งหมด + env var ที่ปรับได้</span></pre>
+        </div>
+          <div class="edge mb-4">
+            <div class="tag mb-1"><span class="mono">--prebuilt</span> มีไว้ให้ CI ใช้ ไม่ใช่สำหรับรันมือ</div>
+            <p class="text-[13px]">
+              รันมือเปล่า ๆ จะได้พฤติกรรม<b>เดิมทุกอย่าง</b> — lint/test/build บนเครื่อง dev แล้ว server build ซ้ำของมันเอง
+              ส่วน <span class="mono text-[12px]">--prebuilt</span> เป็น flag แบบ opt-in ที่บอกว่า
+              "<span class="mono text-[12px]">dist/</span> ใน working tree นี้ build เสร็จแล้วและถือเป็นของจริง"
+              แล้วข้าม build ฝั่ง server ไปเลย ถ้าจะใช้เองต้อง build ให้ครบก่อน มิฉะนั้น script จะหยุดให้
+              ตั้งแต่ยังไม่ ssh (มันเช็ค <span class="mono text-[12px]">dist/apps/&lt;app&gt;/main.js</span> ทุกตัวก่อนส่ง)
+            </p>
+          </div>
+
+          <div class="rulebox mb-4">
+            <div class="rc mb-1">RULE · ต่อให้ส่ง artifact แล้ว server ก็ยัง <span class="mono text-[12px]">git reset --hard</span> อยู่ดี</div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+              คำถามที่ต้องมีคนถามคือ "ถ้า rsync <span class="mono text-[12px]">dist</span> ขึ้นไปแล้ว ยังต้อง clone
+              source ไว้บนเครื่องทำไม" — เพราะ<b>ยังมีของอีก 4 อย่างที่อ่านจาก source ตรง ๆ ไม่ใช่จาก bundle</b>:
+              <span class="mono text-[12px]">migration:run</span> รันผ่าน <span class="mono text-[12px]">ts-node</span>
+              บนไฟล์ <span class="mono text-[12px]">.ts</span> จริง ·
+              <span class="mono text-[12px]">permissions:sync</span> สแกน
+              <span class="mono text-[12px]">apps/*/src/**/*.ts</span> หา <span class="mono text-[12px]">@RequirePermission()</span>
+              และสแกน <span class="mono text-[12px]">views/**</span> หา <span class="mono text-[12px]">data-permission</span> ·
+              iam เสิร์ฟ EJS template จาก <span class="mono text-[12px]">apps/iam/views</span> ตอน runtime ·
+              และ webpack ตั้ง <span class="mono text-[12px]">webpack-node-externals</span> ไว้ แปลว่า bundle
+              <b>ไม่ self-contained</b> — <span class="mono text-[12px]">node_modules</span> ยังจำเป็นอยู่
+              <br><br>
+              สรุปคือ <b><span class="mono text-[12px]">--prebuilt</span> ตัดแค่ "การ build บน server" ไม่ได้ตัด "source บน server"</b>
+              ซึ่งเป็นส่วนที่แพงจริง — เครื่องนี้รัน Postgres, Redis, RabbitMQ และ erp-web อยู่ด้วย
+              การให้มัน webpack แปด Nest app คือขั้นที่ช้าและกวนที่สุดของ deploy
+              ถ้าจะตัด git ออกจากเครื่องให้หมดจริง ๆ ต้องแปลง migration/permissions:sync ให้รันจาก compiled output ก่อน
+            </p>
+          </div>
+
+          <h4 class="font-semibold text-[15px] mb-2 mt-6">pipeline ฝั่ง server — ทั้ง 2 ทางใช้ร่วมกัน</h4>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
             ลำดับขั้นถูกออกแบบให้ <b>ทุก gate อยู่ก่อน pm2</b> — ทั้ง script รันใต้
             <span class="mono text-[12px]">set -euo pipefail</span> ดังนั้น lint/test/build/migration ที่ fail
@@ -384,12 +517,26 @@ pm2 save</pre>
           </p>
         <div class="code p-5 mb-4">
 <pre>flock กัน deploy ซ้อน → เช็ค git credential → เช็ค .env → git reset --hard origin/&lt;branch&gt;
-  → pnpm install → lint → test
-  → <b>snapshot dist ที่รันอยู่</b> ไป backups/dist_YYYYMMDD_NNN   <span class="c"># ← ก่อน build</span>
-  → build ทุก BC → build asset ของ iam → migration
+  → pnpm install → lint/test <span class="c"># เฉพาะ --checks=server; CI/manual default รันไปแล้วที่อื่น</span>
+  → <b>snapshot dist ที่รันอยู่</b> ไป backups/dist_YYYYMMDD_NNN   <span class="c"># ← ก่อนทับ dist เสมอ</span>
+  → <b>①</b> install_artifacts()  <span class="c"># rsync มาแล้ว: ย้ายจาก .deploy-staging/ ลง dist/ ไม่ build</span>
+    <b>②</b> build ทุก BC + build asset ของ iam บน server
+  → migration → permissions:sync
   → pm2 startOrReload <span class="c"># zero-downtime; recycle เฉพาะ app ที่ exec_mode/instances เปลี่ยน</span> → pm2 save
   → health check <span class="mono">/health/ready</span> ครบทั้ง 8 app</pre>
         </div>
+          <div class="edge mb-4">
+            <div class="tag mb-1">ทำไมต้องพักของไว้ที่ <span class="mono">.deploy-staging/</span> ก่อน</div>
+            <p class="text-[13px]">
+              rsync กับ pipeline เป็นคนละ ssh session กัน ถ้าเขียนทับ <span class="mono text-[12px]">dist/</span>
+              ตรง ๆ ตอน rsync จะกลายเป็นว่า<b>ทับก่อนที่ snapshot จะถูกถ่าย</b> — rollback artifact หายทันที
+              พักไว้ที่ staging แล้วให้ <span class="mono text-[12px]">install_artifacts()</span> ย้ายลงในสล็อตเดิมของ
+              build (คือหลัง snapshot) จึงรักษาลำดับนี้ไว้ได้ และ staging dir ต้องอยู่ทั้งใน
+              <span class="mono text-[12px]">.gitignore</span> และใน exclude ของ
+              <span class="mono text-[12px]">git clean</span> — ไม่งั้น <span class="mono text-[12px]">sync_git()</span>
+              ที่รัน<b>ก่อน</b>จะลบ payload ของ deploy รอบนั้นทิ้งเอง
+            </p>
+          </div>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
             <b>erp-frontend มี script รูปทรงเดียวกัน</b> (<span class="mono text-[12px]">scripts/deploy-ovh-dev.sh</span>
             ใน repo นั้น) — flock ตัวเดียวกัน → git reset → install → lint → test →
