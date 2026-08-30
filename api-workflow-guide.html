@@ -90,6 +90,7 @@
 flowchart LR
   subgraph A["กลุ่ม A · จัดซื้อ"]
     A2["PO<br/>ใบสั่งซื้อ"] --> A3["GRN<br/>ใบรับสินค้า"] --> A4["PRN<br/>ส่งคืนสินค้า"]
+    A3 -.->|"ยังไม่มี"| APINV["AP Invoice<br/>(ตั้งหนี้ผู้ขาย)"]
   end
   subgraph D["กลุ่ม D · คลัง"]
     D1["Stock Entry<br/>โอน/เบิก/แปรรูป"]
@@ -111,6 +112,7 @@ flowchart LR
   B3 --> C1
   C1 --> GL
   C4 --> GL
+  APINV -.->|"ยังไม่มี — ตอนนี้ PAY จ่ายตรง ไม่ผูกใบไหนเลย"| C4
 </pre>
         </div>
 
@@ -122,6 +124,29 @@ flowchart LR
             เอกสารจะถูกล็อก เลขที่เอกสารถูกออก และสต็อก/บัญชีเคลื่อนทันที · การแก้ไขหลังจากนั้นทำได้ทางเดียวคือ
             <b>ยกเลิกแล้วออกใหม่</b> หรือ <b>ออกใบลด/เพิ่มหนี้</b> — ปุ่ม “แก้ไข” บนหน้าจอจึงต้องซ่อนเมื่อสถานะไม่ใช่ DRAFT
           </p>
+        </div>
+
+        <div class="rulebox ok mb-8">
+          <div class="rc ok mb-1">"ยกเลิก" = ระบบตีกลับให้อัตโนมัติเสมอ — FE ไม่ต้องไปทำ D2 (Stock Adjustment) เอง</div>
+          <p class="text-[13.5px] mb-3">
+            ทุก <span class="mono text-[12px]">cancel</span>/<span class="mono text-[12px]">void</span> ที่เคยเคลื่อนสต็อกหรือบัญชีไปแล้ว <b>ตีกลับให้เองในทรานแซกชันเดียวกับการยกเลิก</b>
+            ไม่มีจุดไหนในระบบที่ต้องให้ผู้ใช้ไปสร้างเอกสารแยกเพื่อดึงสต็อก/ยอดคืน — ถ้า FE เห็นสต็อก/ยอดไม่ตรงหลังยกเลิก ให้สงสัยว่าเรียก endpoint ผิด
+            หรือแคช state ฝั่ง FE ค้าง ไม่ใช่ว่าต้องไปทำ D2/CN-DN เพิ่มเอง
+          </p>
+          <div class="overflow-x-auto">
+          <table class="d">
+            <thead><tr><th>เอกสาร</th><th>action</th><th>ตีกลับอะไร</th><th>บล็อกยกเลิกเมื่อไหร่</th></tr></thead>
+            <tbody>
+              <tr><td>A3 GRN</td><td class="mono text-[12px]">cancel</td><td>คืนล็อตที่สร้างไว้กลับเป็น 0</td><td>ล็อตถูกเบิกไปแล้วแม้ชิ้นเดียว (409) — ให้ใช้ A4 (Purchase Return) แทน</td></tr>
+              <tr><td>A4 PRN</td><td class="mono text-[12px]">cancel</td><td>คืนจำนวนกลับเข้าล็อตเดิม</td><td>ไม่มี (คืนได้เสมอ — ล็อตยังอยู่ต่อให้ว่างแล้ว)</td></tr>
+              <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td>ไม่มี guard พิเศษ — คืนได้เสมอ</td></tr>
+              <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ</td></tr>
+              <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td>ไม่มี guard พิเศษ</td></tr>
+              <tr><td>D1 Stock Entry</td><td class="mono text-[12px]">cancel</td><td>คืนล็อต/ย้ายกลับตาม entry_type</td><td>ล็อตปลายทางถูกเบิกไปแล้ว (409)</td></tr>
+              <tr><td>D2 Stock Adjustment</td><td class="mono text-[12px]">cancel</td><td>คืน available_qty กลับเป็นค่าก่อนปรับ</td><td>ล็อตถูกแก้ไปอีกหลังปรับยอด (409) — เช็คว่า available_qty ตรงกับตอน submit</td></tr>
+            </tbody>
+          </table>
+          </div>
         </div>
 
         <div class="card overflow-hidden mb-8">
