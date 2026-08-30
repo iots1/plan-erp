@@ -252,7 +252,7 @@ docker compose up -d</pre>
           <div class="rc mb-1">RULE</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
             <span class="mono text-[12px]">infrastructure/&lt;stack&gt;/</span> ใน repo คือ<b>template</b>เสมอ —ของจริงที่รันอยู่ควร
-            อยู่นอก checkout ของแอป กันไม่ให้ <span class="mono text-[12px]">deploy-ovh-dev.sh</span>-style script (ที่ทำ
+            อยู่นอก checkout ของแอป กันไม่ให้ <span class="mono text-[12px]">deploy-app.sh</span>-style script (ที่ทำ
             <span class="mono text-[12px]">git reset --hard</span>) กระทบ data/credentials โดยไม่ตั้งใจ
           </p>
         </div>
@@ -281,8 +281,8 @@ docker compose up -d</pre>
           </p>
         <div class="code p-5 mb-4">
 <pre><span class="c"># 1) สร้าง key คนละอันต่อ repo (ไม่ตั้ง passphrase — deploy รันแบบ non-interactive)</span>
-ssh-keygen -t ed25519 -N <span class="s">''</span> -C <span class="s">"ovh-dev deploy key (erp-api)"</span> -f ~/.ssh/id_ed25519_erp_api
-ssh-keygen -t ed25519 -N <span class="s">''</span> -C <span class="s">"ovh-dev deploy key (erp-frontend)"</span> -f ~/.ssh/id_ed25519_erp_frontend
+ssh-keygen -t ed25519 -N <span class="s">''</span> -C <span class="s">"app server deploy key (erp-api)"</span> -f ~/.ssh/id_ed25519_erp_api
+ssh-keygen -t ed25519 -N <span class="s">''</span> -C <span class="s">"app server deploy key (erp-frontend)"</span> -f ~/.ssh/id_ed25519_erp_frontend
 
 <span class="c"># 2) ตั้ง host alias ให้ ssh เลือก key ถูกตัว</span>
 cat &gt;&gt; ~/.ssh/config &lt;&lt;<span class="s">'EOF'</span>
@@ -361,7 +361,7 @@ pm2 save</pre>
           <p class="text-sm" style="color:var(--ink-soft)">
             ได้ process ชื่อ <span class="mono text-[12px]">erp-web</span> ฟังอยู่ที่ port
             <span class="mono text-[12px]">3300</span> ซึ่งเป็น upstream ที่ Kong ชี้มาใน §06 —
-            deploy รอบถัดไปใช้ <span class="mono text-[12px]">scripts/deploy-ovh-dev.sh</span> ใน repo นั้นได้เลย
+            deploy รอบถัดไปใช้ <span class="mono text-[12px]">scripts/deploy-app.sh</span> ใน repo นั้นได้เลย
           </p>
         </div>
 
@@ -370,14 +370,14 @@ pm2 save</pre>
           <h3 class="font-semibold text-[16px] mb-2">Deploy รอบถัดไป — มี 2 ทาง</h3>
           <p class="text-sm mb-4" style="color:var(--ink-soft)">
             ขั้นตอนข้างบนคือการตั้งเครื่อง<b>ครั้งแรก</b>เท่านั้น หลังจากนั้น deploy ได้ 2 ทาง —
-            <b>ทางปกติคือ CI/CD</b> (push แล้วจบ) ส่วน <span class="mono text-[12px]">scripts/deploy-ovh-dev.sh</span>
+            <b>ทางปกติคือ CI/CD</b> (push แล้วจบ) ส่วน <span class="mono text-[12px]">scripts/deploy-app.sh</span>
             รันมือเก็บไว้ใช้ตอน<b>ฉุกเฉิน</b>หรือเวลาต้องเจาะจงกว่าที่ CI ตัดสินใจให้ ทั้งสองทาง
             <b>ลงเอยที่ pipeline ฝั่ง server ตัวเดียวกัน</b> (ตัว script เดียวกันด้วย) ต่างกันแค่
             <b>build ที่ไหน</b> กับ <b>ใครสั่ง</b>
           </p>
 
           <table class="d mb-6">
-            <thead><tr><th></th><th>① CI/CD · self-hosted runner</th><th>② manual · deploy-ovh-dev.sh</th></tr></thead>
+            <thead><tr><th></th><th>① CI/CD · self-hosted runner</th><th>② manual · deploy-app.sh</th></tr></thead>
             <tbody>
               <tr><td>สั่งด้วย</td><td>push <span class="mono text-[12px]">main</span>/<span class="mono text-[12px]">develop</span> หรือกด Run workflow</td><td>รันคำสั่งจากเครื่อง dev</td></tr>
               <tr><td>build ที่ไหน</td><td><b>บน runner</b> — ติด nx cache ข้ามรอบ</td><td>เครื่อง dev (default) หรือบน server (<span class="mono text-[12px]">--checks=server</span>)</td></tr>
@@ -405,8 +405,8 @@ pm2 save</pre>
        ├ <b>pnpm nx run-many -t build --all</b>   <span class="c"># app ที่ไม่เปลี่ยน replay จาก .nx/cache</span>
        ├ npm run build:assets:iam            <span class="c"># esbuild — nest build ไม่ทำให้</span>
        ├ เขียน ~/.ssh/config  ProxyCommand cloudflared access ssh --hostname %h
-       ├ ssh -T ovh-dev 'echo ssh-ok'        <span class="c"># gate: ต่อไม่ได้ก็จบตรงนี้ ยังไม่แตะ server</span>
-       └ ./scripts/deploy-ovh-dev.sh <b>--prebuilt</b> &lt;branch&gt; [--only=… --migrate=…]
+       ├ ssh -T app-server 'echo ssh-ok'     <span class="c"># gate: ต่อไม่ได้ก็จบตรงนี้ ยังไม่แตะ server</span>
+       └ ./scripts/deploy-app.sh <b>--prebuilt</b> &lt;branch&gt; [--only=… --migrate=…]
             ├ rsync dist/apps/&lt;app&gt;/ → server:&lt;repo&gt;/.deploy-staging/dist/apps/&lt;app&gt;/
             └ ssh → pipeline ฝั่ง server (ดูแผนผังท้ายหัวข้อ)</pre>
         </div>
@@ -419,13 +419,21 @@ pm2 save</pre>
           <table class="d mb-4">
             <thead><tr><th>ตั้งที่ไหน</th><th>ชื่อ</th><th>ค่า / default</th></tr></thead>
             <tbody>
-              <tr><td rowspan="2">Environment <b>secret</b><br><span class="text-[12px]">(Settings → Environments → <span class="mono text-[11px]">production</span>/<span class="mono text-[11px]">development</span>)</span></td><td><span class="mono text-[12px]">OVH_SSH_HOSTNAME</span></td><td>hostname ที่ผูกกับ tunnel เช่น <span class="mono text-[12px]">ovh-dev-ssh.example.com</span></td></tr>
-              <tr><td><span class="mono text-[12px]">OVH_SSH_USER</span></td><td>user บนเครื่อง เช่น <span class="mono text-[12px]">root</span></td></tr>
+              <tr><td rowspan="3">Environment <b>secret</b><br><span class="text-[12px]">(Settings → Environments → <span class="mono text-[11px]">production</span>/<span class="mono text-[11px]">development</span>)</span></td><td><span class="mono text-[12px]">APP_SSH_HOSTNAME</span></td><td>hostname ที่ผูกกับ tunnel เช่น <span class="mono text-[12px]">app-ssh.example.com</span></td></tr>
+              <tr><td><span class="mono text-[12px]">APP_SSH_USER</span></td><td>user บนเครื่อง เช่น <span class="mono text-[12px]">root</span></td></tr>
+              <tr><td><span class="mono text-[12px]">ENV_FILE</span></td><td>เนื้อหาไฟล์ <span class="mono text-[12px]">.env</span> ทั้งไฟล์ (optional — ไม่ตั้งก็ข้ามขั้นนี้เฉย ๆ)</td></tr>
               <tr><td rowspan="2">Environment <b>variable</b> (ไม่ลับ)</td><td><span class="mono text-[12px]">DEPLOY_DIR</span></td><td>default <span class="mono text-[12px]">/root/erp-api</span></td></tr>
-              <tr><td><span class="mono text-[12px]">OVH_SSH_KEY_PATH</span></td><td>default <span class="mono text-[12px]">~/.ssh/github_iots1</span> — path <b>บน runner</b></td></tr>
+              <tr><td><span class="mono text-[12px]">APP_SSH_KEY_PATH</span></td><td>default <span class="mono text-[12px]">~/.ssh/github_iots1</span> — path <b>บน runner</b></td></tr>
               <tr><td>บนเครื่อง runner</td><td>private key</td><td><b>ไม่เคยเป็น GitHub secret</b> — ไฟล์อยู่บน runner, public half อยู่ใน <span class="mono text-[12px]">authorized_keys</span> ของ server</td></tr>
             </tbody>
           </table>
+          <p class="text-sm mb-4" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">ENV_FILE</span> เป็นของ<b>เสริม</b> — deploy.yml มี step "Sync .env" เขียนทับ
+            <span class="mono text-[12px]">.env</span> บน server จาก secret นี้ก่อน <span class="mono text-[12px]">deploy-app.sh</span>
+            จะรัน แต่ถ้าไม่ตั้งไว้ก็แค่ warning แล้วข้าม (ใช้ <span class="mono text-[12px]">.env</span> เดิมที่ตั้งไว้ด้วยมือบน
+            server) ต้องเป็น <b>secret</b> ไม่ใช่ variable เพราะ <span class="mono text-[12px]">.env</span> ของ repo นี้แทบทั้งไฟล์
+            คือ credential จริง (DB/Redis/RabbitMQ password, <span class="mono text-[12px]">SECRET_KEY</span>, …)
+          </p>
           <p class="text-sm mb-4" style="color:var(--ink-soft)">
             การเก็บ key ไว้บน runner แทนที่จะยัดเป็น secret ทำให้การ rotate key เป็นเรื่องของเครื่อง runner
             เครื่องเดียว — ไม่มี secret ให้ตามอัปเดต และไม่มี private key ก้อนไหนไหลผ่าน GitHub เลย
@@ -443,7 +451,7 @@ pm2 save</pre>
           <div class="edge mb-4">
             <div class="tag mb-1">environment secret <b>ไม่ข้าม repo</b> — ต้องตั้งซ้ำทุก repo</div>
             <p class="text-[13px]">
-              <span class="mono text-[12px]">OVH_SSH_HOSTNAME</span> ที่ตั้งไว้ใน environment
+              <span class="mono text-[12px]">APP_SSH_HOSTNAME</span> ที่ตั้งไว้ใน environment
               <span class="mono text-[12px]">production</span> ของ <span class="mono text-[12px]">erp-api</span>
               <b>ไม่ถูกมองเห็นจาก</b> <span class="mono text-[12px]">erp-frontend</span> เลย ต่อให้ชื่อ environment
               และเครื่องปลายทางเดียวกันเป๊ะ — อาการคือ deploy ตายที่ step ตรวจ secret ว่า
@@ -463,20 +471,31 @@ pm2 save</pre>
             </p>
           </div>
 
-          <h4 class="font-semibold text-[15px] mb-2 mt-6">② manual — <span class="mono text-[13px]">scripts/deploy-ovh-dev.sh</span></h4>
+          <h4 class="font-semibold text-[15px] mb-2 mt-6">② manual — <span class="mono text-[13px]">scripts/deploy-app.sh</span></h4>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
             คำสั่งเดียวจากเครื่อง dev — script ssh เข้าไปทำงานทั้งหมดบน server ใน session เดียว
             ใช้ตอน runner หรือ GitHub ล่ม, ตอนอยาก redeploy เฉพาะบาง app, หรือตอนไล่ปัญหาที่อยากคุมทุกขั้นเอง
           </p>
         <div class="code p-5 mb-4">
-<pre>./scripts/deploy-ovh-dev.sh                   <span class="c"># redeploy branch ที่ server อยู่</span>
-./scripts/deploy-ovh-dev.sh main              <span class="c"># checkout + reset ไป origin/main</span>
-./scripts/deploy-ovh-dev.sh --skip-migrations <span class="c"># ไม่แตะ DB + permissions catalog</span>
-./scripts/deploy-ovh-dev.sh --only=iam,auth   <span class="c"># build+reload+health เฉพาะ app นี้</span>
-./scripts/deploy-ovh-dev.sh --migrate=finance <span class="c"># migration:run เฉพาะ BC นี้</span>
-./scripts/deploy-ovh-dev.sh --checks=server   <span class="c"># lint/test/build ไปรันบน server</span>
-./scripts/deploy-ovh-dev.sh --help            <span class="c"># flag ทั้งหมด + env var ที่ปรับได้</span></pre>
+<pre>./scripts/deploy-app.sh                   <span class="c"># redeploy branch ที่ server อยู่</span>
+./scripts/deploy-app.sh main              <span class="c"># checkout + reset ไป origin/main</span>
+./scripts/deploy-app.sh --prod            <span class="c"># shorthand สำหรับ main (ชื่อ environment production)</span>
+./scripts/deploy-app.sh --dev             <span class="c"># shorthand สำหรับ develop (ชื่อ environment development)</span>
+./scripts/deploy-app.sh --skip-migrations <span class="c"># ไม่แตะ DB + permissions catalog</span>
+./scripts/deploy-app.sh --only=iam,auth   <span class="c"># build+reload+health เฉพาะ app นี้</span>
+./scripts/deploy-app.sh --migrate=finance <span class="c"># migration:run เฉพาะ BC นี้</span>
+./scripts/deploy-app.sh --checks=server   <span class="c"># lint/test/build ไปรันบน server</span>
+./scripts/deploy-app.sh --help            <span class="c"># flag ทั้งหมด + env var ที่ปรับได้</span></pre>
         </div>
+          <div class="edge mb-4">
+            <div class="tag mb-1"><span class="mono">--dev</span>/<span class="mono">--prod</span> เป็นแค่ชื่อย่อของ branch ไม่ใช่การแยก environment จริง</div>
+            <p class="text-[13px]">
+              ทั้งสอง flag แค่ตั้งค่า branch ให้เอง (<span class="mono text-[12px]">develop</span>/<span class="mono text-[12px]">main</span>
+              ตามลำดับ) — วันนี้ยังชี้ไปที่ <b>box/DB/pm2 app ชุดเดียวกัน</b> เหมือน branch เฉย ๆ ทุกอย่าง
+              (ดู SINGLE BOX WARNING ใน <span class="mono text-[12px]">deploy.yml</span>) ใช้ผสมกับ branch ตรง ๆ หรือใช้คู่กันเองไม่ได้
+              (<span class="mono text-[12px]">--dev --prod</span> หรือ <span class="mono text-[12px]">--dev main</span> จะ error ทันที)
+            </p>
+          </div>
           <div class="edge mb-4">
             <div class="tag mb-1"><span class="mono">--prebuilt</span> มีไว้ให้ CI ใช้ ไม่ใช่สำหรับรันมือ</div>
             <p class="text-[13px]">
@@ -538,7 +557,7 @@ pm2 save</pre>
             </p>
           </div>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
-            <b>erp-frontend มี script รูปทรงเดียวกัน</b> (<span class="mono text-[12px]">scripts/deploy-ovh-dev.sh</span>
+            <b>erp-frontend มี script รูปทรงเดียวกัน</b> (<span class="mono text-[12px]">scripts/deploy-app.sh</span>
             ใน repo นั้น) — flock ตัวเดียวกัน → git reset → install → lint → test →
             snapshot <span class="mono text-[12px]">apps/web/.next</span> → build → pm2 startOrReload →
             health check ต่างกันแค่รายละเอียดที่ควรต่าง:
@@ -635,6 +654,13 @@ health              /health/ready × 8 app        /login <span class="c">(Next �
             <span class="mono text-[12px]">erp-web</span> ตัวเดียว (ทางกลับกันก็ทำให้เสีย
             <span class="mono text-[12px]">erp-web</span> เหมือนกัน) — เป็นบั๊กชนิดเดียวกับ RULE ด้านบน
             แค่เข้าทางประตูหลัง และเงียบกว่ามาก เพราะไม่มีอะไรผิดปกติจนกว่าจะ reboot
+          </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-2">
+            <b>ทำไม path ยังใช้ชื่อเก่า <span class="mono text-[12px]">ovh-dev</span></b> แม้ erp-api จะเปลี่ยน script/secret
+            เป็นชื่อ <span class="mono text-[12px]">app-server</span>/<span class="mono text-[12px]">APP_SSH_*</span> ไปแล้ว —
+            เพราะ path นี้คือ<b>สัญญาข้ามสอง repo</b> เปลี่ยนฝั่งเดียวโดยไม่แก้ erp-frontend พร้อมกันจะทำให้
+            script ทั้งสองไป flock กันคนละไฟล์เงียบ ๆ แล้ว<b>เสียการป้องกันนี้ไปทั้งหมด</b>โดยไม่มี error ให้เห็น
+            ถ้าจะเปลี่ยนชื่อจริง ต้องแก้พร้อมกันทั้งสอง repo ในการ deploy รอบเดียวกัน
           </p>
         </div>
 
@@ -1078,7 +1104,7 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
             <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
               <b>อาการ:</b> deploy script ตายทันทีด้วย <span class="mono text-[12px]">bash: line 10: $8: unbound variable</span>
               ทั้งที่ส่ง argument ไปครบ 8 ตัว เกิดเฉพาะตอน<b>ไม่ระบุ branch</b> — ถ้าสั่ง
-              <span class="mono text-[12px]">deploy-ovh-dev.sh main</span> กลับผ่านปกติ
+              <span class="mono text-[12px]">deploy-app.sh main</span> กลับผ่านปกติ
             </p>
             <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
               <b>สาเหตุ:</b> <span class="mono text-[12px]">ssh host bash -s -- a "" c</span> ไม่ได้ส่ง argv เป็น array —
