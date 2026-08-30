@@ -425,8 +425,9 @@ sequenceDiagram
           <div class="rc mb-1">สิ่งที่ทำให้ submit ไม่ผ่าน (409)</div>
           <p class="text-[13.5px]">
             รับเกินจำนวนใน PO เกินเปอร์เซ็นต์ที่ตั้งไว้ (<span class="mono text-[12px]">stock_settings.over_receipt_allowance</span>) ·
-            เอกสารไม่ใช่ DRAFT · ใบไม่มีบรรทัด · PO ไม่อยู่ในสถานะ SENT/PARTIAL — ทั้งหมดคืน
-            <span class="mono text-[12px]">409</span> พร้อมข้อความบอกตัวเลขที่เกินจริง FE เอาไปแสดงได้ตรง ๆ
+            เอกสารไม่ใช่ DRAFT · ใบไม่มีบรรทัด · PO ไม่อยู่ในสถานะ SENT/PARTIAL ·
+            <span class="mono text-[12px]">document_date</span> ตกในงวดที่ปิดแล้ว (<span class="mono text-[12px]">stock_settings.stock_frozen_upto</span>, เพิ่ม 2026-08-30) —
+            ทั้งหมดคืน <span class="mono text-[12px]">409</span> พร้อมข้อความบอกตัวเลขที่เกินจริง FE เอาไปแสดงได้ตรง ๆ
           </p>
         </div>
         <div class="rulebox mb-8">
@@ -474,7 +475,8 @@ sequenceDiagram
           <div class="rc mb-1">สิ่งที่ทำให้ submit ไม่ผ่าน (409)</div>
           <p class="text-[13.5px]">
             คืนเกินจำนวนที่ยังไม่ถูกคืนของบรรทัดนั้น (นับเฉพาะใบส่งคืนอื่นที่ SUBMITTED แล้ว) · ล็อตถูกเบิกไปแล้วจนเหลือไม่พอให้คืน
-            (<span class="mono text-[12px]">available_qty</span> ไม่ใช่ <span class="mono text-[12px]">received_qty</span>) · เอกสารไม่ใช่ DRAFT —
+            (<span class="mono text-[12px]">available_qty</span> ไม่ใช่ <span class="mono text-[12px]">received_qty</span>) · เอกสารไม่ใช่ DRAFT ·
+            <span class="mono text-[12px]">document_date</span> ตกในงวดที่ปิดแล้ว (<span class="mono text-[12px]">stock_frozen_upto</span>) —
             ทั้งหมดคืน <span class="mono text-[12px]">409</span> พร้อมตัวเลขจริง
           </p>
         </div>
@@ -604,7 +606,8 @@ sequenceDiagram
           <p class="text-[13.5px]">
             ระบบตัดแบบ <b>all-or-nothing</b> · ถ้ารวมทุกล็อตแล้วไม่พอจะคืน error ทั้งใบ ไม่ตัดบางส่วนทิ้งไว้ ·
             ล็อตที่<b>หมดอายุแล้วจะถูกข้าม</b>ไม่นำมาขาย และสินค้าชุด (bundle) จะถูกแตกเป็นสินค้าย่อยตอนตัดจริง —
-            ถ้าย่อยตัวใดไม่พอ ก็ตกทั้งชุด
+            ถ้าย่อยตัวใดไม่พอ ก็ตกทั้งชุด · เพิ่ม 2026-08-30: <span class="mono text-[12px]">document_date</span> ของใบส่งของ (ไม่ใช่วันนี้)
+            ตกในงวดที่ปิดแล้วก็ถูกปฏิเสธด้วย <span class="mono text-[12px]">409</span> เหมือนกัน (<span class="mono text-[12px]">stock_frozen_upto</span>)
           </p>
         </div>
         <div class="rulebox mb-8">
@@ -849,6 +852,16 @@ sequenceDiagram
       <section id="flow-stock" class="section pt-14 pb-4">
         <div class="eyebrow text-[var(--accent)] mb-3">07 — กลุ่ม D</div>
         <h2 class="display text-3xl mb-6">คลังภายใน</h2>
+
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">งวดที่ปิดแล้ว (stock_frozen_upto) กันทั้ง D1 และ D2 เหมือนกัน — เพิ่ม 2026-08-30</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">POST .../stock-entries/{id}/submit</span> และ <span class="mono text-[12px]">POST .../stock-adjustments/{id}/submit</span>
+            ทั้งคู่ปฏิเสธด้วย <span class="mono text-[12px]">409</span> เมื่อ <span class="mono text-[12px]">document_date</span> ของเอกสารตกในหรือก่อนงวดที่ล็อกไว้
+            (<span class="mono text-[12px]">GET /inventory-bc/v1/stock-settings</span> → <span class="mono text-[12px]">stock_frozen_upto</span>) — เหมือนกับ A3/A4/B3 ด้านบน
+            ทุกเอกสารที่ขยับสต็อกเช็คกฎเดียวกันนี้
+          </p>
+        </div>
 
         <h3 class="display text-xl mt-2 mb-4">D1 · โอน / เบิก / แปรรูป <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Staff</span></h3>
         <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
