@@ -162,6 +162,7 @@
               <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">allow_negative_stock</div><p class="text-[13px]">อนุญาตให้ตัดจนติดลบหรือไม่ — ค่าเริ่มต้น <b>false</b> (ตรงกับ CHECK ≥ 0)</p></div>
               <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">default_warehouse</div><p class="text-[13px]">คลังตั้งต้นเวลาสร้างเอกสารใหม่ (ลดการกรอกซ้ำ)</p></div>
               <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">expiry_alert_days</div><p class="text-[13px]">จำนวนวันก่อนหมดอายุที่จะยิง <span class="mono text-[12px]">expiry.approaching</span></p></div>
+              <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">reorder_levels.alert_qty</div><p class="text-[13px]">จุดสั่งซื้อ <b>ต่อคู่ (สินค้า, คลัง)</b> — ไม่ใช่ค่าตั้งค่ากลางตัวเดียวเหมือน <span class="mono text-[12px]">expiry_alert_days</span> จึงไม่มี setting ให้ override รายคำขอ · ต่ำกว่านี้จะยิง <span class="mono text-[12px]">stock.low</span></p></div>
               <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">stock_frozen_upto</div><p class="text-[13px]"><b>ล็อกงวดอดีต</b>: ห้ามบันทึก/แก้ movement ที่ document_date ≤ ค่านี้ (กันแก้ย้อนหลังกระทบบัญชี) — <b>implement แล้ว (2026-08-30)</b>: เดิมมีแค่คอลัมน์ ไม่เคยมีโค้ดตรวจจริง ดู B.7 ด้านล่าง</p></div>
               <div class="edge" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">over_receipt_allowance</div><p class="text-[13px]">% ที่ยอมให้รับ/ส่งเกินจำนวนในเอกสารอ้างอิง (เช่น รับเกิน PO ได้ 5%)</p></div>
             </div>
@@ -309,6 +310,7 @@
                 <tr><td>stock.deducted</td><td>inventory-bc</td><td>finance-bc (COGS) · report-bc</td></tr>
                 <tr><td>lot.created</td><td>inventory-bc</td><td>report-bc (inventory summary)</td></tr>
                 <tr><td>expiry.approaching</td><td>inventory-bc</td><td>report-bc · notification</td></tr>
+                <tr><td>stock.low</td><td>inventory-bc</td><td>report-bc · notification</td></tr>
                 <tr><td>item.updated</td><td>inventory-bc</td><td>report-bc (ชื่อ/หมวดหมู่/ยี่ห้อ denormalized) · sales-bc, supplier-bc (cache)</td></tr>
               </tbody>
             </table>
@@ -468,7 +470,8 @@ erDiagram
     REORDER_LEVELS {
         uuid id PK
         uuid product_id FK
-        int alert_qty
+        uuid warehouse_id "reorder point is per warehouse, not per product"
+        int alert_qty "breached = stock.low, nightly at 02:00 Asia/Bangkok"
     }
     PRICE_LISTS {
         uuid id PK

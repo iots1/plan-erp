@@ -63,7 +63,7 @@
         </p>
         <div class="mt-9 flex flex-wrap gap-2.5">
           <span class="chip">20 Business Flows</span>
-          <span class="chip">292 REST Endpoints</span>
+          <span class="chip">294 REST Endpoints</span>
           <span class="chip">8 Bounded Contexts</span>
           <span class="chip">JSON:API Envelope</span>
         </div>
@@ -589,6 +589,17 @@ sequenceDiagram
             เป็นตัวจัดกลุ่มในรายงานเจ้าหนี้ค้างชำระ (ดู C7) · ไม่ได้ตกลงเครดิตเทอมไว้ = <span class="mono text-[12px]">null</span> ไปอยู่คอลัมน์ no_due_date
           </p>
         </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ผู้ขายไม่ได้จด VAT = ไม่มีภาษีซื้อ (2026-08-31)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">suppliers.is_vat_registered</span> เขียน comment ไว้ตั้งแต่แรกว่า "ซื้อจากรายนี้แล้วขอเครดิตภาษีซื้อไม่ได้" แต่<b>ไม่มีอะไรบังคับ</b> ·
+            ตอนนี้ถ้าผู้ขายไม่ได้จด VAT ระบบ<b>บังคับ <span class="mono text-[12px]">vat_rate = 0</span></b> ไม่ว่า <span class="mono text-[12px]">tax_configs</span> จะบอกอัตราเท่าไหร่
+            (ผู้ที่ไม่ได้จด VAT ออกใบกำกับภาษีตามกฎหมายไม่ได้ จึงไม่มีภาษีซื้อให้เครดิต — และการขอเครดิตภาษีซื้อจากผู้ขายที่ไม่ได้จดคือสิ่งที่สรรพากรไม่ยอมรับ)<br>
+            ค่านี้ถูก <b>snapshot ลงหัวเอกสาร</b> (<span class="mono text-[12px]">is_supplier_vat_registered</span>) ไม่ใช่ถามใหม่ทุกครั้ง — เพื่อ (1) ตอบได้ว่าทำไมใบนี้ไม่มีภาษีซื้อ
+            (2) แก้ DRAFT แล้วภาษีไม่เปลี่ยนไปตามสถานะผู้ขายที่ขยับหลังบันทึกบิล (3) แก้ DRAFT ได้แม้ supplier-bc ล่ม ·
+            <b>ค่า default เป็น true</b> จึงมีผลเฉพาะรายที่ตั้งใจบันทึกไว้ว่าไม่ได้จด และ supplier-bc รุ่นเก่าที่ไม่ส่งฟิลด์นี้มาถือว่า "จด" (ฟิลด์ที่หายไปต้องไม่ตัดภาษีซื้อทิ้งทุกใบ)
+          </p>
+        </div>
       </section>
 
       <!-- ============ 05 FLOW B ============ -->
@@ -814,6 +825,18 @@ sequenceDiagram
 }
 <span class="c">// response จะมี sub_total · total_discount · net_amount · vat_amount · total</span>
 <span class="c">// และ 3 ถังภาษี: total_standard_vat_price / total_zero_vat_price / total_exempt_vat_price</span></pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ลูกค้าไม่ได้จด VAT ออกใบกำกับเต็มรูปให้ไม่ได้ (2026-08-31)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">customers.is_vat_registered</span> เขียน comment ไว้ว่า "ออกใบกำกับภาษีให้รายนี้ไม่ได้" แต่<b>ไม่มีอะไรบังคับ</b> ·
+            ตอนนี้ <span class="mono text-[12px]">FULL_TAX_INVOICE</span>/<span class="mono text-[12px]">INV_TAX_INVOICE</span> ถูกปฏิเสธด้วย
+            <span class="mono text-[12px]">400</span> ถ้าลูกค้าไม่ได้จด VAT<br>
+            <b>ยกเว้น 2 กลุ่มโดยเจตนา</b>: <span class="mono text-[12px]">ABB_TAX_INVOICE</span> (§86/6) ยังออกได้ เพราะใบกำกับอย่างย่อมีไว้สำหรับหน้าร้านที่ผู้ซื้อมักเป็นผู้บริโภคนอกระบบ VAT
+            — ถ้าบล็อกด้วยจะเหลือทางออกเป็น "ไม่มีเอกสารภาษีให้เลย" · และใบลดหนี้/เพิ่มหนี้ (§86/22) ยังออกได้ เพราะเป็นการปรับปรุงเอกสารที่ออกและตรวจไปแล้ว
+            การห้ามแก้เพราะสถานะลูกค้าถูกปิดทีหลังจะทำให้ใบเดิมค้างโดยไม่มีทางปรับ<br>
+            <b>ค่า default เป็น true</b> จึงมีผลเฉพาะรายที่ตั้งใจบันทึกไว้ว่าไม่ได้จด · ทางแก้ที่ error บอก: ออก <span class="mono text-[12px]">ABB_TAX_INVOICE</span>/<span class="mono text-[12px]">RECEIPT</span> แทน หรือแก้ข้อมูลลูกค้าก่อน
+          </p>
         </div>
         <div class="rulebox mb-4">
           <div class="rc mb-1">อ้างใบส่งของแล้วต้องอ้างให้จริง (2026-08-31)</div>
@@ -1132,6 +1155,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-balances</td><td class="mono text-[11px]">stock_balance:view</td><td>ยอดคงเหลือ + มูลค่าคงคลัง · <span class="mono">group_by=product|product_warehouse|lot</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-ledger-entries</td><td class="mono text-[11px]">stock_ledger:view</td><td>ไล่การเคลื่อนไหวพร้อมยอดสะสม · <b>ต้องส่ง <span class="mono">product_id</span></b></td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td><td>ล็อตใกล้/เลยหมดอายุ · <span class="mono">within_days</span> ปรับได้</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/reorder-alerts</td><td class="mono text-[11px]">reorder_alert:view</td><td>สินค้าที่ต่ำกว่าจุดสั่งซื้อ · เรียงจากขาดมากไปน้อย</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/lots</td><td class="mono text-[11px]">lot:view</td><td>ล็อตดิบ ไม่รวมยอด</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-movements</td><td class="mono text-[11px]">stock_movement:view</td><td>รายการเคลื่อนไหวดิบ</td></tr>
             </tbody>
@@ -1151,6 +1175,21 @@ sequenceDiagram
 <span class="c">// GET /inventory-bc/v1/stock-ledger-entries?product_id=…&amp;date_from=…&amp;date_to=…</span>
 <span class="c">// balance_before/after = ยอดสะสมของ "ขอบเขต" ที่ถาม (สินค้า×คลัง×ล็อต)</span>
 <span class="c">// lot_balance_after  = ยอดของ "ล็อตนั้น" — ต่างกันเมื่อขอบเขตกินหลายล็อต</span></pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">จุดสั่งซื้อมีคนเฝ้าให้แล้ว (2026-08-31)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">reorder_levels</span> ตั้งค่าได้ตั้งแต่ P3 แต่<b>ไม่มีอะไรเตือน</b> — ต้องเปิดดูแล้วเทียบกับรายงานสต็อกด้วยตาเอง
+            (ต่างจาก <span class="mono text-[12px]">expiry_alert_days</span> ที่มี job กลางคืนมาตั้งแต่แรก) · ตอนนี้มี 2 ทางเข้าที่ใช้<b>ข้อมูลชุดเดียวกัน</b>
+            จึงไม่มีทางขัดกัน: <span class="mono text-[12px]">GET /reorder-alerts</span> สำหรับหน้าจอ และ job กลางคืน <b>02:00 (Asia/Bangkok)</b> ที่ยิง event
+            <span class="mono text-[12px]">stock.low</span> เป็นชุดๆ (ชุดละ 500 แถว พร้อม <span class="mono text-[12px]">chunk_index</span>/<span class="mono text-[12px]">chunk_count</span>
+            ให้ consumer แยกได้ว่าได้รับครบหรือไม่) — เวลา 02:00 ห่างจาก expiry scan (01:00) หนึ่งชั่วโมงเพื่อไม่ให้สแกนเต็มสองชุดชนกันบน connection pool เดียว<br>
+            <b>ยอดคงเหลือนับเฉพาะของที่ขายได้จริง</b> — ล็อตที่ <span class="mono text-[12px]">available_qty &gt; 0</span> และยังไม่หมดอายุ ตรงกับเงื่อนไขที่
+            <span class="mono text-[12px]">postIssue()</span> ใช้เลือกล็อต · ถ้านับของหมดอายุที่ยังค้างในคลังด้วย สินค้าที่ต้องสั่งด่วนที่สุดจะไม่ขึ้นเตือน (ชั้นดูเต็มแต่ขายไม่ได้เลย)<br>
+            สินค้าที่ตั้งจุดสั่งซื้อไว้แต่<b>ไม่มีของเลย</b> ขึ้นเตือนด้วย (<span class="mono text-[12px]">is_out_of_stock: true</span>) — query เริ่มจาก
+            <span class="mono text-[12px]">reorder_levels</span> ไม่ใช่จาก <span class="mono text-[12px]">lots</span> ถ้าเริ่มจาก lots แถวที่สำคัญที่สุดจะหายไปเพราะไม่มีล็อตให้เจอ ·
+            สินค้า/คลังที่ถูกลบ (soft delete) ไม่ขึ้นเตือน
+          </p>
         </div>
 
         <h3 class="display text-xl mt-10 mb-4">E2 · รายงานบัญชี &amp; กำไร</h3>
@@ -1303,7 +1342,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">inventory-bc · สินค้า · คลัง · สต็อก <span class="mono text-[13px] text-[var(--muted)]">— 129 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">inventory-bc · สินค้า · คลัง · สต็อก <span class="mono text-[13px] text-[var(--muted)]">— 131 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1320,6 +1359,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/brands/{id}</td><td class="mono text-[11px]">brand:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/brands/{id}</td><td class="mono text-[11px]">brand:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/reorder-alerts</td><td class="mono text-[11px]">reorder_alert:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts</td><td class="mono text-[11px]">goods_receipt:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts</td><td class="mono text-[11px]">goods_receipt:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/goods-receipts/{id}</td><td class="mono text-[11px]">goods_receipt:update</td></tr>
@@ -1366,6 +1406,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules/{id}</td><td class="mono text-[11px]">pricing_rule:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules/{id}</td><td class="mono text-[11px]">pricing_rule:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products</td><td class="mono text-[11px]">product:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products</td><td class="mono text-[11px]">product:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:update</td></tr>
@@ -1602,7 +1643,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 292 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 294 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->
