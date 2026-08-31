@@ -148,7 +148,7 @@
             ต้องเอาไปต่อหลัง HAProxy/Consul/Patroni อีกชั้นเพื่อให้ได้ HA แบบเดียวกัน ในขณะที่ Pgpool-II ผูก
             connection pooling + load balancing + watchdog/VIP failover ไว้ใน process เดียว ลด moving part ที่ต้อง
             operate สำหรับ topology ขนาดนี้ (1 primary + 2 replica) — trade-off คือ Pgpool config ซับซ้อนกว่าและ debug
-            ยากกว่าเมื่อมีปัญหา (ดู §08 บั๊กที่เจอ 20 ข้อ)
+            ยากกว่าเมื่อมีปัญหา (ดู §08 บั๊กที่เจอ 40 ข้อ)
           </p>
         </div>
       </section>
@@ -2741,6 +2741,23 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><b>pgpool cluster ค้าง (บั๊ก #37–38)</b> — standby ทั้งสองถูก mark down มา 3 วัน + node ที่ถือ VIP มอง primary ผิด + pcp auth-fail วนทุก 16s. แก้: standardize pcp password 3 node + วาง <span class="mono text-[12px]">/root/.pcppass</span> + ลบ <span class="mono text-[12px]">pgpool_status</span> แล้ว restart ทั้ง cluster → 3 view ตรงกัน node0=primary, node1,2=standby ทั้งหมด <span class="mono text-[12px]">up</span></span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">⚠</span><span>สำหรับ bulk restore / DDL หนัก / งาน admin — <b>ต่อตรง primary ไม่ผ่าน VIP/pgpool</b> (pgpool มี <span class="mono text-[12px]">client_idle_limit=60</span> ตัด connection ที่ idle เกิน 60s ระหว่าง stream, และ <span class="mono text-[12px]">failover_on_backend_error=1</span> จะ promote standby กลางคันถ้า primary สะดุด). VIP ไว้ให้ application traffic เท่านั้น</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>Proxmox host RAM overcommit — VM ตั้ง <span class="mono text-[12px]">memory=16384 balloon=2048</span> แต่ host เหลือ RAM ~2G ทำให้ balloon บีบ DB ทั้ง 3 เหลือ ~1.6G/node จริง (restore ช้า, checkpoint ตามไม่ทัน) — ต้องลด VM อื่นหรือเพิ่ม RAM host</span></div>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">Silent HA Degradation + Credential Drift — 2026-08-31</div>
+        <div class="card p-6 mb-8">
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mb-4">
+            เปิด <span class="mono text-[12px]">show pool_nodes</span> ดูด้วยเรื่องอื่น แล้วเจอ standby ค้าง
+            <span class="mono text-[12px]">down</span> มา <b>2 วันเต็ม</b> โดยไม่มี alert ใดๆ — ไล่ต่อเจอปัญหาซ้อนกัน 3 ชั้น
+            บวกอีกเคสที่ไม่เกี่ยวกันแต่เกิดพร้อมกัน
+          </p>
+          <div class="space-y-3">
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><b>ต้นเหตุ (บั๊ก #40)</b> — <span class="mono text-[12px]">unattended-upgrades</span> อัป <span class="mono text-[12px]">libpam0g</span> แล้ว <span class="mono text-[12px]">needrestart</span> รีสตาร์ท <span class="mono text-[12px]">postgresql@18-main</span> บน ppr1 (2026-08-29 06:51 UTC) → pgpool degenerate node 1. <b>primary ก็โดนวันเดียวกัน</b> (06:14 UTC) แค่บังเอิญไม่มีใครเห็น. แก้: วาง <span class="mono text-[12px]">99-no-db-autorestart.conf</span> ครบทั้ง 6 เครื่อง ยืนยัน parse ผ่านทุกตัวแล้ว</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><b>ทำไมไม่ฟื้นเอง (บั๊ก #39 — สาเหตุที่แท้จริงของ #14/#20/#38)</b> — <span class="mono text-[12px]">backend_application_name</span> = <span class="mono text-[12px]">node0/1/2</span> ไม่ตรงกับ <span class="mono text-[12px]">pg_stat_replication</span> ที่เป็น <span class="mono text-[12px]">ppm/ppr1/ppr2</span> → <span class="mono text-[12px]">auto_failback</span> ยืนยัน streaming ไม่ได้ ไม่เคยยิงเลยตลอดอายุคลัสเตอร์. แก้ครบ 3 pgpool node + reload → node กลับมาเองใน ~8 วินาที และ <span class="mono text-[12px]">replication_state</span> ขึ้น <span class="mono text-[12px]">streaming</span> เป็นครั้งแรก</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><b>ทำไมไม่มีใครรู้ (บั๊ก #37 กลับมาอีก)</b> — <span class="mono text-[12px]">pgpool-watchdog-exporter</span> auth PCP ไม่ผ่านบน <b>pgpool1 (ตัวถือ VIP) และ pgpool3</b> ทำให้ metric ทุกตัวเป็น 0 รวมถึง <span class="mono text-[12px]">pgpool_watchdog_is_leader</span> — Grafana มองไม่เห็นแม้แต่ว่าใครเป็น leader และ log โดน flood ~225 บรรทัด/ชม./node. <b>ยังไม่ได้แก้</b> — #37 เคยแก้ไปแล้วรอบหนึ่งแต่ regress</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><b>Credential drift ฝั่ง client (คนละเคส เกิดพร้อมกัน)</b> — meditech-api บนเครื่อง on-prem ถือรหัส <span class="mono text-[12px]">postgres</span> เก่า retry วน <b>118,983 ครั้งใน 4 ชม.</b> เข้ามาทาง NAT 9876. ต้นตอ: มี <span class="mono text-[12px]">.env.new</span> ที่รหัสถูกอยู่แล้วแต่ไม่เคยถูก copy ทับ <span class="mono text-[12px]">.env</span> และ <span class="mono text-[12px]">ecosystem.config.js</span> อ่านแค่ <span class="mono text-[12px]">.env</span>. <b>ยังไม่ได้แก้</b> — ต้อง copy ทับ + <span class="mono text-[12px]">pm2 restart all --update-env</span></span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><b>postgres_exporter บน replica พังทุก 15 วินาที</b> — <span class="mono text-[12px]">collector failed name=stat_bgwriter · column "checkpoints_timed" does not exist</span> เพราะ exporter 0.15.0 (ต.ค. 2023) เก่าเกินสำหรับ PostgreSQL 18 ที่ย้าย column ไป <span class="mono text-[12px]">pg_stat_checkpointer</span> — อัป exporter หรือปิด collector ด้วย <span class="mono text-[12px]">--no-collector.stat_bgwriter</span></span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><b>Alert ที่ยังไม่มี และเป็นเหตุผลที่เคสนี้ค้าง 2 วัน</b> — (1) <span class="mono text-[12px]">status != pg_status</span> นานเกิน 1 นาที (2) <span class="mono text-[12px]">pgpool_watchdog_scrape_success == 0</span> เพื่อไม่ให้ monitoring พังเงียบอีก</span></div>
           </div>
         </div>
       </section>
