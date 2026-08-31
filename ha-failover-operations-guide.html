@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HA &amp; Failover Operations Guide — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="⚡" title="HA &amp; Failover" subtitle="OPERATIONS GUIDE · JUNIOR-READY" width="280">
+    <nav slot="nav">
+      <a href="#model"      class="navlink"><span class="n">01</span> โมเดล 2 ชั้น</a>
+      <a href="#readiness"  class="navlink"><span class="n">02</span> สถานะความพร้อม</a>
+      <a href="#s1"         class="navlink"><span class="n">03</span> เคส A · primary ดับ</a>
+      <a href="#s2"         class="navlink"><span class="n">04</span> เคส B · pgpool ดับ</a>
+      <a href="#s3"         class="navlink"><span class="n">05</span> เคส C · standby ดับ</a>
+      <a href="#s4"         class="navlink"><span class="n">06</span> เคส D · หลายตัวดับ</a>
+      <a href="#rejoin"     class="navlink"><span class="n">07</span> กู้ node กลับเข้า cluster</a>
+      <a href="#gaps"       class="navlink"><span class="n">08</span> ช่องโหว่ที่ต้องปิด</a>
+      <a href="#drill"      class="navlink"><span class="n">09</span> การซ้อม</a>
+      <a href="#triage"     class="navlink"><span class="n">10</span> Triage สำหรับ Junior</a>
+    </nav>
+    <div slot="footnote">
+      <a href="postgresql-pgpool-cluster-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Pgpool-II Cluster Guide</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="postgresql-pgpool-cluster-guide.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Pgpool-II Cluster Guide
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Operations Guide · เขียนให้ Junior ทำตามได้</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          เครื่องไหนดับแล้ว<br>
+          <span class="text-[#7FE3DE]">ระบบยังอยู่ไหม</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          ตอบทีละเคสว่าอะไรเกิดขึ้น<b class="text-white font-medium">อัตโนมัติ</b> อะไร<b class="text-white font-medium">ต้องใช้มือ</b>
+          ใช้เวลาเท่าไหร่ ต้องเช็คอะไร และถ้าไม่เป็นไปตามแผนต้องทำยังไงต่อ
+          — ทุกตัวเลขในหน้านี้มาจากการตรวจระบบจริง ไม่ใช่ค่าตามทฤษฎี
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>repmgr promote: อัตโนมัติ</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>VIP failover: อัตโนมัติ</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9635E"></span>Auto-reattach hook: พังอยู่</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <div class="rulebox mt-12" style="border-color:var(--signal)">
+        <div class="rc mb-1" style="color:var(--signal)">อ่านย่อหน้านี้ก่อนถ้ามีเวลา 30 วินาที</div>
+        <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+          <b class="text-[var(--ink)]">primary ดับ → ระบบกู้ตัวเองได้</b> (repmgr promote standby อัตโนมัติ ~30 วินาที) ·
+          <b class="text-[var(--ink)]">pgpool node ดับ → ระบบกู้ตัวเองได้</b> (VIP ย้ายอัตโนมัติ ตราบใดที่เหลือ 2 ใน 3 node) ·
+          <b style="color:var(--signal)">แต่ safety net ตัวหนึ่งพังอยู่</b> — hook ที่เคลียร์สถานะค้างของ pgpool หลัง failover
+          auth ไม่ผ่านทั้ง 3 node แปลว่าถ้าเจอเคสที่ pgpool มาร์ค backend ค้าง จะไม่มีอะไรเคลียร์ให้เอง
+          ต้องมีคนกดตาม <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01</a> (ดู §08)
+        </p>
+      </div>
+
+      <!-- ========== 01 MODEL ========== -->
+      <section id="model" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — โมเดล 2 ชั้น</div>
+        <h2 class="display text-3xl mb-6">สองระบบที่ทำงานแยกกัน และไม่รู้จักกันโดยตรง</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ความสับสนอันดับหนึ่งของคนที่เพิ่งเข้ามาดูแลระบบนี้คือคิดว่า pgpool เป็นคนสั่ง promote
+          — <b class="text-[var(--ink)]">ไม่ใช่</b> สองชั้นนี้แยกหน้าที่กันเด็ดขาด และ<b class="text-[var(--ink)]">คุยกันทางอ้อมเท่านั้น</b>
+        </p>
+
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นข้อมูล</div>
+            <h3 class="font-semibold mb-2 text-[15px]">repmgr — ตัดสินว่าใครเป็น primary</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <span class="mono text-[12px]">repmgrd</span> รันอยู่บน ppm/ppr1/ppr2 คอยจับตาดู primary
+              ถ้าติดต่อไม่ได้ครบตามเงื่อนไข จะเลือก standby ตัวหนึ่ง <span class="mono text-[12px]">promote</span>
+              แล้วสั่งอีกตัว <span class="mono text-[12px]">follow</span> — <b class="text-[var(--ink)]">pgpool ไม่มีส่วนในขั้นตอนนี้เลย</b>
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นทางเดิน</div>
+            <h3 class="font-semibold mb-2 text-[15px]">pgpool — ตัดสินว่าส่ง query ไปไหน</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              pgpool ถาม backend ทุกตัวด้วย <span class="mono text-[12px]">pg_is_in_recovery()</span> ทุก 5 วินาที
+              (<span class="mono text-[12px]">sr_check_period</span>) แล้ว<b class="text-[var(--ink)]">ค้นพบเองว่าใครเป็น primary</b>
+              — ไม่ได้อ่านจาก config และไม่ได้ถาม repmgr
+            </p>
+          </div>
+        </div>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+flowchart TB
+    subgraph L2["ชั้นทางเดิน · pgpool watchdog (3 node)"]
+      V["VIP ลอยอยู่ที่ node ที่ priority สูงสุดที่ยังมีชีวิต"]
+    end
+    subgraph L1["ชั้นข้อมูล · repmgr (3 node)"]
+      P["primary"] --- S1["standby"] --- S2["standby"]
+    end
+    APP["Application"] -->|"ต่อที่ VIP เท่านั้น"| L2
+    L2 -->|"sr_check ทุก 5 วิ<br/>pg_is_in_recovery()"| L1
+    L1 -.->|"event hook หลัง promote<br/>pcp_attach_node (ขาที่พังอยู่)"| L2
+</pre>
+        </div>
+
+        <div class="rulebox ok">
+          <div class="rc mb-1">ทำไมออกแบบแบบนี้ถึงดี — และจุดที่ต้องระวัง</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b class="text-[var(--ink)]">ดี:</b> pgpool ค้นพบ primary เองจากสภาพจริงของ backend
+            เพราะฉะนั้นต่อให้ promote ด้วยมือ ด้วย repmgr หรือด้วยวิธีไหน pgpool ก็ตามทันเสมอ ไม่ต้องแก้ config
+            · <b style="color:var(--signal)">ระวัง:</b> ขาลูกศรประที่ชี้กลับขึ้นไป (event hook) คือตัวที่คอย<b>เคลียร์สถานะค้าง</b>ของ pgpool
+            หลัง promote ซึ่ง<b class="text-[var(--ink)]">ตอนนี้พังอยู่</b> — ระบบยัง failover ได้ แต่ขาด safety net (§08)
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 READINESS ========== -->
+      <section id="readiness" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — สถานะความพร้อม</div>
+        <h2 class="display text-3xl mb-6">ตรวจจริงเมื่อ 2026-08-31</h2>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th style="width:44px">สถานะ</th><th>รายการ</th><th>ที่ตรวจพบ</th></tr></thead>
+              <tbody>
+                <tr><td>✅</td><td><span class="mono text-[11.5px]">repmgrd</span> ทำงานทั้ง 3 node</td><td><span class="mono text-[11.5px]">active</span> ทั้ง ppm/ppr1/ppr2</td></tr>
+                <tr><td>✅</td><td><span class="mono text-[11.5px]">failover=automatic</span></td><td>ตั้งครบทั้ง 3 node</td></tr>
+                <tr><td>✅</td><td>Replication slot ทำงาน</td><td><span class="mono text-[11.5px]">2 of 2 physical replication slots are active</span></td></tr>
+                <tr><td>✅</td><td>Standby ตามทัน</td><td><span class="mono text-[11.5px]">2 of 2 downstream nodes attached</span> · lag &lt; 1ms</td></tr>
+                <tr><td>✅</td><td><span class="mono text-[11.5px]">pg_rewind</span> ใช้ได้ (จำเป็นตอนกู้ node เก่ากลับ)</td><td><span class="mono text-[11.5px]">data_checksums = on</span> — ผ่านเงื่อนไข</td></tr>
+                <tr><td>✅</td><td>Watchdog priority ไม่ซ้ำ</td><td>pgpool1=3, pgpool2=2, pgpool3=1 → เลือก leader ได้แน่นอน</td></tr>
+                <tr><td>✅</td><td><span class="mono text-[11.5px]">auto_failback</span> ทำงานจริงแล้ว</td><td>เพิ่งแก้ 2026-08-31 (บั๊ก #39) — ยืนยันด้วยการยิงเองสำเร็จ</td></tr>
+                <tr style="background:rgba(220,90,22,.06)"><td>❌</td><td><b>Event hook เคลียร์สถานะ pgpool หลัง failover</b></td><td><b>auth ไม่ผ่านทั้ง 3 pgpool node</b> — safety net หายไป (§08 ข้อ 1)</td></tr>
+                <tr style="background:rgba(220,90,22,.06)"><td>❌</td><td><b>สเปก standby ไม่เท่า primary</b></td><td>ppm = 6.9 GB / 4 core · ppr1,ppr2 = <b>3.9 GB / 2 core</b> — promote แล้วกำลังหายครึ่ง (§08 ข้อ 2)</td></tr>
+                <tr><td>⚠️</td><td><span class="mono text-[11.5px]">priority</span> เท่ากันหมด</td><td>ทั้ง 3 node = 100 → เลือกไม่ได้ว่าอยากให้ตัวไหนขึ้นเป็น primary</td></tr>
+                <tr><td>⚠️</td><td>ไม่มี WAL archive / PITR</td><td><span class="mono text-[11.5px]">archive_mode = off</span> — กู้ย้อนเวลาไม่ได้ มีแค่ replication</td></tr>
+                <tr><td>⚠️</td><td>Slot เก็บ WAL ไม่จำกัด</td><td><span class="mono text-[11.5px]">max_slot_wal_keep_size = -1</span> — standby ดับนานๆ ทำ disk primary เต็มได้</td></tr>
+                <tr><td>⚠️</td><td>pgpool online recovery ไม่ได้ตั้ง</td><td><span class="mono text-[11.5px]">recovery_user</span> ว่าง → <span class="mono text-[11.5px]">pcp_recovery_node</span> ใช้ไม่ได้ ต้องกู้ด้วย repmgr เท่านั้น</td></tr>
+                <tr><td>⚠️</td><td>Monitoring มีจุดบอด</td><td>exporter ของ pgpool auth ไม่ผ่าน 2/3 node · postgres_exporter บน replica พังกับ PG18</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="rulebox">
+          <div class="rc mb-1">สรุปเป็นประโยคเดียว</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b class="text-[var(--ink)]">กลไก failover ทั้งสองชั้นพร้อมใช้งานจริง</b> — สิ่งที่ขาดคือ safety net และความสามารถ<b>มองเห็น</b>ว่ามันทำงานหรือไม่
+            ระบบจะกู้ตัวเองได้ในเคสปกติ แต่ถ้าหลุดจากเคสปกติเมื่อไหร่ จะไม่มีอะไรเตือนและไม่มีอะไรแก้ให้
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 SCENARIO A ========== -->
+      <section id="s1" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — เคส A</div>
+        <h2 class="display text-3xl mb-6">ppm (primary) ดับ — promote อัตโนมัติ ✅</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <b class="text-[var(--ink)]">คำตอบสั้น: ใช่ ระบบ promote เองอัตโนมัติ</b> เคยทดสอบ kill จริงมาแล้ว
+          ใช้เวลาจากตอน kill ถึง promote เสร็จ <b class="text-[var(--ink)]">29 วินาที</b> คุณ<b>ไม่ต้องทำอะไรเลย</b>ในนาทีแรก
+          หน้าที่ของคุณคือเฝ้าดูว่ามันจบตามแผนไหม แล้วค่อยตามเก็บงานหลังบ้าน
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ลำดับเหตุการณ์ที่ควรเห็น</div>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th style="width:80px">เวลา</th><th>ใครทำ</th><th>เกิดอะไร</th></tr></thead>
+              <tbody>
+                <tr><td>0 วิ</td><td>—</td><td>ppm ดับ · write ทั้งหมดเริ่ม error</td></tr>
+                <tr><td>~5–20 วิ</td><td>pgpool</td><td>health check ล้มครบ retry (<span class="mono text-[11.5px]">period=5</span>, <span class="mono text-[11.5px]">max_retries=3</span>) → degenerate node 0</td></tr>
+                <tr><td>~30 วิ</td><td>repmgrd</td><td>ครบ <span class="mono text-[11.5px]">reconnect_attempts=6 × interval=5</span> → ประกาศว่า primary ตาย เลือก standby แล้ว promote</td></tr>
+                <tr><td>~30–35 วิ</td><td>repmgrd</td><td>สั่ง standby อีกตัว <span class="mono text-[11.5px]">follow</span> primary ใหม่ · สร้าง replication slot ให้เอง (<span class="mono text-[11.5px]">use_replication_slots=1</span>)</td></tr>
+                <tr><td>~35–40 วิ</td><td>pgpool</td><td><span class="mono text-[11.5px]">sr_check</span> รอบถัดไปเจอ primary ตัวใหม่ → เริ่ม route write ไปที่นั่น</td></tr>
+                <tr style="background:rgba(220,90,22,.06)"><td>~40 วิ</td><td>event hook</td><td><b>ควรจะ</b>ยิง <span class="mono text-[11.5px]">pcp_attach_node</span> เคลียร์สถานะค้าง — <b style="color:var(--signal)">ตอนนี้ขั้นนี้ fail เงียบ</b></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="text-[13.5px] mb-8" style="color:var(--ink-soft)">
+          <b class="text-[var(--ink)]">ช่วงที่ระบบเขียนไม่ได้จริงๆ ประมาณ 30–60 วินาที</b> — แอปที่มี retry loop จะกลับมาเองโดยไม่ต้อง restart
+          ส่วน transaction ที่ค้างอยู่ตอนนั้นจะ fail และต้องถูกส่งใหม่จากฝั่ง client
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">สิ่งที่คุณต้องทำ — ตามลำดับ</div>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">รอ 60 วินาทีก่อน อย่าเพิ่งแตะอะไร</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            นี่คือข้อที่สำคัญที่สุดและผิดกันบ่อยที่สุด — <b class="text-[var(--ink)]">การเข้าไปแทรกระหว่างที่ repmgr กำลังทำงานทำให้เกิด
+            split-brain ได้</b> ถ้าคุณ start ppm กลับขึ้นมาเองตอนที่ ppr1 เพิ่ง promote จะมี primary สองตัวพร้อมกันทันที
+          </p>
+          <div class="rulebox" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ห้ามทำเด็ดขาดในนาทีแรก</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              ❌ <span class="mono text-[12px]">systemctl start postgresql</span> บน ppm ·
+              ❌ <span class="mono text-[12px]">repmgr standby promote</span> ด้วยมือ ·
+              ❌ restart pgpool ·
+              ❌ แก้ <span class="mono text-[12px]">.env</span> ให้ชี้ IP ใหม่ (VIP จัดการให้แล้ว)
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คว่า promote สำเร็จไหม</h3>
+          <div class="code p-5">
+<pre>ssh ovh-ppr1 <span class="s">"sudo -u postgres repmgr cluster show --compact"</span></pre>
+          </div>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ผ่าน = มี primary หนึ่งตัว และ standby ที่เหลือ running ชี้ไปหามัน</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              ถ้าเห็น <span class="mono text-[12px]">? unreachable</span> ที่ node เดิมคือปกติ (มันดับจริง) แต่ถ้าเห็น
+              <b class="text-[var(--ink)]">primary สองตัว</b> ให้หยุดทุกอย่างแล้ว escalate ทันที — นั่นคือ split-brain
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คว่า pgpool ตามทันไหม — ขั้นที่คนลืมบ่อยที่สุด</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            repmgr สำเร็จไม่ได้แปลว่าแอปใช้งานได้ ต้องดูว่า pgpool มองเห็นภาพเดียวกันหรือเปล่า
+          </p>
+          <div class="code p-5">
+<pre>psql -h &lt;vip&gt; -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span></pre>
+          </div>
+          <div class="card overflow-hidden mt-3 mb-3">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>ต้องเห็น</th><th>แปลว่า</th></tr></thead>
+                <tbody>
+                  <tr><td>มี <span class="mono text-[11.5px]">role = primary</span> หนึ่งแถว</td><td>pgpool รู้แล้วว่าเขียนไปไหน</td></tr>
+                  <tr><td>node ที่ดับ = <span class="mono text-[11.5px]">status down</span></td><td>ถูกต้อง มันดับจริง</td></tr>
+                  <tr><td>node ที่รอด = <span class="mono text-[11.5px]">status up</span></td><td>ยังรับ read ได้</td></tr>
+                  <tr><td><span class="mono text-[11.5px]">replication_state = streaming</span></td><td>standby ตามทัน primary ใหม่แล้ว</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="rulebox" style="border-color:var(--signal)">
+            <div class="rc mb-1">ถ้า node ที่ยังมีชีวิตอยู่ขึ้นเป็น down — นี่คือเคสที่ hook ควรแก้ให้ แต่มันพัง</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              สังเกตจาก <span class="mono text-[12px]">status = down</span> แต่ <span class="mono text-[12px]">pg_status = up</span>
+              — แก้ตาม <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01</a> คือ
+              <span class="mono text-[12px]">pcp_attach_node</span> ให้ครบทั้ง <b class="text-[var(--ink)]">3 node</b> ไม่ใช่แค่ตัวที่ผิด
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">ทดสอบด้วย write จริง</h3>
+          <div class="code p-5">
+<pre>psql -h &lt;vip&gt; -p 5432 -U postgres -c \
+  <span class="s">"select inet_server_addr(), pg_is_in_recovery();"</span>
+<span class="c"># ต้องได้ pg_is_in_recovery = f (false) = เขียนได้จริง</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">5</span>
+          <h3 class="font-semibold text-[16px] mb-2">แจ้งทีมว่ากำลังวิ่งบนเครื่องที่เล็กกว่าเดิม</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            primary ตัวใหม่มี RAM และ CPU <b class="text-[var(--ink)]">ครึ่งเดียว</b>ของตัวเดิม (3.9 GB / 2 core เทียบกับ 6.9 GB / 4 core)
+            — ให้เลี่ยงงานหนักทุกชนิด (report ใหญ่, bulk import, migration, re-index) จนกว่าจะกู้ ppm กลับมาและ switch กลับ
+            รายละเอียดใน §08 ข้อ 2
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 SCENARIO B ========== -->
+      <section id="s2" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — เคส B</div>
+        <h2 class="display text-3xl mb-6">pgpool1 (ตัวถือ VIP) ดับ — VIP ย้ายเอง ✅</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <b class="text-[var(--ink)]">คำตอบสั้น: ระบบทำงานต่อได้ ไม่ต้องแตะอะไร</b> — watchdog เลือก leader ใหม่จาก
+          <span class="mono text-[13px]">wd_priority</span> ที่ตั้งไว้ไม่ซ้ำกัน (pgpool1=3 &gt; pgpool2=2 &gt; pgpool3=1)
+          แล้วยก VIP ขึ้นที่ node ใหม่ ฝั่งแอปไม่ต้องแก้อะไรเพราะยังต่อ IP เดิม
+        </p>
+
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>node ที่ดับ</th><th>เหลือกี่ตัว</th><th>quorum (ต้องการ 2)</th><th>VIP ไปอยู่ที่</th><th>ระบบ</th></tr></thead>
+              <tbody>
+                <tr><td>pgpool1</td><td>2</td><td>✅ ครบ</td><td><b>pgpool2</b> (priority รองลงมา)</td><td>ใช้งานได้ปกติ</td></tr>
+                <tr><td>pgpool2 หรือ pgpool3</td><td>2</td><td>✅ ครบ</td><td>ยังอยู่ที่ pgpool1</td><td>ใช้งานได้ปกติ ไม่มีอะไรเปลี่ยน</td></tr>
+                <tr style="background:rgba(220,90,22,.06)"><td>สองตัวพร้อมกัน</td><td>1</td><td>❌ ไม่ครบ</td><td><b>ไม่มี — VIP ตก</b></td><td><b>แอปต่อ DB ไม่ได้ทั้งหมด</b></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox mb-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">จุดสำคัญที่ต้องเข้าใจ: pgpool ที่เหลือ 1 ตัวจะไม่ยอมทำงาน</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            มันไม่ใช่บั๊ก แต่เป็น<b class="text-[var(--ink)]">การป้องกัน split-brain โดยเจตนา</b> — node เดียวไม่มีทางรู้ว่าตัวเอง
+            "รอดอยู่คนเดียว" หรือ "โดนตัดขาดจากคนอื่นที่ยังทำงานกันอยู่" ถ้ามันยก VIP ขึ้นมาเองในกรณีหลัง
+            จะมี VIP สองที่พร้อมกันบนเครือข่ายเดียว ซึ่งเลวร้ายกว่าการไม่มี VIP เลย
+            <br><br>
+            <b class="text-[var(--ink)]">แปลว่า: PostgreSQL ทั้ง 3 ตัวสุขภาพดี 100% ก็ยังใช้งานไม่ได้ ถ้า pgpool เหลือตัวเดียว</b>
+            — อย่า reboot pgpool หลายตัวพร้อมกันเด็ดขาด ให้ทำทีละตัวและรอ join กลับครบก่อนเสมอ
+          </p>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">วิธีเช็คว่า VIP ย้ายสำเร็จ</div>
+        <div class="code p-5 mb-3">
+<pre><span class="c"># 1) ใครถือ VIP อยู่ตอนนี้ — ต้องเจอที่ node เดียวเท่านั้น</span>
+<span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
+  <span class="k">echo</span> -n <span class="s">"$h: "</span>
+  ssh $h <span class="s">"ip -4 -o addr show | grep -c '&lt;vip&gt;'"</span>
+<span class="k">done</span>
+
+<span class="c"># 2) watchdog เห็นภาพตรงกันไหม + quorum ยังอยู่ไหม</span>
+ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+  pcp_watchdog_info -h localhost -p 9898 -U pgpool_admin -w -v"</span></pre>
+        </div>
+        <div class="rulebox ok mb-8">
+          <div class="rc mb-1">ผ่าน = เห็นแบบนี้</div>
+          <p class="text-[13.5px]" style="color:var(--ink-soft)">
+            ข้อ 1 ต้องได้ <span class="mono text-[12px]">1</span> ที่ node เดียว และ <span class="mono text-[12px]">0</span> ที่เหลือ
+            — <b class="text-[var(--ink)]">ถ้าได้ 1 สองที่คือ VIP ซ้ำ ต้องแก้ทันที</b> ·
+            ข้อ 2 ต้องเห็น <span class="mono text-[12px]">Quorum state : QUORUM EXIST</span>
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">→</span>
+          <h3 class="font-semibold text-[16px] mb-2">เอา pgpool ที่ดับกลับเข้า cluster</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            แค่ start ขึ้นมา มันจะ join เองและรับสถานะจากเสียงข้างมาก — <b class="text-[var(--ink)]">แต่ต้องเช็คสถานะ backend หลัง join เสมอ</b>
+            เพราะไฟล์ <span class="mono text-[12px]">pgpool_status</span> เก็บสถานะเก่าข้าม restart และเคยทำให้ backend ค้าง down มาแล้ว (บั๊ก #38)
+          </p>
+          <div class="code p-5">
+<pre>ssh ovh-pgpool1 <span class="s">"sudo systemctl start pgpool2"</span>
+<span class="c"># รอ ~15 วิ แล้วเช็คว่า 3 view ตรงกัน</span>
+psql -h &lt;vip&gt; -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span></pre>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 SCENARIO C ========== -->
+      <section id="s3" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — เคส C</div>
+        <h2 class="display text-3xl mb-6">standby ดับ — ระบบไม่สะดุด แต่มีเงื่อนเวลา ⚠️</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          write ไม่กระทบเลยเพราะ replication เป็น <span class="mono text-[13px]">async</span> ส่วน read จะกระจายไปที่ node ที่เหลือ
+          พอ start กลับขึ้นมา <span class="mono text-[13px]">auto_failback</span> จะดึงกลับเข้า rotation เอง
+          ภายใน ~10 วินาที (ตั้งแต่แก้บั๊ก #39 เมื่อ 2026-08-31)
+        </p>
+
+        <div class="rulebox mb-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">แต่ห้ามปล่อยทิ้งไว้นาน — นี่คือกับดักที่จะทำให้ primary ล่มตามไปด้วย</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ระบบตั้ง <span class="mono text-[12px]">max_slot_wal_keep_size = -1</span> (ไม่จำกัด) แปลว่า replication slot ของ standby
+            ที่ดับอยู่จะ<b class="text-[var(--ink)]">สั่งให้ primary เก็บ WAL ไว้ตลอดไป</b> รอวันที่มันกลับมา
+            — WAL จะกองสะสมใน <span class="mono text-[12px]">pg_wal</span> จนกิน disk ของ primary หมด แล้ว
+            <b class="text-[var(--ink)]">primary จะ PANIC และดับ</b> ซึ่งเคยเกิดมาแล้วในเหตุการณ์ restore เมื่อ 2026-08-25
+            <br><br>
+            <b class="text-[var(--ink)]">กฎ:</b> ถ้า standby จะดับเกิน 1 วัน ต้องเฝ้าดู disk ของ primary ทุกวัน
+            และถ้าจะเลิกใช้ node นั้นถาวร <b>ต้องลบ replication slot ทิ้งด้วย</b> ไม่ใช่แค่ปิดเครื่อง
+          </p>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">คำสั่งเฝ้าระวังระหว่างที่ standby ดับ</div>
+        <div class="code p-5 mb-6">
+<pre><span class="c"># disk ของ primary เหลือเท่าไหร่ + pg_wal โตแค่ไหน</span>
+ssh ovh-ppm <span class="s">"df -h / | tail -1; sudo du -sh /var/lib/postgresql/18/main/pg_wal"</span>
+
+<span class="c"># slot ไหนไม่ active และค้าง WAL ไว้เท่าไหร่</span>
+ssh ovh-ppm <span class="s">"sudo -u postgres psql -tAc \
+  \"select slot_name, active, \
+    pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) as wal_held \
+    from pg_replication_slots order by 3 desc;\""</span></pre>
+        </div>
+        <div class="rulebox">
+          <div class="rc mb-1">ถ้าต้องเลิกใช้ standby ตัวนั้นถาวร</div>
+          <div class="code p-5 mt-2">
+<pre>ssh ovh-ppm <span class="s">"sudo -u postgres psql -c \
+  \"select pg_drop_replication_slot('&lt;slot-name&gt;');\""</span>
+ssh ovh-ppm <span class="s">"sudo -u postgres repmgr standby unregister --node-id=&lt;id&gt;"</span></pre>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 SCENARIO D ========== -->
+      <section id="s4" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — เคส D</div>
+        <h2 class="display text-3xl mb-6">หลายตัวดับพร้อมกัน — ตารางตัดสินใจ</h2>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>สถานการณ์</th><th>ระบบยังใช้ได้?</th><th>ต้องทำอะไร</th></tr></thead>
+              <tbody>
+                <tr><td>pgpool ดับ 1 ตัว</td><td>✅ ปกติ</td><td>start กลับ แล้วเช็ค <span class="mono text-[11.5px]">show pool_nodes</span></td></tr>
+                <tr style="background:rgba(220,90,22,.06)"><td><b>pgpool ดับ 2 ตัว</b></td><td>❌ ต่อไม่ได้เลย</td><td>เอา pgpool กลับมาให้ครบ 2 ตัวโดยเร็วที่สุด — DB ไม่ได้พังแต่ไม่มีทางเข้า</td></tr>
+                <tr><td>standby ดับ 1 ตัว</td><td>✅ ปกติ</td><td>start กลับ · เฝ้า disk primary ถ้าดับนาน (§05)</td></tr>
+                <tr><td>standby ดับ 2 ตัว</td><td>✅ write ปกติ</td><td>read ทั้งหมดกองที่ primary · <b>ไม่มี standby ให้ promote แล้ว</b> ถ้า primary ดับต่อคือดับยาว</td></tr>
+                <tr style="background:rgba(220,90,22,.06)"><td><b>primary + standby 1 ตัว</b></td><td>⚠️ ขึ้นกับจังหวะ</td><td>repmgr ต้องมี standby ที่มองเห็นกันเพื่อ promote — ถ้าเหลือตัวเดียวอาจไม่ promote เอง ต้อง promote ด้วยมือ (ดูล่าง)</td></tr>
+                <tr style="background:rgba(220,90,22,.06)"><td><b>ทั้ง 3 DB node</b></td><td>❌ ดับสนิท</td><td>กู้ตามลำดับ: primary ก่อน → standby ตาม → เช็ค pgpool ตามทีหลัง</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox mb-6" style="border-color:var(--signal)">
+          <div class="rc mb-1">promote ด้วยมือ — ใช้เมื่ออัตโนมัติไม่ทำงานเท่านั้น</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mb-3">
+            ก่อนกดต้อง<b class="text-[var(--ink)]">มั่นใจว่า primary เดิมตายจริงและจะไม่ฟื้นขึ้นมาเอง</b>
+            — ถ้ามันกลับมาทีหลังโดยที่ยังคิดว่าตัวเองเป็น primary คือ split-brain และข้อมูลจะแตกเป็นสองสาย
+            ทางที่ปลอดภัยคือ<b class="text-[var(--ink)]">ปิดเครื่องเดิมให้แน่ใจก่อน</b> แล้วค่อย promote
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># 1) ตรวจก่อนว่าตัวไหนตามข้อมูลมาได้ไกลที่สุด — เลือกตัวนั้น</span>
+<span class="k">for</span> h <span class="k">in</span> ovh-ppr1 ovh-ppr2<span class="k">;</span> <span class="k">do</span>
+  <span class="k">echo</span> -n <span class="s">"$h: "</span>
+  ssh $h <span class="s">"sudo -u postgres psql -tAc 'select pg_last_wal_replay_lsn()'"</span>
+<span class="k">done</span>
+
+<span class="c"># 2) promote ตัวที่ LSN สูงกว่า</span>
+ssh &lt;ตัวที่เลือก&gt; <span class="s">"sudo -u postgres repmgr standby promote -f /etc/repmgr.conf"</span>
+
+<span class="c"># 3) สั่งอีกตัวให้ตามเจ้านายใหม่</span>
+ssh &lt;อีกตัว&gt; <span class="s">"sudo -u postgres repmgr standby follow -f /etc/repmgr.conf"</span></pre>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 REJOIN ========== -->
+      <section id="rejoin" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — กู้ node กลับเข้า cluster</div>
+        <h2 class="display text-3xl mb-6">primary เก่ากลับมาแล้ว ทำยังไงต่อ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          primary เก่า<b class="text-[var(--ink)]">กลับเข้ามาเป็น primary เองไม่ได้</b> ต้องเข้ามาเป็น standby ของเจ้านายใหม่ก่อน
+          ขั้นตอนนี้เรียก <span class="mono text-[13px]">rejoin</span> และใช้ <span class="mono text-[13px]">pg_rewind</span>
+          ย้อน transaction ที่มันเขียนไว้แต่คนอื่นไม่มี — <b class="text-[var(--ink)]">ระบบนี้พร้อมใช้ pg_rewind แล้ว</b>
+          เพราะ <span class="mono text-[12px]">data_checksums = on</span> (ตรวจแล้ว)
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ห้าม start PostgreSQL บนเครื่องเก่าก่อน rejoin</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ถ้ามัน start ขึ้นมาในฐานะ primary แม้แค่ไม่กี่วินาที ก็รับ write ได้แล้ว — ให้ปล่อยให้ service ดับไว้แล้วสั่ง rejoin
+            ซึ่งจะ start ให้เองในโหมดที่ถูกต้อง
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ลองแบบ dry-run ก่อนเสมอ</h3>
+          <div class="code p-5">
+<pre>ssh ovh-ppm <span class="s">"sudo -u postgres repmgr node rejoin -f /etc/repmgr.conf \
+  -d 'host=&lt;new-primary&gt; user=repmgr dbname=repmgr' --force-rewind --dry-run"</span></pre>
+          </div>
+          <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">--dry-run</span> บอกได้ว่าจะสำเร็จไหมโดยไม่แตะข้อมูลจริง
+            ถ้าขึ้น error เรื่อง <span class="mono text-[12px]">pg_rewind</span> หา config ไม่เจอ ให้ดูบั๊ก #29/#30 ใน
+            <a href="postgresql-pgpool-cluster-guide.html#bugs" class="underline" style="color:var(--accent)">คู่มือฉบับเต็ม</a>
+            (Debian แยก config ออกจาก data directory ต้องมี symlink)
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">รันจริง แล้วยืนยันทั้งสองชั้น</h3>
+          <div class="code p-5 mb-3">
+<pre><span class="c"># ตัดคำว่า --dry-run ออก</span>
+ssh ovh-ppm <span class="s">"sudo -u postgres repmgr node rejoin -f /etc/repmgr.conf \
+  -d 'host=&lt;new-primary&gt; user=repmgr dbname=repmgr' --force-rewind"</span>
+
+<span class="c"># ชั้นข้อมูล: ต้องเห็น 3 node running</span>
+ssh ovh-ppm <span class="s">"sudo -u postgres repmgr cluster show --compact"</span>
+
+<span class="c"># ชั้นทางเดิน: ต้องเห็น up ครบ + replication_state = streaming</span>
+psql -h &lt;vip&gt; -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span></pre>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ถ้า rejoin ไม่สำเร็จ — ทางถอยที่ใช้ได้เสมอ</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              ลบ data directory ทิ้งแล้ว clone ใหม่จาก primary ปัจจุบันด้วย
+              <span class="mono text-[12px]">repmgr standby clone</span> — ช้ากว่า (ต้องดึงข้อมูลทั้ง 20 GB ใหม่)
+              แต่ได้ผลแน่นอนกว่า อย่าเสียเวลาไล่ pg_rewind เกิน 2 รอบ
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">สลับกลับให้ ppm เป็น primary เหมือนเดิม (ไม่รีบ)</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เนื่องจาก ppm มีสเปกใหญ่กว่า (§08 ข้อ 2) ควรสลับกลับเมื่อสะดวก แต่<b class="text-[var(--ink)]">ทำในช่วงที่ไม่มี traffic</b>
+            เพราะเป็นการ failover ตั้งใจอีกรอบ — connection จะหลุดอีกครั้ง
+          </p>
+          <div class="code p-5">
+<pre>ssh ovh-ppm <span class="s">"sudo -u postgres repmgr standby switchover -f /etc/repmgr.conf --siblings-follow --dry-run"</span></pre>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 GAPS ========== -->
+      <section id="gaps" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — ช่องโหว่ที่ต้องปิด</div>
+        <h2 class="display text-3xl mb-6">เรียงตามผลกระทบต่อ HA</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2" style="color:var(--signal)">Event hook หลัง failover auth ไม่ผ่านทั้ง 3 node — ด่วนที่สุด</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">/usr/local/bin/repmgr-pgpool-reattach.sh</span> ถูกออกแบบมาให้ยิง
+            <span class="mono text-[12px]">pcp_attach_node</span> ไปที่ pgpool ทั้ง 3 ตัวหลัง promote/follow เพื่อเคลียร์สถานะค้าง
+            — ทดสอบ auth path เดียวกับที่ hook ใช้ พบว่า<b class="text-[var(--ink)]">ไม่ผ่านทั้งสามปลายทาง</b>
+          </p>
+          <div class="code p-5 mb-3">
+<pre><span class="c"># ทดสอบซ้ำได้ (อ่านอย่างเดียว ไม่เปลี่ยนสถานะ)</span>
+ssh ovh-ppm <span class="s">"for h in &lt;pgpool1&gt; &lt;pgpool2&gt; &lt;pgpool3&gt;; do
+  sudo -u postgres env HOME=/var/lib/postgresql \
+    pcp_node_info -h \$h -p 9898 -U pgpool_admin -w -n 0 2>&1 | head -1
+done"</span>
+<span class="c"># ตอนนี้ได้: FATAL: authentication failed for user \"pgpool_admin\" ทั้ง 3 บรรทัด</span></pre>
+          </div>
+          <div class="rulebox" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ผลกระทบจริง</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              hook เขียนด้วย <span class="mono text-[12px]">|| true</span> ทุกบรรทัด แปลว่ามัน<b class="text-[var(--ink)]">ล้มเหลวแบบเงียบสนิท</b>
+              ไม่มี error ไม่มี alert · failover ยังทำงาน แต่ถ้าเจอเคสที่ pgpool มาร์ค backend ค้าง down
+              (ซึ่งเคยเกิดตอน primary ตายจริงเมื่อ 2026-08-09) จะไม่มีอะไรเคลียร์ให้ ต้องมีคนกดเอง
+              <br><b class="text-[var(--ink)]">วิธีแก้:</b> standardize รหัส PCP ให้ตรงกันทั้ง 3 pgpool node แล้ววาง
+              <span class="mono text-[12px]">.pcppass</span> ที่ตรงกันให้ user ที่ hook รันอยู่ — เคยแก้มาแล้วในบั๊ก #32/#37 แต่ drift กลับมา
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2" style="color:var(--signal)">standby มีสเปกครึ่งเดียวของ primary</h3>
+          <div class="card overflow-hidden mb-3">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>Node</th><th>RAM</th><th>CPU</th><th>บทบาท</th></tr></thead>
+                <tbody>
+                  <tr><td>ppm</td><td><b>6.9 GB</b></td><td><b>4 core</b></td><td>primary</td></tr>
+                  <tr><td>ppr1</td><td>3.9 GB</td><td>2 core</td><td>standby · ตัวที่จะขึ้นแทน</td></tr>
+                  <tr><td>ppr2</td><td>3.9 GB</td><td>2 core</td><td>standby · ตัวที่จะขึ้นแทน</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            HA ที่แท้จริงแปลว่า "ล้มแล้วยังรับงานเท่าเดิมได้" — สภาพนี้คือ failover สำเร็จแต่<b class="text-[var(--ink)]">กำลังหายครึ่งหนึ่งทันที</b>
+            บน DB ที่ใหญ่ 20 GB ซึ่งพึ่ง OS page cache เป็นหลัก การมี RAM น้อยลงครึ่งแปลว่า cache hit ตกและ I/O พุ่ง
+            พอดีกับตอนที่ระบบกำลังเครียดที่สุด · <b class="text-[var(--ink)]">แก้:</b> ปรับ RAM/CPU ของ replica ให้เท่า primary
+            (ดูเรื่อง Proxmox balloon ใน §13 ของคู่มือฉบับเต็มประกอบ)
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ไม่มี WAL archive — มีแค่ replication ไม่มี PITR</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">archive_mode = off</span> แปลว่า<b class="text-[var(--ink)]">กู้ย้อนเวลาไม่ได้</b>
+            replication ป้องกันเครื่องพัง แต่ไม่ป้องกัน <span class="mono text-[12px]">DELETE</span> ผิดตาราง —
+            คำสั่งลบจะถูก replicate ไปทั้ง 3 node ภายในมิลลิวินาที ถ้าไม่มี backup แยกก็คือหายถาวร
+            <b class="text-[var(--ink)]">ต้องยืนยันว่ามี logical backup (<span class="mono text-[12px]">pg_dump</span>) นอกคลัสเตอร์
+            และเคยทดสอบ restore จริง</b> ไม่งั้นถือว่าไม่มี backup
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2"><span class="mono text-[14px]">priority</span> เท่ากันหมด — เลือกไม่ได้ว่าใครขึ้น</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ทั้ง 3 node ตั้ง <span class="mono text-[12px]">priority=100</span> ตอนนี้ยังไม่เป็นปัญหาเพราะ ppr1/ppr2 สเปกเท่ากัน
+            แต่ทันทีที่แก้ข้อ 2 หรือเพิ่ม node ที่ตั้งใจให้เป็น reporting replica ควรตั้งให้ต่างกัน
+            เพื่อ<b class="text-[var(--ink)]">คุมได้ว่าตัวไหนควรขึ้นเป็น primary</b> (เลขสูงกว่าชนะ · ตั้ง 0 = ห้าม promote)
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">5</span>
+          <h3 class="font-semibold text-[16px] mb-2">Monitoring มองไม่เห็น failover</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            exporter ของ pgpool auth ไม่ผ่านบน 2 ใน 3 node ทำให้ <span class="mono text-[12px]">pgpool_watchdog_is_leader</span>
+            เป็น 0 ทุกที่ — <b class="text-[var(--ink)]">Grafana บอกไม่ได้ด้วยซ้ำว่าตอนนี้ใครถือ VIP</b> ซึ่งเป็นข้อมูลชิ้นแรกที่ต้องการตอนเกิดเหตุ
+            · alert ที่ควรมีอย่างน้อย: <span class="mono text-[12px]">status != pg_status</span> เกิน 1 นาที ·
+            <span class="mono text-[12px]">scrape_success == 0</span> · จำนวน primary != 1
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 09 DRILL ========== -->
+      <section id="drill" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — การซ้อม</div>
+        <h2 class="display text-3xl mb-6">แผนที่ไม่เคยซ้อม = แผนที่ยังไม่มี</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          บั๊กเกือบทุกข้อในระบบนี้ถูกเจอจาก kill-test ไม่ใช่จากการอ่าน config — เพราะทุกอย่าง
+          "ดูเหมือนทำงานได้" จนกว่าจะลองจริง ซ้อมไล่จากที่เสี่ยงน้อยไปมาก และ<b class="text-[var(--ink)]">หยุดทันทีถ้าข้อไหนไม่ผ่าน</b>
+        </p>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th style="width:34px">#</th><th>ซ้อมอะไร</th><th>วิธี</th><th>ผ่าน = </th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td>PCP auth ใช้ได้ทุกเส้นทาง</td><td>คำสั่งใน §08 ข้อ 1</td><td>ได้ข้อมูล node ครบ 3 บรรทัด ไม่มี FATAL</td></tr>
+                <tr><td>2</td><td>standby ฟื้นเองหลัง restart</td><td><span class="mono text-[11.5px]">systemctl restart postgresql@18-main</span> บน <b>standby</b></td><td>กลับเป็น <span class="mono text-[11.5px]">up</span> เองใน ~30 วิ ไม่ต้อง attach มือ</td></tr>
+                <tr><td>3</td><td>VIP ย้ายเมื่อ leader ดับ</td><td><span class="mono text-[11.5px]">systemctl stop pgpool2</span> บน node ที่ถือ VIP</td><td>VIP โผล่ที่ node priority รองลงมาใน ~10 วิ</td></tr>
+                <tr style="background:rgba(220,90,22,.04)"><td>4</td><td><b>primary ตายจริง</b></td><td>ปิด VM ของ primary (ไม่ใช่ stop service)</td><td>promote สำเร็จ &lt; 60 วิ · <span class="mono text-[11.5px]">show pool_nodes</span> เห็น primary ใหม่</td></tr>
+                <tr style="background:rgba(220,90,22,.04)"><td>5</td><td><b>กู้ node เก่ากลับ</b></td><td><span class="mono text-[11.5px]">repmgr node rejoin --force-rewind</span></td><td>กลับมาเป็น standby · <span class="mono text-[11.5px]">streaming</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1">กติกาการซ้อม</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ทำนอกเวลาให้บริการเสมอ · <b class="text-[var(--ink)]">แก้ข้อ 1 ให้ผ่านก่อนซ้อมข้อ 4</b> ไม่งั้นจะเจอสถานะค้างที่ไม่มีอะไรเคลียร์ให้ ·
+            จดเวลาจริงที่ใช้ทุกครั้งแล้วเทียบกับตัวเลขใน §03 ถ้าช้าลงมากแปลว่ามีอะไรเปลี่ยน ·
+            <b class="text-[var(--ink)]">ข้อ 2 กับ 3 ปลอดภัยพอที่จะทำได้ทุกเดือน</b> ส่วนข้อ 4–5 อย่างน้อยไตรมาสละครั้ง
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 10 TRIAGE ========== -->
+      <section id="triage" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — Triage สำหรับ Junior</div>
+        <h2 class="display text-3xl mb-6">"แอปต่อ DB ไม่ได้" — เริ่มจากตรงนี้</h2>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+flowchart TD
+    A["แอปต่อ DB ไม่ได้"] --> B{"show pool_nodes<br/>ผ่าน VIP ตอบไหม"}
+    B -->|"ไม่ตอบ / connection refused"| C{"ใครถือ VIP อยู่"}
+    C -->|"ไม่มีใครถือ"| D["pgpool เหลือ &lt; 2 ตัว = ไม่มี quorum<br/>→ เอา pgpool กลับมาให้ครบ 2 (เคส B)"]
+    C -->|"มี node ถือ"| E["pgpool ตอบไม่ได้เพราะ backend down หมด<br/>→ Runbook 01"]
+    B -->|"ตอบได้"| F{"มีแถว role = primary ไหม"}
+    F -->|"ไม่มี"| G["pgpool หา primary ไม่เจอ<br/>→ repmgr cluster show ว่า promote สำเร็จไหม (เคส A)"]
+    F -->|"มี"| H{"status ตรงกับ pg_status ทุกแถวไหม"}
+    H -->|"ไม่ตรง (down/up)"| I["สถานะค้าง → pcp_attach_node ครบ 3 node<br/>Runbook 01"]
+    H -->|"ตรงหมด"| J["DB ปกติ — ปัญหาอยู่ฝั่งแอป<br/>เช็ค credential / .env / connection pool"]
+</pre>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">สามคำสั่งแรกที่ต้องรัน ไม่ว่าเจอปัญหาอะไร</div>
+        <div class="code p-5 mb-6">
+<pre><span class="c"># 1) pgpool คิดว่าอะไรเป็นยังไง</span>
+psql -h &lt;vip&gt; -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span>
+
+<span class="c"># 2) repmgr คิดว่าอะไรเป็นยังไง</span>
+ssh ovh-ppm <span class="s">"sudo -u postgres repmgr cluster show --compact"</span>
+
+<span class="c"># 3) ใครถือ VIP</span>
+<span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
+  <span class="k">echo</span> -n <span class="s">"$h: "</span>; ssh $h <span class="s">"ip -4 -o addr show | grep -c '&lt;vip&gt;'"</span>
+<span class="k">done</span></pre>
+        </div>
+
+        <div class="rulebox ok mb-6">
+          <div class="rc mb-1">วิธีอ่าน 3 คำสั่งนี้ให้เป็น</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            มันคือ<b class="text-[var(--ink)]">สาม "ความเห็น" ที่อาจไม่ตรงกัน</b> — pgpool เห็นอย่างหนึ่ง repmgr เห็นอีกอย่าง
+            และ VIP อยู่อีกที่หนึ่ง <b class="text-[var(--ink)]">ปัญหาเกือบทั้งหมดของระบบนี้คือ "สามความเห็นไม่ตรงกัน" ไม่ใช่ "ของพังจริง"</b>
+            ถ้าทั้งสามตรงกันแล้วแอปยังต่อไม่ได้ ให้เลิกสงสัย DB แล้วไปดูฝั่งแอปแทน
+          </p>
+        </div>
+
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>เห็นแบบนี้</th><th>แปลว่า</th><th>ไปที่</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[11.5px]">status=down</span> แต่ <span class="mono text-[11.5px]">pg_status=up</span> · node เดียว</td><td>สถานะค้าง auto_failback ไม่ทำงาน</td><td><a href="runbook-standby-stuck-down.html" class="underline" style="color:var(--accent)">Runbook 04</a></td></tr>
+                <tr><td><span class="mono text-[11.5px]">down</span> ทั้ง 3 node</td><td>pgpool มองไม่เห็น primary เลย</td><td><a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01</a></td></tr>
+                <tr><td><span class="mono text-[11.5px]">replication_state</span> ว่าง</td><td><span class="mono text-[11.5px]">backend_application_name</span> ไม่แมตช์</td><td>บั๊ก #39 ในคู่มือฉบับเต็ม</td></tr>
+                <tr><td><span class="mono text-[11.5px]">authentication failed ... does not exist in backend</span></td><td>role ไม่ได้อยู่ใน <span class="mono text-[11.5px]">pool_passwd</span> (ไม่ใช่รหัสผิด)</td><td><a href="pgpool-access-control-hardening.html" class="underline" style="color:var(--accent)">Access Control §05</a></td></tr>
+                <tr><td>ไม่มีใครถือ VIP</td><td>quorum ไม่ครบ</td><td>เคส B (§04)</td></tr>
+                <tr><td>primary 2 ตัวใน <span class="mono text-[11.5px]">cluster show</span></td><td><b>split-brain</b></td><td><b>หยุดทุกอย่าง escalate ทันที</b> — อย่าแก้เอง</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">สามข้อที่ห้ามทำ ถ้าไม่แน่ใจ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b>1.</b> อย่า <span class="mono text-[12px]">start</span> PostgreSQL บน node ที่เพิ่งดับ ถ้ายังไม่รู้ว่ามี primary ตัวใหม่หรือยัง — เสี่ยง split-brain ·
+            <b>2.</b> อย่า restart pgpool หลายตัวพร้อมกัน — จะทำ quorum หลุดแล้ว VIP ตกทั้งที่ DB ยังดีอยู่ ·
+            <b>3.</b> อย่าแก้ <span class="mono text-[12px]">.env</span> ให้ชี้ IP ของ node ตรงๆ เพื่อ "แก้ขัด" — ตอน failover รอบหน้ามันจะชี้ผิดและหาสาเหตุยากมาก
+            (เคยเกิดมาแล้ว: <span class="mono text-[12px]">.env</span> ชี้ตรงไป primary เดิมค้างไว้หลัง failover ทำให้ write ยิงเข้า standby)
+          </p>
+        </div>
+
+        <div class="rulebox mt-5">
+          <div class="rc mb-1">อ่านต่อ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <a href="postgresql-pgpool-cluster-guide.html" class="underline" style="color:var(--accent)">Pgpool-II Cluster Guide</a> — สถาปัตยกรรม, config ทุกบรรทัด, บั๊ก 40 ข้อ ·
+            <a href="runbook.html" class="underline" style="color:var(--accent)">Runbook Index</a> — ขั้นตอนรับมือรายเคส ·
+            <a href="pgpool-access-control-hardening.html" class="underline" style="color:var(--accent)">Access Control Hardening</a> — เรื่อง auth และสิทธิ์
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · HA &amp; FAILOVER OPERATIONS"
+        line2="verified against live cluster 2026-08-31">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
