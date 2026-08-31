@@ -453,6 +453,7 @@
               <span class="chip" style="color:var(--signal)">bundle_items</span>
               <span class="chip">purchase_returns</span><span class="chip">purchase_return_items</span>
               <span class="chip">purchase_return_number_counters</span>
+              <span class="chip">sales_return_receipts</span><span class="chip">sales_return_receipt_allocations</span>
             </div>
           </div>
 
@@ -476,7 +477,7 @@
               <div><h3 class="font-semibold text-[17px] mono">sales-bc</h3><p class="text-[13px] text-[var(--muted)]">Sales</p></div>
               <span class="tag-db">db: sales</span>
             </div>
-            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ลูกค้า, ใบเสนอราคา, ใบสั่งขาย และใบส่งของ (<b>ทริกเกอร์การตัดสต็อก</b>)</p>
+            <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ลูกค้า, ใบเสนอราคา, ใบสั่งขาย, ใบส่งของ (<b>ทริกเกอร์การตัดสต็อก</b>) และใบรับคืนสินค้าจากลูกค้า</p>
             <div class="flex flex-wrap gap-1.5">
               <span class="chip">customers</span><span class="chip">customer_groups</span>
               <span class="chip">quotations</span><span class="chip">quotation_items</span>
@@ -485,6 +486,8 @@
               <span class="chip">delivery_notes</span><span class="chip">delivery_note_items</span>
               <span class="chip">quotation_number_counters</span><span class="chip">sales_order_number_counters</span>
               <span class="chip">delivery_note_number_counters</span>
+              <span class="chip">sales_returns</span><span class="chip">sales_return_items</span>
+              <span class="chip">sales_return_number_counters</span>
             </div>
           </div>
 
@@ -1025,6 +1028,9 @@ sequenceDiagram
                 <tr><td>finance-bc → sales-bc</td><td>RPC <span class="mono text-[12px]">getCustomerOutstanding</span></td><td>ยอดหนี้ค้างชำระของลูกค้า → sales-bc เอาไปรวมกับมูลค่าออเดอร์ที่ยังไม่ส่ง เพื่อตรวจวงเงินเครดิตก่อนยืนยันใบสั่งขาย (เกิน = กันไว้รอผู้จัดการขายอนุมัติ)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>sales-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getDeliveryNoteItemById</span></td><td>บรรทัดใบส่งของ 1 บรรทัด (สถานะใบ + ลูกค้า + สินค้า + จำนวนที่ส่ง) → finance-bc ใช้ตรวจว่าใบกำกับที่อ้างใบส่งของนั้นอ้างจริง — ภาพสะท้อนของ <span class="mono text-[12px]">getGoodsReceiptItemById</span> ฝั่งซื้อ</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>inventory-bc → report-bc</td><td>event <span class="mono text-[12px]">stock.low</span></td><td>คู่ (สินค้า, คลัง) ที่ต่ำกว่า <span class="mono text-[12px]">reorder_levels.alert_qty</span> — job กลางคืน 02:00 (Asia/Bangkok) ยิงเป็นชุดละ 500 แถว พร้อม <span class="mono text-[12px]">chunk_index</span>/<span class="mono text-[12px]">chunk_count</span> · ยอดคงเหลือนับเฉพาะล็อตที่ยังขายได้ (ไม่หมดอายุ) และสินค้าที่ไม่มีของเลยก็ขึ้นเตือน · เดิม <span class="mono text-[12px]">reorder_levels</span> เป็น master data ที่ไม่มีอะไรอ่าน</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>Delivery → Sales Return</td><td>เอกสารรับคืน (ใน sales-bc)</td><td>อ้าง <span class="mono text-[12px]">dn_item_id</span> รายบรรทัด — สินค้า/ลูกค้า/ใบสั่งขาย/คลัง/ราคา derive จากบรรทัดใบส่งของทั้งหมด ไม่รับจาก client · ตรวจจำนวน 2 ชั้น (sales-bc เทียบยอดที่ส่ง, inventory-bc เทียบล็อตจริง) · <span class="mono text-[12px]">sales_order_items.returned_qty</span> ทำให้สถานะใบสั่งขายพลิก CLOSED กลับเป็น PARTIAL ได้</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>sales-bc → inventory-bc</td><td>RPC <span class="mono text-[12px]">confirmSalesReturn</span> / <span class="mono text-[12px]">reverseSalesReturn</span></td><td>ของกลับเข้า<b>ล็อตเดิมที่ใบส่งของตัดออกไป</b> ด้วยต้นทุนตอนตัดออก (อ่านจากรายการ ISSUE ในสต็อกเลดเจอร์) — ไม่ใช่ FIFO และไม่ใช่ต้นทุนวันนี้ · idempotent ต่อบรรทัดผ่าน <span class="mono text-[12px]">sales_return_receipts</span> · การยกเลิกล้มเหลวได้จริงถ้าของถูกขายออกไปอีกแล้ว</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>inventory-bc → finance-bc</td><td>event <span class="mono text-[12px]">sales_return.received</span></td><td>ต้นทุนรายล็อตของที่คืน → finance-bc กลับ COGS <b>เฉพาะส่วนที่คืน</b> โดยลดแถว <span class="mono text-[12px]">cogs_entries</span> เดิม (แถวติดลบมีอยู่ไม่ได้ตาม CHECK) และโพสต์ journal กลับด้านผูกกับบรรทัดใบส่งของ — คนละ event กับ <span class="mono text-[12px]">stock.deduction_reversed</span> ที่ล้างทั้งการขาย</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>inventory-bc → supplier-bc</td><td>RPC <span class="mono text-[12px]">applyPurchaseReturn</span></td><td>เพิ่ม <span class="mono text-[12px]">returned_qty</span> (idempotent ด้วย <span class="mono text-[12px]">return_item_id</span>) — สถานะ PO คิดจากยอดสุทธิ <span class="mono text-[12px]">received_qty − returned_qty</span> จึงพลิก RECEIVED กลับเป็น PARTIAL ได้</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>sales-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getCustomerById</span></td><td>ชื่อ + เลขผู้เสียภาษีลูกค้า → <b>snapshot</b> ลงเอกสาร (§86/4(2) บังคับให้พิมพ์บนใบกำกับภาษีเต็มรูป/ใบแจ้งหนี้+ใบกำกับ)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>inventory-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getProductById</span></td><td>sku/ชื่อ + <span class="mono text-[12px]">tax_category.vat_treatment</span> → snapshot ต่อบรรทัด</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>

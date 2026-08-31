@@ -289,6 +289,7 @@
                 <span class="evt evt-emit">stock.deducted</span>
                 <span class="evt evt-emit">stock.adjusted</span>
                 <span class="evt evt-emit">stock.low</span>
+                <span class="evt evt-emit">sales_return.received</span>
                 <span class="evt evt-emit">expiry.approaching</span>
                 <span class="evt evt-emit">item.updated</span>
               </div>
@@ -299,6 +300,7 @@
                 <span class="evt evt-listen">po.received ← supplier</span>
                 <span class="evt evt-listen">delivery.confirmed ← sales</span>
                 <span class="evt evt-tcp">checkAvailability (TCP) ← sales</span>
+                <span class="evt evt-tcp">confirmSalesReturn (TCP) ← sales</span>
                 <span class="evt evt-tcp">getItemUom (TCP) ← supplier · sales</span>
               </div>
             </div>
@@ -311,6 +313,8 @@
                 <tr><td>lot.created</td><td>inventory-bc</td><td>report-bc (inventory summary)</td></tr>
                 <tr><td>expiry.approaching</td><td>inventory-bc</td><td>report-bc · notification</td></tr>
                 <tr><td>stock.low</td><td>inventory-bc</td><td>report-bc · notification</td></tr>
+                <tr><td>sales_return.received</td><td>inventory-bc</td><td>finance-bc (กลับ COGS เฉพาะส่วนที่คืน) · report-bc</td></tr>
+                <tr><td>sales_return.reversed</td><td>inventory-bc</td><td>finance-bc · report-bc</td></tr>
                 <tr><td>item.updated</td><td>inventory-bc</td><td>report-bc (ชื่อ/หมวดหมู่/ยี่ห้อ denormalized) · sales-bc, supplier-bc (cache)</td></tr>
               </tbody>
             </table>
@@ -467,6 +471,23 @@ erDiagram
         int qty
         decimal unit_cost "carried"
     }
+    SALES_RETURN_RECEIPTS {
+        uuid id PK
+        uuid source_doc_id "sales-bc sales_return_items.id — the idempotency key"
+        uuid dn_item_id "sales-bc delivery_note_items.id — what the return is matched against"
+        uuid product_id FK
+        uuid warehouse_id FK
+        int qty
+        decimal total_cost "at the cost the original ISSUE booked"
+        timestamptz reversed_at "null = still in effect"
+    }
+    SALES_RETURN_RECEIPT_ALLOCATIONS {
+        uuid id PK
+        uuid receipt_id FK
+        uuid lot_id FK "always a lot the original delivery issued from"
+        int qty
+        decimal unit_cost "copied from the original ISSUE movement"
+    }
     REORDER_LEVELS {
         uuid id PK
         uuid product_id FK
@@ -525,6 +546,8 @@ erDiagram
     LOTS ||--o{ STOCK_ENTRY_ITEMS : "moves / repacks"
     WAREHOUSES ||--o{ STOCK_ENTRIES : "from / to"
     PRODUCTS ||--o| REORDER_LEVELS : has
+    SALES_RETURN_RECEIPTS ||--o{ SALES_RETURN_RECEIPT_ALLOCATIONS : "splits per lot"
+    LOTS ||--o{ SALES_RETURN_RECEIPT_ALLOCATIONS : "credited back into"
     PRODUCTS ||--o{ ITEM_PRICES : "priced in"
     PRICE_LISTS ||--o{ ITEM_PRICES : contains
     UOMS ||--o{ ITEM_PRICES : "quoted per"
