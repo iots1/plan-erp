@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pgpool Access Control Hardening (pool_hba.conf) — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="🔒" title="Access Control" subtitle="PGPOOL · POOL_HBA HARDENING" width="280">
+    <nav slot="nav">
+      <a href="#layers"     class="navlink"><span class="n">01</span> สามชั้นที่มักสับสน</a>
+      <a href="#semantics"  class="navlink"><span class="n">02</span> กฎการอ่านไฟล์</a>
+      <a href="#antipattern" class="navlink"><span class="n">03</span> Anti-Pattern</a>
+      <a href="#target"     class="navlink"><span class="n">04</span> Config เป้าหมาย</a>
+      <a href="#roles"      class="navlink"><span class="n">05</span> แยก Role · pool_passwd</a>
+      <a href="#beyond"     class="navlink"><span class="n">06</span> ชั้นนอก pool_hba</a>
+      <a href="#verify"     class="navlink"><span class="n">07</span> Checklist ตรวจสอบ</a>
+    </nav>
+    <div slot="footnote">
+      <a href="postgresql-pgpool-cluster-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Pgpool-II Cluster Guide</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="postgresql-pgpool-cluster-guide.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Pgpool-II Cluster Guide
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Security Hardening Guide</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Pgpool Access Control<br>
+          <span class="text-[#7FE3DE]">pool_hba.conf</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          <span class="mono text-[13px] text-white">pool_hba.conf</span> คือประตูบานแรกและบานเดียวที่เห็น IP จริงของ client
+          — <b class="text-white font-medium">การรัด <span class="mono text-[13px]">pg_hba.conf</span> ให้แน่นแค่ไหนก็ไม่ช่วย</b>
+          เพราะ PostgreSQL เห็นแค่ IP ของ pgpool เอกสารนี้คือแนวทางตั้งค่าให้ถูกตั้งแต่แรก
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>First-match-wins · No fall-through</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Least Privilege Role</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Defense in Depth</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <div class="rulebox mt-12" style="border-color:var(--signal)">
+        <div class="rc mb-1" style="color:var(--signal)">เอกสารนี้ไม่มี IP จริงเลย — ตั้งใจ</div>
+        <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+          ทุกที่อยู่ในหน้านี้เป็น <b class="text-[var(--ink)]">placeholder</b> แบบ <span class="mono text-[12px]">&lt;ชื่อ&gt;</span>
+          หรือช่วง <span class="mono text-[12px]">192.0.2.0/24</span> / <span class="mono text-[12px]">198.51.100.0/24</span>
+          ซึ่งเป็นช่วงสำหรับเอกสารตาม RFC 5737 (ไม่มีอยู่จริงบนอินเทอร์เน็ต) — คัดลอกไปใช้ต้องแทนค่าจริงเองเสมอ
+          ห้าม commit ค่าจริงกลับเข้าเอกสารนี้ เพราะ repo นี้เป็น public repo
+        </p>
+      </div>
+
+      <!-- ========== 01 LAYERS ========== -->
+      <section id="layers" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — สามชั้นที่มักสับสน</div>
+        <h2 class="display text-3xl mb-6">PostgreSQL ไม่เคยเห็น IP ของ client เลย</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          นี่คือความเข้าใจผิดที่ทำให้คนคิดว่าระบบปลอดภัยทั้งที่ไม่ — เมื่อมี pgpool คั่นกลาง
+          connection ที่ไปถึง PostgreSQL <b class="text-[var(--ink)]">มี source IP เป็นของ pgpool node เสมอ</b>
+          ไม่ใช่ของ client ตัวจริง เพราะฉะนั้น <span class="mono text-[13px]">pg_hba.conf</span> จะรัดยังไงก็กรอง client ภายนอกไม่ได้
+        </p>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+flowchart LR
+    C["Client<br/>(app / psql)"] -->|"ชั้น 1<br/>pool_hba.conf<br/>เห็น IP จริงของ client"| P["Pgpool"]
+    P -->|"ชั้น 2<br/>pool_passwd<br/>pgpool ยืนยันตัวแทน client"| B["PostgreSQL<br/>backend"]
+    B -.->|"ชั้น 3<br/>pg_hba.conf<br/>เห็นแค่ IP ของ pgpool"| B
+</pre>
+        </div>
+
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>ชั้น</th><th>ไฟล์</th><th>ตัดสินอะไร</th><th>เห็น IP ของใคร</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td><span class="mono text-[12px]">pool_hba.conf</span></td><td>client คนนี้ต่อเข้า pgpool ได้ไหม ด้วยวิธีไหน</td><td><b>client จริง</b></td></tr>
+                <tr><td>2</td><td><span class="mono text-[12px]">pool_passwd</span></td><td>pgpool จะ auth ต่อ backend แทน client ยังไง</td><td>—</td></tr>
+                <tr><td>3</td><td><span class="mono text-[12px]">pg_hba.conf</span></td><td>pgpool node ต่อเข้า PostgreSQL ได้ไหม</td><td><b>pgpool node</b> เท่านั้น</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">เช็คก่อนอย่างอื่นทั้งหมด: <span class="mono text-[12px]">enable_pool_hba</span> ต้องเป็น on</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ถ้า <span class="mono text-[12px]">enable_pool_hba = off</span> ตัวไฟล์ <span class="mono text-[12px]">pool_hba.conf</span>
+            <b class="text-[var(--ink)]">จะถูกเมินทั้งไฟล์</b> — ไม่มี error ไม่มี warning และกฎทุกบรรทัดที่อุตส่าห์เขียนไว้กลายเป็นความว่างเปล่า
+            ยืนยันจากค่าที่ pgpool โหลดอยู่จริง ไม่ใช่จากไฟล์ config:
+          </p>
+          <div class="code p-5 mt-3">
+<pre>psql -h &lt;pgpool-host&gt; -p &lt;port&gt; -U &lt;admin-user&gt; -tAc <span class="s">"show pool_status;"</span> \
+  | grep enable_pool_hba</pre>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 SEMANTICS ========== -->
+      <section id="semantics" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — กฎการอ่านไฟล์</div>
+        <h2 class="display text-3xl mb-6">สี่กฎที่ต้องรู้ก่อนแตะไฟล์นี้</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">First match wins · ไม่มี fall-through · ไม่แมตช์ = ปฏิเสธ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            แถวแรกที่ตรงทั้ง type + address + database + user จะถูกใช้ทันที และ<b class="text-[var(--ink)]">ถ้า auth ด้วยแถวนั้นแล้วไม่ผ่าน
+            จะไม่ไปลองแถวถัดไป</b> ส่วนถ้าไม่มีแถวไหนตรงเลย pgpool ปฏิเสธเอง
+          </p>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ผลที่ตามมาที่สำคัญที่สุดของทั้งเอกสารนี้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              วิธีปิดช่องโหว่คือ <b class="text-[var(--ink)]">ลบแถวที่กว้างเกินไปทิ้ง</b> ไม่ใช่ไปเพิ่มแถว deny ต่อท้าย
+              — เพราะ default คือ deny อยู่แล้ว การเติม deny ท้ายไฟล์ไม่มีผลอะไรเลยถ้าแถวกว้างๆ ยังอยู่ข้างบน
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ลำดับสำคัญกว่าเนื้อหา — <span class="mono text-[14px]">reject</span> ต้องอยู่ก่อน</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">reject</span> เป็น method ที่ pgpool รองรับ (พร้อมกับ
+            <span class="mono text-[12px]">trust</span>, <span class="mono text-[12px]">md5</span>,
+            <span class="mono text-[12px]">scram-sha-256</span>, <span class="mono text-[12px]">pam</span>)
+            ใช้ปิดเฉพาะ user บางตัวจากบางที่ แต่ต้องวางให้ถูกลำดับ
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># ✅ ถูก — reject โดนตรวจก่อน</span>
+host  all  &lt;superuser&gt;  0.0.0.0/0        reject
+host  all  all          0.0.0.0/0        scram-sha-256
+
+<span class="c"># ❌ ผิด — แถวบนแมตช์ก่อน reject ไม่มีวันถูกอ่าน</span>
+host  all  all          0.0.0.0/0        scram-sha-256
+host  all  &lt;superuser&gt;  0.0.0.0/0        reject</pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ไม่มี group — ต่างจาก pg_hba.conf ตรงนี้</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            pgpool ไม่รู้จัก role membership ใน PostgreSQL จึง<b class="text-[var(--ink)]">ไม่รองรับ <span class="mono text-[12px]">+groupname</span>
+            ในช่อง user และไม่รองรับ <span class="mono text-[12px]">samegroup</span> ในช่อง database</b>
+            ต้องระบุชื่อเป็นรายตัวหรือคั่นด้วย comma ถ้ามีหลาย role ให้ใช้ไฟล์แยกด้วย <span class="mono text-[12px]">@</span>
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># ระบุตรงๆ หรือคั่น comma</span>
+host  &lt;db-name&gt;  &lt;app-role-a&gt;,&lt;app-role-b&gt;  &lt;cidr&gt;  scram-sha-256
+
+<span class="c"># หรือดึงรายชื่อจากไฟล์แยก (ดูแลง่ายกว่าเมื่อมีหลาย service)</span>
+host  &lt;db-name&gt;  @app-roles.txt             &lt;cidr&gt;  scram-sha-256</pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">อย่าเชื่อว่า reload พอ — ทดสอบด้วย connection จริงเสมอ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ไฟล์ <span class="mono text-[12px]">pool_hba.conf.sample</span> ที่มากับ package ระบุว่า
+            <i>"This file is read on pgpool startup. If you edit the file on a running system, you have to restart the pgpool
+            for the changes to take effect."</i> — ต่างจาก <span class="mono text-[12px]">pgpool.conf</span> หลายพารามิเตอร์ที่ reload พอ
+          </p>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ทำไมข้อนี้อันตราย</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              ถ้าคุณแก้ไฟล์ให้แน่นขึ้นแล้ว <span class="mono text-[12px]">reload</span> แล้วเชื่อว่าจบ — อาจกำลังเปิดช่องอยู่โดยไม่รู้ตัว
+              <b class="text-[var(--ink)]">พิสูจน์ด้วยการต่อจริงเสมอ</b> (ดู §07) และถ้าจำเป็นต้อง restart ให้รู้ไว้ว่า
+              <b class="text-[var(--ink)]">connection ที่ค้างอยู่จะหลุดทั้งหมด</b> ต้องวางแผนจังหวะ — restart node ที่ถือ VIP เป็นตัวสุดท้ายเสมอ
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 ANTI-PATTERN ========== -->
+      <section id="antipattern" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — Anti-Pattern</div>
+        <h2 class="display text-3xl mb-6">เจ็ดแบบที่เจอบ่อย เรียงตามความอันตราย</h2>
+
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th style="width:34px">#</th><th>รูปแบบ</th><th>ทำไมอันตราย</th><th>แทนด้วย</th></tr></thead>
+              <tbody>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>1</td>
+                  <td><span class="mono text-[11.5px]">host all all 0.0.0.0/0 scram-sha-256</span></td>
+                  <td>เปิดให้ทุก IP บนโลกลองรหัสได้ไม่จำกัดครั้ง — <span class="mono text-[11.5px]">scram</span> กันการดักฟังได้ แต่ไม่ได้กันการเดา ยิ่งถ้า user ที่โดนเดาเป็น superuser ก็คือเดิมพันทั้งคลัสเตอร์</td>
+                  <td>ลบทิ้ง แล้วระบุ CIDR ที่เจาะจง — หรือถ้าจำเป็นต้องเปิดกว้างจริงๆ ต้องมี <span class="mono text-[11.5px]">reject</span> ปิด superuser ไว้ก่อน (§04)</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>2</td>
+                  <td><span class="mono text-[11.5px]">host all all 127.0.0.1/32 <b>trust</b></span><br><span class="mono text-[11.5px]">local all all <b>trust</b></span></td>
+                  <td><b>ใครก็ตามที่มี shell บน pgpool node เป็น superuser ของทุก DB ได้ทันทีโดยไม่ต้องรู้รหัส</b> — รวมถึง service account ที่ถูกยึด, deploy user, หรือ process ที่หลุดมา ไม่ต้องผ่านอะไรเลยสักชั้น</td>
+                  <td><span class="mono text-[11.5px]">scram-sha-256</span> — cost แทบไม่มี แต่ปิดช่องยกระดับสิทธิ์ที่ใหญ่ที่สุดในเครื่อง</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>3</td>
+                  <td>application ต่อด้วย role <b>superuser</b></td>
+                  <td>credential ตัวเดียวรั่ว = อ่าน/เขียน/ลบได้ทุก DB, ปิด audit, สร้าง extension, อ่านไฟล์บน host ได้ — และ <span class="mono text-[11.5px]">pool_hba</span> แยกไม่ออกว่า connection ไหนคือ "แอป" ไหนคือ "แอดมิน" เพราะเป็น user เดียวกัน</td>
+                  <td>role แยกต่อ service ตาม least privilege (§05) — ทำให้ <span class="mono text-[11.5px]">reject</span> superuser จากภายนอกเป็นไปได้</td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>whitelist <b>IP บ้าน / dynamic</b> แบบ <span class="mono text-[11.5px]">/32</span></td>
+                  <td>พังเงียบวันที่ ISP เปลี่ยน IP ให้ — และคนแก้มักจะ "ขยายให้กว้างขึ้น" เป็น prefix ของ ISP ซึ่งเท่ากับเปิดให้ลูกค้าหลายหมื่นรายของ ISB นั้น ไม่ต่างจากข้อ 1</td>
+                  <td>ให้ตัวตนมาจาก <b>credential/tunnel</b> ไม่ใช่จาก IP — VPN/tunnel ทำให้ client โผล่มาจาก CIDR ภายในที่นิ่ง (§06)</td>
+                </tr>
+                <tr>
+                  <td>5</td>
+                  <td>คิดว่า <span class="mono text-[11.5px]">pg_hba.conf</span> กรอง client ให้แล้ว</td>
+                  <td>PostgreSQL เห็น source IP เป็นของ pgpool ทุก connection — กฎ CIDR ใน pg_hba จึงไม่มีผลกับ client ภายนอกเลยสักข้อ (§01)</td>
+                  <td>ย้ายกฎ CIDR ของ client ทั้งหมดมาไว้ที่ <span class="mono text-[11.5px]">pool_hba.conf</span> ส่วน pg_hba ให้แคบลงเหลือแค่ pgpool node + replication</td>
+                </tr>
+                <tr>
+                  <td>6</td>
+                  <td>แก้ไฟล์ด้วยมือ ทั้งที่มี installer generate ให้</td>
+                  <td>script ที่ generate config มักเขียนทับทั้งไฟล์ — การรัดความปลอดภัยที่ทำด้วยมือจะหายเงียบในรอบ deploy ถัดไป และไม่มีใครรู้จนกว่าจะโดน</td>
+                  <td>แก้ที่ template/flag ของ generator เสมอ แล้ว re-run — ถ้าแก้มือเป็นการชั่วคราว ต้องมี ticket ตามปิด</td>
+                </tr>
+                <tr>
+                  <td>7</td>
+                  <td>ใช้ <span class="mono text-[11.5px]">md5</span> ทั้งที่ backend รองรับ <span class="mono text-[11.5px]">scram-sha-256</span></td>
+                  <td><span class="mono text-[11.5px]">md5</span> ของ PostgreSQL อ่อนต่อการ crack offline ถ้า hash รั่ว และไม่มี mutual proof แบบ SCRAM</td>
+                  <td><span class="mono text-[11.5px]">scram-sha-256</span> ทุกแถว — ให้ตรงกับ <span class="mono text-[11.5px]">password_encryption</span> ของ backend</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox">
+          <div class="rc mb-1">ข้อ 1 กับ 3 คูณกันแล้วอันตรายกว่าที่คิด</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            แต่ละข้อเดี่ยวๆ ยังพอรับได้ — เปิดกว้างแต่ user มีสิทธิ์น้อย หรือ user แรงแต่เข้าถึงได้จากวงในเท่านั้น
+            แต่พอมีทั้งคู่พร้อมกันคือ <b class="text-[var(--ink)]">บัญชี superuser ของ production เปิดให้ทั้งอินเทอร์เน็ตลองรหัสได้ไม่จำกัดครั้ง</b>
+            และเนื่องจาก pgpool ไม่มี rate limit หรือ lockout ในตัว การเดาจึงทำได้เร็วเท่าที่เครือข่ายจะไหว
+            โดยไม่มีอะไรหยุดและไม่มี alert ใดๆ นอกจากบรรทัด log ที่ดูเหมือน noise
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 TARGET ========== -->
+      <section id="target" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — Config เป้าหมาย</div>
+        <h2 class="display text-3xl mb-6">สองแบบ ขึ้นกับว่า client อยู่ในวงหรือนอกวง</h2>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">แบบ ก — client ทุกตัวเข้าผ่าน VPN/tunnel (แนะนำ)</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
+          เมื่อ client ภายนอกเข้ามาทาง tunnel มันจะโผล่ที่ pgpool ด้วย IP ภายใน ทำให้
+          <b class="text-[var(--ink)]">ไม่ต้องมีแถวสำหรับอินเทอร์เน็ตเลยแม้แต่แถวเดียว</b> — นี่คือรูปที่ปลอดภัยที่สุดและดูแลง่ายที่สุด
+        </p>
+        <div class="code p-5 mb-8">
+<pre><span class="c"># TYPE  DATABASE  USER  ADDRESS              METHOD</span>
+local   all       all                        scram-sha-256
+host    all       all   127.0.0.1/32         scram-sha-256
+host    all       all   &lt;internal-cidr&gt;      scram-sha-256
+
+<span class="c"># ไม่มีแถว 0.0.0.0/0 — ไม่ต้องเขียน deny เพราะ "ไม่แมตช์ = ปฏิเสธ" อยู่แล้ว</span></pre>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">แบบ ข — จำเป็นต้องเปิดให้ต่อจากภายนอกจริงๆ</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
+          ถ้าเลี่ยงไม่ได้ ให้ยอมรับว่ากันด้วย IP ไม่ได้ (โดยเฉพาะเมื่อฝั่ง client เป็น dynamic IP) แล้วย้ายการป้องกันไปที่
+          <b class="text-[var(--ink)]">"ใครล็อกอินได้"</b> แทน — กุญแจคือแถว <span class="mono text-[13px]">reject</span> ที่ต้องอยู่ก่อน
+        </p>
+        <div class="code p-5 mb-6">
+<pre><span class="c"># TYPE  DATABASE      USER            ADDRESS            METHOD</span>
+local   all           all                                scram-sha-256
+host    all           all             127.0.0.1/32       scram-sha-256
+host    all           all             &lt;internal-cidr&gt;    scram-sha-256
+
+<span class="c"># --- ปิด superuser จากนอกวงเด็ดขาด ต้องอยู่ "ก่อน" แถวล่าง ---</span>
+host    all           &lt;superuser&gt;     0.0.0.0/0          reject
+host    all           &lt;repl-admin&gt;    0.0.0.0/0          reject
+
+<span class="c"># --- แอปจากภายนอก: จำกัดทั้ง role และ database ---</span>
+host    &lt;app-db&gt;      &lt;app-role&gt;      0.0.0.0/0          scram-sha-256</pre>
+        </div>
+        <div class="rulebox ok mb-8">
+          <div class="rc mb-1">สังเกตว่าแถวสุดท้ายแคบลงสองมิติพร้อมกัน</div>
+          <p class="text-[13.5px]" style="color:var(--ink-soft)">
+            ไม่ใช่แค่ <span class="mono text-[12px]">all</span> ในช่อง user แต่ช่อง database ก็ระบุเจาะจงด้วย —
+            ถ้าแอปแตะแค่ DB เดียว ก็ไม่มีเหตุผลที่ connection จากอินเทอร์เน็ตจะเปิด DB อื่นได้
+            ยิ่งแคบทั้งสองช่อง ความเสียหายตอน credential รั่วยิ่งจำกัด
+          </p>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ถ้าจะระบุ CIDR ภายนอกได้จริง</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
+          ใช้ได้เฉพาะเมื่อฝั่งนั้นมี <b class="text-[var(--ink)]">static IP</b> จริงเท่านั้น (เช่นสำนักงานที่ซื้อ fixed IP ไว้)
+          — แทนแถวสุดท้ายด้วยแบบนี้ และคอมเมนต์กำกับไว้เสมอว่าเป็นของใคร จะได้รู้ตอนเลิกใช้ว่าลบได้
+        </p>
+        <div class="code p-5">
+<pre><span class="c"># สำนักงาน &lt;ชื่อไซต์&gt; — static IP, ทบทวนทุกไตรมาส</span>
+host    &lt;app-db&gt;   &lt;app-role&gt;   192.0.2.10/32       scram-sha-256
+<span class="c"># วง VPN ของ &lt;ผู้ให้บริการ&gt;</span>
+host    &lt;app-db&gt;   &lt;app-role&gt;   198.51.100.0/24     scram-sha-256</pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 ROLES ========== -->
+      <section id="roles" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — แยก Role · pool_passwd</div>
+        <h2 class="display text-3xl mb-6">งานที่ pool_hba ทำแทนไม่ได้</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทุกอย่างใน §04 จะทำไม่ได้เลยถ้าแอปยังต่อด้วย superuser — เพราะแถว
+          <span class="mono text-[13px]">reject</span> จะตัดแอปตัวเองไปด้วย ลำดับจึงต้องเป็น
+          <b class="text-[var(--ink)]">สร้าง role ก่อน แล้วค่อยรัด pool_hba</b> ไม่ใช่กลับกัน
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">สร้าง role ต่อ service ตาม least privilege</h3>
+          <div class="code p-5">
+<pre><span class="k">CREATE ROLE</span> &lt;app-role&gt; <span class="k">LOGIN PASSWORD</span> <span class="s">'&lt;password&gt;'</span>;
+<span class="k">GRANT CONNECT ON DATABASE</span> &lt;app-db&gt; <span class="k">TO</span> &lt;app-role&gt;;
+<span class="k">GRANT USAGE ON SCHEMA</span> &lt;schema&gt; <span class="k">TO</span> &lt;app-role&gt;;
+<span class="k">GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA</span> &lt;schema&gt; <span class="k">TO</span> &lt;app-role&gt;;
+
+<span class="c">-- ตารางที่สร้างในอนาคตจะได้สิทธิ์เองโดยไม่ต้อง grant ซ้ำ</span>
+<span class="k">ALTER DEFAULT PRIVILEGES IN SCHEMA</span> &lt;schema&gt;
+  <span class="k">GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO</span> &lt;app-role&gt;;</pre>
+          </div>
+          <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+            แยก role สำหรับงานที่อ่านอย่างเดียว (report, BI, exporter) ให้เหลือแค่
+            <span class="mono text-[12px]">SELECT</span> — เป็นการแบ่งที่ให้ผลมากที่สุดต่อแรงที่ลงไป
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">เพิ่ม role เข้า <span class="mono text-[14px]">pool_passwd</span> — ขั้นที่ลืมกันมากที่สุด</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            pgpool ต้องมี entry ของ role นั้นใน <span class="mono text-[12px]">pool_passwd</span> เพื่อ auth ต่อ backend แทน client
+            — สร้าง role ใน PostgreSQL อย่างเดียวไม่พอ และต้องทำ<b class="text-[var(--ink)]">ทุก pgpool node</b>
+          </p>
+          <div class="code p-5">
+<pre>sudo -u &lt;pgpool-user&gt; PGPOOLKEYFILE=&lt;keyfile&gt; \
+  pg_enc -m -f &lt;pgpool.conf&gt; -u &lt;app-role&gt; -p</pre>
+          </div>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">อาการเวลาลืม — หลอกให้ไล่ผิดทางได้ทั้งวัน</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">ERROR: authentication failed</span> ตามด้วย
+              <span class="mono text-[12px]">DETAIL: username "&lt;role&gt;" or password does not exist in backend</span>
+              — ข้อความนี้<b class="text-[var(--ink)]">อ่านเหมือนรหัสผิด</b> ทั้งที่รหัสถูกทุกตัวอักษร มันแค่แปลว่า pgpool
+              หา entry ใน <span class="mono text-[12px]">pool_passwd</span> ไม่เจอ
+              <b class="text-[var(--ink)]">วิธีแยกให้ขาด:</b> ลองต่อ<b>ตรงเข้า PostgreSQL ข้าม pgpool</b> ด้วยรหัสเดียวกัน
+              ถ้าตรงนั้นผ่าน = รหัสถูก ปัญหาอยู่ที่ pool_passwd ไม่ใช่ credential
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">เปลี่ยนฝั่งแอป แล้วค่อยปิด superuser</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เปลี่ยน connection string ของทุก service ให้ใช้ role ใหม่ → ยืนยันว่าทุกตัวทำงานได้จริง →
+            <b class="text-[var(--ink)]">แล้วค่อย</b>เพิ่มแถว <span class="mono text-[12px]">reject</span> ของ superuser
+            ถ้าสลับลำดับกันคือระบบดับทันที
+          </p>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ตรวจว่าไม่มีใครหลงเหลือใช้ superuser อยู่</div>
+            <div class="code p-5 mt-2">
+<pre><span class="k">SELECT</span> usename, client_addr, count(*)
+<span class="k">FROM</span> pg_stat_activity
+<span class="k">WHERE</span> usename <span class="k">IN</span> (<span class="k">SELECT</span> rolname <span class="k">FROM</span> pg_roles <span class="k">WHERE</span> rolsuper)
+<span class="k">GROUP BY</span> 1,2 <span class="k">ORDER BY</span> 3 <span class="k">DESC</span>;</pre>
+            </div>
+            <p class="text-[13.5px] mt-2" style="color:var(--ink-soft)">
+              ควรเหลือแค่ connection จากงานดูแลระบบ (replication, repmgr, admin session) — ถ้ายังเห็นจาก IP ของ pgpool node
+              จำนวนมาก แปลว่ายังมีแอปที่ยังไม่ได้เปลี่ยน
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 BEYOND ========== -->
+      <section id="beyond" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — ชั้นนอก pool_hba</div>
+        <h2 class="display text-3xl mb-6">pool_hba ปิดได้แค่ประตู ไม่ได้ปิดถนน</h2>
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นนอกสุด</div>
+            <h3 class="font-semibold mb-2 text-[15px]">อย่าเผยแพร่พอร์ต DB ออกอินเทอร์เน็ต</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              ถ้าไม่มี NAT/port-forward ชี้เข้า pooler ตั้งแต่แรก anti-pattern ข้อ 1 ก็ไม่มีความหมาย —
+              การเอา rule นั้นออกคือการแก้ที่ให้ผลมากที่สุดต่อแรงที่ใช้ มากกว่าการไปไล่รัด pool_hba
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">FIREWALL</div>
+            <h3 class="font-semibold mb-2 text-[15px]">พอร์ตบริหารต้องไม่เปิดทั้ง LAN</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              พอร์ต PCP และ watchdog ควรจำกัดเฉพาะ pgpool node ด้วยกันเอง — เครื่องใดในวงโดนยึด
+              ไม่ควรเดินเข้าช่องทางบริหารคลัสเตอร์ได้ตรงๆ host firewall ที่ปิดอยู่ = ไม่มีชั้นนี้เลย
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">TUNNEL</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ให้ตัวตนมาจาก key ไม่ใช่จาก IP</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              VPN (WireGuard/mesh VPN) หรือ tunnel ที่ auth ด้วย key/service token ทำให้ client โผล่มาจาก CIDR ภายในที่นิ่ง
+              — แก้ปัญหา dynamic IP ได้จริง และได้ audit log ว่าใครต่อเมื่อไหร่แถมมาด้วย
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DETECTION</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ตั้ง alert ที่นับ auth failure</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              pgpool ไม่มี lockout หรือ rate limit ในตัว การเดารหัสจึงไม่มีอะไรหยุด — ต้องชดเชยด้วย alert
+              เมื่อ auth failure เกิน threshold ต่อนาที ไม่งั้นการเดานับแสนครั้งจะดูเหมือน log noise ธรรมดา
+            </p>
+          </div>
+        </div>
+
+        <div class="rulebox">
+          <div class="rc mb-1">rate limit ระดับ network ถ้าจำเป็นต้องเปิดพอร์ตออกนอกจริงๆ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mb-3">
+            ไม่ใช่การป้องกันที่แข็งแรง แต่ทำให้การเดาแบบหมื่นครั้งต่อชั่วโมงเป็นไปไม่ได้ และทำให้ alert มีเวลาทำงาน
+            — ปรับตัวเลขตามจำนวน connection จริงของแอป (แอปที่มี pool ปกติเปิด connection ใหม่ไม่บ่อย)
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># จำกัดจำนวน connection ใหม่ต่อ source IP (ตัวอย่าง — ปรับค่าตามงานจริง)</span>
+iptables -A INPUT -p tcp --dport &lt;pooler-port&gt; -m conntrack --ctstate NEW \
+  -m recent --set --name PGPOOL
+iptables -A INPUT -p tcp --dport &lt;pooler-port&gt; -m conntrack --ctstate NEW \
+  -m recent --update --seconds 60 --hitcount 20 --name PGPOOL -j DROP</pre>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 VERIFY ========== -->
+      <section id="verify" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — Checklist ตรวจสอบ</div>
+        <h2 class="display text-3xl mb-6">พิสูจน์ทุกข้อด้วยการต่อจริง อย่าอ่านแค่ไฟล์</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ทุกข้อในตารางนี้ตรวจได้จากภายนอกโดยไม่ต้องแก้อะไร — ควรรันหลังเปลี่ยน config ทุกครั้ง
+          และตั้งเป็นงานประจำทุกไตรมาส เพราะ config มีโอกาสถูก generator เขียนทับกลับ (anti-pattern ข้อ 6)
+        </p>
+
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th style="width:34px">✓</th><th>ตรวจอะไร</th><th>ผ่าน = เห็นอะไร</th></tr></thead>
+              <tbody>
+                <tr><td>☐</td><td><span class="mono text-[11.5px]">enable_pool_hba</span> เปิดอยู่จริงในค่าที่โหลด (ไม่ใช่แค่ในไฟล์)</td><td><span class="mono text-[11.5px]">on</span> จาก <span class="mono text-[11.5px]">show pool_status</span></td></tr>
+                <tr><td>☐</td><td>ต่อจากนอกวงด้วย <b>superuser</b></td><td><b>ถูกปฏิเสธ</b> — ถ้าต่อติดคือยังไม่ปลอดภัย</td></tr>
+                <tr><td>☐</td><td>ต่อจากนอกวงด้วย <b>app role</b> เข้า DB ที่<b>ไม่ใช่</b>ของแอป</td><td><b>ถูกปฏิเสธ</b> (พิสูจน์ว่าช่อง database แคบจริง)</td></tr>
+                <tr><td>☐</td><td>ต่อจากนอกวงด้วย app role เข้า DB ของตัวเอง</td><td><b>สำเร็จ</b> (พิสูจน์ว่าไม่ได้รัดจนแอปพัง)</td></tr>
+                <tr><td>☐</td><td>ไม่มีแถว <span class="mono text-[11.5px]">trust</span> เหลืออยู่ในไฟล์</td><td><span class="mono text-[11.5px]">grep -c trust</span> = 0</td></tr>
+                <tr><td>☐</td><td>ไม่มี login role ที่เป็น superuser ถูกใช้โดยแอป</td><td>query ใน §05 ข้อ 3 เหลือแต่งานดูแลระบบ</td></tr>
+                <tr><td>☐</td><td>พอร์ตที่เปิดออกอินเทอร์เน็ตจริง (ทดสอบจากเครื่องนอกวง)</td><td>มีเฉพาะพอร์ตที่ตั้งใจ — พอร์ตบริหารต้องปิด</td></tr>
+                <tr><td>☐</td><td>จำนวน auth failure ต่อชั่วโมงในช่วงปกติ</td><td>ใกล้ 0 — ถ้าไม่ใช่ แปลว่ามีคนหรือแอปกำลังเดารหัสอยู่</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">คำสั่งทดสอบ — รันจากเครื่องที่อยู่นอกวงจริงเท่านั้น</div>
+        <div class="code p-5 mb-6">
+<pre><span class="c"># 1) superuser จากนอกวง — ต้องถูกปฏิเสธ</span>
+PGPASSWORD=&lt;pw&gt; psql -h &lt;public-endpoint&gt; -p &lt;port&gt; \
+  -U &lt;superuser&gt; -d &lt;app-db&gt; -tAc <span class="s">'select 1'</span>
+<span class="c"># คาดหวัง: authentication failed / ต่อไม่ได้</span>
+
+<span class="c"># 2) app role เข้า DB ที่ไม่ใช่ของตัวเอง — ต้องถูกปฏิเสธ</span>
+PGPASSWORD=&lt;pw&gt; psql -h &lt;public-endpoint&gt; -p &lt;port&gt; \
+  -U &lt;app-role&gt; -d &lt;other-db&gt; -tAc <span class="s">'select 1'</span>
+
+<span class="c"># 3) app role เข้า DB ของตัวเอง — ต้องสำเร็จ และบอกได้ว่าไปโผล่ backend ตัวไหน</span>
+PGPASSWORD=&lt;pw&gt; psql -h &lt;public-endpoint&gt; -p &lt;port&gt; \
+  -U &lt;app-role&gt; -d &lt;app-db&gt; -tAc <span class="s">'select current_user, inet_server_addr()'</span></pre>
+        </div>
+
+        <div class="code p-5 mb-8">
+<pre><span class="c"># 4) พอร์ตอะไรเปิดออกนอกบ้าง — รันจากเครื่องนอกวง</span>
+<span class="k">for</span> p <span class="k">in</span> &lt;port-list&gt;<span class="k">;</span> <span class="k">do</span>
+  <span class="k">printf</span> <span class="s">'%s: '</span> <span class="s">"$p"</span>
+  timeout 4 bash -c <span class="s">"&lt;/dev/tcp/&lt;public-endpoint&gt;/$p"</span> 2&gt;/dev/null \
+    &amp;&amp; <span class="k">echo</span> OPEN || <span class="k">echo</span> closed
+<span class="k">done</span>
+
+<span class="c"># 5) นับ auth failure ย้อนหลัง 1 ชั่วโมง — รันบน pgpool node</span>
+journalctl -u &lt;pgpool-unit&gt; --since <span class="s">'-1h'</span> --no-pager \
+  | grep -c <span class="s">'authentication failed'</span></pre>
+        </div>
+
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ข้อ 8 คือข้อที่คุ้มที่สุดและคนมองข้ามบ่อยที่สุด</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ตัวเลข auth failure ต่อชั่วโมง<b class="text-[var(--ink)]">ควรใกล้ศูนย์ในระบบที่สุขภาพดี</b> เพราะแอปที่ config ถูก
+            จะ auth ผ่านทุกครั้ง ตัวเลขที่สูงและ<b>คงที่</b>มักไม่ใช่การโจมตี แต่คือ service ของเราเองที่ถือ credential เก่า
+            แล้ว retry วนอยู่ — ซึ่งแปลว่ามี config drift ที่ยังไม่มีใครเห็น ส่วนตัวเลขที่สูงและ<b>แกว่ง</b>ค่อยน่าสงสัยว่ามาจากภายนอก
+            ไม่ว่ากรณีไหน ถ้าไม่เคยวัดก็จะไม่มีวันรู้ เพราะ log พวกนี้ดูเหมือน noise ทั้งหมด
+          </p>
+        </div>
+
+        <div class="rulebox mt-5">
+          <div class="rc mb-1">อ่านต่อ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <a href="postgresql-pgpool-cluster-guide.html" class="underline" style="color:var(--accent)">Pgpool-II Cluster Guide</a>
+            — สถาปัตยกรรม, config ทุกบรรทัด, บั๊กที่เจอจริง ·
+            <a href="runbook.html" class="underline" style="color:var(--accent)">Runbook Index</a>
+            — ขั้นตอนรับมือเมื่อเกิดเหตุ
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · SECURITY · PGPOOL ACCESS CONTROL"
+        line2="pool_hba.conf hardening · no real addresses in this document">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
