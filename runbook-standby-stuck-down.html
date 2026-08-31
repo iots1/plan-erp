@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Runbook: Standby ค้าง down หลัง apt Auto-Upgrade — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="R" title="Runbook" subtitle="STANDBY ค้าง DOWN" width="280">
+    <nav slot="nav">
+      <a href="#symptom"    class="navlink"><span class="n">1</span> อาการ</a>
+      <a href="#impact"     class="navlink"><span class="n">2</span> ผลกระทบ</a>
+      <a href="#diagnosis"  class="navlink"><span class="n">3</span> วินิจฉัย</a>
+      <a href="#rootcause"  class="navlink"><span class="n">4</span> สาเหตุ</a>
+      <a href="#fix"        class="navlink"><span class="n">5</span> การแก้ไข</a>
+      <a href="#verify"     class="navlink"><span class="n">6</span> ยืนยัน + ป้องกัน</a>
+    </nav>
+    <div slot="footnote">
+      <a href="runbook.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ Runbook Index</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="runbook.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Runbook Index
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Runbook · Database / Infra</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Standby ค้าง <span class="text-[#7FE3DE]">down</span><br>
+          หลัง apt Auto-Upgrade
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          <span class="mono text-[13px] text-white">show pool_nodes</span> โชว์ standby เป็น
+          <span class="mono text-[13px] text-white">status=down</span> แต่
+          <span class="mono text-[13px] text-white">pg_status=up</span> — ระบบยังใช้งานได้ ไม่มีใครแจ้ง
+          และ <span class="mono text-[13px] text-white">auto_failback</span> ก็ไม่ดึงกลับให้เอง ค้างอยู่แบบนั้นได้เป็นวัน
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A23B"></span>Severity: High (Silent — HA เหลือครึ่งเดียว)</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Est. fix time: 10–15 นาที</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 1 SYMPTOM ========== -->
+      <section id="symptom" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">1 — อาการ (Symptom)</div>
+        <h2 class="display text-3xl mb-6">ไม่มี error ฝั่ง app — เห็นได้จาก pool_nodes เท่านั้น</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เคสนี้ <b class="text-[var(--ink)]">เงียบสนิท</b> — ต่างจาก
+          <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01 (All Nodes Down)</a>
+          ที่ app ต่อ DB ไม่ได้ทั้งระบบ ที่นี่ app ยังทำงานปกติทุกอย่าง เพราะ pgpool ยังมี node เหลือให้ route
+          จะเห็นก็ต่อเมื่อไปเปิด <span class="mono text-[13px]">show pool_nodes</span> ดูเองเท่านั้น
+        </p>
+        <div class="code p-5">
+<pre>psql -h 172.16.0.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span>
+
+ node_id |   hostname   | port | status | pg_status |  role   | select_cnt | replication_state
+---------+--------------+------+--------+-----------+---------+------------+-------------------
+ 0       | 172.16.0.221 | 5432 | up     | up        | primary | 170591     |
+ 1       | 172.16.0.222 | 5432 | <span class="s">down</span>   | <span class="s">up</span>        | standby | <span class="s">0</span>          |
+ 2       | 172.16.0.223 | 5432 | up     | up        | standby | 14794      |</pre>
+        </div>
+        <div class="rulebox mt-6" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ลายเซ็น 3 อย่างที่ต้องเห็นพร้อมกัน</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b>(1)</b> <span class="mono text-[12px]">status = down</span> แต่ <span class="mono text-[12px]">pg_status = up</span>
+            — pgpool มาร์กว่าตาย แต่ health check ยังตอบ ·
+            <b>(2)</b> <span class="mono text-[12px]">select_cnt = 0</span> บน node นั้น ขณะที่ node อื่นเดินหน้าเรื่อยๆ ·
+            <b>(3)</b> <span class="mono text-[12px]">replication_state</span> และ <span class="mono text-[12px]">replication_sync_state</span>
+            <b class="text-[var(--ink)]">ว่างเปล่าทุก standby</b> (ไม่ใช่แค่ตัวที่ down) — ข้อ 3 นี่แหละคือเบาะแสว่าทำไม
+            <span class="mono text-[12px]">auto_failback</span> ถึงไม่ทำงาน ดู §4
+          </p>
+        </div>
+        <p class="mt-6 text-[var(--ink-soft)] text-[15.5px] max-w-3xl leading-[1.85]">
+          บน pgpool node ที่เป็น watchdog leader จะมี log ย้อนหลังตอนที่มันตัด node ออก:
+        </p>
+        <div class="code p-5">
+<pre><span class="c">DETAIL:  postmaster on DB node 1 was shutdown by administrative command</span>
+<span class="c">LOG:  received degenerate backend request for node_id: 1 from pid [18836]</span>
+<span class="c">LOG:  starting degeneration. shutdown host 172.16.0.222(5432)</span>
+<span class="c">LOG:  failover done. shutdown host 172.16.0.222(5432)</span></pre>
+        </div>
+        <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
+          คำว่า <span class="mono text-[12px]">shutdown by administrative command</span> สำคัญมาก — มันแปลว่า PostgreSQL
+          <b class="text-[var(--ink)]">ถูกสั่งปิดอย่างสุภาพ</b> ไม่ใช่ crash ไม่ใช่ network หลุด ให้ไปตามหาว่า "ใครสั่ง" ต่อใน §3
+        </p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 2 IMPACT ========== -->
+      <section id="impact" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">2 — ผลกระทบ (Impact)</div>
+        <h2 class="display text-3xl mb-6">ไม่ล่ม แต่ HA หายไปครึ่งหนึ่ง — และไม่มีใครรู้</h2>
+        <div class="grid sm:grid-cols-3 gap-5">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">READ CAPACITY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">Load balance เหลือ 2 จาก 3</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">read query ทั้งหมดถูกอัดลง primary + standby ที่เหลือตัวเดียว โหลดต่อโหนดเพิ่มขึ้น ~50% แบบเงียบๆ</p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">FAILOVER RISK</div>
+            <h3 class="font-semibold mb-2 text-[15px]">เหลือ standby ให้ promote ตัวเดียว</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">ถ้า primary ตายตอนนี้ pgpool มีตัวเลือกเดียว — ถ้าตัวนั้นดันมีปัญหาด้วยคือ total outage เต็มรูปแบบ</p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DETECTION</div>
+            <h3 class="font-semibold mb-2 text-[15px]">อยู่ได้เป็นวันโดยไม่มีใครเห็น</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">ของจริงค้าง 2 วันเต็ม (29 → 31 ส.ค. 2026) เจอตอนเปิด pool_nodes ดูด้วยเรื่องอื่น ไม่ได้เจอจาก alert</p>
+          </div>
+        </div>
+        <div class="rulebox mt-8">
+          <div class="rc mb-1">ทำไมถึงไม่ escalate เป็น Critical</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ข้อมูลไม่เสี่ยง — streaming replication ยังวิ่งปกติ (slot active, lag ต่ำกว่า 1ms) node ที่ down รับข้อมูลครบทุกไบต์
+            แค่ pgpool ไม่ยอม route traffic ไปหามันเท่านั้น พอ attach กลับก็ใช้งานได้ทันทีโดยไม่ต้อง re-clone
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 3 DIAGNOSIS ========== -->
+      <section id="diagnosis" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">3 — วินิจฉัย (Diagnosis)</div>
+        <h2 class="display text-3xl mb-6">4 ขั้นตอน — อย่าข้ามขั้นที่ 4</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ขั้นที่ 1–3 ยืนยันว่าเป็นเคสนี้และหาต้นเหตุที่ทำให้ node หลุด แต่
+          <b class="text-[var(--ink)]">ขั้นที่ 4 คือขั้นที่คนมักข้าม</b> — มันตอบคำถามว่า "ทำไม auto_failback ที่เปิดอยู่ถึงไม่ดึงกลับเอง"
+          ถ้าไม่แก้ตรงนั้น attach กลับไปก็จะค้างซ้ำอีกในรอบหน้า
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยืนยันว่า PostgreSQL จริงยังปกติ (จะได้ไม่ไปแตะ replication)</h3>
+          <div class="code p-5">
+<pre>ssh ovh-ppm <span class="s">"sudo -u postgres repmgr cluster show"</span>
+ssh ovh-ppm <span class="s">"sudo -u postgres psql -x -c \
+  'select application_name, state, sync_state, write_lag from pg_stat_replication;'"</span></pre>
+          </div>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">สิ่งที่ควรได้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              repmgr โชว์ครบ 3 โหนด <span class="mono text-[12px]">running</span> · pg_stat_replication มี standby ครบทุกตัว
+              <span class="mono text-[12px]">state = streaming</span> และ <span class="mono text-[12px]">write_lag</span> ระดับมิลลิวินาที
+              — แปลว่า replication layer ไม่มีปัญหาเลย ปัญหาอยู่ที่ pgpool ล้วนๆ
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">หาว่า pgpool ตัด node ออกตอนไหน และเพราะอะไร</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ใช้เวลาจากคอลัมน์ <span class="mono text-[12px]">last_status_change</span> ใน <span class="mono text-[12px]">show pool_nodes</span> เป็นจุดตั้งต้น
+            แล้วไปขุด journal ของ pgpool leader รอบๆ เวลานั้น
+          </p>
+          <div class="code p-5">
+<pre>ssh ovh-pgpool1 <span class="s">"journalctl -u pgpool2 --since '2026-08-29 06:45' --until '2026-08-29 07:00' \
+  --no-pager | grep -iE 'degenerate|shutdown|failover'"</span></pre>
+          </div>
+          <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+            หมายเหตุ: user ปกติอ่าน journal ได้โดยไม่ต้อง <span class="mono text-[12px]">sudo</span> ถ้าอยู่ในกลุ่ม
+            <span class="mono text-[12px]">adm</span> — แต่ <span class="mono text-[12px]">/etc/pgpool2/pgpool.conf</span> ต้อง sudo เสมอ
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ไปที่ DB node ตัวนั้น — ใครสั่งปิด PostgreSQL</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            กรอง <span class="mono text-[12px]">postgres_exporter</span> ออกก่อน ไม่งั้นมันจะท่วมจอ (ดู §6 — exporter บน replica พังอยู่)
+          </p>
+          <div class="code p-5">
+<pre>ssh ovh-ppr1 <span class="s">"journalctl --since '2026-08-29 06:48' --until '2026-08-29 06:56' --no-pager \
+  | grep -viE 'postgres_exporter|sysstat'"</span>
+
+ssh ovh-ppr1 <span class="s">"grep -A6 '2026-08-29 06:51' /var/log/unattended-upgrades/unattended-upgrades.log"</span></pre>
+          </div>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ผู้ต้องสงสัยอันดับหนึ่ง</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">Starting apt-daily-upgrade.service</span> ตามด้วย
+              <span class="mono text-[12px]">Stopping postgresql@18-main.service</span> ภายในไม่กี่วินาที
+              — ของจริงคือ <span class="mono text-[12px]">libpam0g</span> ถูกอัป แล้ว
+              <span class="mono text-[12px]">needrestart</span> สั่งรีสตาร์ททุก service ที่ link libpam
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">ขั้นสำคัญที่สุด — เทียบ application_name สองฝั่ง</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            pgpool จับคู่ standby ใน <span class="mono text-[12px]">pg_stat_replication</span> ด้วยค่า
+            <span class="mono text-[12px]">backend_application_nameN</span> ถ้าสองฝั่งนี้ไม่ตรงกัน
+            <span class="mono text-[12px]">auto_failback</span> จะยืนยันไม่ได้ว่า node นั้น streaming อยู่ → ไม่ยิง attach ให้
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># ฝั่ง pgpool คาดหวังชื่ออะไร</span>
+psql -h 172.16.0.226 -U postgres -tAc <span class="s">"show pool_status;"</span> | grep backend_application
+
+<span class="c"># ฝั่ง PostgreSQL ส่งชื่ออะไรมาจริง</span>
+ssh ovh-ppm <span class="s">"sudo -u postgres psql -tAc 'select application_name from pg_stat_replication;'"</span></pre>
+          </div>
+          <div class="card overflow-hidden mt-4">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>Backend</th><th>pgpool คาดหวัง</th><th>PostgreSQL ส่งมาจริง</th><th>ตรงกัน?</th></tr></thead>
+                <tbody>
+                  <tr><td>0 · 172.16.0.221</td><td><span class="mono text-[12px]">node0</span></td><td><span class="mono text-[12px]">ppm</span></td><td>❌</td></tr>
+                  <tr><td>1 · 172.16.0.222</td><td><span class="mono text-[12px]">node1</span></td><td><span class="mono text-[12px]">ppr1</span></td><td>❌</td></tr>
+                  <tr><td>2 · 172.16.0.223</td><td><span class="mono text-[12px]">node2</span></td><td><span class="mono text-[12px]">ppr2</span></td><td>❌</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
+            ค่าฝั่ง PostgreSQL มาจาก <span class="mono text-[12px]">application_name</span> ใน
+            <span class="mono text-[12px]">primary_conninfo</span> ซึ่ง repmgr เขียนให้เป็น
+            <span class="mono text-[12px]">node_name</span> ของ repmgr เสมอ — ไม่ใช่ค่าที่ตั้งเองได้ตามใจ
+            ดังนั้นให้แก้ฝั่ง pgpool ให้ตามมันดีกว่า (ดู §5)
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 4 ROOT CAUSE ========== -->
+      <section id="rootcause" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">4 — สาเหตุ (Root Cause)</div>
+        <h2 class="display text-3xl mb-6">ความผิดพลาด 3 ชั้นที่ต่อกันพอดี</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          แต่ละชั้นเดี่ยวๆ ไม่ร้ายแรง — ชั้นแรกเป็นพฤติกรรมที่ถูกต้องของ pgpool ด้วยซ้ำ
+          แต่พอต่อกันครบสามชั้นจึงกลายเป็น "standby หายไปเงียบๆ เป็นวัน"
+        </p>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+flowchart TD
+    A["ชั้น 1 · ต้นเหตุ<br/>unattended-upgrades อัป libpam0g<br/>needrestart รีสตาร์ท postgresql@18-main"] --> B["pgpool เห็น postmaster ปิดตัว<br/>degenerate node 1 (พฤติกรรมถูกต้อง)"]
+    B --> C["ชั้น 2 · ทำไมไม่ฟื้นเอง<br/>backend_application_name = node1<br/>แต่ pg_stat_replication = ppr1"]
+    C --> D["auto_failback ยืนยันไม่ได้ว่า streaming<br/>replication_state ว่าง → ไม่ยิง attach"]
+    D --> E["ชั้น 3 · ทำไมไม่มีใครรู้<br/>pgpool-watchdog-exporter auth PCP ไม่ผ่าน<br/>บน pgpool1 + pgpool3"]
+    E --> F["metric ทุกตัวเป็น 0<br/>Grafana มองไม่เห็นแม้แต่ว่าใครเป็น leader"]
+    F --> G["standby ค้าง down 2 วันเต็ม<br/>เจอตอนเปิดดูด้วยเรื่องอื่น"]
+</pre>
+        </div>
+
+        <div class="grid sm:grid-cols-3 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้น 1</div>
+            <h3 class="font-semibold mb-2 text-[15px]">apt แตะ database เอง</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <span class="mono text-[12px]">apt-daily-upgrade.timer</span> เปิดอยู่ทั้ง 6 เครื่อง
+              <b class="text-[var(--ink)]">รวม primary</b> — และ needrestart ไม่มี override ให้ postgresql/pgpool เลย
+              ของจริง primary ก็โดนรีสตาร์ทไปแล้ววันเดียวกัน
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้น 2</div>
+            <h3 class="font-semibold mb-2 text-[15px]">auto_failback เปิดแต่ใช้ไม่ได้</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <span class="mono text-[12px]">auto_failback = 1</span>, <span class="mono text-[12px]">interval = 10</span>
+              ตั้งไว้ถูกทุกอย่าง แต่ชื่อไม่แมตช์ → เป็น config ที่ดู "เปิดอยู่" ในทุก dashboard แต่ไม่เคยทำงานสักครั้ง
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้น 3</div>
+            <h3 class="font-semibold mb-2 text-[15px]">monitoring ตาบอด</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              PCP password ถูก generate แยกต่อ node แต่ <span class="mono text-[12px]">.pcppass</span> ถูก copy ข้ามเครื่องมา
+              → auth ไม่ผ่าน 2 ใน 3 node แถม log ถูก flood ทุก 15 วินาที
+            </p>
+          </div>
+        </div>
+
+        <div class="rulebox">
+          <div class="rc mb-1">ต่างจาก Runbook 01 ยังไง</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01</a>
+            บอกว่า "pgpool ไม่ re-attach ให้เองต้องใช้มือ" ซึ่งจริงในกรณี <b>ทุก node down พร้อมกัน</b>
+            (ตอนนั้น pgpool ไม่เห็น primary เลย auto_failback ไม่มีทางทำงานได้อยู่แล้ว) — แต่ในเคส
+            <b>standby ตัวเดียวหลุด</b> แบบนี้ <span class="mono text-[12px]">auto_failback</span>
+            <b class="text-[var(--ink)]">ควรจะฟื้นให้เองได้</b> การที่มันไม่ฟื้นคือบั๊ก config ไม่ใช่ข้อจำกัดของ pgpool
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 5 FIX ========== -->
+      <section id="fix" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">5 — การแก้ไข (Fix)</div>
+        <h2 class="display text-3xl mb-6">แก้ต้นเหตุก่อน แล้วค่อย attach — อย่าสลับลำดับ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ถ้ารีบ <span class="mono text-[13px]">pcp_attach_node</span> ก่อนโดยไม่แก้ §5.2 ระบบจะกลับมาปกติจริง
+          แต่รอบหน้าที่มีการรีสตาร์ท PostgreSQL ก็จะค้าง down ซ้ำอีกเหมือนเดิม
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ห้าม apt แตะ database — ทำครบทั้ง 6 เครื่อง</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            สร้าง snippet ให้ needrestart ข้าม service กลุ่ม DB ไฟล์ใน <span class="mono text-[12px]">conf.d/</span>
+            ถูก eval ต่อท้าย config หลัก และเรียงตามชื่อ — ขึ้นต้นด้วย <span class="mono text-[12px]">99-</span> เพื่อให้ทับค่าอื่นได้แน่นอน
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># /etc/needrestart/conf.d/99-no-db-autorestart.conf</span>
+$nrconf{override_rc}-&gt;{qr(^postgresql)} = 0;
+$nrconf{override_rc}-&gt;{qr(^pgpool)}     = 0;
+$nrconf{override_rc}-&gt;{qr(^repmgr)}     = 0;</pre>
+          </div>
+          <div class="code p-5 mt-3">
+<pre><span class="k">for</span> h <span class="k">in</span> ovh-ppm ovh-ppr1 ovh-ppr2 ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
+  scp 99-no-db-autorestart.conf $h:/tmp/
+  ssh $h <span class="s">"sudo cp /tmp/99-no-db-autorestart.conf /etc/needrestart/conf.d/"</span>
+  ssh $h <span class="s">"sudo needrestart -v -b -r l 2>&amp;1 | grep 'eval.*99-no-db'"</span>
+<span class="k">done</span></pre>
+          </div>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ต้องเห็นบรรทัดนี้ทุกเครื่อง = config ถูก parse จริง</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">[main] eval /etc/needrestart/conf.d/99-no-db-autorestart.conf</span><br>
+              ถ้า syntax ผิด needrestart จะ <span class="mono text-[12px]">die</span> ทันที ซึ่งจะทำให้ <b>apt ทั้งเครื่องพัง</b> — ต้องเช็คทุกครั้ง
+            </p>
+          </div>
+          <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
+            <b class="text-[var(--ink)]">อย่าตกใจ</b> ถ้า <span class="mono text-[12px]">-r l</span> ยังลิสต์
+            <span class="mono text-[12px]">repmgrd.service</span> อยู่ — โหมด list รายงานทุก service ที่ "ควร" รีสตาร์ท
+            ส่วน <span class="mono text-[12px]">override_rc</span> มีผลตอนโหมด restart จริงเท่านั้น (ดู needrestart บรรทัด ~1092)
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">แก้ backend_application_name ให้ตรง repmgr — ทั้ง 3 pgpool node</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ทำ backup ก่อนเสมอ แล้วแก้ทีละเครื่อง — config ต้องเหมือนกันทั้ง 3 ตัว ไม่งั้น watchdog จะมองเห็น cluster คนละแบบ
+          </p>
+          <div class="code p-5">
+<pre><span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
+  ssh $h <span class="s">"sudo cp /etc/pgpool2/pgpool.conf /etc/pgpool2/pgpool.conf.bak-\$(date +%Y%m%d)"</span>
+  ssh $h <span class="s">"sudo sed -i \
+    -e \"s/^backend_application_name0 = 'node0'/backend_application_name0 = 'ppm'/\"  \
+    -e \"s/^backend_application_name1 = 'node1'/backend_application_name1 = 'ppr1'/\" \
+    -e \"s/^backend_application_name2 = 'node2'/backend_application_name2 = 'ppr2'/\" \
+    /etc/pgpool2/pgpool.conf"</span>
+  ssh $h <span class="s">"sudo systemctl reload pgpool2"</span>
+<span class="k">done</span></pre>
+          </div>
+          <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">reload</span> = <span class="mono text-[12px]">SIGHUP</span> ไม่ตัด connection ของ client
+            — ยืนยันว่า pgpool รับค่าใหม่แล้วด้วย <span class="mono text-[12px]">show pool_status</span> ก่อนไปข้อ 3
+            ถ้า reload แล้วค่ายังเป็นของเก่า ให้ restart pgpool ทีละตัว <b class="text-[var(--ink)]">โดยไล่จาก standby watchdog ก่อน แล้วค่อย leader เป็นตัวสุดท้าย</b>
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ซ่อม PCP credential ถ้า auth ไม่ผ่าน</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ต้องทำก่อนข้อ 4 ถ้าเครื่องที่จะรัน attach เป็นเครื่องที่ auth พัง — เช็คก่อนว่าเครื่องไหนใช้ได้:
+          </p>
+          <div class="code p-5">
+<pre><span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
+  <span class="k">echo</span> -n <span class="s">"$h: "</span>
+  ssh $h <span class="s">"cat /var/lib/node_exporter/textfile_collector/pgpool_watchdog.prom \
+    | grep scrape_success"</span>
+<span class="k">done</span>
+<span class="c"># scrape_success 1 = PCP ใช้ได้ · 0 = auth พัง</span></pre>
+          </div>
+          <div class="rulebox mt-3">
+            <div class="rc mb-1">วิธีแก้ — password ต้องตรงกันสองไฟล์บนเครื่องเดียวกัน</div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+              <span class="mono text-[12px]">/etc/pgpool2/pcp.conf</span> เก็บ <span class="mono text-[12px]">username:md5(password)</span> ·
+              <span class="mono text-[12px]">/var/lib/postgresql/.pcppass</span> เก็บ
+              <span class="mono text-[12px]">host:port:username:password</span> แบบ plaintext (perm 0600, เจ้าของ postgres)
+              ทั้งสองไฟล์เป็นของ <b>เครื่องนั้นๆ</b> — copy .pcppass ข้ามเครื่องมาคือสาเหตุของบั๊กนี้
+            </p>
+          </div>
+          <div class="code p-5 mt-3">
+<pre><span class="c"># ตั้งใหม่ให้ตรงกัน (แทน &lt;PCP_PASSWORD&gt; ด้วยค่าจริง อย่า commit ลง git)</span>
+ssh ovh-pgpool1 <span class="s">'read -rs PW; \
+  echo "pgpool_admin:$(pg_md5 "$PW")" | sudo tee /etc/pgpool2/pcp.conf.new; \
+  printf "localhost:9898:pgpool_admin:%s\n" "$PW" \
+    | sudo -u postgres tee /var/lib/postgresql/.pcppass'</span>
+ssh ovh-pgpool1 <span class="s">"sudo chmod 600 /var/lib/postgresql/.pcppass; sudo systemctl reload pgpool2"</span></pre>
+          </div>
+          <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+            <b class="text-[var(--ink)]">อย่าลืม</b> merge entry ของ user อื่นที่มีอยู่เดิมใน <span class="mono text-[12px]">pcp.conf</span> ก่อนเขียนทับ
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">Attach node กลับ — ส่วนใหญ่ไม่ต้องทำเอง</h3>
+          <div class="rulebox ok mb-3">
+            <div class="rc mb-1">ยืนยันจากของจริง 2026-08-31: พอ reload เสร็จ node กลับมาเอง ~8 วินาที</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              ทันทีที่ pgpool ตัวใดตัวหนึ่ง reload แล้วเห็นชื่อแมตช์ <span class="mono text-[12px]">auto_failback</span>
+              จะยิง <span class="mono text-[12px]">FAILBACK_REQUEST</span> เองแล้ว watchdog กระจายให้ทั้ง cluster —
+              <b class="text-[var(--ink)]">ให้รอ 15 วินาทีแล้วเช็ค §6 ก่อนเสมอ</b> ถ้ากลับมาเองแล้วก็ข้ามข้อนี้ไปได้เลย
+            </p>
+          </div>
+          <div class="rulebox mb-3" style="border-color:var(--signal)">
+            <div class="rc mb-1">รู้ไว้: failback มีผลกับ client ไม่ว่าจะมาจาก auto หรือสั่งเอง</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              failback event ทำให้ pgpool child process ทุกตัว <span class="mono text-[12px]">restarting myself</span>
+              และ <span class="mono text-[12px]">discarding existing connections</span> — connection ที่ค้างอยู่จะถูกตัดทั้งหมด
+              (~1–2 วินาที) query ที่กำลังวิ่งจะ error ส่วน connection pool ของ app จะ reconnect เอง
+              <b class="text-[var(--ink)]">แปลว่า §5.2 เองก็ทำให้เกิด connection reset ได้ทันที</b> ไม่ใช่แค่ข้อนี้ —
+              วางแผนจังหวะตั้งแต่ตอน reload เลย ไม่ใช่ค่อยมาคิดตอน attach
+            </p>
+          </div>
+          <div class="code p-5">
+<pre><span class="c"># รันจาก pgpool node ที่ PCP auth ผ่าน (ดูข้อ 3)</span>
+<span class="c"># watchdog จะ propagate failback ให้ทั้ง cluster เอง</span>
+ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+  pcp_attach_node -h localhost -p 9898 -U pgpool_admin -w -n 1"</span></pre>
+          </div>
+          <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+            ควรได้ <span class="mono text-[12px]">pcp_attach_node -- Command Successful</span>
+            — ถ้าเพิ่งผ่านเหตุการณ์ที่ <b>primary ตาย</b> มา ให้ attach ครบทั้ง <span class="mono text-[12px]">-n 0 1 2</span>
+            ตาม <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01</a> แทน
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 6 VERIFY ========== -->
+      <section id="verify" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">6 — ยืนยัน + ป้องกัน (Verify / Prevent)</div>
+        <h2 class="display text-3xl mb-6">เช็คว่าหายจริง แล้วปิดสาเหตุถาวร</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">รอ ~15 วินาที แล้วดู pool_nodes อีกครั้ง</h3>
+          <div class="code p-5 mb-3">
+<pre>psql -h 172.16.0.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span></pre>
+          </div>
+          <div class="card overflow-hidden mb-3">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>Node</th><th>status</th><th>pg_status</th><th>replication_state</th><th>select_cnt</th></tr></thead>
+                <tbody>
+                  <tr><td>0 · ppm</td><td><b>up</b></td><td>up</td><td><span class="mono text-[12px]">—</span> (primary)</td><td>เพิ่มขึ้น</td></tr>
+                  <tr><td>1 · ppr1</td><td><b>up</b></td><td>up</td><td><b><span class="mono text-[12px]">streaming</span></b></td><td>เริ่มจาก 0 แล้วเพิ่ม</td></tr>
+                  <tr><td>2 · ppr2</td><td><b>up</b></td><td>up</td><td><b><span class="mono text-[12px]">streaming</span></b></td><td>เพิ่มขึ้น</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ตัวชี้วัดที่สำคัญกว่า status = up</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              คือคอลัมน์ <span class="mono text-[12px]">replication_state</span> ต้องขึ้นเป็น
+              <span class="mono text-[12px]">streaming</span> แล้ว (จากเดิมที่ว่าง) — นั่นแปลว่า §5.2 ได้ผล
+              และ <span class="mono text-[12px]">auto_failback</span> จะทำงานเองได้จริงในรอบหน้า
+              ถ้า status เป็น up แต่ replication_state ยังว่าง แปลว่าแก้ยังไม่ครบ กลับไปดู §3 ข้อ 4
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ทดสอบ auto_failback ว่าฟื้นเองได้จริง (ทำในเวลาว่าง)</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เป็นการทดสอบเดียวที่พิสูจน์ว่า §5.2 ใช้ได้จริง — รีสตาร์ท PostgreSQL บน standby ตัวหนึ่งแล้วดูว่ามันกลับมาเองไหม
+            <b class="text-[var(--ink)]">ทำกับ standby เท่านั้น ห้ามทำกับ primary</b>
+          </p>
+          <div class="code p-5">
+<pre>ssh ovh-ppr2 <span class="s">"sudo systemctl restart postgresql@18-main"</span>
+<span class="c"># รอ ~30 วินาที แล้วเช็ค — ควรกลับมา up เองโดยไม่ต้องรัน pcp_attach_node</span>
+psql -h 172.16.0.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span>
+ssh ovh-pgpool1 <span class="s">"journalctl -u pgpool2 --since '-2min' --no-pager | grep -i failback"</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คว่า log ไม่ถูก flood แล้ว</h3>
+          <div class="code p-5">
+<pre>ssh ovh-pgpool1 <span class="s">"journalctl -u pgpool2 --since '-1h' --no-pager \
+  | grep -c 'authentication failed for user'"</span>
+<span class="c"># ควรได้ 0 — ถ้าได้ ~225 แปลว่า §5.3 ยังไม่ได้แก้ (fail ทุก 15 วินาที)</span></pre>
+          </div>
+        </div>
+
+        <div class="rulebox mt-8">
+          <div class="rc mb-1">ป้องกันระยะยาว — 3 อย่างที่ควรทำต่อ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b>(1) Alert ที่ควรมีตั้งแต่แรก:</b> ยิงเตือนเมื่อ <span class="mono text-[12px]">status != pg_status</span>
+            บน node ใดนานเกิน 1 นาที — เคสนี้ค้าง 2 วันเพราะไม่มี alert ตัวนี้ ·
+            <b>(2)</b> <span class="mono text-[12px]">pgpool_watchdog_scrape_success == 0</span> ต้องเป็น alert ด้วย
+            ไม่งั้น monitoring พังแล้วก็ไม่มีใครรู้อีก (นี่คือ meta-bug ของเคสนี้) ·
+            <b>(3) postgres_exporter บน replica ยังพังอยู่</b> — เวอร์ชัน 0.15.0 (ต.ค. 2023) เก่าเกินสำหรับ PostgreSQL 18
+            ขึ้น <span class="mono text-[12px]">collector failed name=stat_bgwriter · column "checkpoints_timed" does not exist</span>
+            ทุก 15 วินาที เพราะ PG17+ ย้าย column ไป <span class="mono text-[12px]">pg_stat_checkpointer</span>
+            แก้ด้วยการอัป exporter หรือปิด collector นั้นชั่วคราวด้วย
+            <span class="mono text-[12px]">--no-collector.stat_bgwriter</span>
+          </p>
+        </div>
+
+        <div class="rulebox mt-5">
+          <div class="rc mb-1">อ่านเพิ่ม</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <a href="postgresql-pgpool-cluster-guide.html" class="underline" style="color:var(--accent)">Pgpool-II Cluster Guide</a>
+            — topology, watchdog, credential layers ·
+            <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01: All Backend Nodes Down</a>
+            — เคสที่ทุก node down พร้อมกัน (ต่างกันตาม §4)
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · RUNBOOK · STANDBY STUCK DOWN"
+        line2="incident 2026-08-29 · diagnosed &amp; documented 2026-08-31">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>

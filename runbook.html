@@ -33,6 +33,7 @@
       <a href="runbook-pgpool-nodes-down.html" class="navlink"><span class="n" style="color:var(--signal)">01</span> Pgpool: All Backend Nodes Down</a>
       <a href="runbook-pm2-logs-disk-full.html" class="navlink"><span class="n" style="color:var(--signal)">02</span> Disk เต็มจาก pm2 Logs</a>
       <a href="runbook-proxmox-cpu-mce.html" class="navlink"><span class="n" style="color:var(--signal)">03</span> Proxmox Host รีบูตเอง (CPU MCE)</a>
+      <a href="runbook-standby-stuck-down.html" class="navlink"><span class="n" style="color:var(--signal)">04</span> Standby ค้าง down หลัง apt Auto-Upgrade</a>
     </nav>
     <div slot="footnote">
       <a href="postgresql-pgpool-cluster-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ Pgpool-II Cluster Guide (Setup/Deep-dive)</a>
@@ -177,6 +178,15 @@
             <p class="text-sm" style="color:var(--muted)">
               Hypervisor ดับเองไม่มี shutdown log · VM ตายพร้อมกันหมด · Linux ไม่บันทึกอะไรเลยเพราะฮาร์ดแวร์รีเซ็ตก่อน
               — วินิจฉัยด้วย <span class="mono text-[12px]">BERT</span> + BMC SEL
+            </p>
+          </a>
+          <a href="runbook-standby-stuck-down.html" class="bc-card block p-6 no-underline">
+            <div class="chip mb-4"><span class="dot" style="background:var(--signal)"></span>PGPOOL · DATABASE</div>
+            <h3 class="text-lg font-semibold mb-2" style="color:var(--ink)">Standby ค้าง down หลัง apt Auto-Upgrade</h3>
+            <p class="text-sm" style="color:var(--muted)">
+              <span class="mono text-[12px]">status=down</span> แต่ <span class="mono text-[12px]">pg_status=up</span> ·
+              <span class="mono text-[12px]">auto_failback</span> เปิดอยู่แต่ไม่ทำงานเพราะ
+              <span class="mono text-[12px]">application_name</span> ไม่แมตช์ — เงียบสนิท ไม่มี alert
             </p>
           </a>
         </div>

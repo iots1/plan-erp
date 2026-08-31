@@ -185,13 +185,29 @@
       <!-- ========== 4 ROOT CAUSE ========== -->
       <section id="rootcause" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">4 — สาเหตุ (Root Cause)</div>
-        <h2 class="display text-3xl mb-6">Pgpool ไม่ re-attach node ที่เคย mark down เองอัตโนมัติ</h2>
+        <h2 class="display text-3xl mb-6">auto_failback มีอยู่ — แต่ช่วยไม่ได้ตอนที่ pgpool มองไม่เห็น primary</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          Health check ของ pgpool ตรวจจับ <b>UP → DOWN</b> ได้เอง แต่ไม่ตรวจ <b>DOWN → UP</b> — เมื่อ node ใดถูก mark
-          down ครั้งหนึ่ง (เช่นตอน failover, restart, หรือ watchdog เสีย quorum ชั่วคราว) มันจะค้างสถานะ down อยู่แบบนั้น
-          แม้ PostgreSQL จริงจะกลับมาสมบูรณ์แล้วก็ตาม ต้องมีคนสั่ง <span class="mono text-[13px]">pcp_attach_node</span>
-          ด้วยมือเท่านั้นถึงจะกลับมาใช้งานได้
+          Health check ของ pgpool ตรวจจับ <b>UP → DOWN</b> ได้เอง ส่วนขา <b>DOWN → UP</b> เป็นหน้าที่ของ
+          <span class="mono text-[13px]">auto_failback</span> (ตั้ง <span class="mono text-[12px]">on</span> ไว้แล้วในคลัสเตอร์นี้)
+          — แต่มันจะดึง node กลับก็ต่อเมื่อ<b class="text-[var(--ink)]">ยืนยันได้ว่า node นั้น streaming อยู่จริง</b> ซึ่งมันอ่านจาก
+          <span class="mono text-[12px]">pg_stat_replication</span> บน primary
         </p>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ในเคสนี้ pgpool มองไม่เห็น primary เลยสักตัว จึงไม่มีอะไรให้ยืนยัน — <span class="mono text-[13px]">auto_failback</span>
+          ไม่มีทางทำงานได้โดยหลักการ ต้องมีคนสั่ง <span class="mono text-[13px]">pcp_attach_node</span> ด้วยมือเท่านั้น
+          <b class="text-[var(--ink)]">นี่คือเหตุผลที่ runbook นี้ยังต้องใช้มืออยู่ ไม่ใช่เพราะ pgpool ทำไม่ได้</b>
+        </p>
+        <div class="rulebox mb-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ถ้าค้าง down แค่ node เดียว ไม่ใช่ทั้งหมด = คนละเคส อย่าใช้ runbook นี้</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            standby ตัวเดียวค้าง <span class="mono text-[12px]">down</span> ขณะที่ primary ยัง up อยู่ แปลว่า
+            <span class="mono text-[12px]">auto_failback</span> <b class="text-[var(--ink)]">ควรจะฟื้นให้เองได้แต่ไม่ฟื้น</b> —
+            นั่นคือบั๊ก config ไม่ใช่ข้อจำกัดของ pgpool ไปที่
+            <a href="runbook-standby-stuck-down.html" class="underline" style="color:var(--accent)">Runbook 04: Standby ค้าง down หลัง apt Auto-Upgrade</a>
+            แทน (สาเหตุคือ <span class="mono text-[12px]">backend_application_name</span> ไม่แมตช์กับ
+            <span class="mono text-[12px]">pg_stat_replication</span> — ยืนยันแล้ว 2026-08-31)
+          </p>
+        </div>
 
         <div class="diagram mb-8">
 <pre class="mermaid">
@@ -204,7 +220,8 @@ sequenceDiagram
     PP->>PP: mark node เป็น Status = down
     Note over PG: PostgreSQL ฟื้นตัวเองปกติ (repmgr/manual)
     PG-->>PP: backend จริง = up
-    Note over PP: Health check ตรวจ UP→DOWN เท่านั้น<br/>ไม่ตรวจ DOWN→UP ให้เอง
+    Note over PP: auto_failback ต้องอ่าน pg_stat_replication<br/>บน primary เพื่อยืนยันว่า standby streaming อยู่
+    Note over PP: แต่ pgpool มองไม่เห็น primary เลยสักตัว<br/>→ ยืนยันไม่ได้ → ไม่ยิง failback
     Note over PP: Status ค้างเป็น down ต่อไปเรื่อยๆ<br/>= "all backend nodes are down"
     Note over Ev,PG: ต้อง pcp_attach_node ด้วยมือ<br/>ถึงจะกลับมา route traffic ได้
 </pre>
@@ -299,14 +316,24 @@ sequenceDiagram
         </div>
 
         <div class="rulebox mt-8">
-          <div class="rc mb-1">ป้องกันระยะยาว — ยังไม่ได้ทำ ณ ตอนเขียน runbook นี้</div>
+          <div class="rc mb-1">ป้องกันระยะยาว — แก้ไปแล้วบางส่วน (อัปเดต 2026-08-31)</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
-            Pgpool ไม่มี auto re-attach ในตัว (ต้องใช้ external script เฝ้า <span class="mono text-[12px]">pcp_node_info</span>
-            แล้วยิง attach เอง หรือ cron ตรวจสอบ) — ทางที่ยั่งยืนกว่าคือ alert เร็วพอที่มนุษย์จะกดรันตาม runbook นี้ได้ทันที
-            แนะนำเพิ่ม Grafana alert จาก metric ที่มีอยู่แล้วใน
-            <a href="postgresql-pgpool-cluster-guide.html" class="underline" style="color:var(--accent)">Pgpool-II Cluster Guide</a>
-            ให้ยิงแจ้งทันทีที่ node ใดมี <span class="mono text-[12px]">Status Name != Backend Status Name</span> นานเกิน 1 นาที
-            แทนที่จะรอ user แจ้งว่า app ต่อ DB ไม่ได้เหมือนเคสนี้
+            <b class="text-[var(--ink)]">แก้แล้ว:</b> <span class="mono text-[12px]">backend_application_name</span> ถูกตั้งให้ตรงกับ
+            <span class="mono text-[12px]">node_name</span> ของ repmgr (<span class="mono text-[12px]">ppm/ppr1/ppr2</span>) ทั้ง 3 pgpool node
+            ทำให้ <span class="mono text-[12px]">auto_failback</span> ทำงานได้จริงเป็นครั้งแรก — ครอบคลุมเคส "standby ตัวเดียวค้าง down"
+            ซึ่งเป็นเคสที่เจอบ่อยที่สุด (ดู <a href="runbook-standby-stuck-down.html" class="underline" style="color:var(--accent)">Runbook 04</a>)
+            · <b class="text-[var(--ink)]">ยังต้องใช้มืออยู่:</b> เคสของ runbook นี้ (down ทั้ง 3 node) ยังไงก็อัตโนมัติไม่ได้ เพราะ auto_failback
+            ต้องเห็น primary ก่อนถึงจะยืนยัน streaming ได้ (ดู §4)
+          </p>
+        </div>
+
+        <div class="rulebox mt-5" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">Alert ที่ยังไม่มี และควรมีที่สุด</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ยิงแจ้งทันทีที่ node ใดมี <span class="mono text-[12px]">status != pg_status</span> นานเกิน 1 นาที แทนที่จะรอ user แจ้งว่า app ต่อ DB ไม่ได้
+            · และอย่าลืม alert ตัว monitoring เอง — <span class="mono text-[12px]">pgpool_watchdog_scrape_success == 0</span>
+            ต้องเป็น alert ด้วย ไม่งั้น exporter พังแล้วก็ไม่มีใครรู้ (เคส 2026-08-31 ค้าง 2 วันเพราะ exporter auth ไม่ผ่านบน 2 ใน 3 node
+            ดูบั๊ก #37 ใน <a href="postgresql-pgpool-cluster-guide.html#bugs" class="underline" style="color:var(--accent)">คู่มือฉบับเต็ม</a>)
           </p>
         </div>
       </section>
@@ -314,7 +341,7 @@ sequenceDiagram
       <!-- FOOTER -->
       <erp-footer
         line1="ERP SYSTEM · RUNBOOK · PGPOOL ALL NODES DOWN"
-        line2="pcp_attach_node -n 0,1,2 · verified 2026-08-12/13">
+        line2="pcp_attach_node -n 0,1,2 · verified 2026-08-12/13 · §4/§6 revised 2026-08-31">
       </erp-footer>
 
     </div>

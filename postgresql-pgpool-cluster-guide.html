@@ -33,7 +33,7 @@
       <a href="#config"       class="navlink"><span class="n">05</span> Config ทุกบรรทัด</a>
       <a href="#quorum"       class="navlink"><span class="n">06</span> Watchdog Quorum &amp; VIP</a>
       <a href="#testing"      class="navlink"><span class="n">07</span> ทดสอบ Step-by-Step</a>
-      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 38 ข้อ</a>
+      <a href="#bugs"         class="navlink"><span class="n">08</span> บั๊กที่เจอ 40 ข้อ</a>
       <a href="#verified"     class="navlink"><span class="n">09</span> ผลทดสอบจริง (Verified)</a>
       <a href="#incident"     class="navlink"><span class="n">10</span> Accident Playbook · Primary ตายจริง</a>
       <a href="#autofailover" class="navlink"><span class="n">11</span> Automatic Failover · repmgr</a>
@@ -63,7 +63,7 @@
         </h1>
         <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
           บันทึกการติดตั้งจริงตั้งแต่ 0 พร้อม config ทุกบรรทัด, แผนภาพสถาปัตยกรรม, กลไก watchdog quorum/VIP failover,
-          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">38 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
+          บั๊กที่เจอทั้งหมด <b class="text-white font-medium">40 ข้อ</b> พร้อม root cause และวิธีแก้ที่ฝังอยู่ใน script แล้ว,
           ผลการทดสอบ kill-test จริงบน production servers, และการเชื่อม Prometheus/Grafana เข้ามา observe cluster —
           ทุกอย่างในเอกสารนี้ <b class="text-white font-medium">ถูกรันจริงและ verify แล้วบน OVH vRack production</b>
           ไม่ใช่ทฤษฎี
@@ -839,6 +839,50 @@ AUTH_DB_PORT=5432</pre>
               </tbody>
             </table>
           </div>
+
+          <div class="rulebox mt-8" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ตารางข้างบนคือ "ใครควรต่อเข้ามา" — ของจริงเปิดกว้างกว่านั้นมาก (ตรวจสอบ 2026-08-31)</div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+              มี NAT บน PVE map public IP พอร์ตหนึ่งเข้า <b>VIP:5432</b> ให้ app ที่อยู่นอกวง (on-prem/บ้าน) ต่อเข้ามาได้
+              — พอรวมกับสามอย่างข้างล่างนี้เท่ากับ <b class="text-[var(--ink)]">เปิดบัญชี superuser ของ production ให้ทั้งอินเทอร์เน็ตลองรหัสได้ไม่จำกัดจำนวนครั้ง</b>
+            </p>
+            <ul class="mt-3 space-y-1.5 text-[13.5px]" style="color:var(--ink-soft)">
+              <li>• <span class="mono text-[12px]">pool_hba.conf</span> บรรทัดสุดท้ายเป็น <span class="mono text-[12px]">host all all 0.0.0.0/0 scram-sha-256</span> — รับทุก IP บนโลก</li>
+              <li>• <b>ไม่มี firewall เลยบน pgpool node</b> (<span class="mono text-[12px]">ufw: inactive</span>, <span class="mono text-[12px]">iptables -P INPUT ACCEPT</span>) — พอร์ต 9898 (PCP) และ 9000 (watchdog) ไม่ได้ถูก NAT ออกไป แต่เปิดโล่งต่อทั้ง LAN</li>
+              <li>• <b>ทุก app ต่อด้วย role <span class="mono text-[12px]">postgres</span> ซึ่งเป็น superuser</b> — บนคลัสเตอร์นี้มี login role แค่ 4 ตัว (<span class="mono text-[12px]">postgres</span>, <span class="mono text-[12px]">repmgr</span> = superuser ทั้งคู่, <span class="mono text-[12px]">exporter_svc</span>, <span class="mono text-[12px]">replicator</span>) ไม่มี role สำหรับ application เลย</li>
+              <li>• <span class="mono text-[12px]">host all all 127.0.0.1/32 <b>trust</b></span> — ใครก็ตามที่มี shell บน pgpool node เป็น superuser ของทุก DB ได้ทันทีโดยไม่ต้องรู้รหัส (ทดสอบยืนยันแล้วจาก user ธรรมดา)</li>
+            </ul>
+            <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+              เหตุการณ์จริง 2026-08-31: app ตัวหนึ่งนอกวงถือรหัสเก่า retry วนอยู่ <b>118,983 ครั้งใน 4 ชั่วโมง</b> ยิงบัญชี
+              <span class="mono text-[12px]">postgres</span> ล้วน — ครั้งนี้เป็น app ของเราเองที่ config ผิด แต่ช่องทางเดียวกันนี้เปิดให้ใครก็ได้
+            </p>
+          </div>
+
+          <div class="rulebox ok mt-5">
+            <div class="rc mb-1">ทิศทางที่ตัดสินใจแล้ว — ยังไม่ implement (บันทึกไว้ 2026-08-31)</div>
+            <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+              <b class="text-[var(--ink)]">ย้าย client ที่อยู่นอกวงไปต่อผ่าน Tailscale</b> แล้วปิด NAT ที่ชี้เข้า VIP ทิ้ง
+              — พิจารณา Cloudflare Tunnel กับ static IP แล้วไม่เอา: PostgreSQL เป็น raw TCP ทำให้ Cloudflare ต้องใช้
+              <span class="mono text-[12px]">cloudflared access tcp</span> ซึ่งก็ต้องลง agent ฝั่ง client เหมือน Tailscale อยู่ดี
+              (พอร์ต TCP สาธารณะตรงๆ ต้องใช้ Spectrum = Enterprise) ส่วน static IP ทาง ISP ไม่มีให้ และ IP ปัจจุบันเป็น
+              dynamic residential ที่ whitelist แบบ <span class="mono text-[12px]">/32</span> ไม่ได้จริง
+            </p>
+            <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+              เมื่อย้ายเสร็จ <span class="mono text-[12px]">pool_hba.conf</span> จะเหลือแค่นี้ ไม่ต้องมี <span class="mono text-[12px]">0.0.0.0/0</span> เลย
+              (pgpool ปฏิเสธเองอยู่แล้วเมื่อไม่มี record ไหนแมตช์ — ไม่ต้องเขียน deny):
+            </p>
+            <div class="code p-5 mt-3">
+<pre>local   all     all             trust
+host    all     all             127.0.0.1/32     scram-sha-256   <span class="c"># เลิกใช้ trust</span>
+host    all     all             172.16.0.0/24    scram-sha-256</pre>
+            </div>
+            <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
+              <b class="text-[var(--ink)]">งานที่ต้องทำก่อนไม่ว่าจะเลือกทางไหน:</b> สร้าง role สำหรับ application ที่ไม่ใช่ superuser
+              แล้วเพิ่มเข้า <span class="mono text-[12px]">pool_passwd</span> ด้วย <span class="mono text-[12px]">pg_enc</span> ทั้ง 3 pgpool node
+              (ถ้าลืมขั้นนี้จะเจอ <span class="mono text-[12px]">username "x" or password does not exist in backend</span> ทันที) —
+              tunnel กันคนนอกได้ แต่ไม่ได้ลดความเสียหายถ้า credential หลุดจากในเครื่องเอง
+            </p>
+          </div>
         </div>
       </section>
 
@@ -928,8 +972,8 @@ backend_hostname0 = <span class="s">'172.16.0.221'</span>
 backend_port0 = <span class="d">5432</span>
 backend_weight0 = <span class="d">1</span>          <span class="c"># น้ำหนัก load balance เท่ากันทุกตัว</span>
 backend_flag0 = <span class="s">'ALLOW_TO_FAILOVER'</span>
-backend_application_name0 = <span class="s">'node0'</span>
-<span class="c"># ... backend_*1, backend_*2 สำหรับ replica</span>
+backend_application_name0 = <span class="s">'ppm'</span>     <span class="c"># ⚠ ต้อง = node_name ของ repmgr เป๊ะ ไม่ใช่ 'node0'</span>
+<span class="c"># ... backend_*1 = 'ppr1', backend_*2 = 'ppr2' สำหรับ replica</span>
 
 <span class="c"># --- streaming replication check: ถามว่าใครคือ primary ตัวจริง ---</span>
 sr_check_period = <span class="d">5</span>              <span class="c"># ทุก 5 วิ เรียก pg_is_in_recovery()</span>
@@ -1018,7 +1062,8 @@ pid_file_name = <span class="s">'/var/run/postgresql/pgpool.pid'</span>   <span 
                 <tr><td>load_balance_mode</td><td>on</td><td>เปิด routing แบบ replication-aware</td></tr>
                 <tr><td>master_slave_mode /<br>master_slave_sub_mode</td><td>on / 'stream'</td><td>บอก pgpool ว่า backend คือ streaming replication ไม่ใช่ manual replication แบบอื่น</td></tr>
                 <tr><td>disable_load_balance_on_write</td><td>'always'</td><td>ปักหมุด connection ไปที่ primary ทั้ง session หลัง write ครั้งแรก — แก้ "insert แล้ว select กลับมาดูทันที" race replication lag</td></tr>
-                <tr><td>auto_failback /<br>auto_failback_interval</td><td>on / 10</td><td>backend ที่ฟื้นจาก health-check fail กลับเข้า rotation เองอัตโนมัติ ไม่งั้นค้าง DOWN ตลอดกาลจนกว่าจะ <span class="mono text-[12px]">pcp_attach_node</span> มือ (บั๊ก #14, #20)</td></tr>
+                <tr><td>auto_failback /<br>auto_failback_interval</td><td>on / 10</td><td>backend ที่ฟื้นจาก health-check fail กลับเข้า rotation เองอัตโนมัติ ไม่งั้นค้าง DOWN ตลอดกาลจนกว่าจะ <span class="mono text-[12px]">pcp_attach_node</span> มือ (บั๊ก #14, #20) — <b style="color:var(--signal)">แต่จะไม่ทำงานเลยถ้า <span class="mono text-[12px]">backend_application_nameN</span> ไม่ตรงกับ <span class="mono text-[12px]">pg_stat_replication</span></b> (บั๊ก #39)</td></tr>
+                <tr style="background:rgba(220,90,22,.04)"><td>backend_application_name0..N</td><td><b>= node_name ของ repmgr</b><br>(<span class="mono text-[12px]">ppm</span> / <span class="mono text-[12px]">ppr1</span> / <span class="mono text-[12px]">ppr2</span>)</td><td>pgpool ใช้ค่านี้จับคู่ backend กับแถวใน <span class="mono text-[12px]">pg_stat_replication</span> บน primary — ถ้าไม่ตรง คอลัมน์ <span class="mono text-[12px]">replication_state</span>/<span class="mono text-[12px]">replication_sync_state</span> ใน <span class="mono text-[12px]">show pool_nodes</span> จะว่างเปล่า และ <span class="mono text-[12px]">auto_failback</span> จะไม่ยิงเลยแม้จะตั้ง <span class="mono text-[12px]">on</span> ไว้ ค่าฝั่ง PostgreSQL มาจาก <span class="mono text-[12px]">application_name</span> ใน <span class="mono text-[12px]">primary_conninfo</span> ซึ่ง repmgr เขียนให้ = <span class="mono text-[12px]">node_name</span> เสมอ จึงต้องแก้ฝั่ง pgpool ให้ตามมัน ไม่ใช่กลับกัน (บั๊ก #39)</td></tr>
                 <tr><td>delegate_IP</td><td>&lt;VIP&gt; <span class="mono text-[10px]" style="color:var(--signal)">(capital IP!)</span></td><td>lowercase <span class="mono text-[12px]">delegate_ip</span> ถูกเมินเงียบๆ — VIP ไม่มีวันขึ้น (บั๊ก #16)</td></tr>
                 <tr><td>if_cmd_path /<br>arping_path</td><td>'/usr/bin'</td><td>resolve token แรกของคำสั่ง VIP ซึ่งคือ <span class="mono text-[12px]">sudo</span> — ต้องชี้ path ของ sudo ไม่ใช่ของ ip/arping (บั๊ก #17)</td></tr>
                 <tr><td>arping_cmd</td><td>/usr/bin/arping</td><td>ต้องเป็น <span class="mono text-[12px]">iputils-arping</span> ไม่ใช่ package <span class="mono text-[12px]">arping</span> เฉยๆ (คนละโปรแกรม conflict กันที่ dpkg) — ติดตั้งผิดตัว <span class="mono text-[12px]">if_up_cmd</span> จะ fail ทุกครั้งแบบเงียบสนิท (บั๊ก #21)</td></tr>
@@ -1507,7 +1552,7 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
 
       <section id="bugs" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">08 — บั๊กที่เจอระหว่าง Implement</div>
-        <h2 class="display text-3xl mb-6">38 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
+        <h2 class="display text-3xl mb-6">40 บั๊กจริง — ทุกข้อเจอจากการรันจริงบน server จริง ไม่ใช่คาดการณ์ล่วงหน้า</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           บันทึกไว้ให้ครบเพื่อกันคนถัดไป (หรือตัวเราเองตอน re-provision) เจอปัญหาเดิมซ้ำแบบช้าๆ — ทั้งหมดถูกแก้ฝังอยู่ใน
           <span class="mono text-[13px]">install-postgresql.sh</span>/<span class="mono text-[13px]">install-pgpool.sh</span>
@@ -1792,9 +1837,36 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
                   <td>Backend status ของ watchdog cluster ค้างใน <span class="mono text-[11.5px]">pgpool_status</span> (<span class="mono text-[11.5px]">/var/log/postgresql/pgpool_status</span> = <span class="mono text-[11.5px]">up/down/down</span>) — ไฟล์นี้ persist ข้าม restart และตอน node ใด restart เดี่ยว watchdog จะ sync สถานะเก่าจาก majority ที่ยัง running กลับมาทับ → <span class="mono text-[11.5px]">pcp_attach_node</span> ทีละ node เอาไม่อยู่ (ต่อยอดจาก #14: down ที่ค้างลึกกว่าที่ auto_failback/attach เดี่ยวจะเคลียร์ได้)</td>
                   <td><b>stop pgpool ทั้ง 3 node พร้อมกัน → ลบ (mv) <span class="mono text-[11.5px]">pgpool_status</span> ทุก node → start ใหม่</b> ให้ health-check ตรวจ backend สดทั้งหมด (ยอม VIP หลุด ~10s ทำนอกช่วงที่มี traffic/restore). ผล: node 0 = <span class="mono text-[11.5px]">up/primary</span>, node 1,2 = <span class="mono text-[11.5px]">up/standby</span> ตรงกันทั้ง 3 view + auth-fail = 0</td>
                 </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>39</td>
+                  <td><b>สาเหตุที่แท้จริงของ #14 / #20 / #38 ทั้งหมด</b> — <span class="mono text-[11.5px]">auto_failback = on</span> ตั้งไว้ถูกทุกอย่าง (<span class="mono text-[11.5px]">interval = 10</span>) แต่<b>ไม่เคยยิงสักครั้งตลอดอายุคลัสเตอร์</b> standby ที่ถูก degenerate จะค้าง <span class="mono text-[11.5px]">status=down</span> ตลอดไปทั้งที่ <span class="mono text-[11.5px]">pg_status=up</span> และ replication lag &lt; 1ms</td>
+                  <td><span class="mono text-[11.5px]">install-pgpool.sh</span> generate <span class="mono text-[11.5px]">backend_application_name0..2</span> เป็น <span class="mono text-[11.5px]">'node0'/'node1'/'node2'</span> แต่ฝั่ง PostgreSQL ส่ง <span class="mono text-[11.5px]">application_name</span> = <span class="mono text-[11.5px]">'ppm'/'ppr1'/'ppr2'</span> (repmgr เขียนลง <span class="mono text-[11.5px]">primary_conninfo</span> จาก <span class="mono text-[11.5px]">node_name</span>) — pgpool จับคู่ backend กับแถวใน <span class="mono text-[11.5px]">pg_stat_replication</span> ด้วยชื่อนี้ พอไม่ตรงจึงยืนยันไม่ได้ว่า node นั้น streaming อยู่ → ไม่ยิง failback. <b>ลายเซ็นที่มองเห็นได้ตลอดแต่ไม่มีใครสังเกต:</b> คอลัมน์ <span class="mono text-[11.5px]">replication_state</span> และ <span class="mono text-[11.5px]">replication_sync_state</span> ใน <span class="mono text-[11.5px]">show pool_nodes</span> <b>ว่างเปล่าทุก standby</b> มาตลอด ไม่ใช่แค่ตัวที่ down</td>
+                  <td>แก้ <span class="mono text-[11.5px]">backend_application_nameN</span> ให้ = <span class="mono text-[11.5px]">node_name</span> ของ repmgr ทั้ง 3 pgpool node แล้ว <span class="mono text-[11.5px]">systemctl reload pgpool2</span> (ไล่ standby watchdog ก่อน leader ปิดท้าย) — <b>ห้ามแก้ฝั่ง repmgr แทน</b> เพราะ <span class="mono text-[11.5px]">primary_conninfo</span> ถูก repmgr เขียนทับทุกครั้งที่ promote/follow. ผลจริง 2026-08-31: reload เสร็จ ~8 วินาที <span class="mono text-[11.5px]">auto_failback</span> ยิง <span class="mono text-[11.5px]">FAILBACK_REQUEST</span> เอง node กลับมา <span class="mono text-[11.5px]">up</span> + <span class="mono text-[11.5px]">replication_state = streaming</span> โดยไม่ต้อง <span class="mono text-[11.5px]">pcp_attach_node</span> เลย. <b style="color:var(--signal)">ต้องแก้ที่ generator ด้วย</b> ไม่งั้นรัน install-pgpool.sh รอบหน้าเขียนทับกลับเป็น <span class="mono text-[11.5px]">node0</span> อีก (§07 ระบุว่า pgpool.conf ถูกเขียนทับทั้งไฟล์ทุกครั้ง)</td>
+                </tr>
+                <tr style="background:rgba(220,90,22,.04)">
+                  <td>40</td>
+                  <td>PostgreSQL ถูก restart เองโดยไม่มีใครสั่ง — pgpool log ขึ้น <span class="mono text-[11.5px]">postmaster on DB node 1 was shutdown by administrative command</span> แล้ว degenerate node นั้นทิ้ง เกิดกับ <b>primary ด้วย</b> ไม่ใช่แค่ standby</td>
+                  <td><span class="mono text-[11.5px]">apt-daily-upgrade.timer</span> (unattended-upgrades) เปิดอยู่ทั้ง 6 เครื่อง — เวลาอัป <span class="mono text-[11.5px]">libpam0g</span>/<span class="mono text-[11.5px]">libssl</span> ตัว <span class="mono text-[11.5px]">needrestart</span> จะรีสตาร์ททุก service ที่ link library นั้น ซึ่งรวม <span class="mono text-[11.5px]">postgresql@18-main</span> ด้วย และ <span class="mono text-[11.5px]">/etc/needrestart/needrestart.conf</span> เป็น default ไม่มี override ให้ DB เลย (2026-08-29: ppr1 โดน 06:51 UTC, ppm โดน 06:14 UTC วันเดียวกัน)</td>
+                  <td>วาง <span class="mono text-[11.5px]">/etc/needrestart/conf.d/99-no-db-autorestart.conf</span> ทั้ง 6 เครื่อง: <span class="mono text-[11.5px]">$nrconf{override_rc}-&gt;{qr(^postgresql)} = 0;</span> (+ <span class="mono text-[11.5px]">^pgpool</span>, <span class="mono text-[11.5px]">^repmgr</span>) — ไฟล์ใน <span class="mono text-[11.5px]">conf.d/</span> ถูก eval ต่อท้าย config หลักเรียงตามชื่อ จึงต้องขึ้นต้น <span class="mono text-[11.5px]">99-</span>. <b>ยืนยันทุกเครื่องด้วย <span class="mono text-[11.5px]">needrestart -v -b -r l</span></b> ว่าเห็นบรรทัด <span class="mono text-[11.5px]">eval .../99-no-db-autorestart.conf</span> เพราะถ้า Perl syntax ผิด needrestart จะ <span class="mono text-[11.5px]">die</span> แล้ว <b>apt ทั้งเครื่องพัง</b>. หมายเหตุ: โหมด <span class="mono text-[11.5px]">-r l</span> จะยังลิสต์ service ที่ override ไว้อยู่ — เป็นแค่รายงาน override มีผลเฉพาะตอน restart จริง</td>
+                </tr>
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">บทเรียนจากบั๊ก #39: เราแก้อาการมา 3 รอบโดยไม่เคยแตะสาเหตุ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            #14, #20, #38 ถูกบันทึกเป็นคนละบั๊กกัน และแก้ด้วยวิธีที่แรงขึ้นเรื่อยๆ — <span class="mono text-[12px]">pcp_attach_node</span> มือ →
+            เพิ่ม <span class="mono text-[12px]">auto_failback=on</span> → stop pgpool ทั้งคลัสเตอร์แล้วลบ <span class="mono text-[12px]">pgpool_status</span> ทิ้ง
+            ทั้งหมดนี้ได้ผลจริง แต่เป็นการเคลียร์อาการทุกครั้ง เพราะสาเหตุเดียวกันคือ <span class="mono text-[12px]">backend_application_name</span> ไม่แมตช์
+            ยังอยู่ครบตลอด. <b class="text-[var(--ink)]">หลักฐานอยู่ในหน้าจอมาตลอดหลายเดือน</b> — คอลัมน์
+            <span class="mono text-[12px]">replication_state</span> ใน <span class="mono text-[12px]">show pool_nodes</span> ว่างเปล่าทุก standby
+            รวมถึงตัวที่ <span class="mono text-[12px]">up</span> ปกติดี ซึ่งเป็นไปไม่ได้ถ้า streaming replication ทำงานอยู่จริง
+            แต่ไม่มีใครถามว่าทำไมมันว่าง เพราะ "ช่องว่าง" ไม่เตะตาเท่า "ค่าที่ผิด".
+            <b class="text-[var(--ink)]">กฎที่ได้:</b> เวลาอ่าน <span class="mono text-[12px]">show pool_nodes</span> ให้ตรวจคอลัมน์ที่<b>ว่าง</b>ด้วย
+            ไม่ใช่แค่คอลัมน์ <span class="mono text-[12px]">status</span> — และถ้าต้องแก้อาการเดิมเป็นครั้งที่สอง ให้ถือว่ายังไม่เจอสาเหตุ
+          </p>
         </div>
 
         <div class="rulebox" style="border-color:var(--signal)">
