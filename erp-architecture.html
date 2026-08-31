@@ -465,6 +465,7 @@
             <p class="text-[13.5px] text-[var(--ink-soft)] mb-3 leading-relaxed">ผู้จัดซื้อ (Vendor), ใบสั่งซื้อ (PO) และการรับเข้าสินค้า</p>
             <div class="flex flex-wrap gap-1.5">
               <span class="chip">suppliers</span><span class="chip">supplier_groups</span>
+              <span class="chip">supplier_settings</span>
               <span class="chip">purchase_orders</span><span class="chip">purchase_order_items</span>
               <span class="chip">purchase_order_receipts</span><span class="chip">purchase_order_returns</span>
               <span class="chip">purchase_order_attachments</span>
@@ -488,6 +489,7 @@
               <span class="chip">delivery_note_number_counters</span>
               <span class="chip">sales_returns</span><span class="chip">sales_return_items</span>
               <span class="chip">sales_return_number_counters</span>
+              <span class="chip">sales_settings</span>
             </div>
           </div>
 
@@ -509,7 +511,7 @@
               <span class="chip" style="color:var(--signal)">ledger_entries</span>
               <span class="chip">ap_invoices</span><span class="chip">ap_invoice_items</span>
               <span class="chip">ap_invoice_number_counters</span>
-              <span class="chip">finance_settings</span>
+              <span class="chip" style="color:var(--signal)">finance_settings</span>
             </div>
           </div>
 
@@ -1031,6 +1033,9 @@ sequenceDiagram
                 <tr><td>Delivery → Sales Return</td><td>เอกสารรับคืน (ใน sales-bc)</td><td>อ้าง <span class="mono text-[12px]">dn_item_id</span> รายบรรทัด — สินค้า/ลูกค้า/ใบสั่งขาย/คลัง/ราคา derive จากบรรทัดใบส่งของทั้งหมด ไม่รับจาก client · ตรวจจำนวน 2 ชั้น (sales-bc เทียบยอดที่ส่ง, inventory-bc เทียบล็อตจริง) · <span class="mono text-[12px]">sales_order_items.returned_qty</span> ทำให้สถานะใบสั่งขายพลิก CLOSED กลับเป็น PARTIAL ได้</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>sales-bc → inventory-bc</td><td>RPC <span class="mono text-[12px]">confirmSalesReturn</span> / <span class="mono text-[12px]">reverseSalesReturn</span></td><td>ของกลับเข้า<b>ล็อตเดิมที่ใบส่งของตัดออกไป</b> ด้วยต้นทุนตอนตัดออก (อ่านจากรายการ ISSUE ในสต็อกเลดเจอร์) — ไม่ใช่ FIFO และไม่ใช่ต้นทุนวันนี้ · idempotent ต่อบรรทัดผ่าน <span class="mono text-[12px]">sales_return_receipts</span> · การยกเลิกล้มเหลวได้จริงถ้าของถูกขายออกไปอีกแล้ว</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>inventory-bc → finance-bc</td><td>event <span class="mono text-[12px]">sales_return.received</span></td><td>ต้นทุนรายล็อตของที่คืน → finance-bc กลับ COGS <b>เฉพาะส่วนที่คืน</b> โดยลดแถว <span class="mono text-[12px]">cogs_entries</span> เดิม (แถวติดลบมีอยู่ไม่ได้ตาม CHECK) และโพสต์ journal กลับด้านผูกกับบรรทัดใบส่งของ — คนละ event กับ <span class="mono text-[12px]">stock.deduction_reversed</span> ที่ล้างทั้งการขาย</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>Sales Order → Delivery (เครดิต)</td><td>เช็ควงเงินซ้ำตอน submit ใบส่งของ</td><td>เดิมเช็คครั้งเดียวตอนยืนยันออเดอร์ · เวลาผ่านไประหว่างยืนยันกับส่งของ และ<b>การส่งของคือจุดสุดท้ายที่ของยังเป็นของเรา</b> · ที่นี่ถาม "เกินอยู่ตอนนี้ไหม" (ส่ง 0 เข้าไปคิด) ไม่ใช่ "ใบนี้จะทำให้เกินไหม" เพราะการส่งของไม่เปลี่ยนยอดใช้วงเงิน · เกิน = <span class="mono text-[12px]">PENDING_APPROVAL</span> โดยยังไม่ตัดสต็อก ปลดด้วย <span class="mono text-[12px]">delivery_note:approve</span></td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>Stock Adjustment → อนุมัติ</td><td><span class="mono text-[12px]">stock_settings.adjustment_approval_threshold</span></td><td>เอกสาร submittable เดียวที่เคยไม่มีขั้นอนุมัติและไม่มีขอบเขตมูลค่า · เกินเพดาน = <span class="mono text-[12px]">PENDING_APPROVAL</span> โดยยังไม่แตะสต็อกแม้บรรทัดเดียว ปลดด้วย <span class="mono text-[12px]">stock_adjustment:approve</span> · มูลค่าคิดแบบ absolute รายบรรทัด ไม่ใช่ยอดสุทธิ (ตัด 100k ล็อตหนึ่ง + เพิ่ม 100k อีกล็อต สุทธิศูนย์แต่เคลื่อนของมหาศาล) · null = ไม่ต้องอนุมัติ (พฤติกรรมเดิม)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
+                <tr><td>กรอบราคา ±20% → setting ต่อ BC</td><td><span class="mono text-[12px]">price_tolerance_percent</span> ใน <span class="mono text-[12px]">sales_settings</span> / <span class="mono text-[12px]">supplier_settings</span> / <span class="mono text-[12px]">finance_settings</span></td><td>เดิม hard-code 20% ในโค้ด · แยกต่อ BC เพราะตารางค่าตั้งค่าร่วมกันคือการอ่านข้าม database ซึ่ง database-per-context ห้าม และดึงผ่าน RPC จะทำให้การสร้างเอกสารพังทุกครั้งที่ BC อื่นล่ม เพื่อถามเรื่องนโยบาย · หน้า System Settings ของ iam รวมทั้งสามค่า (บวกเพดานอนุมัติใบปรับยอด) ไว้ในฟอร์มเดียว — ความซ้ำอยู่ที่ที่เก็บ ไม่ใช่ที่ขั้นตอนของผู้ใช้</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>inventory-bc → supplier-bc</td><td>RPC <span class="mono text-[12px]">applyPurchaseReturn</span></td><td>เพิ่ม <span class="mono text-[12px]">returned_qty</span> (idempotent ด้วย <span class="mono text-[12px]">return_item_id</span>) — สถานะ PO คิดจากยอดสุทธิ <span class="mono text-[12px]">received_qty − returned_qty</span> จึงพลิก RECEIVED กลับเป็น PARTIAL ได้</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>sales-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getCustomerById</span></td><td>ชื่อ + เลขผู้เสียภาษีลูกค้า → <b>snapshot</b> ลงเอกสาร (§86/4(2) บังคับให้พิมพ์บนใบกำกับภาษีเต็มรูป/ใบแจ้งหนี้+ใบกำกับ)</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>
                 <tr><td>inventory-bc → finance-bc</td><td>RPC <span class="mono text-[12px]">getProductById</span></td><td>sku/ชื่อ + <span class="mono text-[12px]">tax_category.vat_treatment</span> → snapshot ต่อบรรทัด</td><td><span class="chip" style="border-color:var(--signal);color:var(--signal)">implement แล้ว</span></td></tr>

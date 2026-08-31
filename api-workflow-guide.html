@@ -63,7 +63,7 @@
         </p>
         <div class="mt-9 flex flex-wrap gap-2.5">
           <span class="chip">21 Business Flows</span>
-          <span class="chip">301 REST Endpoints</span>
+          <span class="chip">308 REST Endpoints</span>
           <span class="chip">8 Bounded Contexts</span>
           <span class="chip">JSON:API Envelope</span>
         </div>
@@ -163,7 +163,7 @@ flowchart LR
               <tr><td class="mono">A5</td><td>ตั้งหนี้ผู้ขาย (3-way match)</td><td>AR / AP Clerk</td><td>AP Invoice · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">B1</td><td>เสนอราคา</td><td>Sales Rep</td><td>Quotation · DRAFT→SENT→APPROVED</td></tr>
               <tr><td class="mono">B2</td><td>แปลงเป็นใบสั่งขาย</td><td>Sales Rep · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>SO · <b>PENDING_APPROVAL</b>→CONFIRMED→PARTIAL→CLOSED</td></tr>
-              <tr><td class="mono">B3</td><td>ส่งของ</td><td>Warehouse Staff</td><td>DN · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">B3</td><td>ส่งของ</td><td>Warehouse Staff · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>DN · DRAFT→<b>PENDING_APPROVAL</b>→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">B4</td><td>รับคืนสินค้าจากลูกค้า</td><td>Warehouse Staff</td><td>SRN · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">C1</td><td>ออกใบกำกับภาษี/ใบเสร็จ</td><td>Accountant</td><td>Receipt · DRAFT→ISSUED→VOID</td></tr>
               <tr><td class="mono">C2</td><td>ใบลดหนี้ / ใบเพิ่มหนี้</td><td>Accountant</td><td>Receipt (CN/DN) · DRAFT→ISSUED</td></tr>
@@ -173,7 +173,7 @@ flowchart LR
               <tr><td class="mono">C6</td><td>ปิดงวดบัญชี</td><td>Finance Manager</td><td>ไม่มีสถานะ (one-way ratchet)</td></tr>
               <tr><td class="mono">C7</td><td>รายงานลูกหนี้/เจ้าหนี้ค้างชำระ</td><td>AR / AP Clerk · Finance Manager</td><td>อ่านอย่างเดียว</td></tr>
               <tr><td class="mono">D1</td><td>โอน / เบิก / แปรรูป</td><td>Warehouse Staff</td><td>Stock Entry · DRAFT→SUBMITTED→CANCELLED</td></tr>
-              <tr><td class="mono">D2</td><td>ปรับยอดสต็อก</td><td>Warehouse Manager</td><td>Stock Adjustment · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">D2</td><td>ปรับยอดสต็อก</td><td>Warehouse Manager</td><td>Stock Adjustment · DRAFT→<b>PENDING_APPROVAL</b>→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">E1</td><td>รายงานสต็อก</td><td>Warehouse Manager</td><td>อ่านอย่างเดียว</td></tr>
               <tr><td class="mono">E2</td><td>รายงานบัญชี &amp; กำไร</td><td>Accountant / Executive</td><td>อ่านอย่างเดียว</td></tr>
               <tr><td class="mono">E3</td><td>พิมพ์เอกสาร (PDF)</td><td>ทุกบทบาท</td><td>เรียก render</td></tr>
@@ -712,7 +712,8 @@ sequenceDiagram
             <tbody>
               <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /sales-bc/v1/sales-orders?relations=items</td><td class="mono text-[11px]">sales_order:view</td><td>หาบรรทัดที่ยังส่งไม่ครบ</td></tr>
               <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes</td><td class="mono text-[11px]">delivery_note:create</td><td><b>DRAFT</b> · ยังไม่ตัดสต็อก</td></tr>
-              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/submit</td><td class="mono text-[11px]">delivery_note:submit</td><td><b>ตัดสต็อก FIFO/FEFO + บวก delivered_qty + ยิง COGS</b></td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/submit</td><td class="mono text-[11px]">delivery_note:submit</td><td><b>ตัดสต็อก FIFO/FEFO + บวก delivered_qty + ยิง COGS</b> — หรือ <b>PENDING_APPROVAL</b> ถ้าลูกค้าเกินวงเงิน (ยังไม่ตัดสต็อก)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/approve</td><td class="mono text-[11px]">delivery_note:approve</td><td>ปลดใบที่ติด PENDING_APPROVAL เพราะเกินวงเงิน แล้วตัดสต็อก</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/cancel</td><td class="mono text-[11px]">delivery_note:cancel</td><td>คืนสต็อกเข้าล็อตเดิม + กลับรายการ COGS</td></tr>
             </tbody>
           </table>
@@ -736,6 +737,19 @@ sequenceDiagram
             ล็อตที่<b>หมดอายุแล้วจะถูกข้าม</b>ไม่นำมาขาย และสินค้าชุด (bundle) จะถูกแตกเป็นสินค้าย่อยตอนตัดจริง —
             ถ้าย่อยตัวใดไม่พอ ก็ตกทั้งชุด · เพิ่ม 2026-08-30: <span class="mono text-[12px]">document_date</span> ของใบส่งของ (ไม่ใช่วันนี้)
             ตกในงวดที่ปิดแล้วก็ถูกปฏิเสธด้วย <span class="mono text-[12px]">409</span> เหมือนกัน (<span class="mono text-[12px]">stock_frozen_upto</span>)
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">เช็ควงเงินเครดิตซ้ำตอนส่งของ (2026-09-01)</div>
+          <p class="text-[13.5px]">
+            เดิมเช็คแค่ครั้งเดียวตอนยืนยันใบสั่งขาย (B2) · <b>เวลาผ่านไประหว่างยืนยันกับส่งของ</b> — ออเดอร์ที่ยืนยันตอนวงเงินยังพอ
+            อาจถูกส่งอีกหลายสัปดาห์ต่อมาตอนที่ลูกค้าไปก่อหนี้ที่อื่นเพิ่มแล้ว และ<b>การส่งของคือจุดสุดท้ายที่ของยังเป็นของเรา</b>
+            (สิ่งที่ทำให้หนี้เก็บไม่ได้คือการส่งของ ไม่ใช่การยืนยันออเดอร์)<br>
+            <b>คำถามคนละข้อกับตอน B2</b>: ที่นี่ถาม "<b>เกินวงเงินอยู่ตอนนี้ไหม</b>" ไม่ใช่ "ใบนี้จะทำให้เกินไหม" — เพราะการส่งของ
+            ไม่ทำให้ยอดใช้วงเงินเปลี่ยนเลย แค่ย้ายมูลค่าจากฝั่ง "ออเดอร์ที่ยังไม่ส่ง" ไปฝั่งหนี้ ถามแบบเดิมจะได้คำตอบเดิมทุกครั้ง<br>
+            เกินวงเงิน → ใบติดสถานะ <b>PENDING_APPROVAL</b> และ<b>ยังไม่ตัดสต็อกเลย</b> (เช็คก่อนเรียก inventory-bc) จึงไม่มีของค้างจองไว้กับใบที่อาจไม่ได้ส่ง ·
+            ปลดด้วย <span class="mono text-[12px]">POST /delivery-notes/{id}/approve</span> (สิทธิ์ใหม่ <span class="mono text-[12px]">delivery_note:approve</span>) ·
+            finance-bc ตอบไม่ได้ = ติด hold ด้วย ไม่ยอมส่งของบนยอดที่ไม่รู้ · ไม่คำนวณซ้ำตอนอนุมัติ และเก็บ snapshot ไว้เป็นหลักฐาน
           </p>
         </div>
         <div class="rulebox mb-8">
@@ -1210,10 +1224,25 @@ sequenceDiagram
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-adjustments</td><td class="mono text-[11px]">stock_adjustment:create</td><td>DRAFT</td></tr>
-              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-adjustments/{id}/submit</td><td class="mono text-[11px]">stock_adjustment:submit</td><td>ปรับยอดจริง + ลง ledger</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-adjustments/{id}/submit</td><td class="mono text-[11px]">stock_adjustment:submit</td><td>ปรับยอดจริง + ลง ledger — หรือ <b>PENDING_APPROVAL</b> ถ้ามูลค่าเกินเพดาน (ยังไม่แตะสต็อก)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-adjustments/{id}/approve</td><td class="mono text-[11px]">stock_adjustment:approve</td><td>ปลดใบที่เกินเพดานแล้วปรับยอดจริง</td></tr>
               <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/stock-adjustments/{id}/cancel</td><td class="mono text-[11px]">stock_adjustment:cancel</td><td>กลับรายการ</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">เพดานอนุมัติ — ใบใหญ่ต้องมีคนเห็น (2026-09-01)</div>
+          <p class="text-[13.5px]">
+            เดิมใบปรับยอดสต็อกเป็น<b>เอกสารเดียวในระบบที่ไม่มีขั้นอนุมัติและไม่มีขอบเขตอะไรเลย</b> — ใครมีสิทธิ์
+            <span class="mono text-[12px]">stock_adjustment:submit</span> ก็ตัดจำหน่ายของเท่าไหร่ก็ได้ ·
+            ตอนนี้ <span class="mono text-[12px]">stock_settings.adjustment_approval_threshold</span> เป็นเพดานมูลค่า
+            เกินแล้วใบไปอยู่ <b>PENDING_APPROVAL</b> โดย<b>ยังไม่แตะสต็อกเลย</b> (ไม่ใช่แตะบางบรรทัด)<br>
+            <b>มูลค่าใบ = Σ |จำนวนที่นับได้ − ยอดในระบบ| × ต้นทุนล็อต</b> — นับ<b>ค่าสัมบูรณ์รายบรรทัด ไม่ใช่ยอดสุทธิ</b>:
+            ใบที่ตัด 100,000 ออกจากล็อตหนึ่งและเพิ่ม 100,000 อีกล็อต สุทธิเป็นศูนย์แต่เคลื่อนของมหาศาล ซึ่งคือกรณีที่ต้องมีคนเห็นที่สุด<br>
+            <b>ไม่ตั้งเพดาน (เว้นว่าง) = ไม่ต้องอนุมัติเลย</b> ตรงกับพฤติกรรมเดิมทุกอย่าง จึงไม่กระทบระบบที่ใช้อยู่จนกว่าจะมีคนไปตั้งค่า ·
+            ตอน hold <b>ไม่บันทึก system_qty ไว้</b> เพราะยอดในระบบขยับได้ระหว่างรออนุมัติ — <span class="mono text-[12px]">approve</span> อ่านใหม่ใต้ lock ·
+            อนุมัติแล้ว<b>ไม่คำนวณเพดานซ้ำ</b> แต่<b>ตรวจงวดสต็อกซ้ำ</b> (ผู้อนุมัติข้ามเพดานได้ ข้ามงวดที่ปิดแล้วไม่ได้)
+          </p>
         </div>
       </section>
 
@@ -1327,13 +1356,30 @@ sequenceDiagram
               <tr><td>inventory</td><td class="mono text-[11.5px]">/item-suppliers · /tax-categories · /bundles</td><td>ผู้ขายต่อสินค้า · ประเภทภาษีต่อสินค้า · สินค้าชุด</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/products/{id}/reorder-levels · /products/{id}/variant-barcodes</td><td>จุดสั่งซื้อซ้ำ · บาร์โค้ด</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/purchase-returns</td><td>ส่งคืนสินค้าให้ผู้ขาย (ดู A4 ด้านบน) — submittable, ไม่ใช่ CRUD ตรง</td></tr>
-              <tr><td>inventory</td><td class="mono text-[11.5px]">/stock-settings</td><td><b>GET/PUT เท่านั้น</b> · FIFO/FEFO · วันแจ้งเตือนหมดอายุ · % รับเกิน</td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/stock-settings</td><td><b>GET/PUT เท่านั้น</b> · FIFO/FEFO · วันแจ้งเตือนหมดอายุ · % รับเกิน · <b>เพดานอนุมัติใบปรับยอด</b></td></tr>
+              <tr><td>sales</td><td class="mono text-[11.5px]">/sales-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบเสนอราคา (%)</td></tr>
+              <tr><td>supplier</td><td class="mono text-[11.5px]">/supplier-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบสั่งซื้อ (%)</td></tr>
+              <tr><td>finance</td><td class="mono text-[11.5px]">/finance-settings</td><td><b>GET/PATCH</b> · กรอบราคาใบตั้งหนี้ (%) — <span class="mono text-[11px]">ledger_frozen_upto</span> แก้ที่นี่ไม่ได้ ต้องผ่าน close-period (ดู C6)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/suppliers · /supplier-groups</td><td>ผู้ขาย + กลุ่ม</td></tr>
               <tr><td>sales</td><td class="mono text-[11.5px]">/customers · /customer-groups</td><td>ลูกค้า + กลุ่ม (วงเงินเครดิต · price list เริ่มต้น)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/tax-configs</td><td>อัตรา VAT / หัก ณ ที่จ่าย · <b>ห้ามช่วงวันซ้อนกันใน code เดียว</b></td></tr>
               <tr><td>iam</td><td class="mono text-[11.5px]">/users · /roles · /policies · /permissions · /access-keys</td><td>ผู้ใช้ · บทบาท · นโยบายสิทธิ์ · คีย์สำหรับระบบภายนอก</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">กรอบราคา ±20% ตั้งค่าได้แล้ว — และตั้งแยกต่อ BC (2026-09-01)</div>
+          <p class="text-[13.5px]">
+            กรอบที่กันการกรอกราคาผิดปกติบนใบเสนอราคา ใบสั่งซื้อ และใบตั้งหนี้ เดิม <b>hard-code ไว้ 20%</b> ในโค้ด ·
+            ธุรกิจเกษตรราคาผันผวนเกิน 20% ตามฤดู กรอบตายตัวจึงเป็นได้แค่ "แคบเกินในฤดูหนึ่ง" หรือ "ไม่มีประโยชน์ในอีกฤดู" —
+            ต้องเป็นตัวเลขของลูกค้า ไม่ใช่ของเรา<br>
+            <b>ทำไมตั้งแยก 3 ที่</b>: ตารางค่าตั้งค่าร่วมกันคือการอ่านข้าม database ซึ่ง database-per-context ห้าม
+            และถ้าดึงผ่าน RPC การสร้างเอกสารจะพังทุกครั้งที่ BC อื่นล่ม — เพื่อถามเรื่อง<b>นโยบาย</b> ·
+            หน้า <b>System Settings ของ iam</b> รวมทั้งสามค่า (บวกเพดานอนุมัติใบปรับยอดสต็อก) ไว้ในฟอร์มเดียว
+            ความซ้ำจึงอยู่ที่ที่เก็บ ไม่ใช่ที่ขั้นตอนการทำงานของผู้ใช้<br>
+            ค่าเริ่มต้นทุก BC = <b>20</b> ซึ่งคือค่าที่ hard-code ไว้เดิม จึงไม่เปลี่ยนพฤติกรรมของระบบที่ใช้อยู่จนกว่าจะมีคนแก้ ·
+            ตั้ง <b>0</b> = ต้องตรงราคาอ้างอิงเป๊ะ
+          </p>
         </div>
         <div class="rulebox mb-6">
           <div class="rc mb-1">สแกนบาร์โค้ด — ไม่ใช่ CRUD ตรง เพิ่ม 2026-08-30</div>
@@ -1417,7 +1463,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">inventory-bc · สินค้า · คลัง · สต็อก <span class="mono text-[13px] text-[var(--muted)]">— 131 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">inventory-bc · สินค้า · คลัง · สต็อก <span class="mono text-[13px] text-[var(--muted)]">— 132 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1523,6 +1569,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}</td><td class="mono text-[11px]">stock_adjustment:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}</td><td class="mono text-[11px]">stock_adjustment:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}</td><td class="mono text-[11px]">stock_adjustment:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}/approve</td><td class="mono text-[11px]">stock_adjustment:approve</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}/cancel</td><td class="mono text-[11px]">stock_adjustment:cancel</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-adjustments/{id}/submit</td><td class="mono text-[11px]">stock_adjustment:submit</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/stock-balances</td><td class="mono text-[11px]">stock_balance:view</td></tr>
@@ -1556,7 +1603,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">supplier-bc · ผู้ขาย · ใบสั่งซื้อ <span class="mono text-[13px] text-[var(--muted)]">— 24 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">supplier-bc · ผู้ขาย · ใบสั่งซื้อ <span class="mono text-[13px] text-[var(--muted)]">— 26 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1585,10 +1632,12 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers/{id}</td><td class="mono text-[11px]">supplier:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers/{id}</td><td class="mono text-[11px]">supplier:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers/{id}</td><td class="mono text-[11px]">supplier:update</td></tr>
+                          <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-settings</td><td class="mono text-[11px]">supplier_setting:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-settings</td><td class="mono text-[11px]">supplier_setting:update</td></tr>
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 43 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 46 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1608,6 +1657,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}</td><td class="mono text-[11px]">delivery_note:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}</td><td class="mono text-[11px]">delivery_note:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}</td><td class="mono text-[11px]">delivery_note:update</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}/approve</td><td class="mono text-[11px]">delivery_note:approve</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}/cancel</td><td class="mono text-[11px]">delivery_note:cancel</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}/submit</td><td class="mono text-[11px]">delivery_note:submit</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations</td><td class="mono text-[11px]">quotation:view</td></tr>
@@ -1635,11 +1685,13 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-returns/{id}</td><td class="mono text-[11px]">sales_return:update</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-returns/{id}/cancel</td><td class="mono text-[11px]">sales_return:cancel</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-returns/{id}/submit</td><td class="mono text-[11px]">sales_return:submit</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-settings</td><td class="mono text-[11px]">sales_setting:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-settings</td><td class="mono text-[11px]">sales_setting:update</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders/{id}/cancel</td><td class="mono text-[11px]">sales_order:cancel</td></tr>
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 54 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 55 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1662,6 +1714,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/cogs-entries/{id}</td><td class="mono text-[11px]">cogs_entry:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings</td><td class="mono text-[11px]">period:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PATCH</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings</td><td class="mono text-[11px]">finance_setting:update</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings/close-period</td><td class="mono text-[11px]">period:close</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ledger-entries/{id}</td><td class="mono text-[11px]">ledger_entry:view</td></tr>
@@ -1725,7 +1778,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 301 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 308 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->
