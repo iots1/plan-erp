@@ -62,8 +62,8 @@
           เรียงตามลำดับการทำงานจริงของแต่ละบทบาท พร้อมตัวอย่าง payload และสถานะเอกสารที่เปลี่ยนในแต่ละขั้น
         </p>
         <div class="mt-9 flex flex-wrap gap-2.5">
-          <span class="chip">19 Business Flows</span>
-          <span class="chip">290 REST Endpoints</span>
+          <span class="chip">20 Business Flows</span>
+          <span class="chip">292 REST Endpoints</span>
           <span class="chip">8 Bounded Contexts</span>
           <span class="chip">JSON:API Envelope</span>
         </div>
@@ -169,6 +169,7 @@ flowchart LR
               <tr><td class="mono">C4</td><td>รับ/จ่ายชำระเงิน</td><td>AR / AP Clerk</td><td>Payment · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">C5</td><td>กำหนดงวดชำระ</td><td>AR Clerk</td><td>ไม่มีสถานะ (แทนที่ทั้งชุด)</td></tr>
               <tr><td class="mono">C6</td><td>ปิดงวดบัญชี</td><td>Finance Manager</td><td>ไม่มีสถานะ (one-way ratchet)</td></tr>
+              <tr><td class="mono">C7</td><td>รายงานลูกหนี้/เจ้าหนี้ค้างชำระ</td><td>AR / AP Clerk · Finance Manager</td><td>อ่านอย่างเดียว</td></tr>
               <tr><td class="mono">D1</td><td>โอน / เบิก / แปรรูป</td><td>Warehouse Staff</td><td>Stock Entry · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">D2</td><td>ปรับยอดสต็อก</td><td>Warehouse Manager</td><td>Stock Adjustment · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">E1</td><td>รายงานสต็อก</td><td>Warehouse Manager</td><td>อ่านอย่างเดียว</td></tr>
@@ -201,7 +202,7 @@ flowchart LR
               <tr><td><b>Sales Rep</b><br><span class="mono text-[11px]">พนักงานขาย</span></td><td class="mono text-[12px]">B1</td><td class="mono text-[11.5px]">customer:* · quotation:create/view/update/send/cancel</td></tr>
               <tr><td><b>Sales Manager</b><br><span class="mono text-[11px]">ผู้จัดการขาย</span></td><td class="mono text-[12px]">B2</td><td class="mono text-[11.5px]">quotation:approve · sales_order:create/view/cancel/<b>approve</b></td></tr>
               <tr><td><b>Accountant</b><br><span class="mono text-[11px]">นักบัญชี</span></td><td class="mono text-[12px]">C1 · C2 · E2</td><td class="mono text-[11.5px]">receipt:* · tax_config:* · ledger_entry:view · trial_balance:view · cogs_entry:view · period:view</td></tr>
-              <tr><td><b>AR / AP Clerk</b><br><span class="mono text-[11px]">เจ้าหน้าที่การเงิน</span></td><td class="mono text-[12px]">A5 · C3 · C4 · C5</td><td class="mono text-[11.5px]">billing_note:* · payment_entry:* · payment_schedule:* · ap_invoice:*</td></tr>
+              <tr><td><b>AR / AP Clerk</b><br><span class="mono text-[11px]">เจ้าหน้าที่การเงิน</span></td><td class="mono text-[12px]">A5 · C3 · C4 · C5 · C7</td><td class="mono text-[11.5px]">billing_note:* · payment_entry:* · payment_schedule:* · ap_invoice:*</td></tr>
               <tr><td><b>Finance Manager</b><br><span class="mono text-[11px]">ผู้จัดการการเงิน</span></td><td class="mono text-[12px]">C6 · E2</td><td class="mono text-[11.5px]">period:view/close · report:view</td></tr>
               <tr><td><b>Executive</b><br><span class="mono text-[11px]">ผู้บริหาร</span></td><td class="mono text-[12px]">E1 · E2</td><td class="mono text-[11.5px]">*:view (อ่านอย่างเดียวทุก BC)</td></tr>
               <tr><td><b>Security / User Admin</b><br><span class="mono text-[11px]">ผู้ดูแลระบบ</span></td><td class="mono text-[12px]">—</td><td class="mono text-[11.5px]">user:* · role:* · policy:* · access_key:* · permission_sync:*</td></tr>
@@ -542,6 +543,8 @@ sequenceDiagram
   <span class="s">"vendor_document_number"</span>: <span class="s">"INV-2026-8842"</span>,   <span class="c">// เลขบนใบกระดาษของผู้ขาย — คนละเลขกับ APINV ของเรา</span>
   <span class="s">"document_date"</span>: <span class="s">"2026-08-30T00:00:00+07:00"</span>, <span class="c">// วันที่บนใบผู้ขาย ไม่ใช่วันที่เรากรอก — กำหนดงวดบัญชี + อัตรา VAT</span>
   <span class="s">"is_vat_included"</span>: <span class="k">false</span>,               <span class="c">// ราคาบนใบผู้ขายรวม VAT แล้วหรือยัง — AP Clerk เป็นคนตอบ</span>
+  <span class="s">"due_date"</span>: <span class="k">null</span>,                      <span class="c">// ไม่ส่ง = document_date + credit_terms ของผู้ขาย · null = ไม่มีกำหนดชำระ</span>
+  <span class="s">"wht_config_code"</span>: <span class="k">null</span>,               <span class="c">// เช่น "WHT3_SERVICE" ถ้าจ่ายค่าบริการที่ต้องหัก ณ ที่จ่าย</span>
   <span class="s">"discount_mode"</span>: <span class="s">"none"</span>,
   <span class="s">"items"</span>: [
     { <span class="s">"grn_item_id"</span>: <span class="s">"e2df…"</span>,          <span class="c">// อ้างรายการรับเข้า — ที่เหลือระบบ derive ให้หมด</span>
@@ -568,12 +571,22 @@ sequenceDiagram
             <span class="mono text-[12px]">document_date</span> ตกในงวดบัญชีที่ปิดแล้ว (ดู C6)
           </p>
         </div>
-        <div class="rulebox mb-8">
+        <div class="rulebox mb-4">
           <div class="rc ok mb-1">1 ใบตั้งหนี้ ผูกได้หลาย GRN</div>
           <p class="text-[13.5px]">
             ผู้ขายส่งของหลายรอบแล้วเก็บเงินทีเดียวเป็นเรื่องปกติ — เพราะ match เกิดที่<b>ระดับบรรทัด</b> (แต่ละบรรทัดมี grn_item_id ของตัวเอง) ไม่ใช่ที่หัวเอกสาร
-            หน้าจอจึงควรให้เลือกรายการรับเข้าข้ามหลาย GRN มารวมในใบเดียวได้ · <span class="mono text-[12px]">wht_rate</span>/<span class="mono text-[12px]">total_wht</span>
-            บนใบตั้งหนี้<b>ยังไม่ใช้งาน</b> — การหัก ณ ที่จ่ายจริงเกิดตอนจ่ายเงินที่ C4 เท่านั้น
+            หน้าจอจึงควรให้เลือกรายการรับเข้าข้ามหลาย GRN มารวมในใบเดียวได้
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">หัก ณ ที่จ่าย + กำหนดชำระ (2026-08-31)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">wht_rate</span>/<span class="mono text-[12px]">total_wht</span> เดิมเป็นคอลัมน์ที่เตรียมไว้แต่ไม่มีใครเซ็ต ·
+            ตอนนี้ระบบ resolve จาก <span class="mono text-[12px]">tax_configs</span> ตาม <span class="mono text-[12px]">wht_config_code</span> ที่ส่งมา
+            (คิดจาก <span class="mono text-[12px]">net_amount</span> — หลังส่วนลด ก่อน VAT ฐานเดียวกับฝั่งขาย) · <b>ไม่ลด <span class="mono text-[12px]">total</span> และไม่ลง GL ที่นี่</b>
+            — การหักจริงเกิดตอนจ่ายเงินที่ C4 ซึ่งใช้ <span class="mono text-[12px]">total_wht</span> นี้เป็น<b>เพดาน</b> · ไม่ส่ง code = ไม่มีการหัก และใบจ่ายจะหักไม่ได้เลย<br>
+            <span class="mono text-[12px]">due_date</span> คิดจาก <span class="mono text-[12px]">document_date + suppliers.credit_terms</span> ตอนสร้าง (ส่งมา override ได้) —
+            เป็นตัวจัดกลุ่มในรายงานเจ้าหนี้ค้างชำระ (ดู C7) · ไม่ได้ตกลงเครดิตเทอมไว้ = <span class="mono text-[12px]">null</span> ไปอยู่คอลัมน์ no_due_date
           </p>
         </div>
       </section>
@@ -632,7 +645,8 @@ sequenceDiagram
   <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,
   <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount_value"</span>: <span class="t">0</span>,
   <span class="s">"items"</span>: [
-    { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">10</span>, <span class="s">"unit_price"</span>: <span class="t">520</span>,
+    { <span class="s">"dn_item_id"</span>: <span class="s">"a91c…"</span>,        <span class="c">// บรรทัดใบส่งของที่ออกบิล — บังคับเมื่อหัวเอกสารมี delivery_note_id</span>
+      <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">10</span>, <span class="s">"unit_price"</span>: <span class="t">520</span>,
       <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> }
   ]
 }</pre>
@@ -784,9 +798,10 @@ sequenceDiagram
   <span class="s">"document_type"</span>: <span class="s">"FULL_TAX_INVOICE"</span>,
   <span class="s">"reference_receipt_id"</span>: <span class="k">null</span>,   <span class="c">// บังคับเมื่อเป็น CREDIT_NOTE / DEBIT_NOTE</span>
   <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,
-  <span class="s">"delivery_note_id"</span>: <span class="s">"e018…"</span>,   <span class="c">// อ้างใบส่งของ (ไม่บังคับ)</span>
+  <span class="s">"delivery_note_id"</span>: <span class="s">"e018…"</span>,   <span class="c">// อ้างใบส่งของ (ไม่บังคับ) — ถ้าใส่ ทุกบรรทัดต้องมี dn_item_id</span>
   <span class="s">"document_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,
-  <span class="s">"wht_config_code"</span>: <span class="k">null</span>,        <span class="c">// เช่น "WHT3_SERVICE" ถ้ามีหัก ณ ที่จ่าย</span>
+  <span class="s">"due_date"</span>: <span class="k">null</span>,               <span class="c">// ไม่ส่ง = document_date + credit_terms ของลูกค้า · null = ไม่มีกำหนดชำระ</span>
+  <span class="s">"wht_config_code"</span>: <span class="k">null</span>,        <span class="c">// เช่น "WHT3_SERVICE" — ระบบ resolve อัตราเอง ห้ามส่งอัตรามาตรง</span>
   <span class="s">"currency"</span>: <span class="s">"THB"</span>, <span class="s">"currency_rate"</span>: <span class="t">1</span>,
   <span class="s">"currency_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,
   <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
@@ -800,12 +815,30 @@ sequenceDiagram
 <span class="c">// response จะมี sub_total · total_discount · net_amount · vat_amount · total</span>
 <span class="c">// และ 3 ถังภาษี: total_standard_vat_price / total_zero_vat_price / total_exempt_vat_price</span></pre>
         </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">อ้างใบส่งของแล้วต้องอ้างให้จริง (2026-08-31)</div>
+          <p class="text-[13.5px]">
+            เดิม <span class="mono text-[12px]">delivery_note_id</span> เป็น uuid ที่<b>ไม่มีใครตรวจ</b> — ออกใบกำกับสินค้าที่ไม่เคยส่ง หรือออกซ้ำใบส่งเดิมได้
+            (ตรงข้ามกับฝั่งซื้อที่ AP บังคับ <span class="mono text-[12px]">grn_item_id</span> มาตั้งแต่แรก)<br>
+            กฎตอนนี้คือ "<b>อ้างแล้วต้องอ้างให้จริง</b>" ไม่ใช่ "ทุกใบต้องอ้าง" — ขายสด/ค่าบริการที่ไม่มีการส่งของ ไม่ต้องส่ง
+            <span class="mono text-[12px]">delivery_note_id</span> (และห้ามมี <span class="mono text-[12px]">dn_item_id</span> ในบรรทัด) · แต่ถ้าหัวเอกสารอ้างใบส่งของ
+            <b>ทุกบรรทัดต้องระบุ <span class="mono text-[12px]">dn_item_id</span></b> แล้วระบบตรวจกับ sales-bc ว่า:
+            บรรทัดนั้นอยู่ในใบส่งของที่อ้างจริง · ใบส่งของ <b>SUBMITTED</b> แล้ว (DRAFT = ของยังไม่ออก, CANCELLED = ของกลับเข้าสต็อกแล้ว) ·
+            เป็นของ<b>ลูกค้ารายเดียวกัน</b> · <b>สินค้าตรงกัน</b> (§86/4(5) — ใบกำกับต้องบรรยายของที่ส่งจริง) ·
+            และยอดที่ออกบิล<b>รวมทุกใบไม่เกินที่ส่งจริง</b><br>
+            <span class="mono text-[12px]">400</span> = ผิดเงื่อนไขข้อใดข้อหนึ่ง · <span class="mono text-[12px]">409</span> = ออกบิลเกินที่ส่ง ·
+            <b>ตรวจซ้ำอีกครั้งตอน issue()</b> ใต้ row lock (นับเฉพาะใบที่ ISSUED แล้ว) — DRAFT สองใบจึงผ่านตอนสร้างได้ทั้งคู่ แต่ใบที่สอง issue ไม่ผ่าน ·
+            ใบลดหนี้/เพิ่มหนี้ (§86/22) <b>ข้ามการตรวจนี้ทั้งหมด</b> เพราะยึด <span class="mono text-[12px]">reference_receipt_id</span> ไม่ใช่การส่งของ
+          </p>
+        </div>
         <div class="rulebox mb-8">
           <div class="rc mb-1">ภาษีหัก ณ ที่จ่าย ไม่ลดยอดหนี้</div>
           <p class="text-[13.5px]">
             <span class="mono text-[12px]">total_wht</span> <b>ไม่ถูกหักออกจาก</b> <span class="mono text-[12px]">total</span> ·
             ยอดที่ลูกค้าต้องจ่ายจริงคือ <span class="mono text-[12px]">total − total_wht</span> ซึ่ง FE คำนวณเองตอนแสดงผล ·
-            เพราะการถูกหักภาษีคือ<b>เงินสดที่ได้น้อยลง ไม่ใช่หนี้ที่น้อยลง</b> — ตอนรับชำระจะเห็นชัดว่าปิดหนี้ได้เต็มจำนวน
+            เพราะการถูกหักภาษีคือ<b>เงินสดที่ได้น้อยลง ไม่ใช่หนี้ที่น้อยลง</b> — ตอนรับชำระจะเห็นชัดว่าปิดหนี้ได้เต็มจำนวน ·
+            และตั้งแต่ 2026-08-31 <span class="mono text-[12px]">total_wht</span> ยังเป็น<b>เพดาน</b>ที่ใบจ่ายเงินหักได้ (ดู C4) —
+            <span class="mono text-[12px]">wht_config_code</span> จึงถูกเก็บไว้บนเอกสาร เพื่อให้แก้ DRAFT โดยไม่ต้องส่งรหัสซ้ำแล้วอัตราหายไปเป็น 0
           </p>
         </div>
 
@@ -887,11 +920,23 @@ sequenceDiagram
             ส่งผิดฝั่งได้ <span class="mono text-[12px]">400</span>
           </p>
         </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">wht_amount มีเพดาน — ไม่ใช่ตัวเลขที่กรอกอะไรก็ได้ (2026-08-31)</div>
+          <p class="text-[13.5px]">
+            เดิม <span class="mono text-[12px]">wht_amount</span> เป็นค่าที่ client ส่งมาแล้วเชื่อเลย · เพราะยอดที่ตัดหนี้ได้ = <span class="mono text-[12px]">paid_amount + wht_amount</span>
+            จึงกรอก <span class="mono text-[12px]">paid_amount: 1, wht_amount: 10699</span> ปิดหนี้ 10,700 ได้โดยเงินแทบไม่เข้า<br>
+            ตอนนี้เพดานคือ <span class="mono text-[12px]">total_wht</span> ของ<b>เอกสารปลายทาง</b> (ระบบ resolve จาก <span class="mono text-[12px]">tax_configs</span> ตอนออกเอกสาร ไม่ใช่ค่าที่ client บอก)
+            หัก<b>ที่ใบอื่นหักไปแล้ว</b> — จึงหักซ้ำสองครั้งข้ามงวดไม่ได้ · เกินเพดานได้ <span class="mono text-[12px]">400</span> พร้อมบอกว่าเหลือให้หักเท่าไหร่<br>
+            <b>FE ไม่ต้องแตกยอดหักรายใบ</b> — ไม่ส่ง <span class="mono text-[12px]">wht_amount</span> ในบรรทัด allocations ระบบเฉลี่ยให้ตามสัดส่วนยอดที่ตัดแต่ละใบ ·
+            ส่งเองได้เมื่อสองใบคนละอัตรา แต่<b>ต้องส่งครบทุกบรรทัดและผลรวมเท่ากับหัวเอกสารพอดี</b> · แต่ละบรรทัดหักได้ไม่เกินยอดที่ตัด (WHT เป็น<b>ส่วนหนึ่ง</b>ของยอดที่ตัด ไม่ใช่บวกเพิ่ม)
+          </p>
+        </div>
         <div class="rulebox mb-8">
           <div class="rc mb-1">ข้อจำกัดปัจจุบันที่ FE ต้องรู้</div>
           <p class="text-[13.5px]">
             <b>ยังไม่รองรับหลายสกุลเงิน</b> — การชำระตัดกับยอด THB ของใบเสมอ ·
-            ใบตั้งหนี้ที่ถูกจ่ายตัดไปแล้ว <b>ยกเลิกไม่ได้</b> ต้องยกเลิกใบจ่ายก่อน
+            ใบตั้งหนี้ที่ถูกจ่ายตัดไปแล้ว <b>ยกเลิกไม่ได้</b> ต้องยกเลิกใบจ่ายก่อน ·
+            เอกสารที่ไม่ได้ระบุ <span class="mono text-[12px]">wht_config_code</span> ตอนสร้าง = <span class="mono text-[12px]">total_wht</span> เป็น 0 → ใบจ่ายหักไม่ได้เลย (แก้ที่เอกสาร ไม่ใช่ที่ใบจ่าย)
           </p>
         </div>
 
@@ -954,6 +999,59 @@ sequenceDiagram
             ทางเดียวคือออก<b>ใบลด/เพิ่มหนี้</b> โดยตั้ง <span class="mono text-[12px]">document_date</span> ไว้ใน<b>งวดปัจจุบัน</b> แทน
             (ดู C2 ด้านบน) · ปุ่ม “ยกเลิก”/“void” บนเอกสารเก่าควรซ่อนหรือ disable เมื่อ <span class="mono text-[12px]">document_date</span> ≤
             <span class="mono text-[12px]">ledger_frozen_upto</span> เพื่อไม่ให้ผู้ใช้กดแล้วเจอ 409 โดยไม่รู้สาเหตุ
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">C7 · รายงานลูกหนี้ / เจ้าหนี้ค้างชำระ (aging) <span class="mono text-[13px] text-[var(--muted)]">— AR / AP Clerk · Finance Manager</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          เพิ่มเข้ามา 2026-08-31 — เดิม <span class="mono text-[12px]">credit_terms</span> มีทั้งฝั่งลูกค้าและผู้ขายแต่<b>ไม่มีอะไรอ่าน</b>
+          และไม่มีเอกสารไหนบันทึกว่าครบกำหนดเมื่อไหร่ จึงไม่มีรายงานค้างชำระให้ทำ · ตอนนี้ทั้ง Receipt และ AP Invoice มี
+          <span class="mono text-[12px]">due_date</span> แล้ว (คิดจาก <span class="mono text-[12px]">document_date + credit_terms</span> ตอนสร้าง)
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/receipt-agings</td><td class="mono text-[11px]">receipt:view</td><td>ยอดลูกหนี้ค้างชำระ แยกช่วงอายุหนี้ ต่อลูกค้า</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ap-invoice-agings</td><td class="mono text-[11px]">ap_invoice:view</td><td>ยอดเจ้าหนี้ค้างชำระ แยกช่วงอายุหนี้ ต่อผู้ขาย</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// GET /finance-bc/v1/receipt-agings?as_of_date=2026-08-31T00:00:00%2B07:00</span>
+<span class="c">// as_of_date ไม่ส่ง = วันนี้ · party_id ส่งได้เพื่อดูรายเดียว</span>
+<span class="c">// data[] เรียงจากยอดรวมมากไปน้อย · ทุกคอลัมน์เป็นตัวเลข ไม่มี null</span>
+[
+  { <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,
+    <span class="s">"customer_name_th"</span>: <span class="s">"บริษัท ตัวอย่าง จำกัด"</span>,
+    <span class="s">"customer_name_en"</span>: <span class="s">"Example Co., Ltd."</span>,
+    <span class="s">"document_count"</span>: <span class="t">6</span>,
+    <span class="s">"current"</span>:      <span class="t">12000</span>,   <span class="c">// ยังไม่ครบกำหนด (ครบกำหนดวันนี้ก็นับที่นี่)</span>
+    <span class="s">"days_1_30"</span>:    <span class="t">8000</span>,
+    <span class="s">"days_31_60"</span>:   <span class="t">3000</span>,
+    <span class="s">"days_61_90"</span>:   <span class="t">0</span>,
+    <span class="s">"over_90"</span>:      <span class="t">1500</span>,
+    <span class="s">"no_due_date"</span>:  <span class="t">2000</span>,    <span class="c">// ไม่ได้ตกลงเครดิตเทอมไว้ — ไม่ใช่ "ยังไม่ครบกำหนด"</span>
+    <span class="s">"total"</span>:        <span class="t">26500</span> }
+]</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">no_due_date เป็นคอลัมน์แยก ไม่ยุบรวมกับ current</div>
+          <p class="text-[13.5px]">
+            เอกสารที่คู่ค้าไม่มี <span class="mono text-[12px]">credit_terms</span> บันทึกไว้ ไม่ใช่ "ยังไม่ครบกำหนด" แต่คือ <b>ไม่รู้</b> —
+            ซ่อนไว้ในคอลัมน์ยังไม่ครบกำหนดคือวิธีที่หนี้ที่เก็บไม่ได้จริงหายไปจากรายงาน · เอกสารเก่าก่อนมีฟีเจอร์นี้จะอยู่คอลัมน์นี้ทั้งหมด
+            (ยกเว้นใบที่มี payment_schedules อยู่แล้ว ซึ่ง migration ดึงงวดแรกขึ้นมาเป็น <span class="mono text-[12px]">due_date</span> ให้)<br>
+            ช่วงอายุหนี้นับเป็น<b>วันบนปฏิทิน Asia/Bangkok</b> ไม่ใช่มิลลิวินาทีที่ผ่านไป — ครบกำหนดเมื่อวานคือเกิน 1 วัน ไม่ว่าจะดูตอน 09:00 หรือ 23:59
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ยอดที่เห็นตรงกับที่ระบบใช้ตัดสินใจจริง</div>
+          <p class="text-[13.5px]">
+            คิดสดทุกครั้งจากตัวเลขชุดเดียวกับที่ sales-bc ใช้เช็ควงเงินเครดิต (ดู B2) — ไม่มีคอลัมน์ <span class="mono text-[12px]">outstanding</span> เก็บไว้ให้เพี้ยน ·
+            AR นับเฉพาะเอกสาร <b>ISSUED</b> หักยอดที่ตัดชำระแล้ว หักใบลดหนี้ · AP นับเฉพาะใบ <b>SUBMITTED</b> หักยอดที่จ่ายตัดแล้ว ·
+            ยอดสุทธิ ≤ 0 ไม่แสดง (ลูกค้าที่จ่ายเกินไม่ใช่ลูกหนี้)<br>
+            <b>จัดกลุ่มระดับเอกสาร</b> ตาม <span class="mono text-[12px]">due_date</span> ของหัวเอกสาร — ใบที่แบ่งงวด (C5) ต้องดูรายงวดที่
+            <span class="mono text-[12px]">GET /receipts/{id}/payment-schedules</span> ซึ่งมี <span class="mono text-[12px]">outstanding</span>/<span class="mono text-[12px]">is_overdue</span> ของแต่ละงวดอยู่แล้ว
           </p>
         </div>
       </section>
@@ -1418,11 +1516,12 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 52 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 54 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
             <tbody>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoice-agings</td><td class="mono text-[11px]">ap_invoice:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices</td><td class="mono text-[11px]">ap_invoice:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices</td><td class="mono text-[11px]">ap_invoice:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/ap-invoices/{id}</td><td class="mono text-[11px]">ap_invoice:update</td></tr>
@@ -1453,6 +1552,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/profit-loss-records/{id}</td><td class="mono text-[11px]">profit_loss_record:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/profit-loss-reconciliations</td><td class="mono text-[11px]">profit_loss_record:reconcile</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipt-agings</td><td class="mono text-[11px]">receipt:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts</td><td class="mono text-[11px]">receipt:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts</td><td class="mono text-[11px]">receipt:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:update</td></tr>
@@ -1502,7 +1602,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 290 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 292 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->
