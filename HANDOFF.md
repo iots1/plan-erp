@@ -1,7 +1,7 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-01 (C3 + currency enum + FX audit)** · ยังไม่ commit
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts)** · ยังไม่ commit
 
 ---
 
@@ -16,7 +16,7 @@
 
 **สุขภาพระบบตอนนี้** (ยืนยันแล้วทั้งหมด ไม่ใช่เดา · รันซ้ำหลัง C3):
 
-- **1444 tests / 106 suites ผ่านทั้งหมด**
+- **1454 tests / 106 suites ผ่านทั้งหมด**
 - **ทั้ง 6 database รายงาน `No changes`** จาก `migration:generate` — ตรวจซ้ำหลังรัน migration ของ C3 แล้ว
   (ก่อนหน้านี้ `--check` ใช้เป็นสัญญาณไม่ได้เลยเพราะรายงาน changes ทุกครั้ง ของจริงจะซ่อนอยู่ในนั้น)
 - boot จริงผ่านทั้ง 4 BC ที่แตะ — `finance-bc` 55 routes · `sales-bc` 46 · `supplier-bc` 26 · `inventory-bc` 132 · DI resolve ครบ ไม่มี error (ไม่มี endpoint ใหม่ ตัวเลข 308 เส้นจึงไม่เปลี่ยน)
@@ -119,12 +119,12 @@ partial COGS reversal, D1–D3 (credit re-check ตอนส่งของ / pr
 | 2 | **`price_lists.currency` ถูกทิ้งที่ BC boundary** — `IItemPriceLookupResult` ส่งแค่ `{rate, price_list_id}` แม้ query จะ join `price_list` อยู่แล้ว | `assertPriceWithinReferenceBound` เทียบเลขสองตัวเสมือนหน่วยเดียวกัน · price list USD อ้างอิง 100 กับบรรทัด THB 3,600 → **ปฏิเสธเอกสารที่ถูก** และบรรทัด THB 100 → **ผ่าน** ทั้งที่ควรตก = ขายต่ำกว่าราคาไป ~36 เท่า **ผ่าน guard ที่มีไว้กันการขายต่ำราคาเอง** |
 | 3 | **3 ใน 6 คอลัมน์ currency ไม่ได้ validate ISO เลย** — `customers.billing_currency`, `suppliers.billing_currency`, `price_lists.currency` มีแค่ `@IsString()` | เก็บ `'ZZ'`/`'usd'`/คำอะไรก็ได้ลง DB ได้ · ปิดด้วย enum ระดับ DB (ดู §2 ด้านล่าง) |
 
-#### P2 — ต้องตัดสินใจ / งานฟีเจอร์ ยังไม่ทำ
+#### P2 — เหลือ 3 ข้อ (ข้อ 4 เสร็จแล้ว)
 
 | # | เรื่อง | ต้องทำอะไร |
 |---|---|---|
-| 4 | **`quotations` / `purchase_orders` ไม่มี currency เลย** — สกุลเงินโผล่ขึ้นมาครั้งแรกที่ใบกำกับ/ใบตั้งหนี้ | ขายหรือซื้อสกุลต่างประเทศจึงเสนอราคา/สั่งซื้อไม่ได้ · fix P1#2 เปลี่ยนจาก "ผิดเงียบ" เป็น 400 ชัดเจนแล้ว (สถานะกลางที่ซื่อสัตย์) · ของจริงคือเพิ่ม FX snapshot ทั้งสองใบ แบบเดียวกับที่ทำกับ `ap_invoices` |
-| 5 | **`receipt_items` / `ap_invoice_items` ไม่มี `raw_*`** | ใบกำกับส่งออกต้องพิมพ์ยอดต่อบรรทัดเป็นสกุลที่ทำรายการ · ตอนนี้มีแต่ระดับหัวเอกสาร ถ้า derive ตอนพิมพ์ ผลรวมหลังปัดเศษไม่จำเป็นต้องเท่ากับ `raw_total` |
+| ~~4~~ | ~~**`quotations` / `purchase_orders` ไม่มี currency เลย**~~ | ✅ **เสร็จแล้ว 2026-09-01** — ดู §"P2#4" ด้านล่าง |
+| 5 | **`receipt_items` / `ap_invoice_items` ไม่มี `raw_*`** | ใบกำกับส่งออกต้องพิมพ์ยอดต่อบรรทัดเป็นสกุลที่ทำรายการ · ตอนนี้มีแต่ระดับหัวเอกสาร ถ้า derive ตอนพิมพ์ ผลรวมหลังปัดเศษไม่จำเป็นต้องเท่ากับ `raw_total` · **ควรทำคู่กับข้อ 6** — เพิ่มคอลัมน์ระดับบรรทัดโดยที่ layer พิมพ์ยังไม่อ่าน = สร้าง pattern "คอลัมน์ที่ไม่มีใครอ่าน" ที่ audit ใช้เป็นสัญญาณช่องโหว่เอง |
 | 6 | **report-bc print ไม่รู้จัก currency เลย** (grep แล้วไม่พบคำนี้ทั้งโฟลเดอร์) | เอกสารที่พิมพ์ออกมาแสดงเลข THB โดยไม่มีเครื่องหมายสกุลเงิน — ใบกำกับส่งออกที่พิมพ์เป็น THB คือเอกสารที่ผิดในตัวมันเอง |
 | 7 | **`billing_currency` ทั้งสองฝั่งยังไม่มีใครอ่าน** — enum การันตีแล้วว่าค่าถูก แต่ไม่มีใครเทียบกับ `currency` ของเอกสาร | ต้องได้นโยบายจากลูกค้าก่อน: ออกใบ THB ให้ลูกค้าที่ตกลง USD ควร **ปฏิเสธ / เตือน / ใช้เป็น default** ? — คำถามคลาสเดียวกับ C3 ไม่ควรเดาเอง |
 
@@ -159,6 +159,58 @@ partial COGS reversal, D1–D3 (credit re-check ตอนส่งของ / pr
   เท่ากับกลบเกลื่อน caller ที่ข้าม validation ไปแทนที่จะให้มันพัง
 - **seed folder แก้ครบ** — `IPriceListDef.currency` เป็น `Currency` และ `facility.data.ts` ใช้ `Currency.THB`
   (seeder เขียน raw SQL ไม่ผ่าน entity จึงไม่มีอะไร type-check ให้)
+
+---
+
+### P2#4 · FX snapshot บนเอกสารก่อน booking ✅ **เสร็จแล้ว 2026-09-01**
+
+`quotations`, `sales_orders`, `purchase_orders` ได้ `currency`/`currency_rate`/`currency_date`
++ ชุด `raw_*` แล้ว — สกุลเงินไม่โผล่ขึ้นมากลางทางที่ใบกำกับอีก
+
+**currency เดินตามเส้นทางเดียวกับ `is_vat_included` เป๊ะๆ ไม่ได้คิดกฎใหม่:**
+
+| เอกสาร | currency มาจากไหน | เหตุผล |
+|---|---|---|
+| Quotation | **คัดลอกจาก `price_lists.currency`** (ไม่มีใน DTO) | เส้นทางเดียวกับ `is_vat_included` · ให้ client ส่งมาด้วยจะมีสองแหล่งของข้อเท็จจริงเดียวที่ขัดกันได้ — price list USD แต่ quote เป็น THB คือเอกสารที่ทุกตัวเลขผิดไปเท่าอัตราแลกเปลี่ยน · ขายสกุลต่างประเทศ = เสนอราคาจาก price list สกุลนั้น |
+| Sales Order | **คัดลอกจาก quotation** | เหมือนทุก money field ที่ SO คัดลอกมาอยู่แล้ว · อ่านอัตราใหม่ตอน convert = restate เอกสารที่ลูกค้าอนุมัติแล้วแบบเงียบๆ |
+| Purchase Order | **ผู้จัดซื้อระบุ** (มีใน DTO) | ไม่มีเอกสารต้นทางที่ตอบให้ — เหตุผลเดียวกับ `PurchaseOrder.is_vat_included` |
+
+`currency_rate` มาจาก client เสมอ เพราะ inventory-bc เก็บราคา ไม่ได้เก็บอัตราแลกเปลี่ยน ·
+price list ที่ไม่ใช่ THB **บังคับ** ต้องส่ง `currency_rate` ไม่งั้น 400 (ไม่ใช่ปล่อยให้เอกสารมีมูลค่าศูนย์)
+
+**`IPriceListLookupResult` เพิ่ม `currency`** — docblock ของมันเขียนไว้เองตั้งแต่แรกว่าค่าที่
+denormalize ข้าม BC ต้องพา "ความหมาย" ไปด้วย (ซึ่งเป็นเหตุผลที่ `is_vat_included` อยู่ในนั้น) ·
+handler ส่ง entity ทั้งตัวอยู่แล้ว currency จึงอยู่บนสายมาตลอด แค่ interface ไม่ประกาศ
+
+**เจอปัญหาออกแบบเพิ่มจากการเขียนเทสต์ (ไม่ได้อยู่ใน audit เดิม):** guard ±20% เทียบ
+`unit_cost`/`unit_price` (ซึ่งเป็น THB) กับ reference rate (สกุลของ price list) **โดยไม่แปลงค่า** ·
+แค่บังคับให้สกุลตรงกันยังไม่พอ — ตอนนี้ reference ถูก **แปลงเป็นสกุลบัญชีด้วยอัตราของเอกสารเอง**
+ตอน resolve เลย (`toBookCurrency`) แล้ว bound check ไม่ต้องรู้เรื่องสกุลเงินอีก ·
+`assertReferencePriceInBookCurrency` จึงกลายเป็น `assertReferencePriceCurrencyMatches` ที่เทียบกับ
+สกุลของ **เอกสาร** ไม่ใช่ THB ตายตัว (USD quote จาก USD price list ผ่านได้แล้ว)
+
+---
+
+### Refactor · shared column contracts ✅ **เสร็จแล้ว 2026-09-01**
+
+Scan ทั้ง 112 entity หากลุ่มคอลัมน์ที่ซ้ำกันแล้วยังไม่มีสัญญาคุม ได้ **7 interface ใหม่**
+(รายละเอียดครบอยู่ใน root `CLAUDE.md` § "Shared column contracts"):
+
+`ICurrencySnapshot` (6 entity) · `IRawVatDocumentTotals` (4) · `IDiscountableDocumentHeader` (5) ·
+`IDiscountableDocumentLine` (5) · `IVatBucketedDocumentHeader` (4) · `IWithholdingTaxDocument` (2) ·
+`ISubmittedAudit` (**8** — แต่ละตัวประกาศคอลัมน์คู่เดียวกันด้วยมือทั้งหมด)
+
+- **ไม่มีคอลัมน์ใหม่ ไม่มี schema เปลี่ยน** — เป็น type-level contract ทั้งหมด · ทั้ง 6 DB ยัง `No changes`
+- **tsc ผ่านทันทีทั้ง 17 entity โดยไม่ต้องแก้อะไรเลย** = พิสูจน์ว่าชนิดตรงกัน byte-for-byte อยู่แล้ว
+  ไม่ได้บังคับให้เหมือน · interface ที่ต้องแก้ entity ให้เข้าพวกคือ interface ที่กำลังอธิบาย "ความต่าง"
+  ไม่ใช่ "แนวคิดร่วม"
+- **ทำไมเป็น interface ไม่ใช่ abstract class**: `ICurrencySnapshot` — `currency_rate` ของเอกสารคือ
+  อัตราที่หนี้ถูก**บันทึก** แต่ของ `PaymentEntry` คืออัตราที่เงิน**เคลื่อนไหวจริง** การสืบทอดจะยืนยัน
+  ความเท่ากันที่เป็นเท็จ (และผลต่างของสองอันนี้คือแกนทั้งหมดของ C3) · `ISubmittedAudit` — ถ้าย้าย
+  `submitted_*` ไปไว้บน `SubmittableDocumentEntity` จะไปเพิ่ม 2 คอลัมน์ให้ `Quotation`/`PurchaseOrder`
+  ที่ไม่มีขั้น submit เลย (มันถูก *ส่ง* และ *อนุมัติ*) = แก้ schema เพื่อให้ refactor สวย
+- **`PurchaseOrder` ถูกเว้นจาก `IVatBucketedDocumentHeader` โดยเจตนา** — PO ไม่มีขั้น VAT เลย
+  บังคับให้ implement = เพิ่ม 5 คอลัมน์ที่ไม่มีใครคำนวณ ซึ่งคือ pattern ช่องโหว่ที่ audit เจอ 6/6 ครั้ง
 
 ---
 
