@@ -531,7 +531,7 @@ sequenceDiagram
             <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
               <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/goods-receipts?filter=status||$eq||SUBMITTED</td><td class="mono text-[11px]">goods_receipt:view</td><td>หา GRN ที่ยังไม่ได้ตั้งหนี้</td></tr>
-              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/ap-invoices</td><td class="mono text-[11px]">ap_invoice:create</td><td><b>DRAFT</b> · ได้เลขภายใน APINV-{ปี}-{ลำดับ} · ยังไม่กระทบบัญชี</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/ap-invoices</td><td class="mono text-[11px]">ap_invoice:create</td><td><b>DRAFT</b> · ได้เลขภายใน APINV-{ปี}-{ลำดับ} · ยังไม่กระทบบัญชี · ส่ง <span class="mono">document_type=CREDIT_NOTE</span> = ใบลดหนี้ (เลขชุด APCN)</td></tr>
               <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /finance-bc/v1/ap-invoices/{id}/submit</td><td class="mono text-[11px]">ap_invoice:submit</td><td><b>รับรู้หนี้ + โพสต์ GL</b> (Dr สินค้าคงเหลือ + ภาษีซื้อ / Cr เจ้าหนี้การค้า)</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">PUT /finance-bc/v1/ap-invoices/{id}</td><td class="mono text-[11px]">ap_invoice:update</td><td>แก้ได้เฉพาะ DRAFT · เปลี่ยน supplier_id ไม่ได้</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /finance-bc/v1/ap-invoices/{id}/cancel</td><td class="mono text-[11px]">ap_invoice:cancel</td><td>โพสต์ GL กลับด้าน · <b>ทำไม่ได้ถ้ามีการจ่ายตัดใบนี้ไปแล้ว</b> (ยกเลิกใบจ่ายก่อน)</td></tr>
@@ -544,7 +544,9 @@ sequenceDiagram
   <span class="s">"supplier_id"</span>: <span class="s">"a3f1…"</span>,
   <span class="s">"vendor_document_number"</span>: <span class="s">"INV-2026-8842"</span>,   <span class="c">// เลขบนใบกระดาษของผู้ขาย — คนละเลขกับ APINV ของเรา</span>
   <span class="s">"document_date"</span>: <span class="s">"2026-08-30T00:00:00+07:00"</span>, <span class="c">// วันที่บนใบผู้ขาย ไม่ใช่วันที่เรากรอก — กำหนดงวดบัญชี + อัตรา VAT</span>
-  <span class="s">"is_vat_included"</span>: <span class="k">false</span>,               <span class="c">// ราคาบนใบผู้ขายรวม VAT แล้วหรือยัง — AP Clerk เป็นคนตอบ</span>
+  <span class="s">"document_type"</span>: <span class="s">"VENDOR_BILL"</span>,       <span class="c">// หรือ "CREDIT_NOTE" = ใบลดหนี้ (ต้องส่ง reference_ap_invoice_id ด้วย)</span>
+  <span class="s">"reference_ap_invoice_id"</span>: <span class="k">null</span>,       <span class="c">// ใบแจ้งหนี้เดิมที่ปรับปรุง — บังคับเมื่อ CREDIT_NOTE, ห้ามส่งเมื่อ VENDOR_BILL</span>
+  <span class="s">"is_vat_included"</span>: <span class="k">false</span>,               <span class="c">// ราคาบนใบผู้ขายรวม VAT แล้วหรือยัง — AP Clerk เป็นคนตอบ · CREDIT_NOTE สืบทอดจากใบเดิม</span>
   <span class="s">"due_date"</span>: <span class="k">null</span>,                      <span class="c">// ไม่ส่ง = document_date + credit_terms ของผู้ขาย · null = ไม่มีกำหนดชำระ</span>
   <span class="s">"wht_config_code"</span>: <span class="k">null</span>,               <span class="c">// เช่น "WHT3_SERVICE" ถ้าจ่ายค่าบริการที่ต้องหัก ณ ที่จ่าย</span>
   <span class="s">"discount_mode"</span>: <span class="s">"none"</span>,
@@ -578,6 +580,24 @@ sequenceDiagram
           <p class="text-[13.5px]">
             ผู้ขายส่งของหลายรอบแล้วเก็บเงินทีเดียวเป็นเรื่องปกติ — เพราะ match เกิดที่<b>ระดับบรรทัด</b> (แต่ละบรรทัดมี grn_item_id ของตัวเอง) ไม่ใช่ที่หัวเอกสาร
             หน้าจอจึงควรให้เลือกรายการรับเข้าข้ามหลาย GRN มารวมในใบเดียวได้
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc ok mb-1">ใบลดหนี้ผู้ขาย — ปิดครึ่งที่ขาดของการส่งคืน (2026-09-02)</div>
+          <p class="text-[13.5px]">
+            A4 (ส่งคืนผู้ขาย) ตัดสต็อกและตัด <span class="mono text-[12px]">returned_qty</span> ของใบสั่งซื้อแล้ว แต่<b>ยอดหนี้ผู้ขายไม่เคยลด</b> —
+            ถ้าตั้งหนี้ของล็อตนั้นไปแล้ว เราจะยังเป็นหนี้ค่าของที่ส่งคืนไปแล้ว · ตอนนี้ปิดด้วย
+            <span class="mono text-[12px]">POST /ap-invoices</span> ที่ <span class="mono text-[12px]">document_type=CREDIT_NOTE</span>
+            พร้อม <span class="mono text-[12px]">reference_ap_invoice_id</span> ชี้ใบแจ้งหนี้เดิม (เลขชุด <b>APCN-{ปี}-{ลำดับ}</b> เดินแยกจาก APINV)<br>
+            <b>สืบทอดฐานภาษีจากใบเดิม ไม่คิดใหม่ตามวันนี้</b> — <span class="mono text-[12px]">vat_rate</span>/<span class="mono text-[12px]">is_vat_included</span>/หัก ณ ที่จ่าย
+            มาจากใบที่อ้าง เพราะการปรับปรุงการซื้อที่เคยเสียภาษี 7% ยังเป็นเอกสาร 7% ไม่ว่าอัตราตามกฎหมายจะขยับไปแล้วหรือไม่ (เหตุผลเดียวกับ CN/DN ฝั่งขายที่ C2)<br>
+            <b>ตรวจ 2 ชั้น คนละคำถามกัน</b>: (1) <b>ใบเดิมเรียกเก็บไว้เท่าไหร่</b> — ลดได้ไม่เกินที่ใบนั้นเก็บ หักที่ใบลดหนี้ก่อนหน้าเอาไปแล้ว ·
+            (2) <b>ของกลับไปจริงเท่าไหร่</b> — อ่านจาก Purchase Return ที่ SUBMITTED แล้วผ่าน RPC ใหม่
+            <span class="mono text-[12px]">purchaseReturn.getReturnedQtyByGrnItems</span> · ลดของที่ยังอยู่ในคลังไม่ได้<br>
+            inventory-bc ตอบไม่ได้ = <b>ปฏิเสธ</b> (<span class="mono text-[12px]">409</span>) ไม่ใช่ถือว่า "ไม่มีของคืน" — การอ่านแบบหลังจะปล่อยใบลดหนี้แบบไม่มีเพดานผ่านตอนที่การตรวจใช้ไม่ได้พอดี<br>
+            GL โพสต์กลับด้าน <span class="mono text-[12px]">Dr เจ้าหนี้การค้า / Cr สินค้าคงเหลือ / Cr ภาษีซื้อ</span> — เป็น journal ใหม่ <b>ไม่ใช่การ reverse ใบเดิม</b>
+            เพราะใบเดิมยังยืนอยู่สำหรับส่วนที่เก็บไว้ · ใบลดหนี้<b>ไม่มีกำหนดชำระ</b> และ<b>จ่ายเงินตัดใบลดหนี้ไม่ได้</b> (<span class="mono text-[12px]">400</span>) — ต้องตัดที่ใบแจ้งหนี้ที่มันปรับปรุง<br>
+            <b>ยังไม่มี DEBIT_NOTE</b> โดยเจตนา — กรณีผู้ขายเก็บเพิ่มไม่ใช่โค้ดเดิมกลับเครื่องหมาย มันไม่ถูกจำกัดด้วยจำนวนบนใบเดิมหรือด้วยของที่เคลื่อนจริง (มักเป็นการแก้ราคา) จึงต้องมีเพดานและตัวขับของตัวเอง
           </p>
         </div>
         <div class="rulebox mb-8">
