@@ -1,7 +1,7 @@
 # HANDOFF — PostgreSQL / Pgpool: อะไรที่ยังไม่ได้ทดสอบ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานในนี้จบ
-> เขียนเมื่อ **2026-09-01** · คู่กับ `HANDOFF.md` (ฝั่ง application) แต่แยกกันคนละเรื่อง
+> เขียนเมื่อ **2026-09-01** · คู่กับ `HANDOFF-Feature.md` (ฝั่ง application) แต่แยกกันคนละเรื่อง
 > เนื้อหาถาวรอยู่ที่ `postgresql-pgpool-cluster-guide.html` / `ha-failover-operations-guide.html` / `runbook-*.html`
 
 ---
