@@ -1,8 +1,8 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts +
-> credit column precision)** · commit และ push แล้วทั้งคู่
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (P2#5 + #6 + #7 — ปิด P2 audit ครบ · ยังไม่ commit)**
+> ก่อนหน้า: 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision) · commit+push แล้ว
 
 ---
 
@@ -16,12 +16,12 @@ currency/column-contracts ของรอบนี้ (ไม่เกี่ย�
 | `iotechsoft-company/erp-api` | `d7efab1` fix(install-pgpool): … | `3c22b48` refactor: shared column contracts, currency on pre-booking documents, 4-decimal credit columns |
 | `iots1/plan-erp` (submodule) | `80e305c` docs: record HA drill results, … | `f87d102` docs: shared column contracts, currency on pre-booking documents, money precision |
 
-**สุขภาพระบบตอนนี้** (ยืนยันแล้วทั้งหมด ไม่ใช่เดา · รันซ้ำหลัง C3):
+**สุขภาพระบบตอนนี้** (ยืนยันแล้วทั้งหมด ไม่ใช่เดา · รันซ้ำหลัง P2#5/#6/#7):
 
-- **1454 tests / 106 suites ผ่านทั้งหมด**
-- **ทั้ง 6 database รายงาน `No changes`** จาก `migration:generate` — ตรวจซ้ำหลังรัน migration ของ C3 แล้ว
-  (ก่อนหน้านี้ `--check` ใช้เป็นสัญญาณไม่ได้เลยเพราะรายงาน changes ทุกครั้ง ของจริงจะซ่อนอยู่ในนั้น)
-- boot จริงผ่านทั้ง 4 BC ที่แตะ — `finance-bc` 55 routes · `sales-bc` 46 · `supplier-bc` 26 · `inventory-bc` 132 · DI resolve ครบ ไม่มี error (ไม่มี endpoint ใหม่ ตัวเลข 308 เส้นจึงไม่เปลี่ยน)
+- **1474 tests / 108 suites ผ่านทั้งหมด** (+20 จากรอบ P2 — 8 leaf util + 12 service)
+- **sales/supplier/finance `migration:generate` = `No changes`** หลังรัน migration รอบนี้ (4 ตัว) ·
+  inventory/iam/auth ไม่แตะ
+- boot จริงผ่านทั้ง 4 BC ที่แตะ — `finance-bc` 55 routes · `sales-bc` 46 · `supplier-bc` 26 · `report-bc` 18 · DI resolve ครบ ไม่มี error (ไม่มี endpoint ใหม่)
 - eslint **0 error 0 warning** (warning เดิมที่ `jest-setup-env.js:67` ถูก `--fix` ไปแล้ว)
 - eslint เหลือ **1 warning เดิม** ที่ไม่เกี่ยวข้อง (`libs/common/test/jest-setup-env.js:67` — unused eslint-disable directive)
 - endpoint รวม **308 เส้น** และตาราง index ใน `api-workflow-guide.html` ตรงกับหัวข้อทุก BC (ตรวจทีละแถวแล้ว)
@@ -32,7 +32,8 @@ match, due_date + AR/AP aging, reorder alert job, VAT registration enforcement, 
 partial COGS reversal, D1–D3 (credit re-check ตอนส่งของ / price tolerance ตั้งค่าได้ + หน้า UI /
 เพดานอนุมัติใบปรับยอดสต็อก), vendor credit note, **C3 multi-currency ตอนตัดชำระ + realised FX, currency
 enum ระดับ DB, FX audit (P1 แก้ 3 ข้อ), P2#4 (FX บน quotation/SO/PO), shared column contracts (7
-interface), credit column precision → numeric(18,4) (รอบนี้ทั้งหมด)**
+interface), credit column precision → numeric(18,4), **P2#5 (raw_* ระดับบรรทัด) + P2#6 (currency ใน
+print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — ปิด P2 audit ครบ (รอบ 2026-09-02 ยังไม่ commit)**
 
 ---
 
@@ -123,14 +124,14 @@ interface), credit column precision → numeric(18,4) (รอบนี้ทั�
 | 2 | **`price_lists.currency` ถูกทิ้งที่ BC boundary** — `IItemPriceLookupResult` ส่งแค่ `{rate, price_list_id}` แม้ query จะ join `price_list` อยู่แล้ว | `assertPriceWithinReferenceBound` เทียบเลขสองตัวเสมือนหน่วยเดียวกัน · price list USD อ้างอิง 100 กับบรรทัด THB 3,600 → **ปฏิเสธเอกสารที่ถูก** และบรรทัด THB 100 → **ผ่าน** ทั้งที่ควรตก = ขายต่ำกว่าราคาไป ~36 เท่า **ผ่าน guard ที่มีไว้กันการขายต่ำราคาเอง** |
 | 3 | **3 ใน 6 คอลัมน์ currency ไม่ได้ validate ISO เลย** — `customers.billing_currency`, `suppliers.billing_currency`, `price_lists.currency` มีแค่ `@IsString()` | เก็บ `'ZZ'`/`'usd'`/คำอะไรก็ได้ลง DB ได้ · ปิดด้วย enum ระดับ DB (ดู §2 ด้านล่าง) |
 
-#### P2 — เหลือ 3 ข้อ (ข้อ 4 เสร็จแล้ว)
+#### P2 — ✅ ปิดครบทั้ง 4 ข้อแล้ว (2026-09-02)
 
-| # | เรื่อง | ต้องทำอะไร |
+| # | เรื่อง | สถานะ |
 |---|---|---|
 | ~~4~~ | ~~**`quotations` / `purchase_orders` ไม่มี currency เลย**~~ | ✅ **เสร็จแล้ว 2026-09-01** — ดู §"P2#4" ด้านล่าง |
-| 5 | **`receipt_items` / `ap_invoice_items` ไม่มี `raw_*`** | ใบกำกับส่งออกต้องพิมพ์ยอดต่อบรรทัดเป็นสกุลที่ทำรายการ · ตอนนี้มีแต่ระดับหัวเอกสาร ถ้า derive ตอนพิมพ์ ผลรวมหลังปัดเศษไม่จำเป็นต้องเท่ากับ `raw_total` · **ควรทำคู่กับข้อ 6** — เพิ่มคอลัมน์ระดับบรรทัดโดยที่ layer พิมพ์ยังไม่อ่าน = สร้าง pattern "คอลัมน์ที่ไม่มีใครอ่าน" ที่ audit ใช้เป็นสัญญาณช่องโหว่เอง |
-| 6 | **report-bc print ไม่รู้จัก currency เลย** (grep แล้วไม่พบคำนี้ทั้งโฟลเดอร์) | เอกสารที่พิมพ์ออกมาแสดงเลข THB โดยไม่มีเครื่องหมายสกุลเงิน — ใบกำกับส่งออกที่พิมพ์เป็น THB คือเอกสารที่ผิดในตัวมันเอง |
-| 7 | **`billing_currency` ทั้งสองฝั่งยังไม่มีใครอ่าน** — enum การันตีแล้วว่าค่าถูก แต่ไม่มีใครเทียบกับ `currency` ของเอกสาร | ต้องได้นโยบายจากลูกค้าก่อน: ออกใบ THB ให้ลูกค้าที่ตกลง USD ควร **ปฏิเสธ / เตือน / ใช้เป็น default** ? — คำถามคลาสเดียวกับ C3 ไม่ควรเดาเอง |
+| ~~5~~ | ~~**`receipt_items` / `ap_invoice_items` ไม่มี `raw_*`**~~ | ✅ **เสร็จแล้ว 2026-09-02** — ดู §"P2#5+#6+#7" ด้านล่าง |
+| ~~6~~ | ~~**report-bc print ไม่รู้จัก currency เลย**~~ | ✅ **เสร็จแล้ว 2026-09-02** — mock invoice + `formatMoney` |
+| ~~7~~ | ~~**`billing_currency` ทั้งสองฝั่งยังไม่มีใครอ่าน**~~ | ✅ **เสร็จแล้ว 2026-09-02** — ลูกค้าเลือก "enforcement mode ตั้งค่าได้ + ทุกเอกสาร party-facing" |
 
 #### P3–P4 — รู้ไว้ ไม่ต้องรีบ
 
@@ -241,6 +242,69 @@ Scan ทั้ง 155 numeric column ในโปรเจกต์ (ผู้�
 
 **ยังไม่ทำ**: ไม่มีการบันทึกเรื่องนี้ใน `srs-p5.html` — เป็น schema-precision fix ล้วนๆ ไม่ใช่
 business rule ใหม่ จึงตัดสินใจไม่เพิ่ม rulebox ให้ ถ้าเห็นต่างบอกได้
+
+---
+
+### P2#5 + #6 + #7 · ปิด P2 audit ครบ ✅ **เสร็จแล้ว 2026-09-02** (ยังไม่ commit)
+
+ลูกค้าตอบ 3 คำถามผ่าน `AskUserQuestion`: (1) mismatch policy = **enforcement mode ตั้งค่าได้**
+(off/warn/block ต่อ BC เหมือน `price_tolerance_percent`) · (2) scope = **ทุกเอกสาร party-facing**
+(quotation, SO, PO, receipt, AP invoice) · (3) batch = **#5 + #6 + #7 + seed re-verify**
+
+**P2#7 — `party_currency_enforcement`:**
+- ใหม่ใน `@lib/common`: `enum/party-currency-enforcement.enum.ts` (`OFF|WARN|BLOCK`) +
+  `utils/party-currency.util.ts` (`assertPartyCurrencyMatchesBilling` — คืน `{warning}` ใน WARN,
+  throw `422` ใน BLOCK, no-op อื่น ๆ รวมถึง mode ที่อ่านมาเป็น `undefined` จาก settings row เก่า)
+- คอลัมน์ enum `party_currency_enforcement` (default `off`) เพิ่มบน `sales_settings` /
+  `supplier_settings` / `finance_settings` · migration ต่อ BC (`ADD ... NOT NULL DEFAULT 'off'` ปลอดภัยบน
+  singleton row เดิม ไม่ต้องแก้มือ) · DTO ทั้ง 3 เพิ่ม field แบบ `@IsOptional()` (body เดิมที่ส่งแค่
+  `price_tolerance_percent` ยังใช้ได้)
+- `ICustomerLookupResult` + `ISupplierLookupResult` (สำเนา finance-bc) เพิ่ม `billing_currency?` —
+  RPC handler ส่ง entity เต็มอยู่แล้ว ค่าจึงอยู่บนสายมาตลอด แค่ interface ไม่ประกาศ
+- 5 service เรียก `assertPartyCurrency(...)` ตอน create (+ update ที่ currency/party เปลี่ยนได้) ·
+  quotation/PO เทียบ local repo, receipt/AP เทียบผ่าน RPC lookup, SO เทียบตอน convert
+  (customer.billing_currency อาจเปลี่ยนหลัง quotation อนุมัติ) · WARN → `logger.warn` `action:
+  PARTY_CURRENCY_MISMATCH` (ยังไม่ทำ `meta.warnings` ใน envelope — เป็น follow-up ถ้าต้องการให้ client เห็น)
+- iam System Settings: การ์ดใหม่ "การบังคับสกุลเงินคู่ค้า" + 3 `<select>` · `build:assets:iam` แล้ว
+
+**P2#5 — `raw_*` ระดับบรรทัด:**
+- `receipt_items` / `ap_invoice_items` เพิ่ม 5 คอลัมน์ `numeric(18,4)`:
+  `raw_unit_price`/`raw_unit_cost`, `raw_discount`, `raw_header_discount_amount`, `raw_vat_amount`,
+  `raw_line_total` · `implements IRawDocumentLineTotals` (interface ใหม่ใน `@lib/common` — 4 คอลัมน์
+  ร่วม, per-unit แยกเพราะชื่อคอลัมน์ต่างกัน)
+- **`raw_line_total`/`raw_vat_amount` เฉลี่ยแบบ pro-rata จากยอด raw ของหัวเอกสาร** (`allocateRawLineTotals`
+  ใหม่ใน `currency.util.ts` เรียก `allocateProRata`) ไม่ใช่แปลงทีละบรรทัด → `Σ raw_line_total ===
+  raw_net_amount` ตรงถึงสตางค์โดยโครงสร้าง · หัวเอกสาร `raw_*` **ไม่เปลี่ยนวิธีคิด** (แปลงยอดรวมทีเดียวเหมือนเดิม)
+  ไม่มี test churn ที่นั่น
+- migration `1788285230902-AddRawColumnsToReceiptAndAPInvoiceItems.ts` — **hand-edit**: `ADD ... NOT NULL
+  DEFAULT 0` (ปลอดภัยเพราะมี default) แล้ว `UPDATE ... FROM` parent backfill `raw_x = book_x /
+  currency_rate` (แถวเดิมทั้งหมดเป็น THB rate=1 จึง = สำเนา) · ap-invoice `update()` ที่แก้ rate อย่างเดียว
+  (`built === undefined`) ก็ restate `raw_*` ของบรรทัดที่เก็บไว้ ไม่งั้น Σ หลุด
+- response DTO ของ item ทั้งสองฝั่งเพิ่ม 5 field
+
+**P2#6 — currency ใน report-bc print:**
+- ใหม่ `@lib/common/utils/format-money.util.ts` — `formatMoney(value, currency=THB)` → `"USD 1,234.00"`
+  (ISO code prefix ชัดเจนสำหรับเอกสารภาษี/ส่งออก)
+- `CreateInvoicePrintDTO` +`currency?` · `invoice-print.service.ts` ใช้ `formatMoney` แทน `formatAmount`
+  เดิม · `invoice.ejs` ตัด "บาท" ที่ hard-code + เพิ่มบรรทัด "สกุลเงิน / Currency"
+- **ข้อจำกัด**: real print path ปัจจุบันคือ mock endpoint (`POST /report/v1/invoices/mock-pdf`) เท่านั้น ·
+  `print-template` banded engine ไม่ได้ format เงินเอง จึงไม่ต้องแก้ · ไม่ได้เขียน spec เต็มให้
+  `invoice-print.service` (มี `format-money.util.spec` + boot check + typecheck คุมแล้ว — เกินสัดส่วนสำหรับ mock)
+
+**seed re-verify**: `npm run seed -- --dry-run` → **15/15 seeders ok** · seed แตะแค่
+`erp_inventory`+`erp_supplier` ไม่แตะตารางที่ batch นี้แก้เลย (grep แล้ว 0 hit) · คอลัมน์ใหม่มี DB default
+ทั้งหมด · **`--fresh --yes` บน scratch DB ยังไม่ได้รัน** (connection pool ตึงตอนทำ — ควรรันซ้ำ)
+
+**สุขภาพหลังงาน**: 1474 tests / 108 suites ผ่าน · eslint 0/0 · migration:generate ทั้ง 3 BC = No changes ·
+boot ผ่านทั้ง 4 BC (finance 55 · sales 46 · supplier 26 · report 18 routes — ไม่มี endpoint ใหม่) ·
+เอกสาร: `srs-p5.html` (rulebox 2 จุด) + `api-workflow-guide.html` (rulebox 1 จุด) render-check mermaid 0 error
+
+**เทสต์ที่เพิ่ม (+12):** `party-currency.util.spec` (6) · `format-money.util.spec` (3) · block/off ใน
+receipts (3) / ap-invoices (3) / quotations (2) / PO (2) / SO (1) · raw reconciliation ใน receipts + ap-invoices
+
+**ไฟล์หลักที่แตะ:** `@lib/common` (enum + 2 util + 1 interface + barrel) · 3 settings entity/dto/service/swagger ·
+`quotations`/`sales-orders`/`purchase-orders`/`receipts`/`ap-invoices` service + module · 2 item entity + 2 response dto ·
+4 migration · report-bc print (dto/service/ejs) · iam system-setting (ejs/js) · 5 spec
 
 ---
 

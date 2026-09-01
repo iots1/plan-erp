@@ -1056,6 +1056,14 @@ sequenceDiagram
           </p>
         </div>
         <div class="rulebox mb-4">
+          <div class="rc ok mb-1">สกุลเงินเอกสารต้องตรง billing_currency ของคู่ค้า — ตั้งค่าได้ (2026-09-02)</div>
+          <p class="text-[13.5px]">
+            เอกสารที่หันเข้าคู่ค้า (quotation, sales order, purchase order, receipt, AP invoice) เทียบ <span class="mono text-[12px]">currency</span> ของตัวเองกับ <span class="mono text-[12px]">customers.billing_currency</span>/<span class="mono text-[12px]">suppliers.billing_currency</span> ตามค่า <span class="mono text-[12px]">party_currency_enforcement</span> ที่ operator ตั้งไว้ (หน้า System Settings ของ iam) ·
+            <span class="mono text-[12px]">off</span> = ไม่ตรวจ (ค่าเริ่มต้น) · <span class="mono text-[12px]">warn</span> = สร้างได้ ระบบบันทึก log ให้ · <span class="mono text-[12px]">block</span> = <b>422</b> ต้องแก้ <span class="mono text-[12px]">billing_currency</span> ที่บัตรคู่ค้าก่อน ·
+            FE ที่รองรับ mode <span class="mono text-[12px]">block</span> ควรเตือนผู้ใช้ตั้งแต่เลือกคู่ค้า/price list ว่าสกุลไม่ตรงกัน ก่อนกด save
+          </p>
+        </div>
+        <div class="rulebox mb-4">
           <div class="rc ok mb-1">PAY ตัดใบตั้งหนี้ได้แล้ว (2026-08-30)</div>
           <p class="text-[13.5px]">
             เดิม <span class="mono text-[12px]">PAY</span> ต้องส่ง <span class="mono text-[12px]">allocations: []</span> เพราะยังไม่มีตารางใบแจ้งหนี้ฝั่งซื้อ ·
