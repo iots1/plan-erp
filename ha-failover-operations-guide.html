@@ -65,7 +65,7 @@
         <div class="mt-9 flex flex-wrap gap-2.5">
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>repmgr promote: อัตโนมัติ</span>
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>VIP failover: อัตโนมัติ</span>
-          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9635E"></span>Auto-reattach hook: พังอยู่</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>Auto-reattach hook: ใช้งานได้</span>
         </div>
       </div>
     </header>
@@ -77,9 +77,9 @@
         <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
           <b class="text-[var(--ink)]">primary ดับ → ระบบกู้ตัวเองได้</b> (repmgr promote standby อัตโนมัติ ~30 วินาที) ·
           <b class="text-[var(--ink)]">pgpool node ดับ → ระบบกู้ตัวเองได้</b> (VIP ย้ายอัตโนมัติ ตราบใดที่เหลือ 2 ใน 3 node) ·
-          <b style="color:var(--signal)">แต่ safety net ตัวหนึ่งพังอยู่</b> — hook ที่เคลียร์สถานะค้างของ pgpool หลัง failover
-          auth ไม่ผ่านทั้ง 3 node แปลว่าถ้าเจอเคสที่ pgpool มาร์ค backend ค้าง จะไม่มีอะไรเคลียร์ให้เอง
-          ต้องมีคนกดตาม <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01</a> (ดู §08)
+          <b class="text-[var(--ink)]">safety net หลัง failover ใช้งานได้แล้ว</b> — hook ที่เคลียร์สถานะค้างของ pgpool
+          เคย auth ไม่ผ่านทั้ง 3 node แต่<b class="text-[var(--ink)]">ซ่อมและยืนยันครบ 9 เส้นทางแล้วเมื่อ 2026-09-01</b> (ดู §08 ข้อ 1)
+          · <b style="color:var(--signal)">ที่ยังเหลือ:</b> standby มีสเปกครึ่งเดียวของ primary — failover สำเร็จแต่กำลังหายครึ่ง (§08 ข้อ 2)
         </p>
       </div>
 
@@ -157,13 +157,15 @@ flowchart TB
                 <tr><td>✅</td><td><span class="mono text-[11.5px]">pg_rewind</span> ใช้ได้ (จำเป็นตอนกู้ node เก่ากลับ)</td><td><span class="mono text-[11.5px]">data_checksums = on</span> — ผ่านเงื่อนไข</td></tr>
                 <tr><td>✅</td><td>Watchdog priority ไม่ซ้ำ</td><td>pgpool1=3, pgpool2=2, pgpool3=1 → เลือก leader ได้แน่นอน</td></tr>
                 <tr><td>✅</td><td><span class="mono text-[11.5px]">auto_failback</span> ทำงานจริงแล้ว</td><td>เพิ่งแก้ 2026-08-31 (บั๊ก #39) — ยืนยันด้วยการยิงเองสำเร็จ</td></tr>
-                <tr style="background:rgba(220,90,22,.06)"><td>❌</td><td><b>Event hook เคลียร์สถานะ pgpool หลัง failover</b></td><td><b>auth ไม่ผ่านทั้ง 3 pgpool node</b> — safety net หายไป (§08 ข้อ 1)</td></tr>
-                <tr style="background:rgba(220,90,22,.06)"><td>❌</td><td><b>สเปก standby ไม่เท่า primary</b></td><td>ppm = 6.9 GB / 4 core · ppr1,ppr2 = <b>3.9 GB / 2 core</b> — promote แล้วกำลังหายครึ่ง (§08 ข้อ 2)</td></tr>
+                <tr><td>✅</td><td>Event hook เคลียร์สถานะ pgpool หลัง failover</td><td>ซ่อม 2026-09-01 — ทดสอบครบ 9 เส้นทาง (3 DB node × 3 pgpool node) ผ่านหมด (§08 ข้อ 1)</td></tr>
+                <tr><td>✅</td><td>Monitoring เห็นว่าใครถือ VIP</td><td><span class="mono text-[11.5px]">scrape_success = 1</span> ทั้ง 3 node · <span class="mono text-[11.5px]">is_leader = 1</span> ที่ node เดียว (ซ่อมพร้อมกัน 2026-09-01)</td></tr>
+                <tr><td>✅</td><td>สเปก standby เทียบเท่า primary</td><td>2026-09-01: cores 2→<b>4</b> ทั้งคู่ · RAM ceiling 4,096→<b>7,168</b> (floor 4,096 ผ่าน balloon) — เท่า primary แล้ว (§08 ข้อ 2)</td></tr>
+                <tr style="background:rgba(220,90,22,.06)"><td>❌</td><td><b>VM ทั้ง 7 ตัวอยู่บน hypervisor เดียว</b></td><td>PVE ไม่ใช่ cluster มี node เดียว — host ดับ = ทุกอย่างดับพร้อมกัน ไม่มีอะไรให้ fail over และ<b>เคยเกิดจริงมาแล้ว</b> (§08 ข้อ 0)</td></tr>
                 <tr><td>⚠️</td><td><span class="mono text-[11.5px]">priority</span> เท่ากันหมด</td><td>ทั้ง 3 node = 100 → เลือกไม่ได้ว่าอยากให้ตัวไหนขึ้นเป็น primary</td></tr>
                 <tr><td>⚠️</td><td>ไม่มี WAL archive / PITR</td><td><span class="mono text-[11.5px]">archive_mode = off</span> — กู้ย้อนเวลาไม่ได้ มีแค่ replication</td></tr>
                 <tr><td>⚠️</td><td>Slot เก็บ WAL ไม่จำกัด</td><td><span class="mono text-[11.5px]">max_slot_wal_keep_size = -1</span> — standby ดับนานๆ ทำ disk primary เต็มได้</td></tr>
                 <tr><td>⚠️</td><td>pgpool online recovery ไม่ได้ตั้ง</td><td><span class="mono text-[11.5px]">recovery_user</span> ว่าง → <span class="mono text-[11.5px]">pcp_recovery_node</span> ใช้ไม่ได้ ต้องกู้ด้วย repmgr เท่านั้น</td></tr>
-                <tr><td>⚠️</td><td>Monitoring มีจุดบอด</td><td>exporter ของ pgpool auth ไม่ผ่าน 2/3 node · postgres_exporter บน replica พังกับ PG18</td></tr>
+                <tr><td>⚠️</td><td>Monitoring ยังมีจุดบอดที่เหลือ</td><td>postgres_exporter 0.15.0 บน replica ยังพังกับ PG18 (<span class="mono text-[11.5px]">stat_bgwriter</span>) · ยังไม่มี alert ทั้ง 3 ตัวที่ควรมี</td></tr>
               </tbody>
             </table>
           </div>
@@ -171,8 +173,12 @@ flowchart TB
         <div class="rulebox">
           <div class="rc mb-1">สรุปเป็นประโยคเดียว</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
-            <b class="text-[var(--ink)]">กลไก failover ทั้งสองชั้นพร้อมใช้งานจริง</b> — สิ่งที่ขาดคือ safety net และความสามารถ<b>มองเห็น</b>ว่ามันทำงานหรือไม่
-            ระบบจะกู้ตัวเองได้ในเคสปกติ แต่ถ้าหลุดจากเคสปกติเมื่อไหร่ จะไม่มีอะไรเตือนและไม่มีอะไรแก้ให้
+            <b class="text-[var(--ink)]">HA ระดับ VM สมบูรณ์แล้ว</b> (2026-09-01) — กลไกทั้งสองชั้นทำงาน, safety net กลับมา,
+            สเปก standby เท่า primary แล้ว และซ้อมผ่านครบ 3 ระดับ
+            <br><br>
+            <b style="color:var(--signal)">แต่ HA ระดับเครื่องยังไม่มีเลย</b> — VM ทั้งหมดอยู่บน hypervisor ตัวเดียว
+            เพราะฉะนั้นระบบตอนนี้ "ล้มแล้วลุกได้" เฉพาะเมื่อสิ่งที่ล้มคือ VM ตัวใดตัวหนึ่ง
+            ถ้าสิ่งที่ล้มคือตัว host เอง ยังไม่มีอะไรรองรับ (§08 ข้อ 0)
           </p>
         </div>
       </section>
@@ -543,55 +549,118 @@ psql -h &lt;vip&gt; -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</s
         <div class="eyebrow text-[var(--accent)] mb-3">08 — ช่องโหว่ที่ต้องปิด</div>
         <h2 class="display text-3xl mb-6">เรียงตามผลกระทบต่อ HA</h2>
 
+        <div class="rulebox mb-10" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ข้อ 0 — ใหญ่กว่าทุกข้อในหน้านี้รวมกัน: VM ทั้ง 7 ตัวอยู่บนเครื่องเดียว</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mb-3">
+            ตรวจเมื่อ 2026-09-01: hypervisor ไม่ได้เป็น PVE cluster และมี node เดียว —
+            <span class="mono text-[12px]">pvecm status</span> ตอบ <span class="mono text-[12px]">corosync.conf does not exist - is this node part of a cluster?</span>
+            และ <span class="mono text-[12px]">pvesh get /nodes</span> คืนมา node เดียว
+            บนนั้นรัน <b class="text-[var(--ink)]">ppm + ppr1 + ppr2 + pgpool1/2/3 + เครื่องแอป</b> ครบทั้งชุด
+          </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mb-3">
+            แปลว่ากลไกทุกอย่างในเอกสารนี้ — repmgr promote, watchdog VIP, quorum, auto_failback —
+            <b class="text-[var(--ink)]">ป้องกันได้เฉพาะกรณี VM ตัวใดตัวหนึ่งตาย</b> ถ้า hypervisor ดับ
+            PostgreSQL ตายพร้อมกันสามตัว pgpool ตายพร้อมกันสามตัว และแอปตายด้วย — ไม่มีอะไรเหลือให้ fail over ไปหา
+          </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b style="color:var(--signal)">และนี่ไม่ใช่ความเสี่ยงเชิงทฤษฎี</b> — มี
+            <a href="runbook-proxmox-cpu-mce.html" class="underline" style="color:var(--accent)">Runbook 03: Proxmox Host รีบูตเอง (CPU MCE)</a>
+            เขียนไว้แล้วจากเหตุการณ์จริงว่า <i>"Hypervisor ดับเองไม่มี shutdown log · VM ตายพร้อมกันหมด"</i>
+            <br><br>
+            <b class="text-[var(--ink)]">พูดตรงๆ: โหมดความล้มเหลวที่เคยเกิดขึ้นจริง คือโหมดเดียวที่สถาปัตยกรรมนี้รับไม่ได้</b>
+            ข้อ 1–6 ข้างล่างทั้งหมดคือการทำให้ HA ระดับ VM สมบูรณ์ ซึ่งคุ้มค่าและทำไปแล้วเป็นส่วนใหญ่ —
+            แต่ไม่มีข้อไหนช่วยตอน host ดับ ทางแก้มีทางเดียวคือ<b class="text-[var(--ink)]">กระจาย VM ออกไปมากกว่าหนึ่ง hypervisor</b>
+            อย่างน้อยให้ standby หนึ่งตัวกับ pgpool หนึ่งตัวอยู่คนละเครื่องกับ primary
+          </p>
+        </div>
+
         <div class="step">
           <span class="sn">1</span>
-          <h3 class="font-semibold text-[16px] mb-2" style="color:var(--signal)">Event hook หลัง failover auth ไม่ผ่านทั้ง 3 node — ด่วนที่สุด</h3>
+          <h3 class="font-semibold text-[16px] mb-2">Event hook หลัง failover — <span style="color:#22C55E">แก้แล้ว 2026-09-01</span></h3>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
-            <span class="mono text-[12px]">/usr/local/bin/repmgr-pgpool-reattach.sh</span> ถูกออกแบบมาให้ยิง
+            <span class="mono text-[12px]">/usr/local/bin/repmgr-pgpool-reattach.sh</span> ยิง
             <span class="mono text-[12px]">pcp_attach_node</span> ไปที่ pgpool ทั้ง 3 ตัวหลัง promote/follow เพื่อเคลียร์สถานะค้าง
-            — ทดสอบ auth path เดียวกับที่ hook ใช้ พบว่า<b class="text-[var(--ink)]">ไม่ผ่านทั้งสามปลายทาง</b>
+            — เคยพบว่า auth <b class="text-[var(--ink)]">ไม่ผ่านทั้งสามปลายทาง</b> (credential drift รอบที่สอง ต่อจากบั๊ก #32/#37)
+            <b class="text-[var(--ink)]">แก้โดย standardize รหัส PCP ใหม่ให้ตรงกันทั้ง 6 เครื่อง</b>:
+            <span class="mono text-[12px]">pcp.conf</span> บน pgpool ทั้ง 3 + <span class="mono text-[12px]">.pcppass</span>
+            ของ postgres และ root บนทุกเครื่องที่ต้องเรียก pcp แล้ว <span class="mono text-[12px]">reload</span> ไล่จาก
+            priority ต่ำสุดไปหา VIP leader เป็นตัวสุดท้าย
           </p>
+          <div class="rulebox ok mb-3">
+            <div class="rc mb-1">ผลหลังแก้ — ยืนยันครบทุกด้าน</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              auth ผ่านครบ <b class="text-[var(--ink)]">9 เส้นทาง</b> (3 DB node × 3 pgpool node) ·
+              <span class="mono text-[12px]">scrape_success = 1</span> ทั้ง 3 node (เดิม 0 อยู่ 2 node) ·
+              <span class="mono text-[12px]">is_leader = 1</span> ที่ node เดียวถูกต้อง ·
+              log flood จาก <span class="mono text-[12px]">authentication failed</span> = <b class="text-[var(--ink)]">0 บรรทัด</b>
+              (เดิม ~225/ชม./node) · VIP ไม่ขยับระหว่างทำ
+            </p>
+          </div>
           <div class="code p-5 mb-3">
 <pre><span class="c"># ทดสอบซ้ำได้ (อ่านอย่างเดียว ไม่เปลี่ยนสถานะ)</span>
 ssh ovh-ppm <span class="s">"for h in &lt;pgpool1&gt; &lt;pgpool2&gt; &lt;pgpool3&gt;; do
   sudo -u postgres env HOME=/var/lib/postgresql \
     pcp_node_info -h \$h -p 9898 -U pgpool_admin -w -n 0 2>&1 | head -1
 done"</span>
-<span class="c"># ตอนนี้ได้: FATAL: authentication failed for user \"pgpool_admin\" ทั้ง 3 บรรทัด</span></pre>
+<span class="c"># ผ่าน = ได้ข้อมูล node 3 บรรทัด · ไม่ผ่าน = FATAL: authentication failed</span></pre>
           </div>
           <div class="rulebox" style="border-color:var(--signal)">
-            <div class="rc mb-1" style="color:var(--signal)">ผลกระทบจริง</div>
+            <div class="rc mb-1" style="color:var(--signal)">ทำไมมันพังซ้ำได้ถึงสามรอบ — และวิธีไม่ให้พังอีก</div>
             <p class="text-[13.5px]" style="color:var(--ink-soft)">
               hook เขียนด้วย <span class="mono text-[12px]">|| true</span> ทุกบรรทัด แปลว่ามัน<b class="text-[var(--ink)]">ล้มเหลวแบบเงียบสนิท</b>
-              ไม่มี error ไม่มี alert · failover ยังทำงาน แต่ถ้าเจอเคสที่ pgpool มาร์ค backend ค้าง down
-              (ซึ่งเคยเกิดตอน primary ตายจริงเมื่อ 2026-08-09) จะไม่มีอะไรเคลียร์ให้ ต้องมีคนกดเอง
-              <br><b class="text-[var(--ink)]">วิธีแก้:</b> standardize รหัส PCP ให้ตรงกันทั้ง 3 pgpool node แล้ววาง
-              <span class="mono text-[12px]">.pcppass</span> ที่ตรงกันให้ user ที่ hook รันอยู่ — เคยแก้มาแล้วในบั๊ก #32/#37 แต่ drift กลับมา
+              ไม่มี error ไม่มี exit code ที่ผิด ไม่มี alert · ประกอบกับ <span class="mono text-[12px]">install-pgpool.sh</span>
+              generate รหัส PCP <b class="text-[var(--ink)]">แยกกันเองทุก node</b> ตอนรันครั้งแรก — พอ re-run script บน node ใดก็ตาม
+              รหัสจะไม่ตรงกันอีก และไม่มีอะไรบอก
+              <br><br>
+              <b class="text-[var(--ink)]">กันไม่ให้เกิดอีก 2 ทาง:</b> (1) ใส่การทดสอบ 9 เส้นทางข้างบนเข้าไปใน checklist หลัง deploy ทุกครั้ง
+              — มันเป็นคำสั่งอ่านอย่างเดียว รันได้ตลอดเวลา · (2) ตั้ง alert บน
+              <span class="mono text-[12px]">pgpool_watchdog_scrape_success == 0</span> ซึ่งใช้ credential เส้นทางเดียวกัน
+              พอ PCP พังเมื่อไหร่ metric ตัวนี้จะเป็น 0 ทันที <b class="text-[var(--ink)]">ทำให้ credential drift กลายเป็นสิ่งที่มองเห็นได้ แทนที่จะเงียบ</b>
             </p>
           </div>
         </div>
 
         <div class="step">
           <span class="sn">2</span>
-          <h3 class="font-semibold text-[16px] mb-2" style="color:var(--signal)">standby มีสเปกครึ่งเดียวของ primary</h3>
+          <h3 class="font-semibold text-[16px] mb-2">standby สเปกไม่เท่า primary — <span style="color:#22C55E">แก้แล้ว 2026-09-01</span></h3>
           <div class="card overflow-hidden mb-3">
             <div class="overflow-x-auto">
               <table class="d">
-                <thead><tr><th>Node</th><th>RAM</th><th>CPU</th><th>บทบาท</th></tr></thead>
+                <thead><tr><th>Node</th><th>CPU เดิม → ใหม่</th><th>RAM เดิม</th><th>RAM ใหม่ (ceiling / floor)</th></tr></thead>
                 <tbody>
-                  <tr><td>ppm</td><td><b>6.9 GB</b></td><td><b>4 core</b></td><td>primary</td></tr>
-                  <tr><td>ppr1</td><td>3.9 GB</td><td>2 core</td><td>standby · ตัวที่จะขึ้นแทน</td></tr>
-                  <tr><td>ppr2</td><td>3.9 GB</td><td>2 core</td><td>standby · ตัวที่จะขึ้นแทน</td></tr>
+                  <tr><td>ppm</td><td>4 → <b>4</b> (ไม่แตะ)</td><td>7,168</td><td><b>7,168</b> · fixed (<span class="mono text-[11.5px]">balloon: 0</span>)</td></tr>
+                  <tr><td>ppr1</td><td>2 → <b>4</b></td><td>4,096</td><td><b>7,168</b> / 4,096</td></tr>
+                  <tr><td>ppr2</td><td>2 → <b>4</b></td><td>4,096</td><td><b>7,168</b> / 4,096</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
-          <p class="text-sm" style="color:var(--ink-soft)">
-            HA ที่แท้จริงแปลว่า "ล้มแล้วยังรับงานเท่าเดิมได้" — สภาพนี้คือ failover สำเร็จแต่<b class="text-[var(--ink)]">กำลังหายครึ่งหนึ่งทันที</b>
-            บน DB ที่ใหญ่ 20 GB ซึ่งพึ่ง OS page cache เป็นหลัก การมี RAM น้อยลงครึ่งแปลว่า cache hit ตกและ I/O พุ่ง
-            พอดีกับตอนที่ระบบกำลังเครียดที่สุด · <b class="text-[var(--ink)]">แก้:</b> ปรับ RAM/CPU ของ replica ให้เท่า primary
-            (ดูเรื่อง Proxmox balloon ใน §13 ของคู่มือฉบับเต็มประกอบ)
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            HA ที่แท้จริงแปลว่า "ล้มแล้วยังรับงานเท่าเดิมได้" — เดิม failover สำเร็จแต่<b class="text-[var(--ink)]">กำลังหายครึ่งหนึ่งทันที</b>
+            บน DB 20 GB ที่พึ่ง OS page cache เป็นหลัก (<span class="mono text-[12px]">shared_buffers</span> ตั้งไว้แค่ 128 MB)
+            RAM น้อยลงครึ่ง = cache hit ตกและ I/O พุ่ง พอดีกับตอนที่ระบบเครียดที่สุด
           </p>
+          <div class="rulebox ok mb-3">
+            <div class="rc mb-1">วิธีที่ใช้: ให้ทั้งสาม "แชร์" RAM ด้วย balloon แทนการจองตายตัว</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              host มี RAM ไม่พอให้ทั้งสามตัวจอง 7,168 ตายตัว (ดูข้อ 6) จึงตั้ง standby เป็น
+              <b class="text-[var(--ink)]">ceiling 7,168 / floor 4,096</b> — <b>commitment ที่การันตีเท่าเดิมกับก่อนแก้ทุกประการ</b>
+              แต่เพดานสูงขึ้นเท่า primary แล้ว <span class="mono text-[12px]">pvestatd</span> เกลี่ยให้ตามที่ host ว่าง
+              <br><br>
+              <b class="text-[var(--ink)]">จังหวะ failover คือตอนที่กลไกนี้ได้ผลที่สุด</b> — primary ที่ตายคืน RAM 7 GB ให้ host พอดี
+              ตัวที่ถูก promote จึงขยายขึ้นไปกินได้จริง ไม่ใช่แค่ตัวเลขบนกระดาษ
+              · ส่วน ppm คง <span class="mono text-[12px]">balloon: 0</span> ไว้ เพื่อไม่ให้ primary โดนบีบไม่ว่ากรณีใด
+            </p>
+          </div>
+          <div class="rulebox" style="border-color:var(--signal)">
+            <div class="rc mb-1">ข้อแลกเปลี่ยนที่ต้องรู้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              balloon ทวง RAM คืนโดย "พอง" อยู่ในตัว guest ซึ่ง<b class="text-[var(--ink)]">ไล่ page cache ทิ้ง</b> — คือสิ่งที่ PostgreSQL
+              พึ่งพาที่สุดในระบบนี้ ตั้ง floor ไว้ที่ 4,096 (= ค่าที่ใช้อยู่เดิม) จึงสำคัญ เพราะรับประกันว่า
+              <b class="text-[var(--ink)]">แย่ที่สุดก็ไม่แย่กว่าก่อนแก้</b> · และการพองขึ้นไม่ทันที
+              <span class="mono text-[12px]">pvestatd</span> เกลี่ยทีละขั้น หลัง failover จะไต่ขึ้นในเวลาราวหนึ่งถึงสองนาที ไม่ใช่กระโดดทันที
+            </p>
+          </div>
         </div>
 
         <div class="step">
@@ -655,7 +724,8 @@ done"</span>
         <div class="rulebox" style="border-color:var(--signal)">
           <div class="rc mb-1">กติกาการซ้อม</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
-            ทำนอกเวลาให้บริการเสมอ · <b class="text-[var(--ink)]">แก้ข้อ 1 ให้ผ่านก่อนซ้อมข้อ 4</b> ไม่งั้นจะเจอสถานะค้างที่ไม่มีอะไรเคลียร์ให้ ·
+            ทำนอกเวลาให้บริการเสมอ · <b class="text-[var(--ink)]">ยืนยันข้อ 1 ให้ผ่านก่อนซ้อมข้อ 4 ทุกครั้ง</b>
+            (ผ่านอยู่ ณ 2026-09-01 แต่เคย drift มาแล้ว 3 รอบ) ไม่งั้นจะเจอสถานะค้างที่ไม่มีอะไรเคลียร์ให้ ·
             จดเวลาจริงที่ใช้ทุกครั้งแล้วเทียบกับตัวเลขใน §03 ถ้าช้าลงมากแปลว่ามีอะไรเปลี่ยน ·
             <b class="text-[var(--ink)]">ข้อ 2 กับ 3 ปลอดภัยพอที่จะทำได้ทุกเดือน</b> ส่วนข้อ 4–5 อย่างน้อยไตรมาสละครั้ง
           </p>
@@ -746,7 +816,7 @@ ssh ovh-ppm <span class="s">"sudo -u postgres repmgr cluster show --compact"</sp
       <!-- FOOTER -->
       <erp-footer
         line1="ERP SYSTEM · HA &amp; FAILOVER OPERATIONS"
-        line2="verified against live cluster 2026-08-31">
+        line2="verified against live cluster 2026-08-31 · PCP hook restored 2026-09-01">
       </erp-footer>
 
     </div>

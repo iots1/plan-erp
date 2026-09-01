@@ -381,6 +381,15 @@ $nrconf{override_rc}-&gt;{qr(^repmgr)}     = 0;</pre>
             — ยืนยันว่า pgpool รับค่าใหม่แล้วด้วย <span class="mono text-[12px]">show pool_status</span> ก่อนไปข้อ 3
             ถ้า reload แล้วค่ายังเป็นของเก่า ให้ restart pgpool ทีละตัว <b class="text-[var(--ink)]">โดยไล่จาก standby watchdog ก่อน แล้วค่อย leader เป็นตัวสุดท้าย</b>
           </p>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">แก้มืออย่างเดียวไม่พอ — pgpool.conf ถูก generate ทับทุกครั้งที่รัน installer</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">install-pgpool.sh</span> เขียน <span class="mono text-[12px]">pgpool.conf</span> ใหม่ทั้งไฟล์
+              เพราะฉะนั้นต้องส่ง flag ด้วยทุกครั้ง ไม่งั้น deploy รอบหน้าย้อนกลับเป็น <span class="mono text-[12px]">node0/1/2</span> เงียบๆ:
+              <span class="mono text-[12px]">--backend-app-names=ppm,ppr1,ppr2</span> (เรียงตรงกับ <span class="mono text-[12px]">--backends</span>)
+              — flag นี้เพิ่มเข้า script แล้ว 2026-09-01 ถ้าไม่ใส่จะ warn ดังๆ ถ้าใส่ไม่ครบจำนวนจะ <span class="mono text-[12px]">die</span> ทันที
+            </p>
+          </div>
         </div>
 
         <div class="step">
@@ -397,25 +406,52 @@ $nrconf{override_rc}-&gt;{qr(^repmgr)}     = 0;</pre>
 <span class="k">done</span>
 <span class="c"># scrape_success 1 = PCP ใช้ได้ · 0 = auth พัง</span></pre>
           </div>
-          <div class="rulebox mt-3">
-            <div class="rc mb-1">วิธีแก้ — password ต้องตรงกันสองไฟล์บนเครื่องเดียวกัน</div>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">แก้ทีละเครื่องไม่พอ — ต้องทำครบ 6 เครื่องพร้อมกัน</div>
             <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+              รหัส PCP ต้อง <b class="text-[var(--ink)]">เหมือนกันทุก node</b> เพราะ repmgr event hook เรียก
+              <span class="mono text-[12px]">pcp_attach_node</span> <b>ข้ามเครื่อง</b> ไปหา pgpool ทุกตัว —
+              ไม่ใช่แค่ <span class="mono text-[12px]">-h localhost</span> · สองไฟล์ที่ต้องตรงกัน:
               <span class="mono text-[12px]">/etc/pgpool2/pcp.conf</span> เก็บ <span class="mono text-[12px]">username:md5(password)</span> ·
-              <span class="mono text-[12px]">/var/lib/postgresql/.pcppass</span> เก็บ
-              <span class="mono text-[12px]">host:port:username:password</span> แบบ plaintext (perm 0600, เจ้าของ postgres)
-              ทั้งสองไฟล์เป็นของ <b>เครื่องนั้นๆ</b> — copy .pcppass ข้ามเครื่องมาคือสาเหตุของบั๊กนี้
+              <span class="mono text-[12px]">.pcppass</span> เก็บ <span class="mono text-[12px]">host:port:username:password</span> plaintext (0600)
+              <br><br>
+              <b class="text-[var(--ink)]">host ต้องเป็น <span class="mono text-[12px]">*</span> ไม่ใช่ <span class="mono text-[12px]">localhost</span></b> —
+              เขียนเป็น localhost จะใช้ได้แค่ในเครื่องตัวเอง แล้ว hook จะพังเงียบ (นี่คือสาเหตุที่บั๊กนี้กลับมาซ้ำ 3 รอบ)
             </p>
           </div>
           <div class="code p-5 mt-3">
-<pre><span class="c"># ตั้งใหม่ให้ตรงกัน (แทน &lt;PCP_PASSWORD&gt; ด้วยค่าจริง อย่า commit ลง git)</span>
-ssh ovh-pgpool1 <span class="s">'read -rs PW; \
-  echo "pgpool_admin:$(pg_md5 "$PW")" | sudo tee /etc/pgpool2/pcp.conf.new; \
-  printf "localhost:9898:pgpool_admin:%s\n" "$PW" \
-    | sudo -u postgres tee /var/lib/postgresql/.pcppass'</span>
-ssh ovh-pgpool1 <span class="s">"sudo chmod 600 /var/lib/postgresql/.pcppass; sudo systemctl reload pgpool2"</span></pre>
+<pre><span class="c"># 1) generate รหัสใหม่ 1 ค่า บนเครื่องเดียว แล้วสร้างไฟล์ทั้งสองจากมัน</span>
+ssh ovh-pgpool1 <span class="s">'umask 077
+  PW=$(openssl rand -base64 32 | tr -dc "A-Za-z0-9" | cut -c1-28)
+  printf "pgpool_admin:%s\n" "$(printf %s "$PW" | md5sum | cut -d" " -f1)" &gt; /tmp/pcp.conf.new
+  printf "*:9898:pgpool_admin:%s\n" "$PW" &gt; /tmp/pcppass.new'</span>
+
+<span class="c"># 2) กระจายไป "ทั้ง 6 เครื่อง" — pgpool ได้ทั้งสองไฟล์ / DB node ได้แค่ .pcppass</span>
+<span class="c">#    pgpool ×3 :  pcp.conf (0644 root) + .pcppass ของ postgres และ root (0600)</span>
+<span class="c">#    ppm/ppr1/ppr2: .pcppass ของ postgres (0600) — hook รันเป็น postgres</span>
+
+<span class="c"># 3) reload ไล่จาก wd_priority ต่ำสุด → VIP leader เป็นตัวสุดท้าย</span>
+ssh ovh-pgpool3 <span class="s">"sudo systemctl reload pgpool2"</span>
+ssh ovh-pgpool2 <span class="s">"sudo systemctl reload pgpool2"</span>
+ssh ovh-pgpool1 <span class="s">"sudo systemctl reload pgpool2"</span>   <span class="c"># ตัวถือ VIP</span></pre>
+          </div>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ยืนยันให้ครบ 9 เส้นทาง ไม่ใช่แค่ localhost — จุดที่การแก้รอบก่อนพลาด</div>
+            <div class="code p-5 mt-2">
+<pre><span class="k">for</span> n <span class="k">in</span> ovh-ppm ovh-ppr1 ovh-ppr2<span class="k">;</span> <span class="k">do</span>
+  ssh $n <span class="s">'for h in &lt;pgpool1&gt; &lt;pgpool2&gt; &lt;pgpool3&gt;; do
+    sudo -u postgres env HOME=/var/lib/postgresql \
+      pcp_node_info -h $h -p 9898 -U pgpool_admin -w -n 0 2>&amp;1 | head -1
+  done'</span>
+<span class="k">done</span>
+<span class="c"># ต้องได้ข้อมูล node ครบ 9 บรรทัด — ไม่มี FATAL แม้แต่บรรทัดเดียว</span></pre>
+            </div>
           </div>
           <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
-            <b class="text-[var(--ink)]">อย่าลืม</b> merge entry ของ user อื่นที่มีอยู่เดิมใน <span class="mono text-[12px]">pcp.conf</span> ก่อนเขียนทับ
+            <b class="text-[var(--ink)]">อย่าลืม</b> merge entry ของ user อื่นที่มีอยู่เดิมใน <span class="mono text-[12px]">pcp.conf</span> ก่อนเขียนทับ ·
+            และ<b class="text-[var(--ink)]">แก้ที่ generator ด้วย</b> — <span class="mono text-[12px]">install-pgpool.sh</span> เคยเขียน
+            <span class="mono text-[12px]">localhost:</span> ตายตัว (แก้แล้ว 2026-09-01) และต้องส่ง
+            <span class="mono text-[12px]">--pcp-password</span> ค่าเดียวกันให้ทุก node เสมอ ไม่ปล่อยให้ generate เอง
           </p>
         </div>
 
@@ -499,9 +535,21 @@ ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pg
           </p>
           <div class="code p-5">
 <pre>ssh ovh-ppr2 <span class="s">"sudo systemctl restart postgresql@18-main"</span>
-<span class="c"># รอ ~30 วินาที แล้วเช็ค — ควรกลับมา up เองโดยไม่ต้องรัน pcp_attach_node</span>
+<span class="c"># เช็คได้เลยไม่ต้องรอนาน — ของจริงกลับมาเองใน ~2 วินาที</span>
 psql -h 172.16.0.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span>
 ssh ovh-pgpool1 <span class="s">"journalctl -u pgpool2 --since '-2min' --no-pager | grep -i failback"</span></pre>
+          </div>
+          <div class="rulebox ok mt-3">
+            <div class="rc mb-1">ผลซ้อมจริง 2026-09-01 — เร็วกว่าที่คาดมาก</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">15:25:49.524</span> degenerate node 2 →
+              <span class="mono text-[12px]">15:25:51.446</span> received failback request →
+              <span class="mono text-[12px]">15:25:51.489</span> failback done
+              — <b class="text-[var(--ink)]">รวม ~2 วินาที</b> และคำสั่ง failback ยิงมาจาก
+              <span class="mono text-[12px]">health_check2</span> เอง ไม่ใช่จาก <span class="mono text-[12px]">auto_failback_interval</span>
+              เพราะ health check เจอว่า node กลับมาแล้วก่อน interval จะครบด้วยซ้ำ
+              <b class="text-[var(--ink)]">ถ้าเกิน 30 วินาทีแล้วยังไม่กลับ = §5.2 ยังไม่ได้ผล</b> ให้กลับไปดู §3 ข้อ 4
+            </p>
           </div>
         </div>
 
@@ -521,7 +569,10 @@ ssh ovh-pgpool1 <span class="s">"journalctl -u pgpool2 --since '-2min' --no-page
             <b>(1) Alert ที่ควรมีตั้งแต่แรก:</b> ยิงเตือนเมื่อ <span class="mono text-[12px]">status != pg_status</span>
             บน node ใดนานเกิน 1 นาที — เคสนี้ค้าง 2 วันเพราะไม่มี alert ตัวนี้ ·
             <b>(2)</b> <span class="mono text-[12px]">pgpool_watchdog_scrape_success == 0</span> ต้องเป็น alert ด้วย
-            ไม่งั้น monitoring พังแล้วก็ไม่มีใครรู้อีก (นี่คือ meta-bug ของเคสนี้) ·
+            ไม่งั้น monitoring พังแล้วก็ไม่มีใครรู้อีก (นี่คือ meta-bug ของเคสนี้) — <b class="text-[var(--ink)]">metric ตัวนี้คุ้มเป็นพิเศษ
+            เพราะใช้ credential เส้นทางเดียวกับ repmgr event hook</b> พอ PCP drift เมื่อไหร่มันเป็น 0 ทันที
+            เท่ากับ alert ตัวเดียวเฝ้าได้ทั้ง monitoring และ auto-reattach หลัง failover
+            (<span class="mono text-[12px]">scrape_success = 1</span> ครบ 3 node แล้วตั้งแต่ 2026-09-01 แต่ยังไม่มี alert) ·
             <b>(3) postgres_exporter บน replica ยังพังอยู่</b> — เวอร์ชัน 0.15.0 (ต.ค. 2023) เก่าเกินสำหรับ PostgreSQL 18
             ขึ้น <span class="mono text-[12px]">collector failed name=stat_bgwriter · column "checkpoints_timed" does not exist</span>
             ทุก 15 วินาที เพราะ PG17+ ย้าย column ไป <span class="mono text-[12px]">pg_stat_checkpointer</span>
@@ -544,7 +595,7 @@ ssh ovh-pgpool1 <span class="s">"journalctl -u pgpool2 --since '-2min' --no-page
       <!-- FOOTER -->
       <erp-footer
         line1="ERP SYSTEM · RUNBOOK · STANDBY STUCK DOWN"
-        line2="incident 2026-08-29 · diagnosed &amp; documented 2026-08-31">
+        line2="incident 2026-08-29 · documented 2026-08-31 · fix drilled &amp; verified 2026-09-01">
       </erp-footer>
 
     </div>

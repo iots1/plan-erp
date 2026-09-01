@@ -249,8 +249,8 @@ host  &lt;db-name&gt;  @app-roles.txt             &lt;cidr&gt;  scram-sha-256</p
                 <tr>
                   <td>6</td>
                   <td>แก้ไฟล์ด้วยมือ ทั้งที่มี installer generate ให้</td>
-                  <td>script ที่ generate config มักเขียนทับทั้งไฟล์ — การรัดความปลอดภัยที่ทำด้วยมือจะหายเงียบในรอบ deploy ถัดไป และไม่มีใครรู้จนกว่าจะโดน</td>
-                  <td>แก้ที่ template/flag ของ generator เสมอ แล้ว re-run — ถ้าแก้มือเป็นการชั่วคราว ต้องมี ticket ตามปิด</td>
+                  <td>script ที่ generate config มักเขียนทับทั้งไฟล์ — การรัดความปลอดภัยที่ทำด้วยมือจะหายเงียบในรอบ deploy ถัดไป และไม่มีใครรู้จนกว่าจะโดน · <b>อันตรายกว่านั้น:</b> ค่า default ที่ generator ใส่ให้อาจผิดตั้งแต่แรกและไม่มีใครสังเกต เพราะมันดู "ตั้งใจตั้งไว้"</td>
+                  <td>แก้ที่ template/flag ของ generator เสมอ แล้ว re-run — ถ้าแก้มือเป็นการชั่วคราว ต้องมี ticket ตามปิด · ถ้า generator สร้าง <b>credential แยกต่อ node</b> ให้เปลี่ยนเป็นรับค่าเดียวจากภายนอกแทน ไม่งั้นมันจะ drift ทุกครั้งที่ re-run ทีละเครื่อง</td>
                 </tr>
                 <tr>
                   <td>7</td>
