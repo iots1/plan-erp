@@ -1,18 +1,20 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts)** · ยังไม่ commit
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts +
+> credit column precision)** · commit และ push แล้วทั้งคู่
 
 ---
 
 ## 1 · สถานะล่าสุด
 
-ทั้งสอง repo push แล้ว ตรงกัน:
+ทั้งสอง repo push แล้ว ตรงกัน — **HEAD ปัจจุบันเป็น commit เรื่อง pgpool/HA ของผู้ใช้เอง** ทำต่อบนงาน
+currency/column-contracts ของรอบนี้ (ไม่เกี่ยวกับเนื้อหาไฟล์นี้ ไม่ต้องอ่าน):
 
-| Repo | Commit ล่าสุด |
-|---|---|
-| `iotechsoft-company/erp-api` | `951f034` feat: vendor credit note (C2) + repair erp_iam schema drift |
-| `iots1/plan-erp` (submodule) | `ac2eb19` docs: document the vendor credit note and the iam schema repair |
+| Repo | HEAD ปัจจุบัน | commit ล่าสุดของงานรอบนี้ |
+|---|---|---|
+| `iotechsoft-company/erp-api` | `d7efab1` fix(install-pgpool): … | `3c22b48` refactor: shared column contracts, currency on pre-booking documents, 4-decimal credit columns |
+| `iots1/plan-erp` (submodule) | `80e305c` docs: record HA drill results, … | `f87d102` docs: shared column contracts, currency on pre-booking documents, money precision |
 
 **สุขภาพระบบตอนนี้** (ยืนยันแล้วทั้งหมด ไม่ใช่เดา · รันซ้ำหลัง C3):
 
@@ -28,7 +30,9 @@
 lock, AP Invoice + 3-way match, Credit Limit (SO), เพดาน WHT ที่ payment, Receipt↔Delivery Note
 match, due_date + AR/AP aging, reorder alert job, VAT registration enforcement, Sales Return +
 partial COGS reversal, D1–D3 (credit re-check ตอนส่งของ / price tolerance ตั้งค่าได้ + หน้า UI /
-เพดานอนุมัติใบปรับยอดสต็อก), vendor credit note, **C3 multi-currency ตอนตัดชำระ + realised FX (รอบนี้)**
+เพดานอนุมัติใบปรับยอดสต็อก), vendor credit note, **C3 multi-currency ตอนตัดชำระ + realised FX, currency
+enum ระดับ DB, FX audit (P1 แก้ 3 ข้อ), P2#4 (FX บน quotation/SO/PO), shared column contracts (7
+interface), credit column precision → numeric(18,4) (รอบนี้ทั้งหมด)**
 
 ---
 
@@ -211,6 +215,32 @@ Scan ทั้ง 112 entity หากลุ่มคอลัมน์ที่
   ที่ไม่มีขั้น submit เลย (มันถูก *ส่ง* และ *อนุมัติ*) = แก้ schema เพื่อให้ refactor สวย
 - **`PurchaseOrder` ถูกเว้นจาก `IVatBucketedDocumentHeader` โดยเจตนา** — PO ไม่มีขั้น VAT เลย
   บังคับให้ implement = เพิ่ม 5 คอลัมน์ที่ไม่มีใครคำนวณ ซึ่งคือ pattern ช่องโหว่ที่ audit เจอ 6/6 ครั้ง
+
+---
+
+### Money precision · credit columns ขยายเป็น `numeric(18,4)` ✅ **เสร็จแล้ว 2026-09-01**
+
+Scan ทั้ง 155 numeric column ในโปรเจกต์ (ผู้ใช้ถามตรงว่าเงินครบ 4 ตำแหน่งหมดหรือยัง) พบ
+**5 คอลัมน์เป็น `numeric(18,2)`** ทั้งหมดอยู่ sales-bc เรื่องวงเงินเครดิต:
+`customers.credit_limit`, `sales_orders`/`delivery_notes` คู่ `credit_limit_snapshot` +
+`credit_exposure_snapshot`
+
+- **`credit_exposure_snapshot` เป็นจุดที่ตัดข้อมูลจริง ไม่ใช่แค่เบี่ยง convention** — มันคำนวณจาก
+  `receipts.total`/`sales_orders.total` ซึ่งเป็น `numeric(18,4)` ผ่าน `roundMoney()` แล้วเขียนลง
+  คอลัมน์ 2 ตำแหน่งแบบเงียบๆ ทำให้ snapshot ที่เก็บไว้ต่างจากตัวเลขที่ใช้ตัดสินอนุมัติได้ถึงครึ่งสตางค์
+  — ขัดกับ comment ของคอลัมน์เองที่บอกว่า "เก็บไว้ให้ผู้อนุมัติเห็นตัวเลขที่ใช้ตัดสินจริง"
+- `credit_limit_snapshot`/`credit_limit` เองไม่เคยตัดจริง (รับค่าจากกันเองที่ ≤2 ตำแหน่งอยู่แล้ว) —
+  ขยายเพื่อความสม่ำเสมอทั้งระบบตามที่สั่ง ไม่ใช่เพราะเป็นบั๊ก
+- migration `1788278222823-WidenCreditColumnsToScale4.ts` เป็น `ALTER COLUMN TYPE numeric(18,4)`
+  ตรงๆ **ไม่ต้องแก้มือ** เพราะเป็นการขยาย scale ล้วนๆ (Postgres cast กว้างขึ้นให้เองแบบ implicit
+  ไม่มี `DROP COLUMN`) — ต่างจาก currency enum conversion ที่ต้องแก้มือเพราะเปลี่ยนข้าม type
+- DTO `create-customer.dto.ts` แก้ `maxDecimalPlaces: 2 → 4` คู่กัน ไม่งั้น API จะบล็อกค่า 4
+  ตำแหน่งที่ DB รับได้แล้ว
+- (7,4)/(18,7)/(10,4)/(5,2) ที่เหลือใน numeric ทั้งหมด ตรวจแล้วว่า**ไม่ใช่เงิน** (เปอร์เซ็นต์/อัตรา/
+  factor) จึงไม่ต้องแก้ · `timestamptz`: ตรวจครบ 112 entity แล้ว **0 ข้อผิด**
+
+**ยังไม่ทำ**: ไม่มีการบันทึกเรื่องนี้ใน `srs-p5.html` — เป็น schema-precision fix ล้วนๆ ไม่ใช่
+business rule ใหม่ จึงตัดสินใจไม่เพิ่ม rulebox ให้ ถ้าเห็นต่างบอกได้
 
 ---
 
