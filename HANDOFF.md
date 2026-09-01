@@ -1,0 +1,256 @@
+# HANDOFF — สถานะงานและแผนต่อ
+
+> **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-01 (C3 + currency enum + FX audit)** · ยังไม่ commit
+
+---
+
+## 1 · สถานะล่าสุด
+
+ทั้งสอง repo push แล้ว ตรงกัน:
+
+| Repo | Commit ล่าสุด |
+|---|---|
+| `iotechsoft-company/erp-api` | `951f034` feat: vendor credit note (C2) + repair erp_iam schema drift |
+| `iots1/plan-erp` (submodule) | `ac2eb19` docs: document the vendor credit note and the iam schema repair |
+
+**สุขภาพระบบตอนนี้** (ยืนยันแล้วทั้งหมด ไม่ใช่เดา · รันซ้ำหลัง C3):
+
+- **1444 tests / 106 suites ผ่านทั้งหมด**
+- **ทั้ง 6 database รายงาน `No changes`** จาก `migration:generate` — ตรวจซ้ำหลังรัน migration ของ C3 แล้ว
+  (ก่อนหน้านี้ `--check` ใช้เป็นสัญญาณไม่ได้เลยเพราะรายงาน changes ทุกครั้ง ของจริงจะซ่อนอยู่ในนั้น)
+- boot จริงผ่านทั้ง 4 BC ที่แตะ — `finance-bc` 55 routes · `sales-bc` 46 · `supplier-bc` 26 · `inventory-bc` 132 · DI resolve ครบ ไม่มี error (ไม่มี endpoint ใหม่ ตัวเลข 308 เส้นจึงไม่เปลี่ยน)
+- eslint **0 error 0 warning** (warning เดิมที่ `jest-setup-env.js:67` ถูก `--fix` ไปแล้ว)
+- eslint เหลือ **1 warning เดิม** ที่ไม่เกี่ยวข้อง (`libs/common/test/jest-setup-env.js:67` — unused eslint-disable directive)
+- endpoint รวม **308 เส้น** และตาราง index ใน `api-workflow-guide.html` ตรงกับหัวข้อทุก BC (ตรวจทีละแถวแล้ว)
+
+**สิ่งที่ทำเสร็จในรอบก่อนหน้า** (ทั้งหมด implement + test + เอกสารครบ): Purchase Return, stock period
+lock, AP Invoice + 3-way match, Credit Limit (SO), เพดาน WHT ที่ payment, Receipt↔Delivery Note
+match, due_date + AR/AP aging, reorder alert job, VAT registration enforcement, Sales Return +
+partial COGS reversal, D1–D3 (credit re-check ตอนส่งของ / price tolerance ตั้งค่าได้ + หน้า UI /
+เพดานอนุมัติใบปรับยอดสต็อก), vendor credit note, **C3 multi-currency ตอนตัดชำระ + realised FX (รอบนี้)**
+
+---
+
+## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### ~~C3 · multi-currency ตอนตัดชำระ~~ ✅ **เสร็จแล้ว 2026-09-01**
+
+ลูกค้าตอบคำถามทั้ง 4 ข้อครบแล้ว (ผ่าน `AskUserQuestion` แบบ D1–D3) และ implement ตามคำตอบเรียบร้อย:
+
+| คำถาม | คำตอบที่ได้ |
+|---|---|
+| ขายเป็นสกุลต่างประเทศจริงไหม | **มี** (USD/อื่น) → ทำ C3 |
+| FX gain/loss ลงบัญชีอะไร | **แยกสองบัญชี `4300` กำไร / `5300` ขาดทุน** ตามธรรมเนียม Thai SME — ตั้งเป็นมาตรฐานของแพลตฟอร์ม |
+| ใช้อัตราไหนตอนตัดชำระ | **ผู้ใช้กรอกเองต่อใบจ่าย** (อัตราที่ธนาคารให้จริง) เทียบกับ snapshot บนใบกำกับเพื่อหา FX |
+| ซื้อเป็นสกุลต่างประเทศด้วยไหม | **ทั้งซื้อและขาย** → `ap_invoices` ได้ `raw_*` ครบชุดด้วย |
+
+**แกนของสิ่งที่ทำ — สองอัตรา ไม่ใช่อัตราเดียว** (นี่คือส่วนที่ต้องเข้าใจก่อนแก้อะไรต่อ):
+
+- เอกสาร (`receipts`/`ap_invoices`) snapshot อัตราที่ **หนี้ถูกบันทึก**
+- `payment_entries` มี `currency_rate` ของตัวเอง = อัตราที่ **เงินเคลื่อนไหวจริง**
+- ผลต่างของสองอัตรานี้ **เฉพาะบนส่วนที่ตัดหนี้จริง** = realised FX → `4300`/`5300`
+
+**invariant ย้ายไปฝั่ง `raw_*` ทั้งชุด** — `chk_payment_entries_allocated_within_settleable` (THB)
+ถูก **drop** แล้วแทนด้วย `chk_payment_entries_raw_allocated_within_settleable` เพราะฝั่ง THB
+*ไม่ถูกต้อง*เมื่อมีสองอัตรา: ใบ USD 100 บันทึกไว้ที่ 35 (AR 3,500) จ่ายครบที่ 36 (เงินสด 3,600)
+จะถูกปฏิเสธว่าเกินยอดทั้งที่ปิดหนี้พอดี และในทางกลับกันจะปล่อยยอดขาดจริงผ่าน
+
+**คอลัมน์ THB บน `payment_entries` ไม่ใช่การแปลงตรงๆ จาก `raw_*` — จุดเดียวในแพลตฟอร์มที่เป็นแบบนี้:**
+
+| คอลัมน์ | อัตราที่ใช้ | เหตุผล |
+|---|---|---|
+| `paid_amount` / `wht_amount` | ของ**ใบจ่ายนี้** | เงินสดเคลื่อนที่อัตรานั้น · WHT certificate ออกตามอัตราวันจ่าย |
+| `allocated_amount` | ของ**แต่ละใบที่ถูกตัด** | ต้องลด AR/AP ด้วยมูลค่าที่บันทึกไว้จริง ไม่งั้นใบที่จ่ายครบจะเหลือเศษค้างใน AR ที่ไม่มีใบจ่ายไหนล้างได้ |
+| `unallocated_amount` | ของ**ใบจ่ายนี้** | ยังไม่ปิดหนี้ใบใด จึงยังไม่เกิด FX |
+
+ดังนั้น `allocated + unallocated ≠ paid + wht` เมื่ออัตราต่างกัน — **ช่องว่างนั้นคือ FX พอดี** และ
+`PaymentGlPostingService` คิดเป็น **residual** (`fx = (paid+wht) − allocated − unallocated`)
+ไม่ใช่คำนวณซ้ำจากอัตรา เพื่อให้ voucher balance ถึงระดับสตางค์โดยโครงสร้าง ไม่ขึ้นกับการปัดเศษ
+· เมื่อ `currency=THB` ทุกอัตราเป็น 1 → residual = 0 → ไม่มีบรรทัด FX → journal เหมือนเดิมทุกตัวอักษร
+
+**ไฟล์ที่แตะ (20 ไฟล์):**
+
+- **ใหม่ใน `@lib/common`** — `utils/currency.util.ts` (`BOOK_CURRENCY`, `resolveCurrencyContext`,
+  `toRawCurrency`, `toBookCurrency`, `resolveRealisedFxDifference`) + `interfaces/currency-context.interface.ts`
+  · **ย้ายมาจาก `receipts.service.ts`** (เดิมเป็น private method ที่นั่น) แล้ว `receipts.service` /
+  `ap-invoices.service` / `payment-entries.service` ใช้ตัวเดียวกัน — ลบ `receipt-currency-context.interface.ts` ทิ้ง
+- `GlAccount` +`ForeignExchangeGain='4300'` +`ForeignExchangeLoss='5300'`
+- `payment_entries` +`currency`/`currency_rate`/`currency_date`/`raw_paid_amount`/`raw_wht_amount`/
+  **`raw_allocated_amount`/`raw_unallocated_amount`** (สองตัวหลังเกินจาก scope เดิมใน HANDOFF แต่**จำเป็น** —
+  ไม่มีก็ไม่มีที่เก็บ invariant ฝั่ง raw ให้ CHECK ตรวจได้)
+- `payment_allocations` +`raw_allocated_amount` (ไม่ใช่แค่ audit — invariant กับการเฉลี่ย WHT คิดจากตัวนี้)
+- `ap_invoices` +`currency`/`currency_rate`/`currency_date` + `raw_*` ครบ 6 ตัว (mirror `receipts`) ·
+  credit note **inherit FX snapshot** จากใบที่อ้างอิง ด้วยเหตุผลเดียวกับที่ inherit `vat_rate`
+- `PaymentEntriesService` — refactor จริง: แยก `assertAllocationTargetsWellFormed()` ออกมา, เพิ่ม
+  `resolveAllocationRates()` (โหลด FX ของเอกสารปลายทาง + **ปฏิเสธการตัดข้ามสกุล**), `resolveWithholdingSplit()`
+  เฉลี่ยในสกุลที่ทำรายการแล้วแปลงกลับที่อัตราของแต่ละใบ, `sumRawAllocations()`
+- `PaymentGlPostingService` +`fxLine()` · `APInvoiceGlPostingService` **ไม่ต้องแก้** (อ่านแต่คอลัมน์ THB —
+  FX เกิดตอน *ตัดชำระ* ไม่ใช่ตอนรับรู้หนี้) เพิ่มแต่ docblock อธิบาย
+- migration `1788271413628-AddMultiCurrencyToPaymentsAndAPInvoices.ts` — **hand-edit 3 จุดจาก generated diff**
+  (ดู docblock ในไฟล์): `currency_date` ต้อง add nullable → backfill → set NOT NULL, `raw_*` ต้อง
+  backfill จากคอลัมน์ THB ไม่ใช่ปล่อยเป็น 0 (ไม่งั้น `chk_payment_allocations_raw_allocated_amount_gt_0`
+  **fail ทันที**บนแถวเดิมทุกแถว), และ drop CHECK ตัวเก่า
+- เอกสาร: `srs-p5.html` (ER diagram 3 ตาราง + rulebox `MULTI-CURRENCY SETTLEMENT & REALISED FX` +
+  แก้ invariant ใน `RULE · PAYMENT ALLOCATION`) · `api-workflow-guide.html` (currency ใน request body +
+  rulebox เตือน FE ว่า `allocated_amount` คิดที่อัตราของ**ใบกำกับ** ไม่ใช่ของใบจ่าย) — render-check ผ่านทั้งคู่
+
+**เทสต์ที่เพิ่ม (+30):** `currency.util.spec.ts` (15) · FX ใน `payment-gl-posting.service.spec.ts` (7 —
+รวมเคสเศษสตางค์ที่ยืนยันว่า voucher balance) · multi-currency ใน `payment-entries.service.spec.ts` (8)
+
+**ยังไม่ทำ (จงใจ) — unrealised FX**: การตีราคา AR/AP ที่ยังเปิดอยู่ ณ วันสิ้นงวด (TFRS 21 อีกครึ่ง)
+เป็น period-end adjustment ของทั้ง ledger ไม่ใช่ผลของเอกสารใบใดใบหนึ่ง จึงไม่อยู่ใน posting rule ของเอกสาร
+· ถ้าลูกค้าต้องการ ต้องเป็นงานใหม่ที่มีตัวขับของตัวเอง (คู่กับ `finance_settings.ledger_frozen_upto`)
+
+---
+
+### FX / currency audit — จัดระดับ P0–P4 (ตรวจ 2026-09-01)
+
+ตรวจทั้ง repo หา "หลุดเคส/ช่องโหว่เรื่องอัตราสกุลเงินซื้อ-ขาย" ด้วยสองวิธีใน §5
+(หาคอลัมน์ที่ประกาศแล้วไม่มีใครอ่าน + เทียบความสมมาตรซื้อ↔ขาย)
+
+**P0 — ไม่พบ.** ไม่มีจุดใดที่พังหรือทำข้อมูลเสียในการใช้งาน THB ล้วนตามปกติ · ทางตัดชำระถูกปิดไปแล้วใน C3
+
+#### P1 — แก้แล้วรอบนี้ (มีเทสต์คุมทั้งสามข้อ)
+
+| # | ช่องโหว่ | ผลถ้าไม่แก้ |
+|---|---|---|
+| 1 | **ใบลดหนี้ฝั่งขายไม่ inherit FX snapshot** — `receipts` รับ `currency` จาก client ตรงๆ ขณะที่ `ap_invoices` inherit ตั้งแต่วันแรก (asymmetry ซื้อ↔ขาย) | ใบลดหนี้ที่ปรับใบ USD@35 ออกเป็น THB หรือ USD@40 ได้ → net กับ AR ผิดอัตรา เหลือเศษค้างที่**ไม่มีใบจ่ายไหนล้างได้** และไม่มี FX event อธิบาย · guard ตัดข้ามสกุลจับไม่ได้เพราะใบปรับยอดลง ledger ตรงๆ ไม่ผ่านใบจ่าย |
+| 2 | **`price_lists.currency` ถูกทิ้งที่ BC boundary** — `IItemPriceLookupResult` ส่งแค่ `{rate, price_list_id}` แม้ query จะ join `price_list` อยู่แล้ว | `assertPriceWithinReferenceBound` เทียบเลขสองตัวเสมือนหน่วยเดียวกัน · price list USD อ้างอิง 100 กับบรรทัด THB 3,600 → **ปฏิเสธเอกสารที่ถูก** และบรรทัด THB 100 → **ผ่าน** ทั้งที่ควรตก = ขายต่ำกว่าราคาไป ~36 เท่า **ผ่าน guard ที่มีไว้กันการขายต่ำราคาเอง** |
+| 3 | **3 ใน 6 คอลัมน์ currency ไม่ได้ validate ISO เลย** — `customers.billing_currency`, `suppliers.billing_currency`, `price_lists.currency` มีแค่ `@IsString()` | เก็บ `'ZZ'`/`'usd'`/คำอะไรก็ได้ลง DB ได้ · ปิดด้วย enum ระดับ DB (ดู §2 ด้านล่าง) |
+
+#### P2 — ต้องตัดสินใจ / งานฟีเจอร์ ยังไม่ทำ
+
+| # | เรื่อง | ต้องทำอะไร |
+|---|---|---|
+| 4 | **`quotations` / `purchase_orders` ไม่มี currency เลย** — สกุลเงินโผล่ขึ้นมาครั้งแรกที่ใบกำกับ/ใบตั้งหนี้ | ขายหรือซื้อสกุลต่างประเทศจึงเสนอราคา/สั่งซื้อไม่ได้ · fix P1#2 เปลี่ยนจาก "ผิดเงียบ" เป็น 400 ชัดเจนแล้ว (สถานะกลางที่ซื่อสัตย์) · ของจริงคือเพิ่ม FX snapshot ทั้งสองใบ แบบเดียวกับที่ทำกับ `ap_invoices` |
+| 5 | **`receipt_items` / `ap_invoice_items` ไม่มี `raw_*`** | ใบกำกับส่งออกต้องพิมพ์ยอดต่อบรรทัดเป็นสกุลที่ทำรายการ · ตอนนี้มีแต่ระดับหัวเอกสาร ถ้า derive ตอนพิมพ์ ผลรวมหลังปัดเศษไม่จำเป็นต้องเท่ากับ `raw_total` |
+| 6 | **report-bc print ไม่รู้จัก currency เลย** (grep แล้วไม่พบคำนี้ทั้งโฟลเดอร์) | เอกสารที่พิมพ์ออกมาแสดงเลข THB โดยไม่มีเครื่องหมายสกุลเงิน — ใบกำกับส่งออกที่พิมพ์เป็น THB คือเอกสารที่ผิดในตัวมันเอง |
+| 7 | **`billing_currency` ทั้งสองฝั่งยังไม่มีใครอ่าน** — enum การันตีแล้วว่าค่าถูก แต่ไม่มีใครเทียบกับ `currency` ของเอกสาร | ต้องได้นโยบายจากลูกค้าก่อน: ออกใบ THB ให้ลูกค้าที่ตกลง USD ควร **ปฏิเสธ / เตือน / ใช้เป็น default** ? — คำถามคลาสเดียวกับ C3 ไม่ควรเดาเอง |
+
+#### P3–P4 — รู้ไว้ ไม่ต้องรีบ
+
+| # | ระดับ | เรื่อง |
+|---|---|---|
+| 8 | P3 | **`billing_notes` รวมใบข้ามสกุลได้** — บวก `receipt.total` (THB) จึงถูกต้องภายในตัว แต่ BN ของลูกค้าที่วางบิลเป็น USD จะแสดงยอด THB ก้อนเดียว · เป็นคำถามเรื่องการจัดกลุ่ม/พิมพ์ ไม่ใช่ตัวเลขผิด |
+| 9 | P3 | **`credit_limit`/`credit_exposure` เป็น THB** — ถูกต้องในฐานะสกุลบัญชี แต่ไม่มีที่ไหนเขียนไว้ วงเงินของลูกค้า USD ก็เป็น THB |
+| 10 | P4 | **`item_prices` ไม่มี currency ของตัวเอง** — สืบทอดจาก price list ซึ่ง docblock ระบุไว้แล้วว่าจงใจ (ตรงกับ SAP/Odoo/NetSuite) · **ไม่ใช่บั๊ก** บันทึกไว้เพราะ audit ต้องยืนยัน |
+| 11 | P4 | **เพิ่มสกุลเงินใหม่ = 4 migration** (finance/sales/supplier/inventory) — ราคาของ enum ต่อ database · จงใจ เขียนไว้ใน docblock ของ `Currency` |
+| 12 | P4 | **unrealised FX ยังไม่ทำ** (จากรอบ C3) — period-end revaluation ตาม TFRS 21 อีกครึ่ง เป็นงานของทั้ง ledger ไม่ใช่ของเอกสารใบใด |
+
+---
+
+### currency → enum ระดับ DB ✅ **เสร็จแล้ว 2026-09-01**
+
+ทั้ง **6 คอลัมน์** เป็น Postgres enum แล้ว: `receipts.currency`, `ap_invoices.currency`,
+`payment_entries.currency`, `price_lists.currency`, `customers.billing_currency`,
+`suppliers.billing_currency` · source of truth เดียวคือ `Currency` ใน `@lib/common/enum/currency.enum.ts`
+
+- **157 ค่า** — generate จากรายการ ISO 4217 ชุดเดียวกับที่ class-validator ใช้ (179 code point)
+  แล้วตัด 22 ตัวที่เป็น ISO จริงแต่**ไม่ใช่สกุลเงินที่ทำรายการได้**: โลหะมีค่า (`XAU`/`XAG`/`XPT`/`XPD`),
+  bond unit (`XBA`–`XBD`), unit of account (`XDR`/`XSU`/`XUA`), code สงวน (`XTS` ทดสอบ, `XXX` = ไม่มีสกุลเงิน),
+  fund/index ที่ทับสกุลจริง (`BOV`/`CHE`/`CHW`/`CLF`/`COU`/`MXV`/`USN`/`UYI`/`UYW`)
+  · **แต่เก็บ `XAF`/`XOF`/`XPF`/`XCD` ไว้** เพราะเป็นเงินหมุนเวียนจริงของ 14 ประเทศ ไม่ใช่โลหะ
+  · **ถ้าลูกค้าอยากได้ครบ 179 ตัวจริงๆ** แก้ที่ exclude list ในไฟล์เดียว แล้ว regenerate + migration
+- **DTO เปลี่ยนเป็น `@IsEnum(Currency)`** แทน `@IsISO4217CurrencyCode()` — นิยาม "สกุลเงินที่ถูกต้อง" สองชุด
+  คือทางที่ API จะเริ่มรับ code ที่ DB ปฏิเสธแล้วกลายเป็น 500 แทน 400 · ตัวพิมพ์เล็กยัง normalize ที่ขอบด้วย
+  `toCurrencyCode` (`@Transform`) จึง **ไม่ breaking** กับ client ที่ส่ง `'usd'` มาอยู่แล้ว
+- **`resolveCurrencyContext` ไม่ `.toUpperCase()` อีกแล้ว** — ย้ายไปที่ขอบ DTO โดยเจตนา: ซ่อมค่าลึกๆ ใน service
+  เท่ากับกลบเกลื่อน caller ที่ข้าม validation ไปแทนที่จะให้มันพัง
+- **seed folder แก้ครบ** — `IPriceListDef.currency` เป็น `Currency` และ `facility.data.ts` ใช้ `Currency.THB`
+  (seeder เขียน raw SQL ไม่ผ่าน entity จึงไม่มีอะไร type-check ให้)
+
+---
+
+### งานอื่นที่รู้อยู่ (ไม่บล็อกอะไร)
+
+| งาน | หมายเหตุ |
+|---|---|
+| **`npm run seed --fresh` ตรวจซ้ำ** | **ยังค้างอยู่** (C3 ไม่กระทบ — ตรวจแล้วว่า seed ไม่แตะ `ap_invoices`/`payment_entries`/`payment_allocations` เลย เพราะ seed ครอบแค่ `erp_inventory`+`erp_supplier`) · รอบก่อนแก้ให้ปฏิเสธอย่างชัดเจนแล้วเมื่อมีเอกสารธุรกรรมค้าง แต่หลังจากนั้นเพิ่มตารางใหม่หลายตัว (`sales_returns`, `sales_return_receipts`, `sales_settings`, `supplier_settings`, …) — **ควรรัน `npm run seed -- --dry-run` และ `--fresh --yes` บน DB scratch อีกครั้ง** เพื่อดูว่า `truncates:` ใน seeder ยังครบ (ดู `libs/database/src/scripts/seed/README.md`) |
+| **`system-settings-bc`** | ผู้ใช้เคยถามว่าควรมีไหม · คำตอบที่ให้ไว้: **ไม่ควร** เพราะ settings ถูกอ่านในทรานแซกชันที่บังคับใช้มัน (`assertPeriodOpen` อยู่ใน GL posting) ย้ายออกแล้วต้องมี cache และ cache ที่ค้างจะปล่อยเอกสารเข้างวดที่ปิดแล้ว · "settings" ไม่ใช่ bounded context · หน้า iam System Settings เป็น **UI aggregator** ซึ่งแก้ปัญหา "ที่เดียว" ได้แล้ว · **ผู้ใช้ยังไม่ได้ยืนยันว่าเห็นด้วย** — ถ้าเปิด session ใหม่แล้วสั่งทำ ให้ทำตามที่สั่ง |
+| **audit log กลาง** | ตอนนี้มีแต่ log ต่อ aggregate ใน iam (`role_policy_audit_logs`, `user_role_audit_logs`) ไม่มี facility กลาง · เป็นงานคนละเรื่องกับ settings ตัดสินใจแยกได้ |
+| **DEBIT_NOTE ฝั่งซื้อ** | จงใจไม่ทำ (ดู docblock ของ `APInvoiceDocumentType`) — ไม่ใช่โค้ดเดิมกลับเครื่องหมาย เพราะไม่ถูกจำกัดด้วยจำนวนบนใบเดิมหรือของที่เคลื่อนจริง (มักเป็นการแก้ราคา) ต้องมีเพดานและตัวขับของตัวเอง |
+
+---
+
+## 3 · คำสั่งที่ใช้จริง (ไม่ตรงกับที่เดาจาก package.json)
+
+เสียเวลาไปกับเรื่องพวกนี้มาแล้ว จดไว้:
+
+```bash
+# เทสต์ — ต้องมี NODE_ENV ไม่งั้น config validation ตาย
+#   [Error: Config validation error: "NODE_ENV" must be one of [local, dev, staging, prod]]
+NODE_ENV=local npx jest                        # ทั้งหมด
+NODE_ENV=local npx jest apps/finance-bc/test/unit
+# ไม่มี script test:unit:<bc> · jest --config apps/<bc>/test/jest-unit.json ใช้ไม่ได้
+
+# migration — ชื่อส่งผ่าน env ไม่ใช่ --name
+npm_config_name=MyMigrationName npm run migration:generate:finance
+npm run migration:run:finance
+npm_config_name=Check npm run migration:generate:finance   # "No changes" = ไม่มี drift
+# bc ที่ใช้ได้: sales supplier finance inventory iam auth
+
+# หลังเพิ่ม/แก้ @RequirePermission ต้อง sync ก่อน แล้วค่อยเขียน grant migration
+npm run permissions:sync
+
+# frontend asset ของ iam (esbuild) — ต้องรันเองหลังแก้ไฟล์ใน apps/iam/public
+npm run build:assets:iam
+
+# ตรวจว่า route map จริง / DI resolve จริง (คุ้มมาก เจอบั๊กที่เทสต์จับไม่ได้)
+NODE_ENV=local npx nest start <bc>        # แล้ว grep "Mapped {" ใน log
+
+# render-check เอกสาร (บังคับตาม docs/plan-erp/CLAUDE.md)
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless --disable-gpu --virtual-time-budget=9000 \
+  --dump-dom "file://$PWD/<file>.html" > /tmp/out.txt
+grep -c 'Syntax error in text' /tmp/out.txt     # 0 = mermaid ผ่าน
+```
+
+---
+
+## 4 · กับดักที่เจอมาแล้ว — อย่าเหยียบซ้ำ
+
+1. **`migration:generate` เคยจะ `DROP COLUMN "submitted_by"`** (ข้อมูลจริง) เพราะ patch แทรก
+   คอลัมน์ใหม่คั่นระหว่าง `@Column()` เดิมกับชื่อ property ทำให้ decorator ผูกผิดตัว →
+   **อ่าน SQL ที่ generate ออกมาทุกครั้งก่อนรัน** ตามที่ `CLAUDE.md` สั่ง
+2. **แก้ไฟล์ด้วย python ต้องอ่านเข้าตัวแปรก่อนเขียน** — `open(p,'w').write(open(p).read()...)`
+   ตัดไฟล์เป็นศูนย์ก่อนอ่าน (เคยทำ entity หายไปทั้งไฟล์)
+3. **`??` กับค่า `null` ที่มีความหมาย** — เคยเขียน `options.returnedQty ?? {}` ใน test harness
+   ทำให้ `null` (= "RPC ล้ม") ยุบเป็น `{}` (= "ไม่มีของคืน") ซึ่งคือความต่างที่โค้ดจริงตัดสินจากมัน
+   → เทสต์ผ่านด้วยเหตุผลผิด · ใช้ `!== undefined` เมื่อ `null` มีความหมาย
+4. **mermaid ใน `.html` พังง่าย** — เคยแทรกคอลัมน์ก่อน comment เดิมทำให้บรรทัดมี 2 quoted string
+   แล้วไดอะแกรมพังทั้งอัน (HTML ยัง parse ผ่าน จับได้จาก render-check เท่านั้น)
+5. **เพิ่ม parameter ใน constructor ของ service = spec ทุกตัวที่ new มันพัง**
+   (`Cannot read properties of undefined (reading 'tableName')`) ต้องไปเติม mock ในตำแหน่งที่ถูก
+6. **enum ใหม่ใน `DomainEvent` ต้องเพิ่มใน `DOMAIN_EVENT_ROUTING` ด้วย** ไม่งั้น tsc ตาย
+   (`Record<DomainEvent, …>` บังคับให้ครบ)
+7. **(จาก C3) `migration:generate` เขียน `ADD "col" ... NOT NULL` โดยไม่มี DEFAULT** สำหรับคอลัมน์
+   `timestamptz` ที่ entity ประกาศ non-null — **พังทันที**ถ้าตารางมีแถวอยู่ ต้องแก้เป็น add nullable →
+   `UPDATE` backfill → `SET NOT NULL` เอง · และคอลัมน์ที่ generator ใส่ `DEFAULT 0` ให้ ถ้ามันควรมีค่า
+   *อนุมานจากคอลัมน์อื่น* (เช่น `raw_*` ของแถว THB เดิม = คอลัมน์ THB เพราะ rate เป็น 1) ต้อง backfill
+   **ก่อน**บรรทัด `ADD CONSTRAINT` ไม่งั้น CHECK ที่บังคับ `> 0` fail บนแถวเดิมทุกแถว —
+   ทั้งสองอย่างคือเหตุผลที่ `CLAUDE.md` สั่งอ่าน SQL ที่ generate ทุกครั้ง ไม่ใช่แค่กัน `DROP COLUMN`
+8. **(จาก currency enum) `migration:generate` แปลงชนิดคอลัมน์ด้วย `DROP COLUMN` + `ADD COLUMN`**
+   ซึ่ง**ล้างค่าที่เก็บอยู่ทุกแถว** (กลายเป็น default หรือ NULL) — ต้องเขียนมือเป็น
+   `ALTER COLUMN ... TYPE ... USING col::text::<enum>` · รอบนี้ถ้ารันตามที่ generate มา
+   `suppliers.billing_currency` 14 แถวจะกลายเป็น NULL และ `receipts.currency` 7 แถวถูก reset
+   (ตรวจด้วยการ query จริงหลังรัน ไม่ใช่เดา) · ถ้าค่าเดิมอาจมีตัวพิมพ์เล็ก ให้ `UPPER(TRIM(...))`
+   ก่อน cast (lossless) แต่**อย่า** `NULL` ค่าที่ยัง cast ไม่ผ่าน — ปล่อยให้ migration ล้มดังๆ ดีกว่าทิ้งข้อมูลที่คนพิมพ์มาจริง
+9. **(จาก C3) ถ้าจะเทียบเงินสองยอดที่คิดจาก "อัตราคนละตัว" ให้หยุดคิดก่อน** — bug ที่แพงที่สุดของ C3
+   คือการเผลอเทียบยอด THB ของใบจ่าย (อัตราวันจ่าย) กับยอด THB ของใบกำกับ (อัตราวันออกใบ) ·
+   invariant ทุกตัวที่เทียบ *ใบจ่าย ↔ เอกสาร* ต้องอยู่ฝั่ง `raw_*` และทุกตัวที่เทียบ *เอกสาร ↔ เอกสารเดียวกัน*
+   (outstanding, เพดาน WHT) อยู่ฝั่ง THB ได้ เพราะทุกแถวที่ตัดใบเดียวกันใช้อัตราเดียวกัน
+
+---
+
+## 5 · ถ้าจะทำ audit ซ้ำ
+
+วิธีที่ได้ผลรอบก่อน: หา **"คอลัมน์/ค่าที่ประกาศไว้พร้อม comment อธิบายกฎ แต่ไม่มีโค้ดไหนอ่าน"**
+— เจอ pattern นี้ 6 ครั้ง (`stock_frozen_upto`, `ledger_frozen_upto`, `credit_limit`,
+`credit_terms`, `is_vat_registered` ×2, `reference_ap_invoice_id`) ทุกครั้งเป็นช่องโหว่จริง
+
+อีกวิธี: **เทียบความสมมาตรซื้อ↔ขาย** — Purchase Return มีแต่ Sales Return ไม่มี, AP บังคับ
+`grn_item_id` แต่ AR ไม่บังคับ `dn_item_id`, PO มี `returned_qty` แต่ SO ไม่มี · ทุกข้อเป็นงานจริง
+ทั้งหมด
+
+ตรวจ endpoint index ในเอกสารกับ route ที่ map จริงตอน boot ก็เจอ `POST /products` ที่หายไปจาก index

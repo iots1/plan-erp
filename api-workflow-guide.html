@@ -1027,6 +1027,9 @@ sequenceDiagram
   <span class="s">"reference"</span>: <span class="s">"TRF-88213"</span>,
   <span class="s">"paid_amount"</span>: <span class="t">340.80</span>,           <span class="c">// เงินสดที่เข้าจริง</span>
   <span class="s">"wht_amount"</span>: <span class="t">20.00</span>,              <span class="c">// ภาษีที่ลูกค้าหักไว้</span>
+  <span class="c">// สกุลเงิน — ไม่ส่ง = THB ทั้งคู่ · ส่งเมื่อรับ/จ่ายเป็นสกุลต่างประเทศ</span>
+  <span class="s">"currency"</span>: <span class="s">"THB"</span>,              <span class="c">// ต้องตรงกับ currency ของทุกใบที่ตัด ไม่งั้น 400</span>
+  <span class="s">"currency_rate"</span>: <span class="t">1</span>,              <span class="c">// อัตราที่เงินเคลื่อนไหวจริง (ที่ธนาคารให้) ไม่ใช่อัตราบนใบกำกับ</span>
   <span class="s">"allocations"</span>: [
     { <span class="s">"receipt_id"</span>: <span class="s">"eae5…"</span>, <span class="s">"allocated_amount"</span>: <span class="t">360.80</span> }
   ]
@@ -1039,6 +1042,17 @@ sequenceDiagram
             ปิดหนี้ได้เต็ม 360.80 · ถ้า FE คิดเพดานเป็น <span class="mono text-[12px]">paid_amount</span> ผู้ใช้จะตัดหนี้ไม่หมด
             และใบกำกับจะค้างเท่ากับภาษีตลอดไป · ส่วนที่เหลือหลังตัดจะกลายเป็น
             <span class="mono text-[12px]">unallocated_amount</span> = เครดิตของลูกค้าไว้ใช้รอบหน้า
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc ok mb-1">สกุลต่างประเทศ: allocated_amount คิดที่อัตราของ<b>ใบกำกับ</b> ไม่ใช่ของใบจ่าย (2026-09-01)</div>
+          <p class="text-[13.5px]">
+            <b>จุดที่ FE พลาดได้ง่ายที่สุดของฟีเจอร์นี้</b> — <span class="mono text-[12px]">allocated_amount</span> คือ"ยอดหนี้บนใบกำกับที่ต้องการปิด" จึงเป็น THB <b>ที่อัตราซึ่ง snapshot ไว้บนใบนั้น</b> พูดง่ายๆ คือ<b>ส่ง <span class="mono text-[12px]">total</span> ของใบนั้นมาตรงๆ</b> ไม่ต้องแปลงอะไร ไม่ว่าเงินสดจะเข้ามาที่อัตราเท่าไร ·
+            ส่วน <span class="mono text-[12px]">paid_amount</span>/<span class="mono text-[12px]">wht_amount</span> เป็น THB <b>ที่อัตราของใบจ่ายเอง</b> (<span class="mono text-[12px]">currency_rate</span> ที่ส่งมา)<br>
+            <b>ดังนั้นสองยอดนี้จะไม่เท่ากันเป็นเรื่องปกติ</b> — ใบ USD 100 บันทึกไว้อัตรา 35 (<span class="mono text-[12px]">total</span> = 3,500) ลูกค้าจ่ายครบตอนอัตรา 36 → ส่ง <span class="mono text-[12px]">paid_amount: 3600</span> กับ <span class="mono text-[12px]">allocated_amount: 3500</span> แล้วใบนั้น<b>ปิดครบพอดี</b> · ผลต่าง 100 บาทไม่ใช่ยอดค้างและไม่ใช่เครดิตลูกค้า — ระบบโพสต์เป็น<b>กำไรจากอัตราแลกเปลี่ยน</b> (<span class="mono text-[12px]">4300</span> / ขาดทุนที่ <span class="mono text-[12px]">5300</span>) ให้ตอน submit เอง ·
+            อย่าพยายามให้ผู้ใช้ "ปรับยอดให้ตรง" เพราะจะกลายเป็นตัดหนี้ผิดจำนวนทันที<br>
+            <b>เพดานที่ FE ต้องคิด อยู่ฝั่งสกุลที่ทำรายการ</b> — <span class="mono text-[12px]">Σ (allocated_amount ÷ อัตราของใบนั้น) ≤ paid_amount ÷ currency_rate + wht_amount ÷ currency_rate</span> · ถ้าคิดเพดานเป็น THB ตรงๆ จะขึ้น 400 ทั้งที่ผู้ใช้กรอกถูก ·
+            <b>ตัดข้ามสกุลไม่ได้เลย</b> (400) — ใบจ่ายสกุลหนึ่งตัดได้เฉพาะเอกสารสกุลเดียวกัน จึงควรกรองรายการใบที่ให้เลือกด้วย <span class="mono text-[12px]">currency</span> ตั้งแต่บน UI
           </p>
         </div>
         <div class="rulebox mb-4">
