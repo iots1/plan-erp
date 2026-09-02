@@ -1056,10 +1056,10 @@ sequenceDiagram
           </p>
         </div>
         <div class="rulebox mb-4">
-          <div class="rc ok mb-1">สกุลเงินเอกสารต้องตรง billing_currency ของคู่ค้า — ตั้งค่าได้ (2026-09-02)</div>
+          <div class="rc ok mb-1">สกุลเงินเอกสารต้องตรง billing_currency ของคู่ค้า — ตั้งค่าได้ (2026-09-02, warn → meta.warnings 2026-09-02)</div>
           <p class="text-[13.5px]">
             เอกสารที่หันเข้าคู่ค้า (quotation, sales order, purchase order, receipt, AP invoice) เทียบ <span class="mono text-[12px]">currency</span> ของตัวเองกับ <span class="mono text-[12px]">customers.billing_currency</span>/<span class="mono text-[12px]">suppliers.billing_currency</span> ตามค่า <span class="mono text-[12px]">party_currency_enforcement</span> ที่ operator ตั้งไว้ (หน้า System Settings ของ iam) ·
-            <span class="mono text-[12px]">off</span> = ไม่ตรวจ (ค่าเริ่มต้น) · <span class="mono text-[12px]">warn</span> = สร้างได้ ระบบบันทึก log ให้ · <span class="mono text-[12px]">block</span> = <b>422</b> ต้องแก้ <span class="mono text-[12px]">billing_currency</span> ที่บัตรคู่ค้าก่อน ·
+            <span class="mono text-[12px]">off</span> = ไม่ตรวจ (ค่าเริ่มต้น) · <span class="mono text-[12px]">warn</span> = สร้างได้ <b>และข้อความเดียวกับที่ลง server log จะมากับ response ด้วย</b> ที่ <span class="mono text-[12px]">meta.warnings</span> — array ของ object รูปร่างเดียวกับ <span class="mono text-[12px]">errors</span> (<span class="mono text-[12px]">{ code, detail }</span> — เทียบ <span class="mono text-[12px]">code === 'PARTY_CURRENCY_MISMATCH'</span> ได้โดยไม่ต้อง string-match <span class="mono text-[12px]">detail</span>, ไม่มี field นี้เลยถ้าไม่มีอะไรเตือน) — FE เช็ค <span class="mono text-[12px]">response.meta.warnings</span> แล้วเด้ง toast/banner ให้ผู้ใช้เห็นได้ทันทีโดยไม่ต้องไปเปิด server log · <span class="mono text-[12px]">block</span> = <b>422</b> ต้องแก้ <span class="mono text-[12px]">billing_currency</span> ที่บัตรคู่ค้าก่อน ·
             FE ที่รองรับ mode <span class="mono text-[12px]">block</span> ควรเตือนผู้ใช้ตั้งแต่เลือกคู่ค้า/price list ว่าสกุลไม่ตรงกัน ก่อนกด save
           </p>
         </div>

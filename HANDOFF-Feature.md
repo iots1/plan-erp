@@ -1,11 +1,13 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว)**
-> ก่อนหน้า: 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (`meta.warnings` ใน envelope — implement+E2E จริงเสร็จ, ยังไม่ commit)**
+> ก่อนหน้า: 2026-09-02 (P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว) · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
-> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ · ไม่มีอะไรค้างกลางคัน
-> ทุกอย่าง commit + push + deploy + verify บน production แล้ว
+> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ (ต่างหากจาก `meta.warnings` ด้านล่าง ซึ่งเป็นงาน envelope/infra ไม่ใช่ currency)
+> ⚠️ **`meta.warnings` implement+test+lint+boot-check+E2E จริงเสร็จแล้วแต่ยังไม่ได้ commit** — ดู §2 หัวข้อ **`meta.warnings`** ก่อนแตะอะไรต่อ
+> ⚠️ **พบ dependency แปลกปลอมระหว่างทำงานรอบนี้ — ยังไม่ได้แก้** ดู §6
+> 🐛 **พบบั๊กแยกต่างหากระหว่าง E2E — auto-resolved price ของ price list ต่างประเทศไม่แปลงอัตรา** ยังไม่ได้แก้ ดูท้ายหัวข้อ `meta.warnings` ใน §2
 
 ## 0 · เปิด session ใหม่ — อ่านตรงไหน
 
@@ -14,17 +16,22 @@
 | อยากรู้ว่า | ไปที่ |
 |---|---|
 | ตอนนี้ระบบอยู่สถานะไหน / commit อะไรไปบ้าง | §1 |
+| `meta.warnings` — implement เสร็จแล้วหรือยัง ต้องทำอะไรต่อ | §2 หัวข้อ **`meta.warnings`** |
+| บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน (เจอระหว่าง E2E) | ท้ายหัวข้อ **`meta.warnings`** ใน §2 |
 | งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **P3–P4** + **งานอื่นที่รู้อยู่** |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5 |
 | คำสั่งที่ใช้จริง (หลายตัวไม่ตรงกับที่เดาจาก `package.json`) | §3 |
 | เคยพลาดอะไรมาแล้วบ้าง — **อ่านก่อนแตะ migration/deploy** | §4 |
 | จะทำ audit หาช่องโหว่รอบใหม่ | §5 |
+| dependency แปลกปลอมที่เจอระหว่างทำงาน (ยังไม่แก้) | §6 |
 
 **ที่แนะนำถ้าจะทำต่อเลย** (เรียงตามความคุ้ม ทั้งหมดไม่บล็อกอะไร):
-1. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
-2. `meta.warnings` ใน JSON:API envelope — ตอนนี้ mode `warn` ของ `party_currency_enforcement` ลงแค่ server log client มองไม่เห็น
-3. P3 #9 — เขียนให้ชัดว่า `credit_limit`/`credit_exposure` เป็น THB เสมอ (เอกสารล้วน ไม่แตะโค้ด)
-4. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
+1. **commit งาน `meta.warnings`** (implement+test+lint+boot-check+E2E จริงผ่านหมดแล้ว รอแค่ commit) — ดู §2
+2. **สอบสวน/แก้บั๊ก auto-resolved price ไม่แปลงอัตรา** (เจอระหว่าง E2E ของข้อ 1 — คนละเรื่องกัน แต่กระทบข้อมูลจริงถ้าใครใช้ price list ต่างประเทศตอนนี้) — ดูท้ายหัวข้อ `meta.warnings` ใน §2
+3. ตัดสินใจเรื่อง dependency แปลกปลอม (§6) — เลือก mitigation แล้วใช้
+4. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
+5. P3 #9 — เขียนให้ชัดว่า `credit_limit`/`credit_exposure` เป็น THB เสมอ (เอกสารล้วน ไม่แตะโค้ด)
+6. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
 
 ---
 
@@ -71,6 +78,98 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### `meta.warnings` ใน JSON:API envelope ✅ **implement+test+lint+boot-check+E2E จริงเสร็จ 2026-09-02 — ยังไม่ commit**
+
+ลูกค้าเลือกทำอันนี้ก่อนจากรายการ "ที่แนะนำถ้าจะทำต่อเลย" รอบก่อน (§0) — ตอนนี้ mode `warn` ของ
+`party_currency_enforcement` ส่งข้อความ mismatch กลับใน response ด้วยแล้ว ไม่ใช่แค่ server log
+
+**กลไก — AsyncLocalStorage, ไม่ใช่ DI**: `TransformInterceptor`/`LocalizationInterceptor` เป็น
+`new`'d ตรงๆ ใน `bootstrap.util.ts` (`app.useGlobalInterceptors(...)`) ไม่ผ่าน `APP_INTERCEPTOR`
+เลย **เป็น `Scope.REQUEST`/`@Inject(REQUEST)` ไม่ได้** และ service ที่ตรวจ party-currency
+(`assertPartyCurrency` ใน 5 service) อยู่ลึกหลายชั้นจาก controller โดยไม่มี `@Req()` เลยสักตัว —
+ทางเดียวที่ให้ service ส่งค่าขึ้นไปถึง interceptor ได้คือ ambient state ตาม async causality chain
+ของ Node เอง (แนวเดียวกับที่ `nestjs-cls`/`cls-hooked` ใช้)
+
+**โครงสร้าง `meta.warnings` — object ทรงเดียวกับ `errors`, ไม่ใช่ string เปล่า** (แก้หลัง code
+review รอบสอง): ตอนแรก implement เป็น `string[]` แล้วผู้ใช้ทักว่าไม่สอดคล้องกับ `errors:
+IErrorObject[]` ที่มีโครงสร้าง `{code, title, detail, ...}` อยู่แล้วในทุก envelope — ทำให้ client ต้อง
+string-match ข้อความแทนที่จะเช็ค `code`) จึงเปลี่ยนเป็น `IWarningObject[]` (`{ code, detail }` —
+mirror แค่ 2 field ที่ `IErrorObject` ใช้จริง ไม่ใส่ `source`/`field`/`meta` ที่ยังไม่มี use case) ·
+พิจารณาแล้วว่า**ไม่ใช้ `status.code` แทน** (แบบ `200002` ที่มีอยู่แล้วสำหรับ large-dataset) เพราะ
+`status.code` มีได้ค่าเดียวต่อ response และ message เป็น static template ต่อ code ขณะที่ warning
+ของ party-currency เป็น dynamic text ผูกกับข้อมูลจริง (ชื่อลูกค้า/สกุลเงิน) และในอนาคตอาจมีมากกว่า 1
+แหล่งพร้อมกัน — `meta` (extension point ตาม JSON:API spec) + array เหมาะกว่า
+
+**ไฟล์:**
+- ใหม่: `interfaces/response/warning-object.interface.ts` (`IWarningObject`) +
+  `interfaces/response/paginated-data.interface.ts` (`IPaginatedData` — ย้ายมาจาก interface
+  `PaginatedData` ที่เคย inline อยู่ใน `transform-interceptor.util.ts` เอง ตาม convention "local
+  interface ต้องแยกไฟล์" ใน root `CLAUDE.md`)
+- `libs/common/src/utils/http-success/request-warnings.util.ts` — เก็บ**ทั้ง lifecycle**ของ
+  warnings ไว้ที่เดียว: `withRequestWarningsContext`/`addRequestWarning`/`consumeRequestWarnings`
+  (AsyncLocalStorage) + `requestWarningsMiddleware` (connect-style, เข้า context ก่อน routing) +
+  `attachWarnings<T>(envelope: IJsonApiResponse<T>)` (ย้ายมาจาก `TransformInterceptor` เอง —
+  อยู่ไฟล์เดียวกับ `consumeRequestWarnings` ที่มันเรียกเข้าท่ากว่า)
+- `bootstrap.util.ts` — `app.use(requestWarningsMiddleware)` เป็นบรรทัดแรกใน
+  `registerGlobalMiddleware()` (ต้องมาก่อน guard/interceptor/controller ทั้งหมด)
+- `TransformInterceptor` — เรียก `attachWarnings(...)` (import จาก request-warnings.util) ทุก
+  branch (single/created/collection/paginated) · ไม่มีอะไรเลย = ไม่มี key `warnings` (ไม่ใช่ array
+  ว่าง) ตอบเหมือนเดิม 100% กับ response ที่ไม่เคยเตือน
+- `IMeta.warnings?: IWarningObject[]`
+- 5 service (`quotations`, `sales-orders.convertFromQuotation`, `receipts`, `ap-invoices`,
+  `purchase-orders`) — `assertPartyCurrency` เรียก
+  `addRequestWarning({ code: 'PARTY_CURRENCY_MISMATCH', detail: warning })` ควบคู่กับ
+  `this.logger.warn(...)` เดิม (ของเดิมไม่ถูกถอด — log ฝั่ง server ยังมีไว้ audit เหมือนเดิม)
+- เอกสาร: `api-workflow-guide.html` รูลบอกซ์ "สกุลเงินเอกสารต้องตรง billing_currency…" แก้ตรง
+  `warn` ว่าตอนนี้มากับ `meta.warnings` ด้วย (object `{code, detail}` ไม่ใช่ string) — render-check
+  ผ่าน (mermaid 0 error)
+
+**⚠️ กับดักที่เจอระหว่างทำ (จำไว้ถ้าจะแก้ `TransformInterceptor`/`request-warnings.util` อีก)**:
+1. ผูก `attachWarnings` เข้ากับ interface ที่มี index signature (`[key: string]: unknown`) แล้วรับ
+   `IJsonApiResponse<T>` เป็น argument **ผ่าน jest แต่ tsc/webpack build จริงพัง** —
+   `TS2345: Index signature for type 'string' is missing in type 'IJsonApiResponse<...>'`
+   เพราะ jest (ts-jest) ไม่ type-check ข้าม module boundary เข้มเท่า `tsc`/webpack —
+   **เจอตอนบูตจริงเท่านั้น** ไม่ใช่ตอน `npx jest` (ทุกเทสต์ผ่านตอนนั้นทั้งที่ build จริงพัง) ·
+   แก้โดย type `attachWarnings<T>(envelope: IJsonApiResponse<T>): IJsonApiResponse<T>` ตรงๆ
+   (ไม่ต้องมี custom interface คั่นเลย เพราะ `IJsonApiResponse.meta` เป็น required field อยู่แล้ว) ·
+   **ย้ำอีกที** ว่าทำไม `CLAUDE.md`/`HANDOFF` เดิมถึงสั่งให้ boot จริง (`nest start`) ก่อนเชื่อว่าเสร็จ
+   ทุกครั้งที่แตะ global interceptor/filter — รอบนี้คือตัวอย่างจริงที่ jest เขียวหมดแต่ของพัง
+2. เทสต์ที่ `expect(consumeRequestWarnings()).toEqual([{ code, detail: expect.stringContaining(...) }])`
+   โดน eslint `@typescript-eslint/no-unsafe-assignment` เพราะ `expect.stringContaining()` type เป็น
+   `any` — ห่อด้วย `expect.objectContaining({...})` **ไม่พอ** ต้อง cast ตัว matcher เองเป็น
+   `as unknown` ด้วย (ตาม pattern ที่มีอยู่แล้วในไฟล์เดียวกัน: `expect.any(Date) as unknown`)
+
+**E2E บน environment จริง (ยิงผ่าน `localhost` boot จริง ไม่ใช่ mock — 2026-09-02):** boot
+`auth`/`iam`/`inventory-bc`/`sales-bc` ทั้ง 4 ตัวจริงในเครื่อง (เช็คก่อนว่า `RABBITMQ_VHOST=/local-pp`
+เป็น vhost แยกของเครื่อง dev **ไม่ปนกับ RMQ consumer ของ production** แม้ Postgres จะแชร์กันจริงตาม
+§4 #10 ก็ตาม) → login จริงด้วย `superadmin` → สร้าง USD price list + item price ชั่วคราวใน
+inventory-bc (ไม่มี price list ต่างประเทศอยู่เลยในข้อมูลจริงตอนนี้) → ตั้ง `sales_settings.
+party_currency_enforcement=warn` → สร้าง quotation จริงให้ `CUST-TEST-03` (billing_currency=THB ที่
+รอบก่อนเหลือไว้ให้ใช้ซ้ำได้) → **response กลับมามี `meta.warnings: [{code:
+"PARTY_CURRENCY_MISMATCH", detail: "Customer 'CUST-TEST-03' is billed in THB, but this document is
+in USD..."}]` ตรงตามที่ออกแบบทุกประการ** → cleanup ครบ: ลบ quotation/item-price/price-list ทดสอบ
+(verify 404 ทั้งคู่), revert `party_currency_enforcement` กลับ `off`, ไม่แตะ `CUST-TEST-03`, ปิด
+เซอร์วิสทั้ง 4 (verify port ว่างหมด), ลบไฟล์ token ใน scratchpad
+
+**ตรวจแล้ว**: 1496/1496 test ผ่าน · eslint 0/0 ทั้ง repo · `nest start sales-bc` build จริงผ่าน
+(webpack compiled successfully) ทั้งก่อนและหลัง refactor เป็น `IWarningObject` DI resolve ครบ ไม่มี
+error route map เหมือนเดิมทุกเส้น (46 routes) · E2E จริงผ่านตามด้านบน
+
+**ยังไม่ทำ**: commit + push + deploy (ตามที่ตกลงกันไว้ว่าไม่ commit ให้เองโดยไม่ถาม)
+
+**🐛 เจอบั๊กแยกต่างหากระหว่างทำ E2E (ไม่เกี่ยวกับ `meta.warnings` — ยังไม่ได้แก้)**: ราคาที่ auto-resolve
+ให้ (บรรทัดที่ไม่ส่ง `unit_price` มา ให้ pricing rule engine/`item_prices` เสนอราคาเอง) **ไม่ถูกแปลง
+เป็น book currency ก่อนบันทึก** เมื่อใช้ price list สกุลต่างประเทศ — ทดสอบจริงกับ USD price list
+rate=10, currency_rate=35 ได้ `unit_price` (book/THB) = 10 ทั้งที่ควรเป็น 350 ·
+`quotations.service.ts` จุด reference-bound check (~บรรทัด 508, สำหรับ `unit_price` ที่ client พิมพ์
+เอง) เรียก `toBookCurrency(reference.rate, documentCurrencyRate)` ถูกต้อง แต่จุด auto-resolve
+(~บรรทัด 538–570, `pricingRuleProxyService.resolvePrice(...)`) ใช้ผลลัพธ์ตรงๆ **ไม่แปลงเลย** ·
+เทสต์เดิมทั้ง 1496 ตัวจับไม่ได้เพราะ unit spec mock `resolvePriceMock`/`getEffectivePriceMock`
+ตรงๆ ไม่เคยรันเลขคำนวณจริงของจุดนี้ · น่าจะกระทบ SO/PO/receipt/AP-invoice ที่ใช้ auto-resolve
+เดียวกันด้วยแต่ยังไม่ได้ตรวจ · **ยังไม่ได้แก้** เป็น scope คนละเรื่องกับ `meta.warnings`
+
+---
 
 ### ~~C3 · multi-currency ตอนตัดชำระ~~ ✅ **เสร็จแล้ว 2026-09-01**
 
@@ -512,3 +611,42 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
 ทั้งหมด
 
 ตรวจ endpoint index ในเอกสารกับ route ที่ map จริงตอน boot ก็เจอ `POST /products` ที่หายไปจาก index
+
+---
+
+## 6 · ⚠️ พบระหว่างทำงานรอบนี้ — dependency แปลกปลอมใน `dotenv@17.4.2` (ยังไม่ได้แก้)
+
+**ไม่เกี่ยวกับ currency/`meta.warnings` เลย** — เจอโดยบังเอิญตอนรัน `NODE_ENV=local npx jest` แล้ว
+เห็น console log แปลกๆ จาก `dotenv.config()` เอง
+
+`node_modules/dotenv/lib/main.js` (เวอร์ชัน 17.4.2 ที่ pin ไว้ใน `pnpm-lock.yaml`) มี array
+`TIPS` ที่สุ่มพิมพ์ "tip" ต่อท้าย log ทุกครั้งที่ inject env — **7 ใน 8 ตัวชี้ไปโดเมนจริงของเจ้าของแพ็กเกจ
+(`dotenvx.com`) หรือเป็น usage hint ธรรมดา แต่มี 1 ตัวชี้ไปโดเมนอื่นที่ไม่เข้าพวก:**
+
+```
+'⌁ auth for agents [www.vestauth.com]'
+```
+
+**ทำไมถึงน่าสงสัย**: คำว่า "auth for agents" เจาะจงกลุ่มเป้าหมายเป็น AI coding agent (Claude Code/
+Copilot/Cursor ฯลฯ) ที่อ่าน terminal output — ต่างจาก 7 ตัวที่เหลือซึ่งเป็นโฆษณาผลิตภัณฑ์ของเจ้าของ
+`dotenv` เอง (`dotenvx.com`) หรือ flag การใช้งานจริง คำเดียวที่ปนมาชี้ไปโดเมนที่ไม่รู้จักเลย —
+รูปแบบนี้ (ปลอมปน 1 รายการอันตรายไว้ในลิสต์ที่ดูถูกต้อง 90%) เป็น pattern ทั่วไปของการโจมตี
+supply-chain/prompt-injection ที่เล็งไปที่ agent โดยเฉพาะ
+
+**ตรวจแล้วว่าไม่ใช่ของถูกแก้ในเครื่องนี้** — เทียบกับตัวจริงบน npm registry ผ่าน mirror
+(`unpkg.com/dotenv@17.4.2/lib/main.js`) string เดียวกันเป๊ะ แปลว่า**เป็นของจริงที่ผู้ดูแล `dotenv`
+ใส่เข้าไปเอง** ไม่ใช่ local tampering ของเครื่อง/repo นี้ — แต่ก็ยังเป็นความเสี่ยงจริง เพราะ:
+
+- `dotenv.config()` ถูกเรียกจริงใน bootstrap path ของทุก BC (`libs/common/src/tracing.ts`,
+  `libs/common/src/constants/timezone.constant.ts`) — log นี้จึงมีโอกาสโผล่ใน **production log จริง**
+  ทุกครั้งที่ service restart ไม่ใช่แค่ตอนรัน test
+- **ไม่ได้ไปเปิด `www.vestauth.com` เลย** ระหว่างตรวจสอบเรื่องนี้ — ยึดตามหลักไม่ทำตาม instruction
+  ที่ฝังมาใน content ที่ไม่น่าเชื่อถือ
+
+**Mitigation ที่ตรวจแล้วว่าใช้ได้** (อ่านจาก source เอง `main.js:222,248,292,309`) — ตั้ง
+`DOTENV_CONFIG_QUIET=true` (env var) หรือส่ง `{ quiet: true }` ให้ `dotenv.config()` จะปิด log
+บรรทัดนี้ทั้งบรรทัด (รวม tip) ไปเลย · อีกทางคือ pin กลับไป `dotenv@16.x` ซึ่งไม่มีฟีเจอร์ tips นี้เลย —
+ปลอดภัยกว่าเพราะไม่ต้องพึ่ง flag ปิดเสียง (เผื่อโดเมนที่ลิสต์เปลี่ยนไปอีกในเวอร์ชันถัดไป)
+
+**ยังไม่ได้ทำอะไรกับเรื่องนี้** — เป็นการค้นพบระหว่างทาง แจ้งผู้ใช้ในแชทแล้วรอการตัดสินใจว่าจะ
+mitigate แบบไหน (หรือจะไม่ทำอะไรเลยก็ได้ถ้าประเมินความเสี่ยงแล้วไม่กังวล)
