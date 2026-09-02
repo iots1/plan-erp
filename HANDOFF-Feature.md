@@ -309,6 +309,41 @@ receipts (3) / ap-invoices (3) / quotations (2) / PO (2) / SO (1) · raw reconci
 `quotations`/`sales-orders`/`purchase-orders`/`receipts`/`ap-invoices` service + module · 2 item entity + 2 response dto ·
 4 migration · report-bc print (dto/service/ejs) · iam system-setting (ejs/js) · 5 spec
 
+#### E2E บน production จริง (ยิงผ่าน domain 2026-09-02) — ผ่านทั้งหมด
+
+| เทสต์ | ผล |
+|---|---|
+| settings ทั้ง 3 BC — `PUT/PATCH` → `block`/`warn`/`off` แล้ว `GET` กลับ | round-trip ตรง (คอลัมน์+migration+DTO+service live) |
+| `POST /finance-bc/v1/receipts` USD · ลูกค้า billing THB · mode `block` | **422** `Customer 'CUST-TEST-03' is billed in THB, but this document is in USD…` |
+| `POST /supplier-bc/v1/purchase-orders` USD · ผู้ขาย billing THB · mode `block` | **422** ข้อความฝั่ง supplier (คนละ code path — local repo ไม่ใช่ RPC) |
+| mode `warn` / `off` → POST ใบเดิม | **201** ทั้งคู่ (warn ลง log, off เงียบ) |
+| P2#5 — receipt USD @35, 2 บรรทัด | `Σ raw_line_total = 142.8571` **=** header `raw_net_amount = 142.8571` · `raw_unit_price` = 1000/35, 3000/35 |
+| P2#6 — `POST /report-bc/v1/invoices/mock-pdf {"currency":"USD"}` | **201** PDF 46,817 bytes · `{"currency":"ZZZ"}` → **400** พร้อมรายการ 157 สกุลจาก `@IsEnum(Currency)` |
+
+cleanup แล้ว: settings กลับเป็น `off` ทั้ง 3 · ลบ test receipts หมด · **เหลือ**
+`CUST-TEST-03.billing_currency = THB` (เดิม null) ไว้เพื่อเทสต์ซ้ำได้ — revert ด้วย
+`PUT /sales-bc/v1/customers/<id> {"billing_currency":null}` ถ้าไม่ต้องการ
+
+#### บั๊ก deploy ที่เจอตอนเทสต์ (ไม่ใช่จากโค้ดรอบนี้)
+
+หน้า System Settings ยิง `localhost:3004/3005/3006` บน production — `SALES_/SUPPLIER_/FINANCE_PUBLIC_URL`
+**ไม่เคยอยู่ใน `.env.example`** (ต่างจาก `AUTH_`/`REPORT_PUBLIC_URL`) คนตั้ง server จึงไม่รู้ว่าต้องตั้ง แล้ว
+fallback ไป port map ของ docker-compose · แก้แล้ว: เติมใน `.env` ของเครื่อง + `pm2 reload iam` + เพิ่มลง
+`.env.example` (commit `215426e`) + เขียนเป็น **บั๊ก #11 ใน `deployment-guide.html` §09** พร้อม
+`*_PUBLIC_URL` ครบ 6 ตัวในตาราง §08
+
+✅ **ปิดครบแล้ว 2026-09-02** — GitHub Environment secret `ENV_FILE` (deploy workflow เขียนทับ `.env`
+ทั้งไฟล์จาก secret นี้ทุกครั้ง) sync ใหม่จาก `.env` ของเครื่องแล้วทั้ง `production` และ `development`
+(174 บรรทัด / 7,513 bytes มี `*_PUBLIC_URL` ครบ) → deploy รอบหน้าไม่ลบทิ้งอีก · คำสั่งที่ใช้:
+
+```bash
+ssh app-server 'cat /root/erp-api/.env' | gh secret set ENV_FILE --env production  --repo iotechsoft-company/erp-api
+ssh app-server 'cat /root/erp-api/.env' | gh secret set ENV_FILE --env development --repo iotechsoft-company/erp-api
+```
+
+> **ลำดับสำคัญ** — แก้ `.env` บนเครื่องก่อน แล้วค่อย sync ขึ้น secret เสมอ · ทำกลับด้าน (แก้ secret ก่อน
+> แล้ว deploy) จะเสี่ยงกว่าเพราะ secret อ่านกลับไม่ได้ ถ้าเนื้อหาขาดจะรู้ตัวตอน `.env` บนเครื่องถูกทับไปแล้ว
+
 ---
 
 ### งานอื่นที่รู้อยู่ (ไม่บล็อกอะไร)

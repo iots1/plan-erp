@@ -855,6 +855,10 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
             <thead><tr><th>ตัวแปร</th><th>Dev default (ผิดสำหรับ prod)</th><th>ต้องเปลี่ยนเป็น</th></tr></thead>
             <tbody>
               <tr><td><span class="mono text-[12px]">AUTH_PUBLIC_URL</span></td><td><span class="mono text-[12px]">http://localhost:3001</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
+              <tr><td><span class="mono text-[12px]">INVENTORY_PUBLIC_URL</span></td><td><span class="mono text-[12px]">http://localhost:3003</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
+              <tr><td><span class="mono text-[12px]">SUPPLIER_PUBLIC_URL</span></td><td><span class="mono text-[12px]">http://localhost:3004</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
+              <tr><td><span class="mono text-[12px]">SALES_PUBLIC_URL</span></td><td><span class="mono text-[12px]">http://localhost:3005</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
+              <tr><td><span class="mono text-[12px]">FINANCE_PUBLIC_URL</span></td><td><span class="mono text-[12px]">http://localhost:3006</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
               <tr><td><span class="mono text-[12px]">REPORT_PUBLIC_URL</span></td><td><span class="mono text-[12px]">http://localhost:3007</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
               <tr><td><span class="mono text-[12px]">CORS_ORIGIN</span></td><td><span class="mono text-[12px]">http://localhost:3002</span></td><td><span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span></td></tr>
               <tr><td><span class="mono text-[12px]">COOKIE_SECURE</span></td><td><span class="mono text-[12px]">false</span></td><td><span class="mono text-[12px]">true</span></td></tr>
@@ -866,7 +870,7 @@ sudo cloudflared service install &lt;TUNNEL_TOKEN&gt;</pre>
         <div class="card p-6">
           <h3 class="font-semibold text-[15px] mb-3">รายละเอียดทีละตัว</h3>
           <ul class="text-sm text-[var(--ink-soft)] leading-relaxed list-disc pl-5 space-y-2.5">
-            <li><b><span class="mono text-[12px]">AUTH_PUBLIC_URL</span> / <span class="mono text-[12px]">REPORT_PUBLIC_URL</span></b> — ค่านี้ถูกฝังลงหน้า admin ของ iam เป็น URL ที่ <b>browser ของผู้ใช้เอง</b>ยิง fetch ตรง ๆ ไม่ใช่ server-to-server เหลือเป็น private IP/localhost แล้ว browser จริงจะโดนบล็อกด้วย Private Network Access policy ของ Chrome ทันที</li>
+            <li><b><span class="mono text-[12px]">*_PUBLIC_URL</span> ทั้ง 6 ตัว</b> (<span class="mono text-[12px]">AUTH</span>, <span class="mono text-[12px]">INVENTORY</span>, <span class="mono text-[12px]">SUPPLIER</span>, <span class="mono text-[12px]">SALES</span>, <span class="mono text-[12px]">FINANCE</span>, <span class="mono text-[12px]">REPORT</span>) — ค่านี้ถูกฝังลงหน้า admin ของ iam เป็น URL ที่ <b>browser ของผู้ใช้เอง</b>ยิง fetch ตรง ๆ ไม่ใช่ server-to-server เหลือเป็น private IP/localhost แล้ว browser จริงจะโดนบล็อกด้วย Private Network Access policy ของ Chrome ทันที (หรือ <span class="mono text-[12px]">ERR_CONNECTION_REFUSED</span> ถ้าเป็น <span class="mono text-[12px]">localhost</span>) · <b>ทุกตัวตั้งเป็น domain เดียวกัน</b> เพราะ Kong route ทุก BC ไว้ใต้ host เดียวด้วย path prefix (<span class="mono text-[12px]">/sales-bc/v1/*</span>, <span class="mono text-[12px]">/finance-bc/v1/*</span>, …) — โค้ดต่อ <span class="mono text-[12px]">&lt;PUBLIC_URL&gt;/&lt;PREFIX_NAME&gt;/&lt;PREFIX_VERSION&gt;</span> ให้เอง · <b>หน้าที่พังถ้าลืม</b>: uoms + print-templates (<span class="mono text-[12px]">INVENTORY</span>/<span class="mono text-[12px]">REPORT</span>) และ <b>System Settings</b> ซึ่งอ่าน-เขียนค่าตั้งค่าข้าม 4 BC พร้อมกัน (<span class="mono text-[12px]">SALES</span>/<span class="mono text-[12px]">SUPPLIER</span>/<span class="mono text-[12px]">FINANCE</span>/<span class="mono text-[12px]">INVENTORY</span>) — ดู §09 บั๊ก #11</li>
             <li><b><span class="mono text-[12px]">CORS_ORIGIN</span></b> — ต้องเป็น origin จริงเป๊ะ ๆ (ไม่ใช่ <span class="mono text-[12px]">*</span>) เพราะแอปใช้ <span class="mono text-[12px]">credentials: true</span> สำหรับ cookie auth flow</li>
             <li><b><span class="mono text-[12px]">COOKIE_SECURE</span></b> — เปิดเป็น <span class="mono text-[12px]">true</span> ได้ปลอดภัยเพราะผู้ใช้คุยกับ Cloudflare ด้วย HTTPS จริงเสมอ แม้ hop ภายใน (cloudflared → Kong → app) จะเป็น HTTP ก็ตาม</li>
             <li><b><span class="mono text-[12px]">TRUST_PROXY</span></b> — หา subnet ของ Kong's docker network ด้วย <span class="mono text-[12px]">docker network inspect kong_default</span> แล้วใส่รวมกับ host's LAN IP (Docker NAT อาจ rewrite source IP เป็น host IP ตอน container เรียกกลับเข้า host) — ไม่งั้น <span class="mono text-[12px]">req.ip</span>/<span class="mono text-[12px]">req.protocol</span> จะอ่านผิดจาก Kong's <span class="mono text-[12px]">X-Forwarded-*</span> headers</li>
@@ -1241,6 +1245,47 @@ cluster/2 + pm2 reload   →  0 request พัง   <span class="c">(250/250 ต
                 ที่รันอยู่จริงกับที่ config ต้องการ แล้ว recycle เฉพาะ app ที่รูปทรงต่างกันจริง —
                 ทดสอบแล้วว่า app ที่ตรงอยู่แล้ว (เช่น BC ที่เป็น cluster/2 อยู่) ไม่ถูกแตะ
                 จึงไม่เกิด downtime ฟรีทุก deploy
+              </p>
+            </div>
+          </div>
+
+          <div class="card p-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="part-num" style="background:var(--signal-soft);color:var(--signal)">11</span>
+              <h3 class="font-semibold text-[15px]">หน้า System Settings ยิง <span class="mono text-[13px]">localhost</span> บน production</h3>
+            </div>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>อาการ:</b> เปิดหน้า <b>ตั้งค่าระบบ</b> ผ่าน <span class="mono text-[12px]">https://erp-api.&lt;domain&gt;</span>
+              ได้ปกติ แต่ทุกช่องว่างเปล่า (โชว์แค่ placeholder) และ console ขึ้น
+              <span class="mono text-[12px]">Failed to load resource: net::ERR_CONNECTION_REFUSED</span> สาม
+              บรรทัดพอดี ชี้ไปที่ <span class="mono text-[12px]">localhost:3004/3005/3006</span> · บันทึกไว้เพราะ
+              <b>บั๊กนี้ซ่อนตัวได้นาน</b> — ทุกหน้าอื่นของ admin ทำงานปกติหมด และ backend ไม่มี error สักบรรทัด
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>สาเหตุ:</b> หน้านี้เสิร์ฟจาก iam แต่ต้องยิง<b>ข้าม origin</b>ไปอ่าน-เขียนค่าตั้งค่าของ
+              sales-bc / supplier-bc / finance-bc (ค่าอย่าง <span class="mono text-[12px]">price_tolerance_percent</span>
+              และ <span class="mono text-[12px]">party_currency_enforcement</span> เก็บแยกต่อ BC เพราะตารางค่าตั้งค่า
+              ร่วมข้าม database ทำไม่ได้) · base URL มาจาก <span class="mono text-[12px]">SALES_PUBLIC_URL</span> /
+              <span class="mono text-[12px]">SUPPLIER_PUBLIC_URL</span> / <span class="mono text-[12px]">FINANCE_PUBLIC_URL</span>
+              ซึ่ง <b>ไม่เคยถูกใส่ไว้ใน <span class="mono text-[12px]">.env.example</span></b> (ต่างจาก
+              <span class="mono text-[12px]">AUTH_</span>/<span class="mono text-[12px]">REPORT_PUBLIC_URL</span> ที่มี)
+              คนตั้ง server จึงไม่มีทางรู้ว่าต้องตั้ง แล้วโค้ด fallback ไปที่ port map ของ docker-compose ทันที
+            </p>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-2">
+              <b>แก้:</b> เติมทั้งสามตัวใน <span class="mono text-[12px]">.env</span> ของเครื่อง ชี้ไป public domain
+              เหมือน <span class="mono text-[12px]">AUTH_PUBLIC_URL</span> แล้ว <span class="mono text-[12px]">pm2 reload iam</span>
+              (ค่านี้อ่านตอน bootstrap ไม่ใช่ต่อ request) · เพิ่มทั้งสามลง
+              <span class="mono text-[12px]">.env.example</span> ด้วย ไม่งั้นเครื่องถัดไปเจอซ้ำ
+            </p>
+            <div class="rulebox">
+              <div class="rc mb-1">แก้ <span class="mono text-[12px]">.env</span> บนเครื่องอย่างเดียวไม่พอ — deploy รอบหน้าทับกลับ</div>
+              <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+                deploy workflow มีสเต็ป <b>Sync .env from GitHub Environment secret</b> ที่เขียนทับ
+                <span class="mono text-[12px]">.env</span> ทั้งไฟล์จาก secret <span class="mono text-[12px]">ENV_FILE</span>
+                ของ Environment นั้นทุกครั้งที่ deploy — ถ้า secret ยังเป็นเวอร์ชันเก่า บรรทัดที่เพิ่งเติมด้วยมือ
+                จะหายไปเงียบ ๆ แล้วบั๊กกลับมาโดยไม่มีใครแตะโค้ดเลย · <b>ลำดับที่ถูกคือแก้ไฟล์บนเครื่องก่อน แล้ว
+                sync ขึ้นเป็น secret</b> (<span class="mono text-[12px]">ssh app-server 'cat &lt;DEPLOY_DIR&gt;/.env' | gh secret set ENV_FILE --env &lt;env&gt;</span>)
+                ทั้ง production และ development เพราะทั้งสอง Environment ชี้เครื่องเดียวกันอยู่
               </p>
             </div>
           </div>
