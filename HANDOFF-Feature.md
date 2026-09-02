@@ -1,12 +1,13 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (auto-resolved price currency bug — แก้เสร็จแล้ว, ยังไม่ commit)**
-> ก่อนหน้า: 2026-09-02 (`meta.warnings` ใน envelope — implement+E2E จริงเสร็จ) · P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว) · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (dotenv tip mitigate เสร็จ — ยังไม่ commit)**
+> ก่อนหน้า: 2026-09-02 (`meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว**) ·
+> P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
-> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ (ต่างหากจาก `meta.warnings`/บั๊ก pricing ด้านล่าง ซึ่งเป็นงานคนละก้อน)
-> ⚠️ **`meta.warnings` + บั๊ก auto-resolved price currency — implement/แก้/test/lint/boot-check เสร็จหมดแล้วแต่ยังไม่ได้ commit** — ดู §2 หัวข้อ **`meta.warnings`** ก่อนแตะอะไรต่อ
-> ⚠️ **พบ dependency แปลกปลอมระหว่างทำงานรอบนี้ — ยังไม่ได้แก้** ดู §6
+> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ
+> ✅ **`meta.warnings` + บั๊ก auto-resolved price currency — commit `986b8b1` + push + deploy สำเร็จแล้ว** (deploy run 33639969936, 8 apps reload, ไม่มี migration)
+> ⚠️ **dotenv tip mitigate เสร็จแล้ว (2 จุด: `tracing.ts` + `config.module.ts`) แต่ยังไม่ได้ commit** — ดู §6
 
 ## 0 · เปิด session ใหม่ — อ่านตรงไหน
 
@@ -15,21 +16,20 @@
 | อยากรู้ว่า | ไปที่ |
 |---|---|
 | ตอนนี้ระบบอยู่สถานะไหน / commit อะไรไปบ้าง | §1 |
-| `meta.warnings` — implement เสร็จแล้วหรือยัง ต้องทำอะไรต่อ | §2 หัวข้อ **`meta.warnings`** |
-| บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน (เจอระหว่าง E2E — **แก้แล้ว**) | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 |
+| `meta.warnings` — สถานะล่าสุด | §2 หัวข้อ **`meta.warnings`** (commit+deploy แล้ว) |
+| บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 (commit+deploy แล้ว) |
+| dotenv tip — mitigate ยังไง ทำไปถึงไหน | §6 (แก้เสร็จแล้ว รอ commit) |
 | งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **P3–P4** + **งานอื่นที่รู้อยู่** |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5 |
 | คำสั่งที่ใช้จริง (หลายตัวไม่ตรงกับที่เดาจาก `package.json`) | §3 |
 | เคยพลาดอะไรมาแล้วบ้าง — **อ่านก่อนแตะ migration/deploy** | §4 |
 | จะทำ audit หาช่องโหว่รอบใหม่ | §5 |
-| dependency แปลกปลอมที่เจอระหว่างทำงาน (ยังไม่แก้) | §6 |
 
 **ที่แนะนำถ้าจะทำต่อเลย** (เรียงตามความคุ้ม ทั้งหมดไม่บล็อกอะไร):
-1. **commit งาน `meta.warnings` + บั๊ก auto-resolved price currency** (implement/แก้/test/lint/boot-check ผ่านหมดแล้ว รอแค่ commit) — ดู §2
-2. ตัดสินใจเรื่อง dependency แปลกปลอม (§6) — เลือก mitigation แล้วใช้
-3. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
-4. P3 #9 — เขียนให้ชัดว่า `credit_limit`/`credit_exposure` เป็น THB เสมอ (เอกสารล้วน ไม่แตะโค้ด)
-5. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
+1. **commit + push งาน dotenv tip mitigate** (แก้/test/lint/boot-check ผ่านหมดแล้ว รอแค่ commit) — ดู §6
+2. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
+3. P3 #9 — เขียนให้ชัดว่า `credit_limit`/`credit_exposure` เป็น THB เสมอ (เอกสารล้วน ไม่แตะโค้ด)
+4. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
 
 ---
 
@@ -77,7 +77,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
-### `meta.warnings` ใน JSON:API envelope ✅ **implement+test+lint+boot-check+E2E จริงเสร็จ 2026-09-02 — ยังไม่ commit**
+### `meta.warnings` ใน JSON:API envelope ✅ **เสร็จสมบูรณ์ 2026-09-02 — commit `986b8b1` + push + deploy สำเร็จ**
 
 ลูกค้าเลือกทำอันนี้ก่อนจากรายการ "ที่แนะนำถ้าจะทำต่อเลย" รอบก่อน (§0) — ตอนนี้ mode `warn` ของ
 `party_currency_enforcement` ส่งข้อความ mismatch กลับใน response ด้วยแล้ว ไม่ใช่แค่ server log
@@ -154,7 +154,11 @@ in USD..."}]` ตรงตามที่ออกแบบทุกประก
 (webpack compiled successfully) ทั้งก่อนและหลัง refactor เป็น `IWarningObject` DI resolve ครบ ไม่มี
 error route map เหมือนเดิมทุกเส้น (46 routes) · E2E จริงผ่านตามด้านบน
 
-**ยังไม่ทำ**: commit + push + deploy (ตามที่ตกลงกันไว้ว่าไม่ commit ให้เองโดยไม่ถาม)
+**Commit + push + deploy**: ผู้ใช้อนุมัติแล้ว 2026-09-02 — `erp-api` commit `986b8b1` (รวมกับบั๊ก
+pricing ด้านล่างในคอมมิตเดียว เพราะไฟล์ทับกันจน `git add -p` ไม่คุ้ม), `docs/plan-erp` commit
+`e4a4dd6`/`ab891a7` · deploy run `33639969936` สำเร็จ — 8 apps reload (`auth`, `iam`,
+`inventory-bc`, `supplier-bc`, `sales-bc`, `finance-bc`, `report-bc`, `storage`), ไม่มี migration
+ใหม่ (`no BC migrations changed this deploy`)
 
 ### บั๊ก · auto-resolved price ของ price list ต่างประเทศไม่แปลงอัตรา ✅ **แก้แล้ว 2026-09-02**
 
@@ -655,7 +659,7 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
 
 ---
 
-## 6 · ⚠️ พบระหว่างทำงานรอบนี้ — dependency แปลกปลอมใน `dotenv@17.4.2` (ยังไม่ได้แก้)
+## 6 · dependency แปลกปลอมใน `dotenv@17.4.2` ✅ **mitigate แล้ว 2026-09-02**
 
 **ไม่เกี่ยวกับ currency/`meta.warnings` เลย** — เจอโดยบังเอิญตอนรัน `NODE_ENV=local npx jest` แล้ว
 เห็น console log แปลกๆ จาก `dotenv.config()` เอง
@@ -684,10 +688,31 @@ supply-chain/prompt-injection ที่เล็งไปที่ agent โด�
 - **ไม่ได้ไปเปิด `www.vestauth.com` เลย** ระหว่างตรวจสอบเรื่องนี้ — ยึดตามหลักไม่ทำตาม instruction
   ที่ฝังมาใน content ที่ไม่น่าเชื่อถือ
 
-**Mitigation ที่ตรวจแล้วว่าใช้ได้** (อ่านจาก source เอง `main.js:222,248,292,309`) — ตั้ง
-`DOTENV_CONFIG_QUIET=true` (env var) หรือส่ง `{ quiet: true }` ให้ `dotenv.config()` จะปิด log
-บรรทัดนี้ทั้งบรรทัด (รวม tip) ไปเลย · อีกทางคือ pin กลับไป `dotenv@16.x` ซึ่งไม่มีฟีเจอร์ tips นี้เลย —
-ปลอดภัยกว่าเพราะไม่ต้องพึ่ง flag ปิดเสียง (เผื่อโดเมนที่ลิสต์เปลี่ยนไปอีกในเวอร์ชันถัดไป)
+**ตรวจสอบเพิ่มเติมก่อนแก้ (ผู้ใช้ถาม "ต้อง upgrade หรือเป็น bug")**: ค้นจริงแล้วพบว่า
+- **ไม่ใช่ bug/hack** — `vestauth.com` เป็นโปรดักต์จริงของ `motdotla` (เจ้าของ `dotenv`/`dotenvx`) เอง
+  เป็น auth-for-agents ตัวใหม่ของเขา ไม่ใช่ third-party ที่แฝงเข้ามา
+- **มี community backlash จริง** — GitHub issues #899/#900/#903/#904 ใน `motdotla/dotenv` บ่นเรื่อง
+  โฆษณาที่ไม่ได้ขอ, พิมพ์ลง stdout ทำ pipe เสีย, ไม่มีปุ่มปิดเฉพาะโฆษณา
+- **เจ้าของลบฟีเจอร์นี้ออกจาก GitHub `master` แล้ว** (ตรวจตรงๆ ว่า `main.js` บน master ไม่มี `TIPS`
+  array แล้ว) **แต่ยังไม่ publish ขึ้น npm** — `npm view dotenv dist-tags` ยืนยันสดๆ ว่า `latest`
+  ยังเป็น `17.4.2` (ตัวที่มีปัญหา) ดังนั้น **"upgrade" ใช้ไม่ได้ตอนนี้** เพราะไม่มีเวอร์ชันใหม่กว่าให้ไป
 
-**ยังไม่ได้ทำอะไรกับเรื่องนี้** — เป็นการค้นพบระหว่างทาง แจ้งผู้ใช้ในแชทแล้วรอการตัดสินใจว่าจะ
-mitigate แบบไหน (หรือจะไม่ทำอะไรเลยก็ได้ถ้าประเมินความเสี่ยงแล้วไม่กังวล)
+**Mitigation ที่ใช้จริง — `DOTENV_CONFIG_QUIET=true`** ตั้งไว้ 2 จุด (ทั้งคู่จำเป็น ไม่ใช่ซ้ำซ้อน):
+- `libs/common/src/tracing.ts` — ก่อนบรรทัด `loadEnvFile()` **จุดนี้คือจุดจริงที่ต้องแก้** เพราะ
+  `tracing.ts` เรียก `dotenv.config()` เอง **ก่อน** `ConfigModule.forRoot()` จะมีโอกาสรันด้วยซ้ำ (ตาม
+  docblock เดิมของไฟล์เอง "This file runs before ConfigModule.forRoot(...) ever gets a chance") —
+  ครอบคลุม boot จริงของทุก BC (`main.ts` → `bootstrap.util.ts` → `tracing.ts` เป็น import แรกสุด)
+- `libs/config/src/config.module.ts` — ก่อน `NestConfigModule.forRoot(...)` ครอบคลุมโค้ดที่ import
+  `ConfigModule` ตรงๆ โดยไม่ผ่าน app bootstrap เลย (migration/seed/permission-sync CLI script)
+
+**⚠️ กับดักที่เจอตอนแก้ (บันทึกไว้กันคนถัดไปเสียเวลาซ้ำ)**: ลองใส่แค่ใน `config.module.ts` ก่อน ผ่าน
+jest ทุกตัว (log หายจริง) **แต่ boot จริงผ่าน `nest start` ยัง log tip อยู่เหมือนเดิม** — เพราะ
+`tracing.ts` ถูก import และรัน `dotenv.config()` ของตัวเอง **ก่อน** Nest จะโหลดถึง `config.module.ts`
+เลย (compiled เป็น `require()` เรียงตามลำดับ import ใน `main.ts`, `tracing.ts` มาก่อน `AppModule`
+เสมอ) jest ผ่านเพราะ test file บางไฟล์ไม่ได้ import chain ผ่าน `tracing.ts` เลย ไม่ใช่เพราะ fix ถูกจุด
+— **verify ด้วย jest อย่างเดียวไม่พอสำหรับโค้ดที่เกี่ยวกับลำดับการโหลดโมดูล ต้อง boot จริงเทียบด้วยเสมอ**
+(ตัวอย่างที่ 2 ของ session นี้ที่ jest เขียวแต่พฤติกรรมจริงผิด — ตัวแรกคือ TS build error ใน
+`meta.warnings`)
+
+**ตรวจแล้ว**: `NODE_ENV=local npx nest start sales-bc` จริง — ไม่มีบรรทัด "injected env ... tip:"
+โผล่มาเลยหลังแก้ทั้ง 2 จุด (ก่อนแก้ยังเห็นอยู่) · 1500/1500 test ผ่าน · eslint 0/0
