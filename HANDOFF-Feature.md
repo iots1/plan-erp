@@ -1,13 +1,12 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (`meta.warnings` ใน envelope — implement+E2E จริงเสร็จ, ยังไม่ commit)**
-> ก่อนหน้า: 2026-09-02 (P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว) · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (auto-resolved price currency bug — แก้เสร็จแล้ว, ยังไม่ commit)**
+> ก่อนหน้า: 2026-09-02 (`meta.warnings` ใน envelope — implement+E2E จริงเสร็จ) · P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว) · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
-> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ (ต่างหากจาก `meta.warnings` ด้านล่าง ซึ่งเป็นงาน envelope/infra ไม่ใช่ currency)
-> ⚠️ **`meta.warnings` implement+test+lint+boot-check+E2E จริงเสร็จแล้วแต่ยังไม่ได้ commit** — ดู §2 หัวข้อ **`meta.warnings`** ก่อนแตะอะไรต่อ
+> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ (ต่างหากจาก `meta.warnings`/บั๊ก pricing ด้านล่าง ซึ่งเป็นงานคนละก้อน)
+> ⚠️ **`meta.warnings` + บั๊ก auto-resolved price currency — implement/แก้/test/lint/boot-check เสร็จหมดแล้วแต่ยังไม่ได้ commit** — ดู §2 หัวข้อ **`meta.warnings`** ก่อนแตะอะไรต่อ
 > ⚠️ **พบ dependency แปลกปลอมระหว่างทำงานรอบนี้ — ยังไม่ได้แก้** ดู §6
-> 🐛 **พบบั๊กแยกต่างหากระหว่าง E2E — auto-resolved price ของ price list ต่างประเทศไม่แปลงอัตรา** ยังไม่ได้แก้ ดูท้ายหัวข้อ `meta.warnings` ใน §2
 
 ## 0 · เปิด session ใหม่ — อ่านตรงไหน
 
@@ -17,7 +16,7 @@
 |---|---|
 | ตอนนี้ระบบอยู่สถานะไหน / commit อะไรไปบ้าง | §1 |
 | `meta.warnings` — implement เสร็จแล้วหรือยัง ต้องทำอะไรต่อ | §2 หัวข้อ **`meta.warnings`** |
-| บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน (เจอระหว่าง E2E) | ท้ายหัวข้อ **`meta.warnings`** ใน §2 |
+| บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน (เจอระหว่าง E2E — **แก้แล้ว**) | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 |
 | งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **P3–P4** + **งานอื่นที่รู้อยู่** |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5 |
 | คำสั่งที่ใช้จริง (หลายตัวไม่ตรงกับที่เดาจาก `package.json`) | §3 |
@@ -26,12 +25,11 @@
 | dependency แปลกปลอมที่เจอระหว่างทำงาน (ยังไม่แก้) | §6 |
 
 **ที่แนะนำถ้าจะทำต่อเลย** (เรียงตามความคุ้ม ทั้งหมดไม่บล็อกอะไร):
-1. **commit งาน `meta.warnings`** (implement+test+lint+boot-check+E2E จริงผ่านหมดแล้ว รอแค่ commit) — ดู §2
-2. **สอบสวน/แก้บั๊ก auto-resolved price ไม่แปลงอัตรา** (เจอระหว่าง E2E ของข้อ 1 — คนละเรื่องกัน แต่กระทบข้อมูลจริงถ้าใครใช้ price list ต่างประเทศตอนนี้) — ดูท้ายหัวข้อ `meta.warnings` ใน §2
-3. ตัดสินใจเรื่อง dependency แปลกปลอม (§6) — เลือก mitigation แล้วใช้
-4. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
-5. P3 #9 — เขียนให้ชัดว่า `credit_limit`/`credit_exposure` เป็น THB เสมอ (เอกสารล้วน ไม่แตะโค้ด)
-6. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
+1. **commit งาน `meta.warnings` + บั๊ก auto-resolved price currency** (implement/แก้/test/lint/boot-check ผ่านหมดแล้ว รอแค่ commit) — ดู §2
+2. ตัดสินใจเรื่อง dependency แปลกปลอม (§6) — เลือก mitigation แล้วใช้
+3. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
+4. P3 #9 — เขียนให้ชัดว่า `credit_limit`/`credit_exposure` เป็น THB เสมอ (เอกสารล้วน ไม่แตะโค้ด)
+5. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
 
 ---
 
@@ -158,16 +156,59 @@ error route map เหมือนเดิมทุกเส้น (46 routes) 
 
 **ยังไม่ทำ**: commit + push + deploy (ตามที่ตกลงกันไว้ว่าไม่ commit ให้เองโดยไม่ถาม)
 
-**🐛 เจอบั๊กแยกต่างหากระหว่างทำ E2E (ไม่เกี่ยวกับ `meta.warnings` — ยังไม่ได้แก้)**: ราคาที่ auto-resolve
-ให้ (บรรทัดที่ไม่ส่ง `unit_price` มา ให้ pricing rule engine/`item_prices` เสนอราคาเอง) **ไม่ถูกแปลง
-เป็น book currency ก่อนบันทึก** เมื่อใช้ price list สกุลต่างประเทศ — ทดสอบจริงกับ USD price list
-rate=10, currency_rate=35 ได้ `unit_price` (book/THB) = 10 ทั้งที่ควรเป็น 350 ·
+### บั๊ก · auto-resolved price ของ price list ต่างประเทศไม่แปลงอัตรา ✅ **แก้แล้ว 2026-09-02**
+
+เจอระหว่าง E2E ของ `meta.warnings` ด้านบน (คนละเรื่องกัน) — ราคาที่ auto-resolve ให้ (บรรทัดที่ไม่ส่ง
+`unit_price` มา ให้ pricing rule engine/`item_prices` เสนอราคาเอง) **ไม่ถูกแปลงเป็น book currency
+ก่อนบันทึก** เมื่อใช้ price list สกุลต่างประเทศ — ทดสอบจริงกับ USD price list rate=10, currency_rate=35
+ได้ `unit_price` (book/THB) = 10 ทั้งที่ควรเป็น 350
+
+**ต้นตอ — currency หายไประหว่างข้าม RPC boundary ไม่ใช่แค่ "ลืมแปลง"**: ตรวจแล้วว่า
 `quotations.service.ts` จุด reference-bound check (~บรรทัด 508, สำหรับ `unit_price` ที่ client พิมพ์
 เอง) เรียก `toBookCurrency(reference.rate, documentCurrencyRate)` ถูกต้อง แต่จุด auto-resolve
 (~บรรทัด 538–570, `pricingRuleProxyService.resolvePrice(...)`) ใช้ผลลัพธ์ตรงๆ **ไม่แปลงเลย** ·
-เทสต์เดิมทั้ง 1496 ตัวจับไม่ได้เพราะ unit spec mock `resolvePriceMock`/`getEffectivePriceMock`
-ตรงๆ ไม่เคยรันเลขคำนวณจริงของจุดนี้ · น่าจะกระทบ SO/PO/receipt/AP-invoice ที่ใช้ auto-resolve
-เดียวกันด้วยแต่ยังไม่ได้ตรวจ · **ยังไม่ได้แก้** เป็น scope คนละเรื่องกับ `meta.warnings`
+สืบเข้าไปใน inventory-bc's `PricingRulesService.resolvePrice()` พบว่า `IItemPriceLookupResult`
+(ที่ reference-check ใช้) มี `currency` มาด้วยอยู่แล้ว แต่ `IResolvePriceResult` (ที่ auto-resolve ใช้)
+**ทิ้ง `currency` ทันทีที่ประกอบ response** — สายที่เรียก `findEffectivePrice()` ภายใน `resolvePrice()`
+เห็น `base.currency`/`fallback.currency` แต่ไม่เคยส่งต่อออกมาให้ sales-bc รู้เลย ไม่ใช่แค่ "ลืมเรียก
+`toBookCurrency`" แต่ฝั่ง caller ไม่มีข้อมูลพอจะรู้ด้วยซ้ำว่าต้องแปลงไหม
+
+**ความซับซ้อนที่ทำให้แก้แบบ "ครอบ `toBookCurrency` ทุกกรณี" ผิด**: ผลจาก `resolvePrice()` มี 2 กรณีที่
+ต้องแยก — rule แบบ `RATE` คืนค่าที่ admin ตั้งเป็นราคาเด็ดขาด **ไม่ผูกกับ price list ใดเลย** (เป็น book
+currency อยู่แล้วโดยธรรมชาติ แปลงซ้ำจะกลายเป็นบั๊กใหม่) ส่วน `DISCOUNT_PERCENT`/fallback มาจาก
+`item_prices` จริง (ผูกกับ price list ก็ต้องแปลง) ทั้งสองกรณีนี้แยกไม่ได้จาก `pricing_rule_id !== null`
+เพราะ `DISCOUNT_PERCENT` ก็มี `pricing_rule_id` ไม่เป็น null เหมือนกัน
+
+**แก้จริง — เพิ่ม `currency: Currency | null` ใน contract ข้าม RPC**:
+- `IResolvePriceResult` (ทั้ง 2 ที่ที่ประกาศซ้ำกันอยู่ — inventory-bc's
+  `pricing-rule/interfaces/resolve-price-result.interface.ts` และ sales-bc's
+  `integrations/inventory-bc/interfaces/resolve-price.interface.ts`, ไม่ได้ dedup เป็น
+  `@lib/common` เพราะเกินขอบเขตของบั๊กนี้) เพิ่ม `currency: Currency | null` —
+  `null` = RATE-type (ไม่ต้องแปลง), ค่าจริง = มาจาก price list นั้น (ต้องแปลง)
+- `pricing-rules.service.ts::resolvePrice()` — ใส่ `currency: null` ใน branch RATE,
+  `currency: base.currency`/`fallback.currency` ใน อีกสอง branch (inventory-bc **ไม่แปลงเอง** —
+  แค่ relay currency ต่อ เหมือนที่ `getEffectivePrice` ทำอยู่แล้ว ให้ผู้บริโภคแปลงเองเมื่อรู้อัตราของ
+  เอกสารตัวเอง)
+- `quotations.service.ts` — เมื่อ `resolution.currency !== null` เรียก
+  `assertReferencePriceCurrencyMatches(...)` (guard เดียวกับจุด reference-check) แล้ว
+  `toBookCurrency(resolution.unit_price, documentCurrencyRate)` ก่อนเก็บลง
+  `resolvedPriceByProductId` · เมื่อ `null` ใช้ค่าตรงๆ (RATE-type ไม่แปลง)
+
+**เทสต์ที่เพิ่ม/แก้ (+4 ใหม่ · แก้ของเดิม 6 ตัวที่พังเพราะ `IResolvePriceResult` เปลี่ยน shape)**:
+`pricing-rules.service.spec.ts` — แก้ 3 เทสต์เดิมให้ expect `currency` ที่ถูกต้อง + เพิ่ม 1 เทสต์ยืนยันว่า
+currency ที่ไม่ใช่ THB ก็ relay ผ่านตรงๆ (ไม่ถูกแปลงเองที่ inventory-bc) ·
+`quotations.service.spec.ts` — แก้ 3 เทสต์เดิม (เติม `currency: null`) + เพิ่ม 3 เทสต์ใหม่: (1) RATE-type
+ไม่ถูกแปลงแม้เอกสารไม่ใช่ THB, (2) auto-resolve จาก USD price list แปลงถูกต้อง (10 USD × 35 = 350 THB
+ตรงกับที่เจอจริงตอน E2E), (3) ปฏิเสธเมื่อ currency ที่ resolve ได้ไม่ตรงกับเอกสาร
+
+**ขอบเขตที่ตรวจแล้วว่าไม่กระทบ** (สำรวจ 4 service ที่มี currency เป็นของตัวเอง): บั๊กนี้อยู่ที่
+`quotations.service.ts` เท่านั้น — `purchase-orders`/`receipts`/`ap-invoices` ไม่มี auto-resolve
+path เลย (`unit_cost`/`unit_price` เป็น required field ใน DTO เสมอ ไม่มี `@IsOptional()`) ·
+`sales-orders.convertFromQuotation` ไม่ re-price อะไรเลย copy `unit_price`/`line_total` จาก
+quotation มาตรงๆ (จะรับสืบทอดบั๊ก/การแก้ของ quotation มาเองโดยอัตโนมัติ ไม่ต้องแก้ซ้ำ)
+
+**ตรวจแล้ว**: 1500/1500 test ผ่าน (+4 ใหม่) · eslint 0/0 ทั้ง repo · `nest start` ทั้ง `inventory-bc`
+และ `sales-bc` build จริงผ่าน (webpack compiled successfully) route map ครบทุกเส้น ไม่มี error
 
 ---
 
