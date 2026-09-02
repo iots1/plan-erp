@@ -721,7 +721,8 @@ sequenceDiagram
             เกินวงเงิน → SO ไม่ถูกปฏิเสธ แต่ไปอยู่สถานะ <b>PENDING_APPROVAL</b> (ส่งของไม่ได้ ออกบิลไม่ได้ จนกว่าจะอนุมัติ) ·
             ค่า <span class="mono text-[12px]">credit_limit_snapshot</span> / <span class="mono text-[12px]">credit_exposure_snapshot</span> ถูกเก็บไว้บนใบ
             เพื่อให้ผู้อนุมัติเห็นตัวเลข ณ ตอนที่ระบบตัดสิน ไม่ใช่ตัวเลขวันนี้<br>
-            ไม่ตั้งวงเงิน (<span class="mono text-[12px]">null</span>) = ไม่จำกัด · finance-bc ไม่ตอบ RPC = <b>ปล่อยผ่าน</b> ไม่บล็อกการขายเพราะระบบบัญชีล่ม
+            ไม่ตั้งวงเงิน (<span class="mono text-[12px]">null</span>) = ไม่จำกัด · finance-bc ไม่ตอบ RPC = <b>hold ด้วย</b> (<span class="mono text-[12px]">PENDING_APPROVAL</span> เหมือนเกินวงเงิน — ไม่ปล่อยผ่านบนยอดที่ไม่รู้ กันไว้ก่อนแล้วปลดทีหลังทำได้ในคลิกเดียว ปล่อยผ่านแล้วเงียบกู้ไม่ได้)<br>
+            <b>วงเงิน/ยอดใช้วงเงินเป็น THB เสมอ</b> — ไม่ผูกกับ <span class="mono text-[12px]">customers.billing_currency</span> หรือ <span class="mono text-[12px]">currency</span> ของ SO ที่กำลังตรวจเลย แม้ลูกค้าจะวางบิลเป็นสกุลต่างประเทศ FE ก็แสดงตัวเลขวงเงิน/snapshot เป็น THB ตรงๆ ไม่ต้องแปลง
           </p>
         </div>
 

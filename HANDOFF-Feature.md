@@ -1,13 +1,14 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (dotenv tip mitigate เสร็จ — ยังไม่ commit)**
-> ก่อนหน้า: 2026-09-02 (`meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว**) ·
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (P3 #9 credit_limit เป็น THB เสมอ — เอกสาร+migration เสร็จ, ยังไม่ commit)**
+> ก่อนหน้า: 2026-09-02 (dotenv tip mitigate เสร็จ — ยังไม่ commit) · `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
 > **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ
 > ✅ **`meta.warnings` + บั๊ก auto-resolved price currency — commit `986b8b1` + push + deploy สำเร็จแล้ว** (deploy run 33639969936, 8 apps reload, ไม่มี migration)
 > ⚠️ **dotenv tip mitigate เสร็จแล้ว (2 จุด: `tracing.ts` + `config.module.ts`) แต่ยังไม่ได้ commit** — ดู §6
+> ⚠️ **P3 #9 credit_limit เป็น THB เสมอ — entity comment + migration (รันแล้ว) + srs-p4.html + api-workflow-guide.html เสร็จหมดแล้วแต่ยังไม่ได้ commit**
 
 ## 0 · เปิด session ใหม่ — อ่านตรงไหน
 
@@ -19,17 +20,17 @@
 | `meta.warnings` — สถานะล่าสุด | §2 หัวข้อ **`meta.warnings`** (commit+deploy แล้ว) |
 | บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 (commit+deploy แล้ว) |
 | dotenv tip — mitigate ยังไง ทำไปถึงไหน | §6 (แก้เสร็จแล้ว รอ commit) |
-| งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **P3–P4** + **งานอื่นที่รู้อยู่** |
+| P3 #9 credit_limit เป็น THB — ทำไปถึงไหน | §2 หัวข้อ **P3 #9** (เสร็จแล้ว รอ commit) |
+| งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **P4** + **งานอื่นที่รู้อยู่** |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5 |
 | คำสั่งที่ใช้จริง (หลายตัวไม่ตรงกับที่เดาจาก `package.json`) | §3 |
 | เคยพลาดอะไรมาแล้วบ้าง — **อ่านก่อนแตะ migration/deploy** | §4 |
 | จะทำ audit หาช่องโหว่รอบใหม่ | §5 |
 
 **ที่แนะนำถ้าจะทำต่อเลย** (เรียงตามความคุ้ม ทั้งหมดไม่บล็อกอะไร):
-1. **commit + push งาน dotenv tip mitigate** (แก้/test/lint/boot-check ผ่านหมดแล้ว รอแค่ commit) — ดู §6
+1. **commit + push งาน dotenv tip mitigate + P3 #9** (แก้/test/lint/boot-check/migration ผ่านหมดแล้ว รอแค่ commit) — ดู §6 และ §2 หัวข้อ P3 #9
 2. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
-3. P3 #9 — เขียนให้ชัดว่า `credit_limit`/`credit_exposure` เป็น THB เสมอ (เอกสารล้วน ไม่แตะโค้ด)
-4. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
+3. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
 
 ---
 
@@ -315,10 +316,51 @@ quotation มาตรงๆ (จะรับสืบทอดบั๊ก/ก�
 | # | ระดับ | เรื่อง |
 |---|---|---|
 | 8 | P3 | **`billing_notes` รวมใบข้ามสกุลได้** — บวก `receipt.total` (THB) จึงถูกต้องภายในตัว แต่ BN ของลูกค้าที่วางบิลเป็น USD จะแสดงยอด THB ก้อนเดียว · เป็นคำถามเรื่องการจัดกลุ่ม/พิมพ์ ไม่ใช่ตัวเลขผิด |
-| 9 | P3 | **`credit_limit`/`credit_exposure` เป็น THB** — ถูกต้องในฐานะสกุลบัญชี แต่ไม่มีที่ไหนเขียนไว้ วงเงินของลูกค้า USD ก็เป็น THB |
+| ~~9~~ | ~~P3~~ | ~~**`credit_limit`/`credit_exposure` เป็น THB**~~ ✅ **เสร็จแล้ว 2026-09-02** — ดู §"P3 #9" ด้านล่าง |
 | 10 | P4 | **`item_prices` ไม่มี currency ของตัวเอง** — สืบทอดจาก price list ซึ่ง docblock ระบุไว้แล้วว่าจงใจ (ตรงกับ SAP/Odoo/NetSuite) · **ไม่ใช่บั๊ก** บันทึกไว้เพราะ audit ต้องยืนยัน |
 | 11 | P4 | **เพิ่มสกุลเงินใหม่ = 4 migration** (finance/sales/supplier/inventory) — ราคาของ enum ต่อ database · จงใจ เขียนไว้ใน docblock ของ `Currency` |
 | 12 | P4 | **unrealised FX ยังไม่ทำ** (จากรอบ C3) — period-end revaluation ตาม TFRS 21 อีกครึ่ง เป็นงานของทั้ง ledger ไม่ใช่ของเอกสารใบใด |
+
+---
+
+### P3 #9 · credit_limit/credit_exposure เป็น THB เสมอ — เขียนเป็น platform standard ✅ **เสร็จแล้ว 2026-09-02 — ยังไม่ commit**
+
+งานเอกสารล้วน (ผู้ใช้ยืนยันชัดเจนว่าไม่แตะ logic) — `customers.credit_limit` และ snapshot ทั้งคู่
+(`sales_orders`/`delivery_notes`) ถูกต้องอยู่แล้วในฐานะสกุลบัญชี (ยืนยันจากโค้ดจริง:
+`SalesOrdersService.resolveCreditExposure()`/`evaluateCredit()` อ่านแต่ `unit_price`/`total` —
+คอลัมน์ book/THB — ไม่แตะ `raw_*`/`currency` เลยสักจุด) แต่ไม่มีที่ไหนเขียนไว้เป็นลายลักษณ์อักษรว่าเป็น
+กติกาของทั้งแพลตฟอร์ม ไม่ใช่แค่บังเอิญ
+
+**ทำไมต้องเขียนตอนนี้**: M11 (`party_currency_enforcement`, 2026-09-02) เพิ่งทำให้
+`customers.billing_currency` มีความหมายจริงเป็นครั้งแรก — ก่อนหน้านั้นค่านี้ไม่เคยถูกอ่านเลย
+พอลูกค้าจริงเริ่มมี `billing_currency = USD` ได้ คำถาม "แล้ววงเงินเครดิตของเขาเป็นสกุลไหน" จึงเพิ่ง
+กลายเป็นคำถามที่มีคนถามได้จริง — ก่อน M11 มันเป็นคำถามที่ไม่มีทางเกิดขึ้น
+
+**ไฟล์ที่แตะ (เอกสาร + entity comment เท่านั้น ไม่มี business logic เปลี่ยน):**
+- `customers.entity.ts` — comment คอลัมน์ `credit_limit` เพิ่ม "เสมอเป็น THB ไม่ผูกกับ billing_currency"
+  · แก้ class docblock ที่ยังเขียนผิดว่า "NOT YET ENFORCED ANYWHERE" ทั้งที่บังคับใช้จริงมาตั้งแต่
+  2026-08-30 (M8) — เจอระหว่างอ่านโค้ดเพื่อยืนยันเรื่อง currency
+- `sales-order.entity.ts` / `delivery-note.entity.ts` — comment คอลัมน์ `credit_limit_snapshot` เพิ่ม
+  ข้อความเดียวกัน (`credit_exposure_snapshot` อ้างอิงกลับไปที่ comment ของ `credit_limit_snapshot`
+  อยู่แล้ว ไม่ต้องแก้ซ้ำ)
+- migration `1788363515188-DocumentCreditLimitAlwaysThb.ts` — **รันแล้ว** บน `erp_sales` เป็น
+  `COMMENT ON COLUMN` ล้วน 3 คำสั่ง ไม่มี data/schema risk เลย (`migration:generate:sales` ยืนยัน
+  `No changes` หลังรัน)
+- `srs-p4.html` — เพิ่ม paragraph "เพดานและยอดใช้วงเงินเป็น THB เสมอ — platform standard" ต่อท้าย
+  rulebox `RULE · CREDIT LIMIT` เดิม (ไม่ทำ rulebox ใหม่แยก เพราะเป็นเรื่องเดียวกัน) อ้างอิงกลับไปที่
+  `RULE · CURRENCY เป็น ENUM ระดับ DB` ใน srs-p5.html
+- `api-workflow-guide.html` — เพิ่มบรรทัดเดียวกันในรูลบอกซ์ FE-facing (B2 · แปลงเป็นใบสั่งขาย) —
+  **เจอบั๊กเอกสารจริงข้างๆ กันระหว่างแก้**: บรรทัดเดิมเขียนว่า "finance-bc ไม่ตอบ RPC = **ปล่อยผ่าน**
+  ไม่บล็อกการขาย" ซึ่ง**ตรงข้ามกับโค้ดจริง** — `evaluateCredit()` ให้ `PENDING_APPROVAL` (hold) เมื่อ
+  finance-bc ไม่ตอบ ไม่ใช่ปล่อยผ่าน (ตรงกับที่ srs-p4.html เขียนถูกอยู่แล้ว) แก้ให้ตรงกันในคราวเดียว
+  เพราะเป็นย่อหน้าเดียวกับที่กำลังแก้อยู่แล้ว
+
+**render-check ผ่านทั้งคู่** (mermaid 0 error, เนื้อหาใหม่ปรากฏจริง)
+
+**ตรวจแล้ว**: 1500/1500 test ผ่าน (ไม่เพิ่ม/ไม่ลด — ไม่มี logic เปลี่ยน) · eslint 0/0 ทั้ง repo
+(รวม migration file ที่ต้อง `--fix` ให้ตรง prettier/`explicit-member-accessibility` ก่อน) ·
+`nest start sales-bc` build จริงผ่าน ไม่มี error · `migration:run:sales` สำเร็จบน DB จริง (dev/prod
+ใช้ร่วมกัน — ดู §4 #10) แล้ว verify `migration:generate:sales` = `No changes` อีกครั้ง
 
 ---
 
