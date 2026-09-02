@@ -4,30 +4,59 @@
 > เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว)**
 > ก่อนหน้า: 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
-> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ · เหลือแต่ backlog P3–P4 (ต้องมี
-> ตัวขับ/ต้องถามลูกค้า) + งานเก็บกวาดเล็ก ๆ (ดู §"เหลืออะไร" ท้ายหัวข้อ P2#5/#6/#7)
+> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ · ไม่มีอะไรค้างกลางคัน
+> ทุกอย่าง commit + push + deploy + verify บน production แล้ว
+
+## 0 · เปิด session ใหม่ — อ่านตรงไหน
+
+**ไม่มีงานที่ค้างกลางคัน** — เริ่มงานใหม่ได้เลย ไม่ต้องสะสางอะไรก่อน
+
+| อยากรู้ว่า | ไปที่ |
+|---|---|
+| ตอนนี้ระบบอยู่สถานะไหน / commit อะไรไปบ้าง | §1 |
+| งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **P3–P4** + **งานอื่นที่รู้อยู่** |
+| จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5 |
+| คำสั่งที่ใช้จริง (หลายตัวไม่ตรงกับที่เดาจาก `package.json`) | §3 |
+| เคยพลาดอะไรมาแล้วบ้าง — **อ่านก่อนแตะ migration/deploy** | §4 |
+| จะทำ audit หาช่องโหว่รอบใหม่ | §5 |
+
+**ที่แนะนำถ้าจะทำต่อเลย** (เรียงตามความคุ้ม ทั้งหมดไม่บล็อกอะไร):
+1. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
+2. `meta.warnings` ใน JSON:API envelope — ตอนนี้ mode `warn` ของ `party_currency_enforcement` ลงแค่ server log client มองไม่เห็น
+3. P3 #9 — เขียนให้ชัดว่า `credit_limit`/`credit_exposure` เป็น THB เสมอ (เอกสารล้วน ไม่แตะโค้ด)
+4. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
 
 ---
 
 ## 1 · สถานะล่าสุด
 
-ทั้งสอง repo push แล้ว ตรงกัน — **HEAD ปัจจุบันเป็น commit เรื่อง pgpool/HA ของผู้ใช้เอง** ทำต่อบนงาน
-currency/column-contracts ของรอบนี้ (ไม่เกี่ยวกับเนื้อหาไฟล์นี้ ไม่ต้องอ่าน):
+**ทั้งสอง repo push แล้ว ตรงกัน · working tree สะอาด · deploy ขึ้น production แล้วและ E2E ผ่าน**
 
-| Repo | HEAD ปัจจุบัน | commit ล่าสุดของงานรอบนี้ |
-|---|---|---|
-| `iotechsoft-company/erp-api` | `d7efab1` fix(install-pgpool): … | `3c22b48` refactor: shared column contracts, currency on pre-booking documents, 4-decimal credit columns |
-| `iots1/plan-erp` (submodule) | `80e305c` docs: record HA drill results, … | `f87d102` docs: shared column contracts, currency on pre-booking documents, money precision |
+| Repo | HEAD ปัจจุบัน |
+|---|---|
+| `iotechsoft-company/erp-api` | `0930cb9` docs: bump plan-erp submodule — party-currency enforcement + *_PUBLIC_URL deployment gap |
+| `iots1/plan-erp` (submodule) | `a2485e6` docs: record party-currency enforcement + the *_PUBLIC_URL deployment gap |
 
-**สุขภาพระบบตอนนี้** (ยืนยันแล้วทั้งหมด ไม่ใช่เดา · รันซ้ำหลัง P2#5/#6/#7):
+ไล่ commit ของรอบ 2026-09-02 (เรียงเก่า→ใหม่ ใน `erp-api`):
+
+| commit | เรื่อง |
+|---|---|
+| `04b810f` | feat: ปิด P2 audit — line `raw_*`, print currency, party-currency enforcement (50 ไฟล์) |
+| `215426e` | docs(env): เพิ่ม `SALES/SUPPLIER/FINANCE_PUBLIC_URL` ใน `.env.example` |
+| `0930cb9` | docs: bump submodule (เอกสารทั้งชุด) |
+
+**สุขภาพระบบตอนนี้** (ยืนยันด้วยการรันจริงทั้งหมด ไม่ใช่เดา):
 
 - **1474 tests / 108 suites ผ่านทั้งหมด** (+20 จากรอบ P2 — 8 leaf util + 12 service)
 - **sales/supplier/finance `migration:generate` = `No changes`** หลังรัน migration รอบนี้ (4 ตัว) ·
   inventory/iam/auth ไม่แตะ
-- boot จริงผ่านทั้ง 4 BC ที่แตะ — `finance-bc` 55 routes · `sales-bc` 46 · `supplier-bc` 26 · `report-bc` 18 · DI resolve ครบ ไม่มี error (ไม่มี endpoint ใหม่)
-- eslint **0 error 0 warning** (warning เดิมที่ `jest-setup-env.js:67` ถูก `--fix` ไปแล้ว)
-- eslint เหลือ **1 warning เดิม** ที่ไม่เกี่ยวข้อง (`libs/common/test/jest-setup-env.js:67` — unused eslint-disable directive)
-- endpoint รวม **308 เส้น** และตาราง index ใน `api-workflow-guide.html` ตรงกับหัวข้อทุก BC (ตรวจทีละแถวแล้ว)
+- boot จริงผ่านทั้ง 4 BC ที่แตะ — `finance-bc` 55 routes · `sales-bc` 46 · `supplier-bc` 26 ·
+  `report-bc` 18 · DI resolve ครบ ไม่มี error · **ไม่มี endpoint ใหม่** จำนวนเส้นรวมจึงไม่เปลี่ยน
+- eslint **0 error 0 warning** ทั้ง repo (warning เดิมที่ `jest-setup-env.js:67` ถูก `--fix` ไปแล้ว)
+- **deploy production สำเร็จ** (run `33544353910`) — 8 apps reload, migration รายงาน `No migrations are
+  pending` ทั้ง 3 BC เพราะ dev กับ prod **ใช้ Postgres ตัวเดียวกัน** migration จึงลงไปตั้งแต่ตอน implement
+  (ดู §4 กับดัก #10)
+- **E2E ยิงผ่าน domain จริงผ่านครบ 6 เคส** — ดู §"E2E บน production จริง" ในหัวข้อ P2#5/#6/#7
 
 **สิ่งที่ทำเสร็จในรอบก่อนหน้า** (ทั้งหมด implement + test + เอกสารครบ): Purchase Return, stock period
 lock, AP Invoice + 3-way match, Credit Limit (SO), เพดาน WHT ที่ payment, Receipt↔Delivery Note
@@ -36,7 +65,8 @@ partial COGS reversal, D1–D3 (credit re-check ตอนส่งของ / pr
 เพดานอนุมัติใบปรับยอดสต็อก), vendor credit note, **C3 multi-currency ตอนตัดชำระ + realised FX, currency
 enum ระดับ DB, FX audit (P1 แก้ 3 ข้อ), P2#4 (FX บน quotation/SO/PO), shared column contracts (7
 interface), credit column precision → numeric(18,4), **P2#5 (raw_* ระดับบรรทัด) + P2#6 (currency ใน
-print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — ปิด P2 audit ครบ (รอบ 2026-09-02 ยังไม่ commit)**
+print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — ปิด P2 audit ครบ + แก้บั๊ก deploy
+`*_PUBLIC_URL` + E2E บน production (รอบ 2026-09-02 · commit + push + deploy ครบแล้ว)**
 
 ---
 
@@ -248,7 +278,7 @@ business rule ใหม่ จึงตัดสินใจไม่เพิ�
 
 ---
 
-### P2#5 + #6 + #7 · ปิด P2 audit ครบ ✅ **เสร็จแล้ว 2026-09-02** (ยังไม่ commit)
+### P2#5 + #6 + #7 · ปิด P2 audit ครบ ✅ **เสร็จแล้ว 2026-09-02** (commit + push + deploy + E2E แล้ว)
 
 ลูกค้าตอบ 3 คำถามผ่าน `AskUserQuestion`: (1) mismatch policy = **enforcement mode ตั้งค่าได้**
 (off/warn/block ต่อ BC เหมือน `price_tolerance_percent`) · (2) scope = **ทุกเอกสาร party-facing**
@@ -384,10 +414,41 @@ npm run build:assets:iam
 NODE_ENV=local npx nest start <bc>        # แล้ว grep "Mapped {" ใน log
 
 # render-check เอกสาร (บังคับตาม docs/plan-erp/CLAUDE.md)
+# ⚠️ ใช้ 15000 ไม่ใช่ 9000 — ไฟล์ใหญ่ (srs-p4/p5 ~1MB) render ไม่ทันที่ 9000
+#    แล้ว grep เนื้อหาที่เพิ่งเพิ่มจะไม่เจอ ทั้งที่ HTML ถูกต้อง (หลงคิดว่าพังได้ง่ายมาก)
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --headless --disable-gpu --virtual-time-budget=9000 \
+  --headless --disable-gpu --virtual-time-budget=15000 \
   --dump-dom "file://$PWD/<file>.html" > /tmp/out.txt
 grep -c 'Syntax error in text' /tmp/out.txt     # 0 = mermaid ผ่าน
+grep -c '<ข้อความที่เพิ่งเพิ่ม>' /tmp/out.txt   # ยืนยันว่าเนื้อหาใหม่ render จริง
+```
+
+### บน app server (ssh app-server → ubuntu-poc, DEPLOY_DIR=/root/erp-api)
+
+```bash
+# ⚠️ pm2/node ไม่อยู่ใน PATH ของ non-interactive ssh shell ต้อง export เอง
+ssh app-server 'export PATH="$HOME/.local/share/pnpm/bin:$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+  cd /root/erp-api && pm2 reload iam --update-env && pm2 describe iam'
+# *_PUBLIC_URL / ค่า config อื่นอ่านตอน bootstrap → แก้ .env แล้วต้อง reload เสมอ
+
+# .env บนเครื่องถูกเขียนทับจาก GitHub Environment secret ทุก deploy → sync ขึ้นด้วย
+ssh app-server 'cat /root/erp-api/.env' | gh secret set ENV_FILE --env production  --repo iotechsoft-company/erp-api
+ssh app-server 'cat /root/erp-api/.env' | gh secret set ENV_FILE --env development --repo iotechsoft-company/erp-api
+# pipe ตรงแบบนี้เพื่อไม่ให้ credential โผล่ใน output · แก้ไฟล์บนเครื่องก่อน แล้วค่อย sync เสมอ
+
+# ดูว่า deploy รอบล่าสุด scope อะไร (docs-only ควรได้ deploy=false, job ถูก skip)
+gh run list --workflow=deploy.yml --limit 3
+gh run view <run-id> --log | grep -oE "deploy=(true|false)|reason=[^\r]*"
+```
+
+### E2E ยิงผ่าน domain จริง
+
+```bash
+# login (username/password ไม่ใช่ email) → ได้ access_token อายุ 8 ชม.
+curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
+  -H 'content-type: application/json' -d '{"username":"<user>","password":"<pass>"}'
+# guard รับทั้ง `Authorization: Bearer <token>` และ cookie access_token
+# mutating request แนบ x-csrf-token (ค่าจาก login response) ไปด้วยได้ ปลอดภัยกว่า
 ```
 
 ---
@@ -424,6 +485,19 @@ grep -c 'Syntax error in text' /tmp/out.txt     # 0 = mermaid ผ่าน
    คือการเผลอเทียบยอด THB ของใบจ่าย (อัตราวันจ่าย) กับยอด THB ของใบกำกับ (อัตราวันออกใบ) ·
    invariant ทุกตัวที่เทียบ *ใบจ่าย ↔ เอกสาร* ต้องอยู่ฝั่ง `raw_*` และทุกตัวที่เทียบ *เอกสาร ↔ เอกสารเดียวกัน*
    (outstanding, เพดาน WHT) อยู่ฝั่ง THB ได้ เพราะทุกแถวที่ตัดใบเดียวกันใช้อัตราเดียวกัน
+10. **(จาก 2026-09-02) dev บนเครื่องกับ production ใช้ Postgres ตัวเดียวกัน** — `.env` ทั้งสองฝั่งชี้ไป
+    pgpool ตัวเดียวกัน · แปลว่า `npm run migration:run:<bc>` ที่รันตอน implement **ลง production ไปแล้ว**
+    ตั้งแต่ตอนนั้น ไม่ใช่ตอน deploy · deploy จึงรายงาน `No migrations are pending` ซึ่ง**ถูกต้อง ไม่ใช่บั๊ก** ·
+    ผลข้างเคียงที่ต้องระวัง: migration ที่ยังไม่อยากให้ขึ้น prod ห้ามรัน local, และการ query ตรวจข้อมูล
+    ก็คือการแตะข้อมูลจริง — ทดสอบอะไรให้ cleanup ทุกครั้ง
+11. **(จาก 2026-09-02) `.env` บนเครื่องถูกเขียนทับทุก deploy** จาก GitHub Environment secret `ENV_FILE`
+    (step "Sync .env from GitHub Environment secret" ใน `deploy.yml`) — แก้ไฟล์บนเครื่องอย่างเดียว
+    **หายเงียบ**ตอน deploy รอบถัดไป แล้วบั๊กกลับมาโดยไม่มีใครแตะโค้ด · อ่านค่า secret กลับไม่ได้ด้วย
+    ลำดับที่ถูกจึงเป็น **แก้ `.env` บนเครื่อง → `pm2 reload` → sync ขึ้น secret ทั้ง 2 environment**
+12. **(จาก 2026-09-02) route ของแต่ละ resource ไม่ได้ใช้ verb เดียวกันหมด** — `customers` update เป็น
+    `PUT /customers/:id` (ไม่ใช่ `PATCH`) ขณะที่ `finance-settings` เป็น `PATCH` และ
+    `sales-settings`/`supplier-settings` เป็น `PUT` · ยิงผิด verb ได้ **404 `Cannot PATCH …`** ซึ่ง
+    หน้าตาเหมือน "ไม่มี resource นี้" ทั้งที่มีอยู่ — เปิด controller ดูก่อนเสมอ อย่าเดาจาก REST convention
 
 ---
 
