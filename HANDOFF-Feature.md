@@ -1,8 +1,11 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (P2#5 + #6 + #7 — ปิด P2 audit ครบ · ยังไม่ commit)**
-> ก่อนหน้า: 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision) · commit+push แล้ว
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว)**
+> ก่อนหน้า: 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
+>
+> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ · เหลือแต่ backlog P3–P4 (ต้องมี
+> ตัวขับ/ต้องถามลูกค้า) + งานเก็บกวาดเล็ก ๆ (ดู §"เหลืออะไร" ท้ายหัวข้อ P2#5/#6/#7)
 
 ---
 
