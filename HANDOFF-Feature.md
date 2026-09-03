@@ -1,7 +1,8 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-03 (audit log กลาง — ขอบเขตเริ่มเล็ก เสร็จหมด + commit + push + deploy + E2E ผ่าน)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-03 (seed ตรวจซ้ำ — ปิดงานแล้ว `truncates:` ครบ ไม่ต้องแก้โค้ด)**
+> ก่อนหน้าในวันเดียวกัน: audit log กลาง — ขอบเขตเริ่มเล็ก เสร็จหมด + commit + push + deploy + E2E ผ่าน
 > ก่อนหน้า: 2026-09-03 (P4 #12 unrealised FX/TFRS 21 — **commit `6254aee`+`2483cf4` + push + deploy แล้ว**) ·
 > 2026-09-02 (dotenv tip mitigate + P3 #9 credit_limit เป็น THB — **commit `18f6acf`/`21b6bd4` + push แล้ว**) ·
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
@@ -33,7 +34,7 @@
 
 **ที่แนะนำถ้าจะทำต่อเลย** (เรียงตามความคุ้ม ทั้งหมดไม่บล็อกอะไร):
 1. **deploy P4 #12** (commit+push แล้ว รอแค่ deploy) — มี migration ใหม่ (`erp_finance`) ต้องรันบน production ด้วย
-2. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
+2. ~~`npm run seed -- --fresh --yes` บน scratch DB~~ ✅ **ปิดงานแล้ว 2026-09-03** — ดู §2 หัวข้อ **seed — ตรวจซ้ำ** (ผู้ใช้ตัดสินใจข้ามส่วน `--fresh` บน scratch DB) · ⚠️ กติกาเดิมยังใช้: **ห้ามรัน `--fresh` ใส่ DB จริง** (ดู §4 #10)
 3. งานอื่นที่รู้อยู่ #8/#10/#11 — ทั้งหมด optional, ไม่ใช่บั๊ก (ดู §2 หัวข้อ **งานอื่นที่รู้อยู่**)
 
 ---
@@ -656,10 +657,40 @@ ssh app-server 'cat /root/erp-api/.env' | gh secret set ENV_FILE --env developme
 
 | งาน | หมายเหตุ |
 |---|---|
-| **`npm run seed --fresh` ตรวจซ้ำ** | **ยังค้างอยู่** (C3 ไม่กระทบ — ตรวจแล้วว่า seed ไม่แตะ `ap_invoices`/`payment_entries`/`payment_allocations` เลย เพราะ seed ครอบแค่ `erp_inventory`+`erp_supplier`) · รอบก่อนแก้ให้ปฏิเสธอย่างชัดเจนแล้วเมื่อมีเอกสารธุรกรรมค้าง แต่หลังจากนั้นเพิ่มตารางใหม่หลายตัว (`sales_returns`, `sales_return_receipts`, `sales_settings`, `supplier_settings`, …) — **ควรรัน `npm run seed -- --dry-run` และ `--fresh --yes` บน DB scratch อีกครั้ง** เพื่อดูว่า `truncates:` ใน seeder ยังครบ (ดู `libs/database/src/scripts/seed/README.md`) |
+| ~~**`npm run seed --fresh` ตรวจซ้ำ**~~ | ✅ **ตรวจแล้ว 2026-09-03 — `truncates:` ครบ ไม่ต้องแก้โค้ด** · ดู §"seed — ตรวจซ้ำ" ด้านล่าง (ส่วน `--fresh --yes` บน scratch DB **ผู้ใช้ตัดสินใจข้าม** เพราะคุ้มค่าน้อยเทียบกับความเสี่ยง — DB ที่ seed ชี้ไปเป็นเซิร์ฟเวอร์ LAN ที่ dev/prod ใช้ร่วมกัน) |
 | **`system-settings-bc`** | ผู้ใช้เคยถามว่าควรมีไหม · คำตอบที่ให้ไว้: **ไม่ควร** เพราะ settings ถูกอ่านในทรานแซกชันที่บังคับใช้มัน (`assertPeriodOpen` อยู่ใน GL posting) ย้ายออกแล้วต้องมี cache และ cache ที่ค้างจะปล่อยเอกสารเข้างวดที่ปิดแล้ว · "settings" ไม่ใช่ bounded context · หน้า iam System Settings เป็น **UI aggregator** ซึ่งแก้ปัญหา "ที่เดียว" ได้แล้ว · **ผู้ใช้ยังไม่ได้ยืนยันว่าเห็นด้วย** — ถ้าเปิด session ใหม่แล้วสั่งทำ ให้ทำตามที่สั่ง |
 | ~~**audit log กลาง**~~ | ✅ **ขอบเขต "เริ่มเล็ก" เสร็จแล้ว 2026-09-03** — ดู §"audit log กลาง" ด้านล่าง (ขอบเขตใหญ่กว่านี้ — pattern กลาง/audit-bc ใหม่ — ยังไม่ได้ทำ ถ้าต้องการค่อยคุยรอบหน้า) |
 | **DEBIT_NOTE ฝั่งซื้อ** | จงใจไม่ทำ (ดู docblock ของ `APInvoiceDocumentType`) — ไม่ใช่โค้ดเดิมกลับเครื่องหมาย เพราะไม่ถูกจำกัดด้วยจำนวนบนใบเดิมหรือของที่เคลื่อนจริง (มักเป็นการแก้ราคา) ต้องมีเพดานและตัวขับของตัวเอง |
+
+---
+
+### seed — ตรวจซ้ำ ✅ **เสร็จแล้ว 2026-09-03 (ไม่ต้องแก้โค้ดเลย)**
+
+งานนี้ค้างมาหลาย session เพราะกลัวว่า `truncates:` ในแต่ละ seeder จะไม่ครบหลังเพิ่มตารางใหม่
+— ตรวจแล้ว **ครบทุกตัว ไม่มีอะไรต้องแก้** แยกเป็น 3 ส่วน:
+
+1. **`truncates:` ครบ (static audit — ไม่แตะ DB)** — เทียบตารางที่ seeder แต่ละตัว *เขียน* กับที่
+   *ประกาศ* ใน `truncates:` ตรงกันทั้ง 15 ตัว รวม 2 ตัวที่เขียนหลายตาราง
+   (`item-attributes` → `item_attribute_values`+`item_attributes`, `products` →
+   `item_variant_attributes`+`products`) ซึ่งเรียง child→parent ถูกต้องด้วย
+2. **ตารางใหม่ไม่ทำให้พัง เพราะกลไกไม่ได้พึ่ง `truncates:` อยู่แล้ว** — `findExternalDependents()`
+   ใน `seed-runner.ts` **ค้น FK จาก `pg_constraint` ตอน runtime** แล้ว **ปฏิเสธ (throw)** ถ้าตาราง
+   นอกชุด seed มีแถวอ้างอิงอยู่ · ตารางธุรกรรมใหม่ (`sales_return_receipts`, `purchase_returns`, …)
+   จึงถูกจับได้เองโดยไม่ต้องมาเติม `truncates:` มือ — ที่ต้อง maintain มือคือ *ตารางที่ seeder
+   เขียนเอง* เท่านั้น (ข้อ 1)
+3. **`npm run seed -- --dry-run` → 15/15 seeders ok** กับ schema จริงตอนนี้ (ปลอดภัย: seeder เช็ค
+   `context.is_dry_run` แล้ว `continue` ก่อนเขียน และ runner ไม่ truncate เมื่อ dry-run) ·
+   `settings` singleton (`stock_settings`, `supplier_settings`) จงใจไม่ seed เพราะสร้างเองผ่าน
+   `getOrCreate()` · `uoms` มาจาก migration `SeedInventoryUoms` และ `resolveUomIds()` throw
+   พร้อมข้อความชี้ migration ให้เลยถ้าขาด
+
+**สิ่งเดียวที่เจอและแก้**: doc drift — README ของ seed ลิสต์ seeder แค่ 14 ตัว (ตกตาราง
+`barcodes` ที่เป็นตัวที่ 15) และ root `CLAUDE.md` ยังเขียน 13 ตัว · แก้ทั้งคู่ให้ตรงกับ
+`SEEDERS[]` จริง (commit `aa4cdec`) ยืนยันด้วย `npm run seed -- --list`
+
+**ส่วนที่ข้าม (ผู้ใช้ตัดสินใจ)**: `--fresh --yes` บน scratch DB — ต้องสร้าง DB ใหม่บนเซิร์ฟเวอร์
+LAN ที่ dev/prod ใช้ร่วมกัน (`172.16.0.x`) และถ้า env override พลาดจะ TRUNCATE master data จริง
+ทั้งที่ได้ค่าเพิ่มแค่การพิสูจน์ลำดับ TRUNCATE บน DB ว่างเปล่า ซึ่งข้อ 2 มี safety net คุมอยู่แล้ว
 
 ---
 
