@@ -1550,7 +1550,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">iam · ผู้ใช้ · บทบาท · สิทธิ์ <span class="mono text-[13px] text-[var(--muted)]">— 29 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">iam · ผู้ใช้ · บทบาท · สิทธิ์ <span class="mono text-[13px] text-[var(--muted)]">— 31 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1573,11 +1573,13 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/policies/{id}</td><td class="mono text-[11px]">policy:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/policies/{id}/statements</td><td class="mono text-[11px]">policy:read</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/policies/{id}/statements</td><td class="mono text-[11px]">policy:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/role-policy-audit-logs</td><td class="mono text-[11px]">role_policy_audit_log:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/roles</td><td class="mono text-[11px]">role:read</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/iam/v1/roles</td><td class="mono text-[11px]">role:create</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/roles/{id}</td><td class="mono text-[11px]">role:read</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/roles/{id}</td><td class="mono text-[11px]">role:update</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/iam/v1/roles/{id}/policies</td><td class="mono text-[11px]">role:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/user-role-audit-logs</td><td class="mono text-[11px]">user_role_audit_log:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/users</td><td class="mono text-[11px]">user_account:read</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/iam/v1/users/{id}</td><td class="mono text-[11px]">user_account:create</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/iam/v1/users/{id}</td><td class="mono text-[11px]">user_account:read</td></tr>

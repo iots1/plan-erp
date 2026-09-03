@@ -1,8 +1,9 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-03 (P4 #12 unrealised FX/TFRS 21 — เสร็จหมดรวม migration+permissions:sync, กำลัง commit)**
-> ก่อนหน้า: 2026-09-02 (dotenv tip mitigate + P3 #9 credit_limit เป็น THB — **commit `18f6acf`/`21b6bd4` + push แล้ว**) ·
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-03 (audit log กลาง — ขอบเขตเริ่มเล็ก เสร็จหมด รอ commit)**
+> ก่อนหน้า: 2026-09-03 (P4 #12 unrealised FX/TFRS 21 — **commit `6254aee`+`2483cf4` + push + deploy แล้ว**) ·
+> 2026-09-02 (dotenv tip mitigate + P3 #9 credit_limit เป็น THB — **commit `18f6acf`/`21b6bd4` + push แล้ว**) ·
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
@@ -10,7 +11,8 @@
 > ✅ **`meta.warnings` + บั๊ก auto-resolved price currency — commit `986b8b1` + push + deploy สำเร็จแล้ว** (deploy run 33639969936, 8 apps reload, ไม่มี migration)
 > ✅ **dotenv tip mitigate — commit `18f6acf` + push แล้ว**
 > ✅ **P3 #9 credit_limit เป็น THB เสมอ — commit `21b6bd4` + push แล้ว**
-> ✅ **P4 #12 unrealised FX (TFRS 21) — เสร็จหมด** (migration รันแล้ว, tests/lint/boot-check ผ่านหมด, `permissions:sync` แล้ว) — ดู §2 หัวข้อ **P4 #12**
+> ✅ **P4 #12 unrealised FX (TFRS 21) — เสร็จหมด + deploy แล้ว** (migration รันแล้ว, tests/lint/boot-check ผ่านหมด, `permissions:sync` + grant migration แล้ว, E2E จริงบน production ผ่าน) — ดู §2 หัวข้อ **P4 #12**
+> ⚠️ **audit log กลาง (ขอบเขตเริ่มเล็ก) — เสร็จหมดแล้วแต่ยังไม่ได้ commit** — ดู §2 หัวข้อ **audit log กลาง**
 
 ## 0 · เปิด session ใหม่ — อ่านตรงไหน
 
@@ -656,8 +658,55 @@ ssh app-server 'cat /root/erp-api/.env' | gh secret set ENV_FILE --env developme
 |---|---|
 | **`npm run seed --fresh` ตรวจซ้ำ** | **ยังค้างอยู่** (C3 ไม่กระทบ — ตรวจแล้วว่า seed ไม่แตะ `ap_invoices`/`payment_entries`/`payment_allocations` เลย เพราะ seed ครอบแค่ `erp_inventory`+`erp_supplier`) · รอบก่อนแก้ให้ปฏิเสธอย่างชัดเจนแล้วเมื่อมีเอกสารธุรกรรมค้าง แต่หลังจากนั้นเพิ่มตารางใหม่หลายตัว (`sales_returns`, `sales_return_receipts`, `sales_settings`, `supplier_settings`, …) — **ควรรัน `npm run seed -- --dry-run` และ `--fresh --yes` บน DB scratch อีกครั้ง** เพื่อดูว่า `truncates:` ใน seeder ยังครบ (ดู `libs/database/src/scripts/seed/README.md`) |
 | **`system-settings-bc`** | ผู้ใช้เคยถามว่าควรมีไหม · คำตอบที่ให้ไว้: **ไม่ควร** เพราะ settings ถูกอ่านในทรานแซกชันที่บังคับใช้มัน (`assertPeriodOpen` อยู่ใน GL posting) ย้ายออกแล้วต้องมี cache และ cache ที่ค้างจะปล่อยเอกสารเข้างวดที่ปิดแล้ว · "settings" ไม่ใช่ bounded context · หน้า iam System Settings เป็น **UI aggregator** ซึ่งแก้ปัญหา "ที่เดียว" ได้แล้ว · **ผู้ใช้ยังไม่ได้ยืนยันว่าเห็นด้วย** — ถ้าเปิด session ใหม่แล้วสั่งทำ ให้ทำตามที่สั่ง |
-| **audit log กลาง** | ตอนนี้มีแต่ log ต่อ aggregate ใน iam (`role_policy_audit_logs`, `user_role_audit_logs`) ไม่มี facility กลาง · เป็นงานคนละเรื่องกับ settings ตัดสินใจแยกได้ |
+| ~~**audit log กลาง**~~ | ✅ **ขอบเขต "เริ่มเล็ก" เสร็จแล้ว 2026-09-03** — ดู §"audit log กลาง" ด้านล่าง (ขอบเขตใหญ่กว่านี้ — pattern กลาง/audit-bc ใหม่ — ยังไม่ได้ทำ ถ้าต้องการค่อยคุยรอบหน้า) |
 | **DEBIT_NOTE ฝั่งซื้อ** | จงใจไม่ทำ (ดู docblock ของ `APInvoiceDocumentType`) — ไม่ใช่โค้ดเดิมกลับเครื่องหมาย เพราะไม่ถูกจำกัดด้วยจำนวนบนใบเดิมหรือของที่เคลื่อนจริง (มักเป็นการแก้ราคา) ต้องมีเพดานและตัวขับของตัวเอง |
+
+---
+
+### audit log กลาง — ขอบเขต "เริ่มเล็ก" ✅ **เสร็จแล้ว 2026-09-03**
+
+ถามผู้ใช้ก่อนเริ่มว่าขอบเขตแบบไหน (3 ตัวเลือก: เริ่มเล็ก / กลาง-ใช้ pattern ร่วม / ใหญ่-audit-bc
+ใหม่) — เลือก **เริ่มเล็ก**: แค่เปิดหน้า UI + API ให้ 2 ตารางที่มีอยู่แล้ว
+(`role_policy_audit_logs`, `user_role_audit_logs` — เขียนมาตั้งแต่ก่อนหน้านี้แต่ไม่เคยมีใครอ่านได้
+เลย) ไม่แตะ schema ไม่สร้าง BC ใหม่ ไม่ทำ pattern กลางข้าม BC
+
+**Backend (iam-bc) — 2 resource read-only ใหม่ ในโมดูลที่มี repository อยู่แล้ว:**
+- `RolePolicyAuditLogsService`/`RolePolicyAuditLogsController` (`GET /role-policy-audit-logs`,
+  permission `role_policy_audit_log:view`) เพิ่มเข้า `RolesModule` ที่มีเดิม
+- `UserRoleAuditLogsService`/`UserRoleAuditLogsController` (`GET /user-role-audit-logs`,
+  permission `user_role_audit_log:view`) เพิ่มเข้า `UsersModule` ที่มีเดิม
+- ทั้งคู่ตาม pattern `LedgerEntriesController`/`LoginHistoriesController` — read-only, มีแค่
+  `findPaginated` ไม่มี `findOne` (ไม่มีอะไรน่า deep-link ไปดูทีละแถว), DTO create/update ว่างเปล่า
+  (`BaseServiceOperations` ต้องการ type param แม้จะไม่มี route จริง)
+- **บั๊กที่เจอจาก real boot check** (jest ผ่านแต่ build จริง fail): `RolePolicyAuditAction`/
+  `UserRoleAuditAction` เป็น `type` alias ใช้เป็น property type บน response DTO ที่มี
+  `emitDecoratorMetadata` — ต้อง `import type` ไม่งั้น TS1272 ("A type referenced in a decorated
+  signature must be imported with 'import type'")
+
+**Admin Console (iam-bc EJS) — เพิ่มเข้าหน้า `Audit Logs` เดิมแทนที่จะแยกหน้าใหม่:**
+หน้าเดิม (`/views/audit-logs`) โชว์แค่ `login_histories` (auth-bc) ทั้งที่ตั้งชื่อ "Audit Logs"
+มาตลอด — เปลี่ยนเป็น 3 แท็บด้วย `.um-page-tabs` (component เดียวกับที่
+`print-templates/form.ejs` ใช้แยก "รายละเอียด"/"รายงาน"): เข้าใช้งาน (login, เดิม) /
+บทบาท↔Policy (ใหม่) / ผู้ใช้↔บทบาท (ใหม่) — โหลดทั้ง 3 แท็บพร้อมกันตอนเปิดหน้า (ตารางเล็ก ไม่ใช่
+transactional data จึงไม่ต้อง lazy-load) แท็บสลับแค่ toggle `.hidden` ไม่ fetch ซ้ำ ·
+`role_id`/`policy_id`/`user_id` โชว์เป็น raw UUID (ไม่ join หา name — เป็น field ที่ไม่มี FK จริง
+โดยตั้งใจ เพื่อให้ audit trail อยู่รอดแม้ role/policy/user ต้นทางถูกลบไปแล้ว; join จริงต้องรวม
+soft-deleted ด้วย `withDeleted()` — ทิ้งไว้เป็นงานต่อยอดถ้าจำเป็นจริง ไม่ทำตอนนี้เพราะเกินขอบเขต
+"เริ่มเล็ก")
+
+**permission ใหม่**: `role_policy_audit_log:view`, `user_role_audit_log:view` — sync เข้า
+`erp_iam` แล้ว **และเขียน grant migration ไปพร้อมกันในรอบเดียว** (ไม่ใช่ทำทีหลังเหมือน P4 #12 —
+เรียนจากบั๊กที่เจอตอน E2E ของ P4 #12 ว่า `permissions:sync` ไม่เคย grant ให้ policy ไหนใช้ได้จริง)
+— `1788425651764-GrantAuditLogPermissionsToMockPolicies.ts` (`erp_iam`, mirror
+`GrantPeriodPermissionsToMockPolicies`) รันแล้วบน DB จริง
+
+**ตรวจแล้ว**: 1525/1525 test ผ่าน (ไม่เพิ่ม — ทั้งสอง resource เป็น thin wrapper รอบ
+`BaseServiceOperations`/`BaseControllerOperations` เหมือน `LedgerEntriesController` ซึ่งไม่มี spec
+ของตัวเองเช่นกัน) · eslint 0/0 ทั้ง repo (ts + vanilla JS หน้า admin) · `nx build iam` build จริง
+ผ่าน (หลังแก้ TS1272) · เสิร์ฟหน้าจริงบน port ทดสอบแล้วเช็ค HTML ที่ render ออกมา (tag-balance ผ่าน,
+element id ทั้ง 3 แท็บครบ) และ bundle.js ที่ esbuild ปั้นออกมา syntax ผ่าน `node --check` ·
+`migration:run:iam` สำเร็จบน DB จริงแล้ว verify `migration:generate:iam` = `No changes` ·
+**ยังไม่ได้ deploy** — โค้ดยัง push ไม่เสร็จตอนเขียนบรรทัดนี้
 
 ---
 
