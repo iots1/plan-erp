@@ -1121,30 +1121,50 @@ sequenceDiagram
 
         <h3 class="display text-xl mt-10 mb-4">C6 · ปิดงวดบัญชี <span class="mono text-[13px] text-[var(--muted)]">— Finance Manager</span></h3>
         <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
-          เพิ่มเข้ามา 2026-08-30 — ปิดงวดคือ<b>เลื่อนงวดที่ล็อกไปข้างหน้าเท่านั้น</b> (one-way ratchet) ไม่มีเอกสาร ไม่มีสถานะ
+          เพิ่มเข้ามา 2026-08-30 — ปิดงวดคือ<b>เลื่อนงวดที่ล็อกไปข้างหน้าเท่านั้น</b> (one-way ratchet)
           มีแค่ค่าเดียว (<span class="mono text-[12px]">ledger_frozen_upto</span>) ที่เก็บใน <span class="mono text-[12px]">finance-bc</span>
-          หลังปิดแล้ว การโพสต์ GL ใดๆ (ออกใบกำกับ, รับชำระ, บันทึก COGS) ที่ <span class="mono text-[12px]">document_date</span> อยู่ในหรือก่อนงวดนั้นจะถูกปฏิเสธทันที
+          หลังปิดแล้ว การโพสต์ GL ใดๆ (ออกใบกำกับ, รับชำระ, บันทึก COGS) ที่ <span class="mono text-[12px]">document_date</span> อยู่ในหรือก่อนงวดนั้นจะถูกปฏิเสธทันที ·
+          <b>ตั้งแต่ 2026-09-03</b> การปิดงวดยังตี<b>ราคา AR/AP ต่างสกุลที่ยังเปิดอยู่ใหม่ (unrealised FX, TFRS 21)</b> ให้อัตโนมัติเป็นส่วนหนึ่งของ transaction เดียวกัน —
+          จึงมีเอกสารเกิดขึ้นจริงแล้ว (<span class="mono text-[12px]">fx_revaluations</span>) ไม่ใช่แค่ค่าเดียวเหมือนเดิมอีกต่อไป
         </p>
         <div class="card overflow-hidden mb-5">
           <table class="d">
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/finance-settings</td><td class="mono text-[11px]">period:view</td><td>ดูว่าปิดงวดล่าสุดถึงวันไหน (<span class="mono">null</span> = ยังไม่เคยปิด)</td></tr>
-              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/finance-settings/close-period</td><td class="mono text-[11px]">period:close</td><td><b>เลื่อนล็อกไปข้างหน้า</b> — ย้อนกลับไม่ได้ผ่าน endpoint นี้ (409)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/finance-settings/close-period</td><td class="mono text-[11px]">period:close</td><td><b>เลื่อนล็อกไปข้างหน้า + ตีราคา unrealised FX</b> — ย้อนกลับไม่ได้ผ่าน endpoint นี้ (409)</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/fx-revaluations</td><td class="mono text-[11px]">fx_revaluation:view</td><td>ประวัติการตีราคาทุก run (list, แบ่งหน้า)</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/fx-revaluations/:id</td><td class="mono text-[11px]">fx_revaluation:view</td><td>1 run พร้อมทุกบรรทัด (<span class="mono text-[12px]">?include=lines</span>) — เอกสารที่ถูกตีราคา, อัตราเดิม/อัตราปิดงวด, กำไร/ขาดทุนต่อใบ</td></tr>
             </tbody>
           </table>
         </div>
         <div class="code p-5 mb-4">
 <pre><span class="c">// POST /finance-bc/v1/finance-settings/close-period</span>
 {
-  <span class="s">"upto"</span>: <span class="s">"2026-07-31T23:59:59+07:00"</span>  <span class="c">// ส่งท้ายวันสุดท้ายของงวด (Asia/Bangkok) ไม่ใช่ YYYY-MM-DD เฉยๆ</span>
+  <span class="s">"upto"</span>: <span class="s">"2026-07-31T23:59:59+07:00"</span>,  <span class="c">// ส่งท้ายวันสุดท้ายของงวด (Asia/Bangkok) ไม่ใช่ YYYY-MM-DD เฉยๆ</span>
+  <span class="s">"closing_rates"</span>: [                          <span class="c">// อัตราปิดงวดต่อสกุลเงิน — ต้องระบุครบทุกสกุลที่มี AR/AP เปิดอยู่ ณ upto ไม่งั้น 400</span>
+    { <span class="s">"currency"</span>: <span class="s">"USD"</span>, <span class="s">"rate"</span>: <span class="d">36.2</span> }
+  ]
 }</pre>
         </div>
         <div class="rulebox mb-4">
-          <div class="rc mb-1">สิ่งที่ทำให้ปิดงวดไม่ผ่าน (409)</div>
+          <div class="rc mb-1">สิ่งที่ทำให้ปิดงวดไม่ผ่าน (409/400)</div>
           <p class="text-[13.5px]">
             <span class="mono text-[12px]">upto</span> ก่อนหรือเท่ากับงวดที่ปิดไว้แล้ว — ระบบไม่รองรับ "เปิดงวดใหม่" ผ่าน endpoint นี้
-            (เป็นการตัดสินใจที่สำคัญพอที่ต้องมีขั้นตอนแยกต่างหาก ยังไม่ทำในรอบนี้)
+            (เป็นการตัดสินใจที่สำคัญพอที่ต้องมีขั้นตอนแยกต่างหาก ยังไม่ทำในรอบนี้) (409) ·
+            <span class="mono text-[12px]">closing_rates</span> ขาดสกุลเงินที่มี AR/AP ต่างสกุลเปิดอยู่ ณ <span class="mono text-[12px]">upto</span> — error ระบุชื่อสกุลที่ขาดตรงๆ (400)
+            ทั้งสองกรณีทำ transaction เดียวกันทั้งหมด rollback หมด ไม่มีทางปิดงวดได้ครึ่งๆ กลางๆ
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc ok mb-1">unrealised FX ทำงานยังไงตอนปิดงวด (TFRS 21)</div>
+          <p class="text-[13.5px]">
+            ทุก receipt/AP invoice ต่างสกุล (ไม่ใช่ THB) ที่ยังมียอดค้างชำระ ณ <span class="mono text-[12px]">upto</span> จะถูกตีราคาใหม่ด้วยอัตราใน
+            <span class="mono text-[12px]">closing_rates</span> · ก่อนตีราคารอบใหม่ ระบบ<b>กลับรายการ run ก่อนหน้าที่ยัง POSTED ทั้งหมดก่อนเสมอ</b> (auto-reverse ต้นงวด)
+            แล้วคำนวณสดจากอัตราที่เอกสารบันทึกไว้จริง — ไม่ต่อยอดจากอัตราปิดงวดคราวก่อน · โพสต์ลงบัญชีแยกจาก realised FX
+            (<span class="mono text-[12px]">4301</span> กำไรยังไม่เกิดขึ้นจริง / <span class="mono text-[12px]">5301</span> ขาดทุนยังไม่เกิดขึ้นจริง)
+            เพราะเป็นตัวเลขประมาณการที่จะถูกกลับทั้งหมดที่ต้นงวดถัดไป ไม่ใช่กำไร/ขาดทุนที่เกิดขึ้นจริงแบบ <span class="mono text-[12px]">4300</span>/<span class="mono text-[12px]">5300</span> ·
+            รายละเอียดกฎทั้งหมด: <a href="srs-p5.html" style="color:var(--teal);text-decoration:underline">SRS P5 — RULE · UNREALISED FX (TFRS 21)</a>
           </p>
         </div>
         <div class="rulebox mb-8">
@@ -1759,6 +1779,8 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings</td><td class="mono text-[11px]">period:view</td></tr>
               <tr><td class="mono text-[11.5px]">PATCH</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings</td><td class="mono text-[11px]">finance_setting:update</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings/close-period</td><td class="mono text-[11px]">period:close</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/fx-revaluations</td><td class="mono text-[11px]">fx_revaluation:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/fx-revaluations/{id}</td><td class="mono text-[11px]">fx_revaluation:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ledger-entries/{id}</td><td class="mono text-[11px]">ledger_entry:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/payment-entries</td><td class="mono text-[11px]">payment_entry:view</td></tr>
