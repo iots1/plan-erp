@@ -1138,14 +1138,64 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          <b>ตัวอย่างครบ flow</b> — สมมติปลายเดือนกรกฎาคม บริษัทมีใบกำกับขาย USD ที่ยังไม่ได้รับชำระเต็ม
+          (<span class="mono text-[12px]">INV-2026-00042</span>, บันทึกไว้ตอนออกที่อัตรา 35, ค้างอยู่ 1,000 USD)
+          และใบตั้งหนี้ผู้ขาย USD ที่ยังไม่ได้จ่าย (<span class="mono text-[12px]">APINV-2026-00017</span>,
+          บันทึกที่อัตรา 35 เหมือนกัน, ค้างอยู่ 500 USD) · Finance Manager ปิดงวดกรกฎาคมด้วยอัตราปิดงวด USD = 36.2:
+        </p>
         <div class="code p-5 mb-4">
-<pre><span class="c">// POST /finance-bc/v1/finance-settings/close-period</span>
+<pre><span class="c">// 1) POST /finance-bc/v1/finance-settings/close-period</span>
 {
   <span class="s">"upto"</span>: <span class="s">"2026-07-31T23:59:59+07:00"</span>,  <span class="c">// ส่งท้ายวันสุดท้ายของงวด (Asia/Bangkok) ไม่ใช่ YYYY-MM-DD เฉยๆ</span>
   <span class="s">"closing_rates"</span>: [                          <span class="c">// อัตราปิดงวดต่อสกุลเงิน — ต้องระบุครบทุกสกุลที่มี AR/AP เปิดอยู่ ณ upto ไม่งั้น 400</span>
     { <span class="s">"currency"</span>: <span class="s">"USD"</span>, <span class="s">"rate"</span>: <span class="d">36.2</span> }
   ]
+}
+
+<span class="c">// ตอบกลับ — แค่ยืนยันว่าล็อกเลื่อนไปแล้ว (ตีราคาเกิดขึ้นเบื้องหลังในธุรกรรมเดียวกัน)</span>
+{
+  <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">200000</span>, <span class="s">"message"</span>: <span class="s">"Request Succeeded"</span> },
+  <span class="s">"data"</span>: { <span class="s">"type"</span>: <span class="s">"finance-settings"</span>, <span class="s">"id"</span>: <span class="s">"a1c2…"</span>, <span class="s">"attributes"</span>: {
+      <span class="s">"ledger_frozen_upto"</span>: <span class="s">"2026-07-31T23:59:59+07:00"</span>
+  } },
+  <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"…"</span> },
+  <span class="s">"links"</span>: { <span class="s">"self"</span>: <span class="s">"/finance-bc/v1/finance-settings/close-period"</span> }
+}
+
+<span class="c">// 2) Finance Manager เปิดดูว่าตีราคาอะไรไปบ้าง — GET /finance-bc/v1/fx-revaluations/{id}?include=lines</span>
+{
+  <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">200000</span>, <span class="s">"message"</span>: <span class="s">"Request Succeeded"</span> },
+  <span class="s">"data"</span>: { <span class="s">"type"</span>: <span class="s">"fx-revaluations"</span>, <span class="s">"id"</span>: <span class="s">"9f3e…"</span>, <span class="s">"attributes"</span>: {
+      <span class="s">"document_number"</span>: <span class="s">"FXR-2026-00001"</span>,
+      <span class="s">"as_of_date"</span>: <span class="s">"2026-07-31T23:59:59+07:00"</span>,
+      <span class="s">"status"</span>: <span class="s">"POSTED"</span>,
+      <span class="s">"total_gain"</span>: <span class="t">1200</span>,          <span class="c">// รวมทุกบรรทัดที่เป็นกำไร</span>
+      <span class="s">"total_loss"</span>: <span class="t">600</span>,           <span class="c">// รวมทุกบรรทัดที่เป็นขาดทุน — ไม่ net กัน</span>
+      <span class="s">"reversed_at"</span>: <span class="d">null</span>,          <span class="c">// null = ยังไม่ถูกกลับ — จะถูกกลับตอนปิดงวดสิงหาคม</span>
+      <span class="s">"lines"</span>: [
+        { <span class="s">"document_type"</span>: <span class="s">"RECEIPT"</span>, <span class="s">"document_number"</span>: <span class="s">"INV-2026-00042"</span>,
+          <span class="s">"currency"</span>: <span class="s">"USD"</span>, <span class="s">"original_rate"</span>: <span class="t">35</span>, <span class="s">"closing_rate"</span>: <span class="t">36.2</span>,
+          <span class="s">"raw_outstanding"</span>: <span class="t">1000</span>, <span class="s">"book_outstanding_before"</span>: <span class="t">35000</span>,
+          <span class="s">"book_outstanding_after"</span>: <span class="t">36200</span>, <span class="s">"fx_amount"</span>: <span class="t">1200</span> },
+        { <span class="s">"document_type"</span>: <span class="s">"AP_INVOICE"</span>, <span class="s">"document_number"</span>: <span class="s">"APINV-2026-00017"</span>,
+          <span class="s">"currency"</span>: <span class="s">"USD"</span>, <span class="s">"original_rate"</span>: <span class="t">35</span>, <span class="s">"closing_rate"</span>: <span class="t">36.2</span>,
+          <span class="s">"raw_outstanding"</span>: <span class="t">500</span>, <span class="s">"book_outstanding_before"</span>: <span class="t">17500</span>,
+          <span class="s">"book_outstanding_after"</span>: <span class="t">18100</span>, <span class="s">"fx_amount"</span>: <span class="t">600</span> }
+      ]
+  } },
+  <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"…"</span> },
+  <span class="s">"links"</span>: { <span class="s">"self"</span>: <span class="s">"/finance-bc/v1/fx-revaluations/9f3e…"</span> }
 }</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc ok mb-1">ทำไม fx_amount ของ AP invoice เป็นบวก แต่กลายเป็น "ขาดทุน" — ไม่ใช่บั๊ก</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">fx_amount</span> คือ<b>ผลต่างมูลค่า THB ก่อน/หลัง</b> เฉยๆ ไม่บอกทิศทางกำไร/ขาดทุนในตัวเอง —
+            ต้องอ่านคู่กับ <span class="mono text-[12px]">document_type</span>: <span class="mono text-[12px]">RECEIPT</span> (ลูกหนี้) มูลค่าขึ้น = <b>กำไร</b> (มีคนติดหนี้เรามากขึ้น) ·
+            <span class="mono text-[12px]">AP_INVOICE</span> (เจ้าหนี้) มูลค่าขึ้น = <b>ขาดทุน</b> (เราติดหนี้เขามากขึ้น) — ทิศตรงข้ามกันแม้ตัวเลขจะเป็นบวกเหมือนกัน ·
+            FE ที่จะโชว์ "กำไร/ขาดทุน" ต่อบรรทัด ต้องคำนวณเองด้วยกฎนี้ ไม่ใช่ดูแค่เครื่องหมายของ <span class="mono text-[12px]">fx_amount</span>
+          </p>
         </div>
         <div class="rulebox mb-4">
           <div class="rc mb-1">สิ่งที่ทำให้ปิดงวดไม่ผ่าน (409/400)</div>
@@ -1165,6 +1215,17 @@ sequenceDiagram
             (<span class="mono text-[12px]">4301</span> กำไรยังไม่เกิดขึ้นจริง / <span class="mono text-[12px]">5301</span> ขาดทุนยังไม่เกิดขึ้นจริง)
             เพราะเป็นตัวเลขประมาณการที่จะถูกกลับทั้งหมดที่ต้นงวดถัดไป ไม่ใช่กำไร/ขาดทุนที่เกิดขึ้นจริงแบบ <span class="mono text-[12px]">4300</span>/<span class="mono text-[12px]">5300</span> ·
             รายละเอียดกฎทั้งหมด: <a href="srs-p5.html" style="color:var(--teal);text-decoration:underline">SRS P5 — RULE · UNREALISED FX (TFRS 21)</a>
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc ok mb-1">ต่อจากตัวอย่างข้างบน — ปิดงวดสิงหาคมแล้วเกิดอะไรกับ FXR-2026-00001</div>
+          <p class="text-[13.5px]">
+            เมื่อ Finance Manager ปิดงวดสิงหาคม (<span class="mono text-[12px]">POST close-period</span> อีกครั้งด้วย <span class="mono text-[12px]">upto</span> ของเดือนถัดไป)
+            ระบบจะ<b>กลับรายการ <span class="mono text-[12px]">FXR-2026-00001</span> ทั้งหมดให้อัตโนมัติก่อน</b> — <span class="mono text-[12px]">status</span> เปลี่ยนเป็น
+            <span class="mono text-[12px]">REVERSED</span>, <span class="mono text-[12px]">reversed_at</span>/<span class="mono text-[12px]">reversed_by</span> ถูกเติม — <b>FE ไม่ต้องกดอะไรเพิ่ม
+            ไม่มี endpoint ให้กลับรายการเอง</b> เป็นผลข้างเคียงอัตโนมัติของการปิดงวดถัดไปเท่านั้น ·
+            ถ้า <span class="mono text-[12px]">INV-2026-00042</span> ยังไม่ถูกชำระและยังค้างอยู่ 1,000 USD เหมือนเดิม ระบบจะสร้าง run ใหม่
+            (<span class="mono text-[12px]">FXR-2026-00002</span>) ตีราคาจากอัตราที่<b>เอกสารบันทึกไว้จริง (35)</b> ไปยังอัตราปิดงวดสิงหาคม — ไม่ใช่ต่อยอดจาก 36.2 ของเดือนก่อน
           </p>
         </div>
         <div class="rulebox mb-8">
