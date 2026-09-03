@@ -996,12 +996,24 @@ sequenceDiagram
   <span class="s">"remark_th"</span>: <span class="s">"วางบิลรอบสิ้นเดือน"</span>
 }</pre>
         </div>
-        <div class="rulebox mb-8">
+        <div class="rulebox mb-4">
           <div class="rc ok mb-1">ใบวางบิลไม่ลงบัญชี — ตั้งใจ</div>
           <p class="text-[13.5px]">
             หนี้ถูกรับรู้ไปแล้วตอนออกใบกำกับ · ใบวางบิลแค่<b>ทวงเงินที่ค้างอยู่แล้ว</b> ไม่ได้สร้างหนี้ใหม่
             ถ้าลงบัญชีซ้ำลูกหนี้จะเด้งเป็นสองเท่า · ยอดในใบเป็น <b>snapshot ณ วันที่ออก</b> ไม่ใช่ยอดค้างสด —
             ลูกค้าจ่ายทีหลังแล้วใบวางบิลจะยังแสดงยอดเดิม ซึ่งถูกต้องเพราะเป็นเอกสารประวัติ
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">รวมใบต่างสกุลเงินกันได้ — total เป็น THB เสมอ (2026-09-03)</div>
+          <p class="text-[13.5px]">
+            ใบวางบิลไม่มี <span class="mono text-[12px]">currency</span> ของตัวเอง — <span class="mono text-[12px]">receipt_ids</span> ที่ส่งมาไม่ต้องสกุลเดียวกัน
+            และ <span class="mono text-[12px]">total</span>/ยอดต่อบรรทัดเป็น <b>THB เสมอ</b> (บวกยอดค้างของแต่ละใบตรงๆ ไม่แปลงอัตรา) —
+            ตัวเลขถูกต้องเสมอไม่ว่าจะรวมกี่สกุล เพราะไม่เคยไปแตะฝั่ง <span class="mono text-[12px]">raw_*</span> เลย ·
+            เมื่อรวมมากกว่า 1 สกุล จะได้ <span class="mono text-[12px]">meta.warnings</span> กลับมา
+            (<span class="mono text-[12px]">code: BILLING_NOTE_MIXED_CURRENCY</span>) เตือนว่ายอด THB ก้อนเดียวอาจไม่พอสื่อสารกับลูกค้าที่วางบิลเป็นสกุลต่างประเทศ —
+            ไม่ใช่ error ใบวางบิลยังสร้าง/ออกได้ปกติ ·
+            อยากรู้สกุลเงินของแต่ละบรรทัด ขอ <span class="mono text-[12px]">?relations=invoices.receipt</span> แล้วอ่านจาก <span class="mono text-[12px]">invoices[].receipt.currency</span>
           </p>
         </div>
 
