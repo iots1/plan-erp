@@ -1,14 +1,16 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-02 (P3 #9 credit_limit เป็น THB เสมอ — เอกสาร+migration เสร็จ, ยังไม่ commit)**
-> ก่อนหน้า: 2026-09-02 (dotenv tip mitigate เสร็จ — ยังไม่ commit) · `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-03 (P4 #12 unrealised FX/TFRS 21 — เสร็จหมดรวม migration+permissions:sync, กำลัง commit)**
+> ก่อนหน้า: 2026-09-02 (dotenv tip mitigate + P3 #9 credit_limit เป็น THB — **commit `18f6acf`/`21b6bd4` + push แล้ว**) ·
+> `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
-> **P2 audit ปิดครบ 100% แล้ว** — ไม่มีงาน currency/FX ที่ค้างต้องทำต่อ
+> **P2 audit ปิดครบ 100% แล้ว — P3–P4 เหลือแค่ #8, #10, #11 (รู้ไว้ ไม่ใช่บั๊ก ไม่ต้องรีบ)**
 > ✅ **`meta.warnings` + บั๊ก auto-resolved price currency — commit `986b8b1` + push + deploy สำเร็จแล้ว** (deploy run 33639969936, 8 apps reload, ไม่มี migration)
-> ⚠️ **dotenv tip mitigate เสร็จแล้ว (2 จุด: `tracing.ts` + `config.module.ts`) แต่ยังไม่ได้ commit** — ดู §6
-> ⚠️ **P3 #9 credit_limit เป็น THB เสมอ — entity comment + migration (รันแล้ว) + srs-p4.html + api-workflow-guide.html เสร็จหมดแล้วแต่ยังไม่ได้ commit**
+> ✅ **dotenv tip mitigate — commit `18f6acf` + push แล้ว**
+> ✅ **P3 #9 credit_limit เป็น THB เสมอ — commit `21b6bd4` + push แล้ว**
+> ✅ **P4 #12 unrealised FX (TFRS 21) — เสร็จหมด** (migration รันแล้ว, tests/lint/boot-check ผ่านหมด, `permissions:sync` แล้ว) — ดู §2 หัวข้อ **P4 #12**
 
 ## 0 · เปิด session ใหม่ — อ่านตรงไหน
 
@@ -19,18 +21,18 @@
 | ตอนนี้ระบบอยู่สถานะไหน / commit อะไรไปบ้าง | §1 |
 | `meta.warnings` — สถานะล่าสุด | §2 หัวข้อ **`meta.warnings`** (commit+deploy แล้ว) |
 | บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 (commit+deploy แล้ว) |
-| dotenv tip — mitigate ยังไง ทำไปถึงไหน | §6 (แก้เสร็จแล้ว รอ commit) |
-| P3 #9 credit_limit เป็น THB — ทำไปถึงไหน | §2 หัวข้อ **P3 #9** (เสร็จแล้ว รอ commit) |
-| งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **P4** + **งานอื่นที่รู้อยู่** |
-| จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5 |
+| dotenv tip / P3 #9 credit_limit — ทำไปถึงไหน | commit แล้วทั้งคู่ (`18f6acf`/`21b6bd4`) — ดู §2 หัวข้อ **P3 #9** |
+| P4 #12 unrealised FX (TFRS 21) — ทำไปถึงไหน | §2 หัวข้อ **P4 #12** (เสร็จหมด รอ deploy) |
+| งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **งานอื่นที่รู้อยู่** (#8, #10, #11) |
+| จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5/P4#12 |
 | คำสั่งที่ใช้จริง (หลายตัวไม่ตรงกับที่เดาจาก `package.json`) | §3 |
 | เคยพลาดอะไรมาแล้วบ้าง — **อ่านก่อนแตะ migration/deploy** | §4 |
 | จะทำ audit หาช่องโหว่รอบใหม่ | §5 |
 
 **ที่แนะนำถ้าจะทำต่อเลย** (เรียงตามความคุ้ม ทั้งหมดไม่บล็อกอะไร):
-1. **commit + push งาน dotenv tip mitigate + P3 #9** (แก้/test/lint/boot-check/migration ผ่านหมดแล้ว รอแค่ commit) — ดู §6 และ §2 หัวข้อ P3 #9
+1. **deploy P4 #12** (commit+push แล้ว รอแค่ deploy) — มี migration ใหม่ (`erp_finance`) ต้องรันบน production ด้วย
 2. `npm run seed -- --fresh --yes` บน scratch DB — ค้างมาหลายรอบแล้ว (dry-run ผ่าน 15/15) · ⚠️ ดู §4 #10 ก่อน (dev/prod ใช้ DB เดียวกัน — **ห้ามรัน `--fresh` ใส่ DB จริง**)
-3. P4 #12 unrealised FX (TFRS 21 อีกครึ่ง) — **ต้องถามลูกค้าก่อน** ต้องมีตัวขับของตัวเอง คู่กับ `ledger_frozen_upto`
+3. งานอื่นที่รู้อยู่ #8/#10/#11 — ทั้งหมด optional, ไม่ใช่บั๊ก (ดู §2 หัวข้อ **งานอื่นที่รู้อยู่**)
 
 ---
 
@@ -281,9 +283,8 @@ quotation มาตรงๆ (จะรับสืบทอดบั๊ก/ก�
 **เทสต์ที่เพิ่ม (+30):** `currency.util.spec.ts` (15) · FX ใน `payment-gl-posting.service.spec.ts` (7 —
 รวมเคสเศษสตางค์ที่ยืนยันว่า voucher balance) · multi-currency ใน `payment-entries.service.spec.ts` (8)
 
-**ยังไม่ทำ (จงใจ) — unrealised FX**: การตีราคา AR/AP ที่ยังเปิดอยู่ ณ วันสิ้นงวด (TFRS 21 อีกครึ่ง)
-เป็น period-end adjustment ของทั้ง ledger ไม่ใช่ผลของเอกสารใบใดใบหนึ่ง จึงไม่อยู่ใน posting rule ของเอกสาร
-· ถ้าลูกค้าต้องการ ต้องเป็นงานใหม่ที่มีตัวขับของตัวเอง (คู่กับ `finance_settings.ledger_frozen_upto`)
+**unrealised FX (TFRS 21 อีกครึ่ง) — ✅ เสร็จแล้ว 2026-09-03**: การตีราคา AR/AP ที่ยังเปิดอยู่ ณ วันสิ้นงวด
+ผูกกับ `finance_settings.ledger_frozen_upto` ตามที่วางแผนไว้ตรงนี้ — ดู §2 หัวข้อ **P4 #12** ด้านล่างสำหรับรายละเอียด
 
 ---
 
@@ -319,11 +320,11 @@ quotation มาตรงๆ (จะรับสืบทอดบั๊ก/ก�
 | ~~9~~ | ~~P3~~ | ~~**`credit_limit`/`credit_exposure` เป็น THB**~~ ✅ **เสร็จแล้ว 2026-09-02** — ดู §"P3 #9" ด้านล่าง |
 | 10 | P4 | **`item_prices` ไม่มี currency ของตัวเอง** — สืบทอดจาก price list ซึ่ง docblock ระบุไว้แล้วว่าจงใจ (ตรงกับ SAP/Odoo/NetSuite) · **ไม่ใช่บั๊ก** บันทึกไว้เพราะ audit ต้องยืนยัน |
 | 11 | P4 | **เพิ่มสกุลเงินใหม่ = 4 migration** (finance/sales/supplier/inventory) — ราคาของ enum ต่อ database · จงใจ เขียนไว้ใน docblock ของ `Currency` |
-| 12 | P4 | **unrealised FX ยังไม่ทำ** (จากรอบ C3) — period-end revaluation ตาม TFRS 21 อีกครึ่ง เป็นงานของทั้ง ledger ไม่ใช่ของเอกสารใบใด |
+| ~~12~~ | ~~P4~~ | ~~**unrealised FX ยังไม่ทำ**~~ ✅ **เสร็จแล้ว 2026-09-03** — ดู §"P4 #12" ด้านล่าง |
 
 ---
 
-### P3 #9 · credit_limit/credit_exposure เป็น THB เสมอ — เขียนเป็น platform standard ✅ **เสร็จแล้ว 2026-09-02 — ยังไม่ commit**
+### P3 #9 · credit_limit/credit_exposure เป็น THB เสมอ — เขียนเป็น platform standard ✅ **เสร็จแล้ว 2026-09-02 — commit `21b6bd4` + push แล้ว**
 
 งานเอกสารล้วน (ผู้ใช้ยืนยันชัดเจนว่าไม่แตะ logic) — `customers.credit_limit` และ snapshot ทั้งคู่
 (`sales_orders`/`delivery_notes`) ถูกต้องอยู่แล้วในฐานะสกุลบัญชี (ยืนยันจากโค้ดจริง:
@@ -361,6 +362,78 @@ quotation มาตรงๆ (จะรับสืบทอดบั๊ก/ก�
 (รวม migration file ที่ต้อง `--fix` ให้ตรง prettier/`explicit-member-accessibility` ก่อน) ·
 `nest start sales-bc` build จริงผ่าน ไม่มี error · `migration:run:sales` สำเร็จบน DB จริง (dev/prod
 ใช้ร่วมกัน — ดู §4 #10) แล้ว verify `migration:generate:sales` = `No changes` อีกครั้ง
+
+---
+
+### P4 #12 · unrealised FX (TFRS 21) — period-end retranslation ✅ **เสร็จแล้ว 2026-09-03**
+
+การตีราคา AR/AP ต่างสกุลที่ยังเปิดอยู่ ณ วันปิดงวดใหม่ — ครึ่งที่ C3 (realised FX ตอนตัดชำระ) จงใจ
+เว้นไว้เพราะเป็น period-end adjustment ของทั้ง ledger ไม่ใช่ผลของเอกสารใบใดใบหนึ่ง ผู้ใช้ยืนยัน 4
+ทางเลือกออกแบบก่อนเริ่ม (ทั้งหมดเป็นตัวเลือกที่แนะนำ):
+
+- **ตัวขับ**: ผูกกับ `POST /finance-settings/close-period` — ปิดงวดแล้วต้องตีราคาเสมอ ไม่มี endpoint
+  แยกที่ปิดงวดโดยไม่ตีราคา (กันไม่ให้ operator ลืมตีราคาบางงวด)
+- **อัตราปิดงวด**: ผู้ใช้กรอกเองต่อสกุลเงิน (`closing_rates: [{currency, rate}]`) เหมือนที่ผู้ใช้กรอก
+  อัตราจริงตอนตัดชำระใน C3 — ไม่ lookup จากที่ไหน
+- **บัญชี GL**: แยกบัญชีใหม่ `4301`/`5301` (unrealised gain/loss) ไม่ reuse `4300`/`5300` ของ
+  realised — เพราะเป็นตัวเลขประมาณการที่จะถูกกลับทั้งหมดที่ต้นงวดถัดไป ผสมกับกำไร/ขาดทุนจริงจะทำให้
+  งบไม่สะท้อนว่าส่วนไหนคือเงินสดจริง
+- **การกลับรายการ**: auto-reverse ทั้ง run ก่อนหน้าที่ยัง `POSTED` ณ ต้นงวดถัดไป (ก่อนตีราคารอบใหม่
+  เสมอ) แล้วคำนวณสดจากอัตราที่เอกสารบันทึกไว้จริง — ไม่ต่อยอดจากอัตราปิดงวดคราวก่อน (ถูกต้องเพราะ
+  ledger ถูกกลับกลับไปที่มูลค่าตามบัญชีเดิมก่อนคำนวณรอบใหม่เสมอ)
+
+**สถาปัตยกรรม — โมดูลใหม่ `fx-revaluation`** (`apps/finance-bc/src/modules/fx-revaluation/`):
+- `FxRevaluation`/`FxRevaluationLine` (header+line, ตาม pattern `SubmittableDocumentEntity`/
+  `DocumentLineItemEntity`) + `FxRevaluationNumberCounter` (`FXR-{YYYY}-{00001}`)
+- `FxRevaluationsService.closePeriodWithRevaluation()` — ทำทั้งหมดใน 1 transaction: reverse run
+  เก่า → หา open exposure (`ReceiptsService.findOpenForeignCurrencyReceipts()` /
+  `APInvoicesService.findOpenForeignCurrencyInvoices()`, เมธอดใหม่ทั้งคู่) → เช็ค `closing_rates`
+  ครบทุกสกุล (ไม่ครบ = 400 ระบุชื่อสกุลที่ขาด) → โพสต์ 1 journal ต่อ 1 เอกสาร (ไม่ใช่ 1 journal ต่อ
+  ทั้ง run — `ref_doc_id` ของแต่ละบรรทัดคือ `fx_revaluation_lines.id` ของตัวเอง กัน `reverse()` ปน
+  กับ issue/cancel ของเอกสารต้นทาง) → `FinanceSettingsService.applyPeriodLock()` เลื่อนล็อก
+- **ทำไมไม่ใส่ไว้ใน `FinanceSettingModule`**: `FinanceSettingModule` ต้อง "depend on nothing else"
+  เพราะ `GeneralLedgerModule` import กลับมาแล้ว — ถ้าให้ `FinanceSettingsService` เรียกกลับหา
+  `FxRevaluationsService` จะกลายเป็น cycle (`FinanceSettingModule → FxRevaluationModule →
+  GeneralLedgerModule → FinanceSettingModule`) แก้ด้วยการย้าย route `POST
+  /finance-settings/close-period` เองไปอยู่ใน `fx-revaluation` module แทน (`ClosePeriodController`,
+  ยังคง mount ที่ `finance-settings` เหมือนเดิม) — ตรงกับแพทเทิร์น "reconsider where the route
+  lives" ใน root CLAUDE.md (เหมือน `ReorderLevelsController`) · `FinanceSettingsService` ได้เมธอด
+  ใหม่ `applyPeriodLock(upto, manager, currentUser)` ให้ orchestrator เรียกกลับแทน `closePeriod()`
+  เดิม (ลบทิ้ง)
+- debit/credit ของบรรทัดควบคุม (AR/AP) คิดตามฝั่งบัญชี ไม่ใช่ทิศทางอัตราเฉยๆ — AR (debit-normal)
+  มูลค่าขึ้น = debit เพิ่ม = กำไร, AP (credit-normal) มูลค่าขึ้น = credit เพิ่ม = ขาดทุน (ตรวจมือครบ
+  4 combination: AR gain/loss, AP gain/loss)
+- `resolveUnrealisedFxDifference()` ใหม่ใน `currency.util.ts` — คู่กับ `resolveRealisedFxDifference()`
+  เดิมของ C3 แต่เทียบ valuation 2 จุดของ**ยอดที่ยังไม่ตัดชำระ** แทนยอดที่ตัดชำระจริง
+
+**migration** `1788394702124-AddFxRevaluation.ts` (`erp_finance`) — สร้าง 3 ตารางใหม่
+(`fx_revaluations`/`fx_revaluation_lines`/`fx_revaluation_number_counters`) + widen
+`ledger_entries.account` (+`4301`/`5301`) และ `.voucher_type` (+`FX_REVALUATION`) ด้วย
+enum-widen pattern ปลอดภัย (rename→create→`ALTER COLUMN...USING`→drop เดิม ไม่ใช่ DROP+ADD
+COLUMN) — **รันแล้วบน DB จริง** (dev/prod ใช้ร่วมกัน — ดู §4 #10) แล้ว verify
+`migration:generate:finance` = `No changes`
+
+**เทสต์ที่เพิ่ม**: `resolveUnrealisedFxDifference` ใน `currency.util.spec.ts` (4) ·
+`fx-revaluations.service.spec.ts` ใหม่ทั้งไฟล์ (12 — ครอบ missing-rate rejection, reversal-then-post
+ordering, debit/credit ครบ 4 combination, zero-fx-amount filtering, no-exposure-skips-run) ·
+`findOpenForeignCurrencyReceipts`/`findOpenForeignCurrencyInvoices` ใน spec เดิมของ
+receipts/ap-invoices (9 รวมกัน) — พบและแก้ spec เก่าที่ค้าง (`finance-settings.service.spec.ts`
+เทสต์ `closePeriod` เดิมที่ถูกลบไปแล้ว ต้องแก้เป็น `applyPeriodLock`)
+
+**เอกสาร**: `srs-p5.html` — rulebox ใหม่ `RULE · UNREALISED FX (TFRS 21)` + แก้ rulebox
+`MULTI-CURRENCY SETTLEMENT & REALISED FX` เดิมที่เคยเขียนว่า "ยังไม่ทำ" ให้ชี้มาที่ rulebox ใหม่ ·
+`api-workflow-guide.html` (C6) — เพิ่ม `closing_rates` ใน request body, endpoint
+`GET /fx-revaluations(/:id)` ใหม่, rulebox อธิบาย flow auto-reverse-then-revalue — render-check
+(tag-balance) ผ่านทั้งคู่
+
+**permission ใหม่**: `fx_revaluation:view` — sync เข้า `erp_iam` แล้วผ่าน `npm run permissions:sync`
+(scan เจอ 1 permission ใหม่ตรงตามคาด ไม่มีอะไรหลุด/เปลี่ยนโดยไม่ตั้งใจ)
+
+**ตรวจแล้ว**: 1525/1525 test ผ่าน (จากเดิม 1500 — เพิ่ม test ใหม่ทั้งหมด 25 ไม่มีของเดิมหาย) ·
+eslint 0/0 ทั้ง repo (รวม migration/spec ใหม่ที่ต้อง `--fix` ก่อน) · `nx build finance-bc` /
+`nx serve finance-bc` build+boot จริงผ่าน ไม่มี error ต่อ DB จริงหลัง migrate · `GET
+/fx-revaluations` ตอบ 401 (ยังไม่ auth) ไม่ใช่ 500 — ยืนยัน routing/DI/DB ต่อกันจริง ·
+`migration:run:finance` สำเร็จบน DB จริงแล้ว verify `migration:generate:finance` = `No changes`
 
 ---
 
