@@ -1,7 +1,7 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-03 (audit log กลาง — ขอบเขตเริ่มเล็ก เสร็จหมด รอ commit)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-03 (audit log กลาง — ขอบเขตเริ่มเล็ก เสร็จหมด + commit + push + deploy + E2E ผ่าน)**
 > ก่อนหน้า: 2026-09-03 (P4 #12 unrealised FX/TFRS 21 — **commit `6254aee`+`2483cf4` + push + deploy แล้ว**) ·
 > 2026-09-02 (dotenv tip mitigate + P3 #9 credit_limit เป็น THB — **commit `18f6acf`/`21b6bd4` + push แล้ว**) ·
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
@@ -12,7 +12,7 @@
 > ✅ **dotenv tip mitigate — commit `18f6acf` + push แล้ว**
 > ✅ **P3 #9 credit_limit เป็น THB เสมอ — commit `21b6bd4` + push แล้ว**
 > ✅ **P4 #12 unrealised FX (TFRS 21) — เสร็จหมด + deploy แล้ว** (migration รันแล้ว, tests/lint/boot-check ผ่านหมด, `permissions:sync` + grant migration แล้ว, E2E จริงบน production ผ่าน) — ดู §2 หัวข้อ **P4 #12**
-> ⚠️ **audit log กลาง (ขอบเขตเริ่มเล็ก) — เสร็จหมดแล้วแต่ยังไม่ได้ commit** — ดู §2 หัวข้อ **audit log กลาง**
+> ✅ **audit log กลาง (ขอบเขตเริ่มเล็ก) — เสร็จหมด + deploy แล้ว** (commit `92da11d`, grant migration เขียนพร้อมกันตั้งแต่แรก, E2E บน production ผ่านรอบแรกไม่มี 403) — ดู §2 หัวข้อ **audit log กลาง**
 
 ## 0 · เปิด session ใหม่ — อ่านตรงไหน
 
@@ -705,8 +705,15 @@ soft-deleted ด้วย `withDeleted()` — ทิ้งไว้เป็น�
 ของตัวเองเช่นกัน) · eslint 0/0 ทั้ง repo (ts + vanilla JS หน้า admin) · `nx build iam` build จริง
 ผ่าน (หลังแก้ TS1272) · เสิร์ฟหน้าจริงบน port ทดสอบแล้วเช็ค HTML ที่ render ออกมา (tag-balance ผ่าน,
 element id ทั้ง 3 แท็บครบ) และ bundle.js ที่ esbuild ปั้นออกมา syntax ผ่าน `node --check` ·
-`migration:run:iam` สำเร็จบน DB จริงแล้ว verify `migration:generate:iam` = `No changes` ·
-**ยังไม่ได้ deploy** — โค้ดยัง push ไม่เสร็จตอนเขียนบรรทัดนี้
+`migration:run:iam` สำเร็จบน DB จริงแล้ว verify `migration:generate:iam` = `No changes`
+
+**commit `92da11d` + push + deploy สำเร็จแล้ว** · **E2E บน production จริง
+(`erp-api.iotechsoft.com`) ผ่านตั้งแต่รอบแรก** — ต่างจาก P4 #12 ที่เจอ 403 รอบแรกเพราะลืม grant
+migration, รอบนี้เขียน grant migration ไปพร้อมกันตั้งแต่แรกจึงไม่เจอปัญหาเดิมซ้ำ: login จริงด้วย
+superadmin → `GET /role-policy-audit-logs` ได้ `200` พร้อมข้อมูลจริง 10 แถว →
+`GET /user-role-audit-logs` ได้ `200` พร้อมข้อมูลจริง 5 แถว → หน้า
+`/iam/v1/views/audit-logs` โหลดได้ `200` มีทั้ง 3 แท็บ (`auditTab-login`,
+`auditTab-role-policy`, `auditTab-user-role`) → `bundle.js` โหลดได้ `200`
 
 ---
 
