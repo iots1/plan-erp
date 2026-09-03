@@ -429,10 +429,25 @@ receipts/ap-invoices (9 รวมกัน) — พบและแก้ spec �
 **permission ใหม่**: `fx_revaluation:view` — sync เข้า `erp_iam` แล้วผ่าน `npm run permissions:sync`
 (scan เจอ 1 permission ใหม่ตรงตามคาด ไม่มีอะไรหลุด/เปลี่ยนโดยไม่ตั้งใจ)
 
+**บั๊กที่เจอตอน E2E บน production (แก้แล้ว)**: `permissions:sync` sync เข้า catalog อย่างเดียว
+ไม่เคย grant ให้ policy ไหนใช้ได้จริง (ตรงกับที่ root `CLAUDE.md` เขียนเตือนไว้อยู่แล้วว่า "ยังต้องมี
+grant migration แยก") — ตอนแรกลืมเขียน migration นี้ ทำให้แม้แต่ `superadmin` เองก็โดน
+`403 Missing required permission: fx_revaluation:view` จริงบน production ตอนยิง
+`GET /fx-revaluations` ทดสอบ (ส่วน `period:*` ไม่กระทบเพราะ grant ไว้แล้วตั้งแต่รอบก่อน) · แก้ด้วย
+migration `1788419843315-GrantFxRevaluationPermissionsToMockPolicies.ts` (`erp_iam`, mirror
+`GrantPeriodPermissionsToMockPolicies`) — **รันแล้วบน DB จริง** ยืนยันด้วยการ login ใหม่ (JWT
+permissions resolve ตอน login เท่านั้น ต้องได้ token ใหม่ถึงจะเห็นสิทธิ์ใหม่) แล้วยิง
+`GET /fx-revaluations` ซ้ำ ได้ `200` list ว่าง (ถูกต้อง — ยังไม่มีใครปิดงวดจริงเลย)
+
 **ตรวจแล้ว**: 1525/1525 test ผ่าน (จากเดิม 1500 — เพิ่ม test ใหม่ทั้งหมด 25 ไม่มีของเดิมหาย) ·
 eslint 0/0 ทั้ง repo (รวม migration/spec ใหม่ที่ต้อง `--fix` ก่อน) · `nx build finance-bc` /
-`nx serve finance-bc` build+boot จริงผ่าน ไม่มี error ต่อ DB จริงหลัง migrate · `GET
-/fx-revaluations` ตอบ 401 (ยังไม่ auth) ไม่ใช่ 500 — ยืนยัน routing/DI/DB ต่อกันจริง ·
+`nx serve finance-bc` build+boot จริงผ่าน ไม่มี error ต่อ DB จริงหลัง migrate ·
+**E2E บน production จริง (`erp-api.iotechsoft.com`)**: `GET /fx-revaluations` /
+`GET /finance-settings` / `POST /finance-settings/close-period` ตอบ `401` ตอนไม่ auth (ยืนยัน
+routing/deploy จริง) → login จริงด้วย superadmin → `GET /finance-settings` ได้ `200` ข้อมูลจริง →
+`GET /fx-revaluations` เจอ `403` ตามบั๊กด้านบน → แก้แล้วได้ `200` list ว่างถูกต้อง ·
+**ไม่ได้ยิง `POST /finance-settings/close-period` จริงบน production** — เป็น one-way ratchet ที่ปิด
+งวดบัญชีจริง จึงหยุดแค่ยืนยัน routing/auth (401) ไม่ทำ state-changing test บนข้อมูลจริง ·
 `migration:run:finance` สำเร็จบน DB จริงแล้ว verify `migration:generate:finance` = `No changes`
 
 ---
