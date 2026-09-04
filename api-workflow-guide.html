@@ -172,6 +172,7 @@ flowchart LR
               <tr><td class="mono">C5</td><td>กำหนดงวดชำระ</td><td>AR Clerk</td><td>ไม่มีสถานะ (แทนที่ทั้งชุด)</td></tr>
               <tr><td class="mono">C6</td><td>ปิดงวดบัญชี</td><td>Finance Manager</td><td>ไม่มีสถานะ (one-way ratchet)</td></tr>
               <tr><td class="mono">C7</td><td>รายงานลูกหนี้/เจ้าหนี้ค้างชำระ</td><td>AR / AP Clerk · Finance Manager</td><td>อ่านอย่างเดียว</td></tr>
+              <tr><td class="mono">C8</td><td>ยื่นภาษีมูลค่าเพิ่ม (ภ.พ.30)</td><td>Accountant · Finance Manager</td><td>อ่านอย่างเดียว (v1 — คำนวณสด)</td></tr>
               <tr><td class="mono">D1</td><td>โอน / เบิก / แปรรูป</td><td>Warehouse Staff</td><td>Stock Entry · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">D2</td><td>ปรับยอดสต็อก</td><td>Warehouse Manager</td><td>Stock Adjustment · DRAFT→<b>PENDING_APPROVAL</b>→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">E1</td><td>รายงานสต็อก</td><td>Warehouse Manager</td><td>อ่านอย่างเดียว</td></tr>
@@ -203,9 +204,9 @@ flowchart LR
               <tr><td><b>Warehouse Manager</b><br><span class="mono text-[11px]">ผู้จัดการคลัง</span></td><td class="mono text-[12px]">D2 · E1</td><td class="mono text-[11.5px]">stock_adjustment:* · stock_balance:view · stock_ledger:view · expiry_alert:view · stock_setting:*</td></tr>
               <tr><td><b>Sales Rep</b><br><span class="mono text-[11px]">พนักงานขาย</span></td><td class="mono text-[12px]">B1</td><td class="mono text-[11.5px]">customer:* · quotation:create/view/update/send/cancel</td></tr>
               <tr><td><b>Sales Manager</b><br><span class="mono text-[11px]">ผู้จัดการขาย</span></td><td class="mono text-[12px]">B2</td><td class="mono text-[11.5px]">quotation:approve · sales_order:create/view/cancel/<b>approve</b></td></tr>
-              <tr><td><b>Accountant</b><br><span class="mono text-[11px]">นักบัญชี</span></td><td class="mono text-[12px]">C1 · C2 · E2</td><td class="mono text-[11.5px]">receipt:* · tax_config:* · ledger_entry:view · trial_balance:view · cogs_entry:view · period:view</td></tr>
+              <tr><td><b>Accountant</b><br><span class="mono text-[11px]">นักบัญชี</span></td><td class="mono text-[12px]">C1 · C2 · C8 · E2</td><td class="mono text-[11.5px]">receipt:* · tax_config:* · ledger_entry:view · trial_balance:view · cogs_entry:view · period:view · vat_return:view</td></tr>
               <tr><td><b>AR / AP Clerk</b><br><span class="mono text-[11px]">เจ้าหน้าที่การเงิน</span></td><td class="mono text-[12px]">A5 · C3 · C4 · C5 · C7</td><td class="mono text-[11.5px]">billing_note:* · payment_entry:* · payment_schedule:* · ap_invoice:*</td></tr>
-              <tr><td><b>Finance Manager</b><br><span class="mono text-[11px]">ผู้จัดการการเงิน</span></td><td class="mono text-[12px]">C6 · E2</td><td class="mono text-[11.5px]">period:view/close · report:view</td></tr>
+              <tr><td><b>Finance Manager</b><br><span class="mono text-[11px]">ผู้จัดการการเงิน</span></td><td class="mono text-[12px]">C6 · C8 · E2</td><td class="mono text-[11.5px]">period:view/close · report:view · vat_return:view</td></tr>
               <tr><td><b>Executive</b><br><span class="mono text-[11px]">ผู้บริหาร</span></td><td class="mono text-[12px]">E1 · E2</td><td class="mono text-[11.5px]">*:view (อ่านอย่างเดียวทุก BC)</td></tr>
               <tr><td><b>Security / User Admin</b><br><span class="mono text-[11px]">ผู้ดูแลระบบ</span></td><td class="mono text-[12px]">—</td><td class="mono text-[11.5px]">user:* · role:* · policy:* · access_key:* · permission_sync:*</td></tr>
             </tbody>
@@ -1313,6 +1314,58 @@ sequenceDiagram
             <span class="mono text-[12px]">GET /receipts/{id}/payment-schedules</span> ซึ่งมี <span class="mono text-[12px]">outstanding</span>/<span class="mono text-[12px]">is_overdue</span> ของแต่ละงวดอยู่แล้ว
           </p>
         </div>
+
+        <h3 class="display text-xl mt-10 mb-4">C8 · ยื่นภาษีมูลค่าเพิ่ม (ภ.พ.30) <span class="mono text-[13px] text-[var(--muted)]">— Accountant · Finance Manager</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          เพิ่มเข้ามา 2026-09-04 (v1 — คำนวณอย่างเดียว) — ภาษีขายหักภาษีซื้อของเดือนนั้น สำหรับยื่นแบบ
+          แสดงรายการภาษีมูลค่าเพิ่มกับกรมสรรพากรภายในวันที่ 15 ของเดือนถัดไป (e-Filing ขยายได้อีก 8 วัน) ·
+          <b>ระบบนี้ไม่ได้ยื่นแทน</b> — endpoint นี้แค่คำนวณตัวเลขให้ ผู้ใช้ยังต้องนำไปกรอกแบบ/ยื่นผ่านระบบ
+          ของกรมสรรพากรเอง
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/vat-returns?year=&amp;month=</td><td class="mono text-[11px]">vat_return:view</td><td>ภาษีขาย/ภาษีซื้อ/ยอดสุทธิของเดือนนั้น</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// GET /finance-bc/v1/vat-returns?year=2026&amp;month=8</span>
+<span class="c">// year 2000-2200 · month 1-12 — ค่าอื่นได้ 400002 ก่อนแตะฐานข้อมูลเลย</span>
+{
+  <span class="s">"year"</span>: <span class="t">2026</span>, <span class="s">"month"</span>: <span class="t">8</span>,
+  <span class="s">"sales_standard_vat_price"</span>:     <span class="t">600</span>,   <span class="c">// ยอดขาย standard-rated (ฐานภาษี ไม่รวม VAT)</span>
+  <span class="s">"sales_zero_vat_price"</span>:         <span class="t">0</span>,
+  <span class="s">"sales_exempt_vat_price"</span>:       <span class="t">360.8</span>,
+  <span class="s">"output_vat"</span>:                   <span class="t">42</span>,     <span class="c">// ภาษีขาย</span>
+  <span class="s">"purchases_standard_vat_price"</span>: <span class="t">0</span>,
+  <span class="s">"purchases_zero_vat_price"</span>:     <span class="t">0</span>,
+  <span class="s">"purchases_exempt_vat_price"</span>:   <span class="t">0</span>,
+  <span class="s">"input_vat"</span>:                    <span class="t">0</span>,      <span class="c">// ภาษีซื้อ</span>
+  <span class="s">"net_payable"</span>:                  <span class="t">42</span>      <span class="c">// output_vat − input_vat · ลบ = ชำระเกิน</span>
+}</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">คำนวณสดทุกครั้ง — ไม่ใช่เอกสารที่ "ยื่นแล้ว" เก็บสถานะได้</div>
+          <p class="text-[13.5px]">
+            คำนวณใหม่จาก <span class="mono text-[12px]">receipts</span>/<span class="mono text-[12px]">ap_invoices</span> ทุกครั้งที่เรียก —
+            เรียกซ้ำได้ไม่จำกัดและไม่มีผลข้างเคียง แต่ก็แปลว่า<b>ไม่มีที่เก็บ "ตัวเลขที่เคยยื่นจริง" ไว้</b> ถ้ามีการแก้เอกสาร
+            ย้อนหลัง (เช่น เพิ่มใบลดหนี้เดือนก่อน) เรียกซ้ำจะได้ตัวเลขใหม่ที่ต่างจากที่เคยยื่นไปแล้ว —
+            หน้าจอที่ใช้ endpoint นี้ควร<b>บันทึก/พิมพ์ตัวเลขไว้เอง ณ เวลาที่ยื่นจริง</b> (ยังไม่มี state ฝั่ง backend ให้) ·
+            เดือนตัดตามปฏิทิน Asia/Bangkok ของ <span class="mono text-[12px]">document_date</span> ไม่ใช่วันที่บันทึกเข้าระบบ
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ใบลดหนี้หักออกเสมอ แม้ตัวเลขจะเก็บเป็นค่าบวก</div>
+          <p class="text-[13.5px]">
+            ใบลดหนี้ (<span class="mono text-[12px]">CREDIT_NOTE</span>) ถูกหักออกจากยอดของฝั่งนั้นเสมอ — ทิศทางมาจาก
+            <span class="mono text-[12px]">document_type</span> ไม่ใช่เครื่องหมายตัวเลข (แถวของมันเก็บเป็นค่าบวกเหมือนเอกสารอื่น) ·
+            ใบเพิ่มหนี้ (<span class="mono text-[12px]">DEBIT_NOTE</span> — มีแค่ฝั่งขาย) บวกเข้าปกติไม่ต้องพลิกเครื่องหมาย ·
+            <b>ยังไม่รองรับ</b>: ยอดภาษีซื้อยกไปเดือนถัดไป, แยกใบกำกับเต็มรูป/อย่างย่อสำหรับสิทธิ์เครดิตภาษีซื้อ,
+            ฟอร์มพิมพ์ 16 ช่องจริง (รอ print engine) — ดู <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §4
+          </p>
+        </div>
       </section>
 
       <!-- ============ 07 FLOW D ============ -->
@@ -1453,7 +1506,6 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td><td>ต้นทุนขายต่อล็อต</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td><td>กำไรขั้นต้นต่อล็อต · <b>ติดลบได้</b> เมื่อขายต่ำกว่าทุน</td></tr>
               <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/profit-loss-reconciliations</td><td class="mono text-[11px]">profit_loss_record:reconcile</td><td>เติมรายการกำไรที่ค้าง (ตอน sales-bc ไม่ตอบ)</td></tr>
-              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/vat-returns?year=&amp;month=</td><td class="mono text-[11px]">vat_return:view</td><td>ภ.พ.30 — ภาษีขายหักภาษีซื้อของเดือนนั้น (v1: คำนวณสดทุกครั้ง ไม่มี state "ยื่นแล้ว")</td></tr>
             </tbody>
           </table>
         </div>
@@ -1464,16 +1516,6 @@ sequenceDiagram
             ถ้าตอนนั้นเรียกไม่ได้ ระบบจะ<b>ลงต้นทุนไว้ก่อนแล้วเว้นกำไรไว้</b> ·
             หน้าจอควรมีปุ่ม “เติมรายการกำไรที่ค้าง” ที่ยิงไป <span class="mono text-[12px]">POST /profit-loss-reconciliations</span>
             ซึ่งเรียกซ้ำได้ไม่จำกัด
-          </p>
-        </div>
-        <div class="rulebox mb-8">
-          <div class="rc mb-1">ภ.พ.30 — คำนวณสด ไม่ใช่เอกสารที่ "ยื่น" ได้ (เพิ่ม 2026-09-04)</div>
-          <p class="text-[13.5px]">
-            <span class="mono text-[12px]">GET /vat-returns?year=2026&amp;month=9</span> คำนวณใหม่จาก <span class="mono text-[12px]">receipts</span>/<span class="mono text-[12px]">ap_invoices</span>
-            ทุกครั้งที่เรียก — เรียกซ้ำได้ไม่จำกัดและไม่มีผลข้างเคียง แต่ก็แปลว่า<b>ไม่มีที่เก็บ "ตัวเลขที่เคยยื่นจริง" ไว้</b>
-            ถ้ามีการแก้เอกสารย้อนหลัง (เช่น เพิ่มใบลดหนี้เดือนก่อน) เรียกซ้ำจะได้ตัวเลขใหม่ที่ต่างจากที่เคยยื่นไปแล้ว —
-            หน้าจอที่ใช้ endpoint นี้ควรมีวิธีบันทึก/พิมพ์ตัวเลขไว้ ณ เวลาที่ยื่นจริงเอง (ยังไม่มี state ฝั่ง backend ให้)
-            · เดือนตัดตามปฏิทิน Asia/Bangkok ของ <span class="mono text-[12px]">document_date</span> ไม่ใช่วันที่บันทึกเข้าระบบ
           </p>
         </div>
 
