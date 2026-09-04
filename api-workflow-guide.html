@@ -1453,6 +1453,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td><td>ต้นทุนขายต่อล็อต</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td><td>กำไรขั้นต้นต่อล็อต · <b>ติดลบได้</b> เมื่อขายต่ำกว่าทุน</td></tr>
               <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/profit-loss-reconciliations</td><td class="mono text-[11px]">profit_loss_record:reconcile</td><td>เติมรายการกำไรที่ค้าง (ตอน sales-bc ไม่ตอบ)</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/vat-returns?year=&amp;month=</td><td class="mono text-[11px]">vat_return:view</td><td>ภ.พ.30 — ภาษีขายหักภาษีซื้อของเดือนนั้น (v1: คำนวณสดทุกครั้ง ไม่มี state "ยื่นแล้ว")</td></tr>
             </tbody>
           </table>
         </div>
@@ -1463,6 +1464,16 @@ sequenceDiagram
             ถ้าตอนนั้นเรียกไม่ได้ ระบบจะ<b>ลงต้นทุนไว้ก่อนแล้วเว้นกำไรไว้</b> ·
             หน้าจอควรมีปุ่ม “เติมรายการกำไรที่ค้าง” ที่ยิงไป <span class="mono text-[12px]">POST /profit-loss-reconciliations</span>
             ซึ่งเรียกซ้ำได้ไม่จำกัด
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ภ.พ.30 — คำนวณสด ไม่ใช่เอกสารที่ "ยื่น" ได้ (เพิ่ม 2026-09-04)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">GET /vat-returns?year=2026&amp;month=9</span> คำนวณใหม่จาก <span class="mono text-[12px]">receipts</span>/<span class="mono text-[12px]">ap_invoices</span>
+            ทุกครั้งที่เรียก — เรียกซ้ำได้ไม่จำกัดและไม่มีผลข้างเคียง แต่ก็แปลว่า<b>ไม่มีที่เก็บ "ตัวเลขที่เคยยื่นจริง" ไว้</b>
+            ถ้ามีการแก้เอกสารย้อนหลัง (เช่น เพิ่มใบลดหนี้เดือนก่อน) เรียกซ้ำจะได้ตัวเลขใหม่ที่ต่างจากที่เคยยื่นไปแล้ว —
+            หน้าจอที่ใช้ endpoint นี้ควรมีวิธีบันทึก/พิมพ์ตัวเลขไว้ ณ เวลาที่ยื่นจริงเอง (ยังไม่มี state ฝั่ง backend ให้)
+            · เดือนตัดตามปฏิทิน Asia/Bangkok ของ <span class="mono text-[12px]">document_date</span> ไม่ใช่วันที่บันทึกเข้าระบบ
           </p>
         </div>
 
@@ -1863,7 +1874,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 55 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 56 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1925,6 +1936,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns</td><td class="mono text-[11px]">vat_return:view</td></tr>
             </tbody>
           </table>
         </div>
@@ -1952,7 +1964,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 308 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 309 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->
