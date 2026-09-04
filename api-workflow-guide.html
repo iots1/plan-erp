@@ -272,10 +272,21 @@ flowchart LR
               <tr><td class="mono">POST</td><td class="mono text-[12px]">/auth/v1/auth/logout</td><td>—</td><td>ออกจากระบบ (เพิกถอน session ทันที)</td></tr>
               <tr><td class="mono">GET</td><td class="mono text-[12px]">/auth/v1/auth/me</td><td>—</td><td>ข้อมูลผู้ใช้ปัจจุบัน + สิทธิ์</td></tr>
               <tr><td class="mono">POST</td><td class="mono text-[12px]">/auth/v1/auth/change-password</td><td>—</td><td>เปลี่ยนรหัสผ่านตัวเอง</td></tr>
+              <tr><td class="mono">POST</td><td class="mono text-[12px]">/auth/v1/auth/credentials</td><td class="mono text-[11.5px]">user_account:set_password</td><td>Admin ตั้งรหัสผ่านให้ผู้ใช้คนอื่นโดยตรง (คนละ flow กับรีเซ็ตแบบสุ่มที่ iam ทำตอนสร้างผู้ใช้ใหม่)</td></tr>
               <tr><td class="mono">GET</td><td class="mono text-[12px]">/auth/v1/auth/sessions</td><td class="mono text-[11.5px]">session:read</td><td>ใครออนไลน์อยู่บ้าง</td></tr>
               <tr><td class="mono">GET</td><td class="mono text-[12px]">/auth/v1/auth/login-histories</td><td class="mono text-[11.5px]">login_history:read</td><td>ประวัติการเข้าสู่ระบบ</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">รหัสผ่านต้อง ≥ 8 ตัวอักษร — บังคับแล้วทั้งสอง endpoint (2026-09-04)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">POST /auth/v1/auth/credentials</span> เดิมรับรหัสผ่านสตริงอะไรก็ได้
+            (แม้ 1 ตัวอักษร) ตอนนี้บังคับ <b>อย่างน้อย 8 ตัวอักษร</b> เหมือน
+            <span class="mono text-[12px]">change-password</span> ที่มีกฎนี้อยู่แล้ว —
+            FE ที่มีฟอร์มตั้งรหัสผ่านให้ผู้ใช้อื่นต้องเช็คความยาวก่อนส่ง ไม่งั้นจะโดน
+            <span class="mono text-[12px]">400001</span> กลับมา
+          </p>
         </div>
 
         <h3 class="display text-xl mt-10 mb-4">3.3 · รูปแบบ Response ที่ได้เสมอ</h3>
@@ -1461,12 +1472,23 @@ sequenceDiagram
             <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/print-templates</td><td class="mono text-[11px]">report:print_template_read</td><td>รายการเทมเพลต</td></tr>
-              <tr><td class="mono text-[11.5px]">POST /report-bc/v1/print-templates/{id}/render</td><td class="mono text-[11px]">report:print_template_render</td><td><b>สร้าง PDF</b> จากข้อมูลเอกสาร</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /report-bc/v1/print-templates/{id}/render</td><td class="mono text-[11px]">report:print_template_render</td><td><b>สร้าง PDF</b> จาก <span class="mono text-[12px]">params</span> ที่ผู้เรียกส่งมาเอง</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_read</td><td>ประเภทเอกสาร + รูปแบบเลขรัน</td></tr>
               <tr><td class="mono text-[11.5px]">POST /report-bc/v1/document-types/{id}/running-number/next</td><td class="mono text-[11px]">report:document_type_running_number_generate</td><td>ขอเลขรันถัดไป</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/print-template-histories</td><td class="mono text-[11px]">report:print_template_history_read</td><td>ประวัติเวอร์ชันเทมเพลต</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">render ไม่รู้จักเอกสารของระบบนี้เลย — FE ต้องประกอบ params เอง (ตรวจซ้ำ 2026-09-04)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">POST /print-templates/{id}/render</span> รับ <span class="mono text-[12px]">params</span> เป็น key-value ล้วน ๆ ที่ผู้เรียกส่งมาเอง —
+            <b>ไม่มีทางส่ง <span class="mono text-[12px]">receipt_id</span>/<span class="mono text-[12px]">quotation_id</span>/<span class="mono text-[12px]">ap_invoice_id</span> แล้วให้ backend ไปดึงข้อมูลจริงมาแทน</b>
+            ไม่ว่าจะเรียก endpoint ไหนในหน้านี้ก็ตาม — FE ต้อง <span class="mono text-[12px]">GET</span> เอกสารจริงจาก BC เจ้าของก่อน (เช่น
+            <span class="mono text-[12px]">GET /finance-bc/v1/receipts/{id}</span>) แล้วประกอบฟิลด์เองเป็น <span class="mono text-[12px]">params</span> ก่อนเรียก render ·
+            เทมเพลต <span class="mono text-[12px]">PAYMENT_RECEIPT</span> ที่มีอยู่ตอนนี้เป็นตัวอย่างที่ยังผูกกับ mock data คนละโครงสร้างกับ <span class="mono text-[12px]">Receipt</span> ของระบบนี้ —
+            ยังพิมพ์ใบเสร็จ/ใบกำกับ/ใบเสนอราคา/ใบสั่งซื้อจริงของระบบนี้ผ่าน API ไม่ได้เลยสักใบ (backlog เต็ม: <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §1)
+          </p>
         </div>
       </section>
 
@@ -1515,6 +1537,18 @@ sequenceDiagram
             ความซ้ำจึงอยู่ที่ที่เก็บ ไม่ใช่ที่ขั้นตอนการทำงานของผู้ใช้<br>
             ค่าเริ่มต้นทุก BC = <b>20</b> ซึ่งคือค่าที่ hard-code ไว้เดิม จึงไม่เปลี่ยนพฤติกรรมของระบบที่ใช้อยู่จนกว่าจะมีคนแก้ ·
             ตั้ง <b>0</b> = ต้องตรงราคาอ้างอิงเป๊ะ
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">/products · เพิ่มการตรวจ 2 จุด (2026-09-04)</div>
+          <p class="text-[13.5px]">
+            <b>1) <span class="mono text-[12px]">item_group_id</span> ต้องเป็น leaf</b> — เดิมไม่ตรวจเลยแม้แต่ว่ามีอยู่จริง
+            ตอนนี้ <span class="mono text-[12px]">POST</span>/<span class="mono text-[12px]">PUT /products</span> ปฏิเสธทั้งกลุ่มที่ไม่มีอยู่จริงและกลุ่มที่เป็นโหนด
+            (<span class="mono text-[12px]">is_group=true</span>) ด้วย <span class="mono text-[12px]">400</span> — ฟอร์มเลือกหมวดสินค้าควรกรองให้เหลือแต่ leaf ตั้งแต่ต้นทาง
+            ไม่ใช่ปล่อยให้ผู้ใช้เลือกโหนดแล้วโดน error ตอนบันทึก<br>
+            <b>2) <span class="mono text-[12px]">stock_uom_id</span> ล็อกเมื่อมีสต็อกแล้ว</b> — <span class="mono text-[12px]">PUT /products/{id}</span>
+            ที่พยายามเปลี่ยน <span class="mono text-[12px]">stock_uom_id</span> ของสินค้าที่มี lot อยู่แล้ว (เคยรับ/ตัด/ปรับสต็อกมาก่อน) จะได้ <span class="mono text-[12px]">400</span>
+            "already has stock movements" — ฟอร์มแก้ไขสินค้าควรปิด (disable) ช่องหน่วยเก็บสต็อกเมื่อสินค้ามีสต็อกอยู่แล้ว แทนที่จะให้กดแล้วเจอ error
           </p>
         </div>
         <div class="rulebox mb-6">

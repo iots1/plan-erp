@@ -26,30 +26,51 @@
 
 ## 1 · พิมพ์เอกสารจริงไม่ได้เลยสักใบ — print engine ต่อไม่ครบวงจร
 
-### 1.1 สถานะโค้ดจริงวันนี้ (ตรวจแล้ว 2026-09-04)
+### 1.1 สถานะโค้ดจริงวันนี้ (ตรวจแล้ว 2026-09-04, แก้ไขรอบสอง 2026-09-04 — พบโมดูลที่พลาดไปรอบแรก)
 
-`apps/report-bc/src/modules/print/` มี pipeline พิมพ์ PDF ที่**ทำงานได้จริงทุกขั้นตอน** — EJS
-template → Gotenberg (HTML→PDF) → upload storage-bc → presigned URL กลับมา — แต่มี endpoint เดียว:
+report-bc มี**สองระบบพิมพ์แยกกัน** ทั้งคู่ใช้งานได้จริงทางเทคนิค แต่**ไม่มีทางไหนเชื่อมกับเอกสารจริง
+เลยสักทาง**:
+
+**(ก) `apps/report-bc/src/modules/print/`** — pipeline เดียว ใช้ EJS → Gotenberg (HTML→PDF) → upload
+storage-bc → presigned URL กลับมา endpoint เดียว:
 
 ```
 POST /report/v1/invoices/mock-pdf
 ```
 
-และ swagger description ของมันเขียนตรง ๆ ว่า:
+swagger description เขียนตรง ๆ ว่า "Demonstrates the report-bc print pipeline end to end... an empty
+body `{}` renders a fully-populated sample invoice" — `CreateInvoicePrintDTO` ทุกฟิลด์
+`@IsOptional()` เพราะออกแบบมาเป็น **smoke test ของ pipeline เอง** ไม่ใช่ endpoint พิมพ์เอกสารจริง
+Template มีแบบเดียว (`templates/invoice.ejs`)
 
-> "Demonstrates the report-bc print pipeline end to end... Every field is optional — an empty body
-> `{}` renders a fully-populated sample invoice."
+**(ข) `apps/report-bc/src/modules/print-template/`** — ระบบที่ใหญ่กว่าและ**ใช้งานจริงอยู่แล้วในระดับ
+โครงสร้าง**: admin สร้าง/แก้เทมเพลตผ่าน `POST/PUT /print-templates` (HTML เก็บบน MinIO ไม่ใช่ Postgres),
+มีระบบเวอร์ชัน + ประวัติ + restore (`print-template-histories`), preview (`POST .../preview`), และ
+เอนจินสองแบบ (`simple`/`banded` — banded คือ pagination ฝั่ง client ผ่าน `paginator.inline.js` สำหรับ
+รายงานที่ต้องพิมพ์หลายหน้า) — **ตรวจข้อมูลจริงในโปรดักชันวันนี้พบ 2 เทมเพลตที่ถูกสร้างไว้แล้ว**: `test`
+กับ `PAYMENT_RECEIPT` (ชื่อไทย "ใบเสร็จรับเงิน") แต่ตรวจละเอียดแล้วพบว่า `PAYMENT_RECEIPT`:
 
-`CreateInvoicePrintDTO` ทุกฟิลด์เป็น `@IsOptional()` — เพราะออกแบบมาให้เป็น **smoke test ของ pipeline
-เอง** ไม่ใช่ endpoint พิมพ์เอกสารจริง: client ส่งข้อมูล invoice มาเองทั้งหมด (หรือปล่อยว่างให้ mock
-data เข้ามาแทน) — **ไม่มีจุดไหนใน backend ที่ดึง `receipt_id`/`ap_invoice_id`/`quotation_id` จริงจาก
-finance-bc/sales-bc มาพิมพ์เลยสักที่** แม้แต่จุดเดียว
+- **`parameters` ว่างเปล่า (`[]`)** — ไม่มี schema กำหนดว่า field ไหนต้องส่งอะไร
+- **`mock_data` ที่ผูกไว้เป็นโครงสร้างของระบบ POS ค้าปลีกอื่น** (`member_no`, `article_no`,
+  `branch.name`: "บมจ.ซีพี เอ็กซ์ตร้า", `copy_type`) — **ไม่ตรงกับ field ของ `Receipt` entity ในระบบนี้
+  เลยสักตัว** (`receipt_number`, `customer_tax_id`, `total_standard_vat_price` ฯลฯ) ยืนยันว่าเป็น
+  เทมเพลตตัวอย่าง/อ้างอิงตอนออกแบบ ไม่ได้ผูกกับข้อมูลจริงของระบบนี้
 
-Template ที่มีอยู่ตอนนี้: `templates/invoice.ejs` — 1 แบบเดียว ไม่มี:
-- ใบเสนอราคา (Quotation)
-- ใบสั่งขาย/ใบส่งของ (Sales Order / Delivery Note)
-- ใบกำกับภาษีเต็มรูป/อย่างย่อ/ใบเสร็จรับเงิน จริงจาก `receipts` (มีแค่ mock invoice)
-- ใบสั่งซื้อ (Purchase Order) — ฝั่งซื้อยังไม่มี template เลยสักแบบ
+**สิ่งที่ยืนยันแล้วว่าไม่มีอยู่จริงในทั้งสองระบบ**: ไม่มีจุดไหนเลย (`grep` ทั้ง `print/` และ
+`print-template/`) ที่เรียก `sendWithContext`/`emitWithContext` ไปหา finance-bc/sales-bc/supplier-bc
+เพื่อดึงข้อมูลเอกสารจริง — `sendWithContext` ที่มีใน `print-template.service.ts` ทุกจุดเรียกแค่
+**storageClient** (อัปโหลด/เซ็น URL ของไฟล์เทมเพลตเอง) เท่านั้น `POST :id/render` รับ `params` เป็น
+`Record<string, unknown>` ที่ client ส่งมาเองล้วน ๆ (`RenderPrintTemplateDTO`) —ไม่มีการ fetch
+`receipt_id`/`quotation_id`/`ap_invoice_id` จากที่ไหนเลย
+
+**สรุป**: โครงสร้างพื้นฐาน (template management + versioning + 2 เอนจิน) **ดีกว่าที่ประเมินไว้รอบแรก
+มาก** — ไม่ต้องสร้างระบบจัดการเทมเพลตใหม่เลย งานที่แท้จริงที่ขาดคือ**ตัวเชื่อม (glue)**: โค้ดที่รับ
+`document_id` จาก BC เจ้าของเอกสาร → แปลงเป็น `params` ตาม schema ของเทมเพลต → เลือกเทมเพลตให้ตรง
+ประเภทเอกสาร → เรียก render — งานนี้ไม่มีอยู่เลยสักบรรทัดในทั้งระบบ
+
+ไม่มี template สำหรับ: ใบเสนอราคา (Quotation), ใบสั่งขาย/ใบส่งของ (Sales Order/Delivery Note),
+ใบกำกับภาษีเต็มรูป/อย่างย่อ (จริง — `PAYMENT_RECEIPT` ที่มีอยู่ผูกกับ mock data คนละระบบ), ใบสั่งซื้อ
+(Purchase Order) — ฝั่งซื้อไม่มี template เลยสักแบบ
 
 ### 1.2 ทำไมเรื่องนี้สำคัญกว่าที่ดูตอนแรก
 
@@ -61,10 +82,10 @@ Phase 4/5 (PO, Quotation, Receipt, AP Invoice) ทั้งหมด **implement
 
 ### 1.3 ขอบเขตที่ต้องตัดสินใจก่อนเริ่ม (ไม่ใช่ correctness fix — เป็น design decision)
 
-1. **Template registry เก็บที่ไหน** — ตอนนี้มีแค่ `.ejs` แบบเดียว hard-code ในโค้ด report-bc ไม่มี
-   ตาราง/mapping ว่า `document_type` ไหนคู่กับ template ไหน (เอกสารพูดถึง "print template engine
-   (simple/banded)" ว่า "เสร็จแล้ว" ใน Gantt — นั่นคือ**เก็บไฟล์** บน MinIO ได้แล้ว ไม่ใช่**เลือก
-   template ให้ตรงประเภทเอกสารอัตโนมัติ**)
+1. **ผูก `print_templates.code` เข้ากับ `document_type`** — `print_templates`/`document_types` เป็น
+   คนละตารางไม่มี FK ถึงกันเลย (ยืนยันแล้ว 2026-09-04) เลือกเทมเพลตตอนนี้ทำได้แค่ผ่าน `code` ตรง ๆ
+   ที่ client รู้เอง — ต้องตัดสินใจว่าจะ hard-code mapping (`document_type → template code`) ไว้ที่ BC
+   เจ้าของเอกสาร หรือเพิ่มคอลัมน์ `document_type_id` บน `print_templates` ให้เลือกอัตโนมัติได้
 2. **ใครเรียกใคร** — แต่ละ BC (finance/supplier/sales) ควรมี endpoint ของตัวเอง
    (`POST /receipts/:id/print`) ที่เรียก report-bc ผ่าน RPC พร้อมข้อมูลจริง หรือ report-bc ควรดึงข้อมูล
    เองผ่าน RPC ข้าม BC (`getReceiptById` ฯลฯ)? แนวทางแรกตรงกับ pattern
@@ -77,8 +98,9 @@ Phase 4/5 (PO, Quotation, Receipt, AP Invoice) ทั้งหมด **implement
 
 ### 1.4 ขอบเขตที่ควรอยู่นอกรอบแรก
 
-- Template แบบ "banded/configurable" (ลาก-วางฟิลด์) — เกินความจำเป็นของรอบแรก ทำ template คงที่
-  ต่อประเภทเอกสารก่อนพอ
+- **สร้างเอนจิน banded ใหม่ — ไม่ต้องทำ มีอยู่แล้วและใช้งานได้จริง** (`template_engine: banded` +
+  `paginator.inline.js` — แก้ไข 2026-09-04 จากที่เข้าใจผิดว่ายังไม่มีในรอบตรวจครั้งแรก) รอบแรกใช้แค่
+  เขียน mapping ให้ template ที่มีอยู่แล้วรับข้อมูลจริงแทน mock data พอ ไม่ต้องแตะเอนจิน
 - พิมพ์หลายภาษาในใบเดียว (มี `_th`/`_en` อยู่แล้ว แต่ใบพิมพ์จริงมักเลือกภาษาเดียวตาม locale ลูกค้า)
 
 ---
