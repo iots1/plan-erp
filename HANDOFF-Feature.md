@@ -1,7 +1,8 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-05 (audit ช่องโหว่กฎหมาย/บัญชีจาก HANDOFF เดิม → เลือกทำ 3 จุด: A1 แยกใบกำกับเต็มรูป/อย่างย่อ, B1 RabbitMQ dead-letter exchange, C audit log กลางสำหรับ settings — ทั้งหมด implement + migrate + deploy + E2E บน production ผ่านแล้ว)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-05 (P6 เริ่มแล้วจริง — 2/4 read model แรก `profit_by_lot`/`expiry_alerts` implement + migrate + deploy แล้ว, ดู §2 หัวข้อ P6)**
+> ก่อนหน้าในวันเดียวกัน: audit ช่องโหว่กฎหมาย/บัญชีจาก HANDOFF เดิม → เลือกทำ 3 จุด: A1 แยกใบกำกับเต็มรูป/อย่างย่อ, B1 RabbitMQ dead-letter exchange, C audit log กลางสำหรับ settings — ทั้งหมด implement + migrate + deploy + E2E บน production ผ่านแล้ว
 > ก่อนหน้าในวันเดียวกัน (2026-09-03): #8 billing_notes ข้ามสกุล + DEBIT_NOTE ฝั่งซื้อ — ตัดสินใจแล้วทั้งคู่ + แก้บั๊กระหว่างทาง 3 จุด ·
 > seed ตรวจซ้ำ ปิดงานแล้ว (`truncates:` ครบ ไม่ต้องแก้โค้ด) ·
 > audit log กลาง (role/policy — ขอบเขตเริ่มเล็ก) เสร็จหมด + commit + push + deploy + E2E ผ่าน
@@ -10,6 +11,7 @@
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
+> ✅ **2026-09-05 P6 — 2/4 read model แรก (`profit_by_lot`, `expiry_alerts`) implement + migrate + deploy แล้ว** — 20 เทสต์ใหม่ผ่าน, boot จริงแมป route ครบ · `sales_summary`/`low_stock` ยัง blocked จริง (event ต้นทางไม่มีอยู่) · **ยังไม่มี E2E ด้วย event จริง** (รอการขาย/สแกนหมดอายุรอบถัดไปเกิดเอง) — ดู §2 หัวข้อ **P6 · profit_by_lot + expiry_alerts**
 > ✅ **2026-09-05 audit ช่องโหว่กฎหมาย/บัญชี — 3 จุดที่เลือกทำเสร็จหมด + deploy + E2E บน production ผ่าน** (migration รันแล้วทั้ง 4 BC, `permissions:sync` + grant migration แล้ว, RabbitMQ broker policy ผูกแล้วจริง) — ดู §2 หัวข้อ **2026-09-05 · Legal/Accounting Audit**
 > **P2 audit ปิดครบ 100% แล้ว — P3–P4 เหลือแค่ #10, #11 (รู้ไว้ ไม่ใช่บั๊ก ไม่ต้องรีบ, ตั้งใจไม่ทำถาวร)**
 > ✅ **`meta.warnings` + บั๊ก auto-resolved price currency — commit `986b8b1` + push + deploy สำเร็จแล้ว** (deploy run 33639969936, 8 apps reload, ไม่มี migration)
@@ -91,6 +93,66 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### 2026-09-05 · P6 · profit_by_lot + expiry_alerts ✅ **2/4 read model แรก — implement + migrate + deploy แล้ว**
+
+หลังปิด A1/B1/C (ด้านล่าง) ผู้ใช้ถามว่า P6 เสร็จหรือยัง (**ยัง 0%**) แล้วสั่งให้ทำ "task ที่ไม่ติด block"
+ตามลำดับความสำคัญ — สำรวจโค้ดจริงก่อนออกแบบ (agent คู่ขนาน 2 ตัว) พบว่า `DOMAIN_EVENT_ROUTING`
+route ทุก event ที่มีอยู่จริงไปหา report-bc แล้ว แต่ report-bc มี **0 consumer** เลยสักตัว และ
+srs-p6.html §03 อ้างอิง event 3 ตัว (`so.confirmed`/`invoice.issued`/`stock.low`) ที่**ไม่มีอยู่จริงใน
+`DomainEvent` enum** — จึงตัดขอบเขตเหลือ 2 read model ที่ event ต้นทางมีอยู่จริงแล้ว: `profit_by_lot`
+(จาก `profit.calculated`) และ `expiry_alerts` (จาก `expiry.approaching`)
+
+**สถาปัตยกรรม** — คัดลอก pattern ของ finance-bc's `CogsModule` (`StockEventsController`, consumer
+ตัวแรกของทั้งแพลตฟอร์ม) ทุกจุด:
+- `ReportProcessedEvent extends ProcessedEventEntity` + `ReportProcessedEventsService extends
+  BaseProcessedEventService` — module ใหม่ `processed-event/` แยกต่างหาก (ไม่ผูกกับ feature module ไหน)
+  เพราะมี 2 consumer ใช้ร่วมกันตั้งแต่วันแรก ต่างจาก finance-bc ที่ยังมีแค่ 1 consumer จึงเก็บไว้ใน
+  `cogs` module เดียว — ทั้ง `profit-by-lot`/`expiry-alert` module import โมดูลนี้แบบทางเดียว (ตรงกับ
+  pattern `FinanceSettingAuditLogModule` ของ A1/C ด้านล่าง)
+- `profit_by_lots` — **insert-only**, `@Unique('sale_id', 'lot_id')` (เหมือน `cogs_entries`) เพราะ 1
+  event ต่อ 1 sale เกิดครั้งเดียว
+- `expiry_alerts` — **upsert ต่อ `lot_id`** (คนละแบบกับข้างบน) เพราะสแกนของ inventory-bc รันซ้ำทุกวันและ
+  ส่งล็อตเดิมมาซ้ำเสมอพร้อม `days_to_expiry` ที่เปลี่ยนไป — `processed_events` (claim ต่อ `event_id`)
+  กันแค่ raw redelivery ของ chunk เดิม ส่วนการ "สแกนวันใหม่ส่งล็อตเดิมมาซ้ำ" ต้อง upsert ถึงจะถูก
+- **`lot.created` ไม่ได้ consume** แม้ §03 ของ srs-p6.html เขียนว่า `expiry_alerts` กินทั้งสอง event —
+  payload ของ `expiry.approaching` เป็น snapshot ครบทุกฟิลด์ต่อล็อตอยู่แล้ว (ชื่อสินค้า/คลัง/ต้นทุน)
+  ไม่มีอะไรที่ `lot.created` ต้องเติม เป็นการตัดขอบเขตที่ตั้งใจ บันทึกไว้ตรงๆ ใน docblock ของ entity
+- ทั้งสอง query API เป็น read-only ล้วน (`BaseServiceOperations`/`BaseControllerOperations`, ไม่มี
+  create/update/delete) เหมือน `LedgerEntriesController`
+
+**migration** `1788608230132-AddP6ProfitByLotAndExpiryAlertReadModels.ts` (`erp_report`) — `CREATE
+TABLE` ล้วน 3 ตาราง (`profit_by_lots`, `expiry_alerts`, `processed_events`) ไม่มี data risk รันแล้ว
+บน DB จริง verify `migration:generate:report` = `No changes`
+
+**permission ใหม่ 2 ตัว**: `profit_by_lot:view`, `expiry_alert:view` — sync เข้า `erp_iam` แล้ว
+(ยืนยัน 2 added, 0 removed, 219 unchanged) **ก่อน** เขียน grant migration เสมอ (เรียนจากบั๊ก P4#12) —
+`1788608297222-GrantP6ReadModelPermissionsToMockPolicies.ts` รันแล้วบน DB จริง
+
+**เทสต์ที่เพิ่ม (+20)**: claim/idempotency ของทั้งสอง consumer, multi-lot payload → multi-row insert
+(profit_by_lot), upsert-by-lot_id + "สแกนใหม่ทับค่าเก่าไม่ error" (expiry_alerts), redelivery เป็น no-op
+ทั้งคู่
+
+**ตรวจแล้ว**: 1594/1594 test ผ่าน (113→115 suites) · eslint 0/0 · `nx build report-bc` ผ่าน · boot จริง
+(`nest start report-bc`) แมป route ครบทั้ง `GET /profit-by-lots(/:id)`/`GET /expiry-alerts(/:id)` DI
+resolve ไม่มี error, dead-letter exchange (`erp.dlx`/`erp.dlq` จากงาน B1 เมื่อเช้า) ยัง setup สำเร็จตอน
+บูตเหมือนเดิม · **ยังไม่ได้ E2E ด้วย event จริง** — ต่างจาก AP invoice/settings ที่ยิงทดสอบเองผ่าน POST
+เดียวจบได้ `profit.calculated`/`expiry.approaching` ต้องรอการขายจริง (COGS posting) หรือรอบสแกนหมดอายุ
+ถัดไปของ inventory-bc เกิดขึ้นเอง — ทิ้งไว้เป็นการตรวจสอบที่ยังติดค้าง เมื่อมีโอกาสธรรมชาติ (ขายจริง/
+สแกนรอบถัดไป) ควรเช็ค `GET /report-bc/v1/profit-by-lots`/`expiry-alerts` ว่ามีแถวใหม่ขึ้นจริง
+
+**ที่ยัง blocked จริง ไม่ใช่แค่ยังไม่ทำ**: `sales_summary` (ต้องการ `so.confirmed`/`invoice.issued`)
+และ `low_stock` (ต้องการ `stock.low`) — ทั้งสามชื่อนี้ไม่มีอยู่ใน `DomainEvent` enum เลย ต้องมีคน
+ตัดสินใจ+emit ฝั่ง producer (sales-bc/inventory-bc) ก่อนถึงจะทำฝั่งรับที่ report-bc ได้ นี่คืองานคนละ
+ขนาดกับที่ทำรอบนี้ (ต้องแก้ business logic ฝั่งขาย/สต็อกด้วย ไม่ใช่แค่เพิ่ม consumer)
+
+**เอกสาร**: `srs-p6.html` §06 (as-built) อัปเดตสถานะ 2/6→ชัดเจนว่า 2 ตัวทำแล้ว + rulebox ใหม่อธิบาย
+ว่า 3 event ที่เหลือยังไม่มีจริง · `api-workflow-guide.html` E2 ใหม่ (เทียบกับ `GET
+/inventory-bc/v1/expiry-alerts` ของจริงที่ยังสดกว่า — คนละ endpoint แม้ permission ชื่อเดียวกัน) +
+endpoint index (report-bc 16→21, พบ+แก้ doc drift เดิม `POST .../invoices/mock-pdf` หายจาก index) ·
+`HANDOFF-Backlog-Reporting-Print-Tax.md` §3 อัปเดตสถานะเต็ม (ดูรายละเอียดกฎ/เหตุผลออกแบบที่นั่น §3.4)
+
+---
 
 ### 2026-09-05 · Legal/Accounting Audit — A1 + B1 + C ✅ **เสร็จหมด + deploy + E2E บน production ผ่าน**
 

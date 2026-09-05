@@ -1619,6 +1619,43 @@ sequenceDiagram
             ยังพิมพ์ใบเสร็จ/ใบกำกับ/ใบเสนอราคา/ใบสั่งซื้อจริงของระบบนี้ผ่าน API ไม่ได้เลยสักใบ (backlog เต็ม: <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §1)
           </p>
         </div>
+
+        <h3 class="display text-xl mt-10 mb-4">E2 · P6 Read Model — แดชบอร์ดข้าม BC <span class="mono text-[13px] text-[var(--muted)]">— Manager · Analyst</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          เพิ่มเข้ามา 2026-09-05 — report-bc ได้ <span class="mono text-[12px]">@EventPattern</span> ตัวแรกของตัวเองแล้ว
+          (ก่อนหน้านี้ 0 ตัว แม้ <span class="mono text-[12px]">DOMAIN_EVENT_ROUTING</span> จะ route ทุก event มาให้แล้วก็ตาม — ดู
+          <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §2/§3) เลือกทำเฉพาะ 2 read model ที่ event ต้นทางมีอยู่จริงในโปรดักชัน
+          (<span class="mono text-[12px]">profit_by_lots</span> จาก <span class="mono text-[12px]">profit.calculated</span>,
+          <span class="mono text-[12px]">expiry_alerts</span> จาก <span class="mono text-[12px]">expiry.approaching</span>) —
+          <span class="mono text-[12px]">sales_summary</span>/<span class="mono text-[12px]">low_stock</span> ยังทำไม่ได้เพราะ event ต้นทาง
+          (<span class="mono text-[12px]">so.confirmed</span>/<span class="mono text-[12px]">invoice.issued</span>/<span class="mono text-[12px]">stock.low</span>) ยังไม่มีอยู่จริง
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/profit-by-lots</td><td class="mono text-[11px]">profit_by_lot:view</td><td>กำไรขั้นต้นต่อล็อตต่อใบขาย — <span class="mono text-[12px]">filter=lot_id</span>/<span class="mono text-[12px]">product_id</span>/<span class="mono text-[12px]">sold_at</span> ได้</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td><td>ล็อตในหน้าต่างเตือนหมดอายุ — สำเนาข้าม BC ของรายงานที่ inventory-bc มีอยู่แล้ว (ดู E1)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">คนละ endpoint กับ inventory-bc's GET /expiry-alerts แม้ permission ชื่อเดียวกัน</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">expiry_alert:view</span> มีอยู่ทั้งสองฝั่งเพราะ permission ผูกกับ <span class="mono text-[12px]">(service, permission)</span> ไม่ใช่ string เปล่า
+            (backend-convention.html) — <b>inventory-bc's เวอร์ชัน (E1) เป็นของจริง คำนวณสดทุกครั้ง</b> ส่วน<b>ของ report-bc (ที่นี่) เป็นสำเนาที่ตามหลังเล็กน้อย</b>
+            อัปเดตเฉพาะตอนสแกนรอบถัดไปมาถึง — ใช้ของ inventory-bc เมื่อต้องการเลขที่แม่นที่สุด ณ ตอนนี้ (เช่น หน้าจอตัดสินใจทำลายสินค้า)
+            ใช้ของ report-bc เมื่อต้องรวมกับตัวเลขข้าม BC อื่นในแดชบอร์ดเดียว (RULE · NO SYNC CALL ON QUERY ของ srs-p6.html)
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ตัวเลขตามหลังได้จริง — ต้องแสดง freshness (srs-p6.html "RULE · SHOW FRESHNESS")</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">expiry_alerts.last_scanned_at</span> คือเวลาที่ inventory-bc สแกนล่าสุดที่ทำให้แถวนั้นถูกเขียน — หน้าจอที่ใช้ endpoint นี้
+            ควรโชว์ค่านี้เสมอ ไม่ใช่แค่โชว์ตัวเลข เพื่อสื่อสาร eventual consistency ให้ผู้ใช้รู้ว่าเห็นข้อมูล ณ เวลาไหน ·
+            ล็อตที่ถูกใช้จนหมด/ตัดออกจากคลังแล้วจะ<b>ยังค้างอยู่ในตารางนี้</b> (ไม่มี event "ล็อตพ้นความเสี่ยงแล้ว" ให้ลบแถวออกในรอบนี้) เป็นข้อจำกัดที่รู้ไว้ ไม่ใช่บั๊ก
+          </p>
+        </div>
       </section>
 
       <!-- ============ 09 MASTER ============ -->
@@ -2064,11 +2101,16 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">report-bc · เทมเพลต · เลขรัน · PDF <span class="mono text-[13px] text-[var(--muted)]">— 16 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">report-bc · เทมเพลต · เลขรัน · PDF · P6 Read Model <span class="mono text-[13px] text-[var(--muted)]">— 21 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
             <tbody>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/invoices/mock-pdf</td><td class="mono text-[11px]">— (smoke-test endpoint, ไม่มี permission gate)</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/profit-by-lots</td><td class="mono text-[11px]">profit_by_lot:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/profit-by-lots/{id}</td><td class="mono text-[11px]">profit_by_lot:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/expiry-alerts/{id}</td><td class="mono text-[11px]">expiry_alert:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_read</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}</td><td class="mono text-[11px]">report:document_type_delete</td></tr>
@@ -2088,7 +2130,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 309 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 314 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->
