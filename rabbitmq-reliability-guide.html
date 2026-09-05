@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RabbitMQ Reliability Guide — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="🐰" title="RabbitMQ" subtitle="RELIABILITY GUIDE" width="280">
+    <nav slot="nav">
+      <a href="#why"        class="navlink"><span class="n">01</span> ทำไมต้องมีคู่มือนี้</a>
+      <a href="#transport"  class="navlink"><span class="n">02</span> Transport &amp; Ack Contract</a>
+      <a href="#holblock"   class="navlink"><span class="n">03</span> Head-of-Line Block — บั๊กที่เจอมาแล้ว</a>
+      <a href="#dlx"        class="navlink"><span class="n">04</span> Dead-Letter Exchange (2026-09-05)</a>
+      <a href="#policy"     class="navlink"><span class="n">05</span> Broker Policy — ทำไมแก้ที่ queue args ไม่ได้</a>
+      <a href="#ops"        class="navlink"><span class="n">06</span> Monitor &amp; กู้คืนข้อความจาก DLQ</a>
+      <a href="#newconsumer" class="navlink"><span class="n">07</span> เพิ่ม consumer ใหม่ให้ปลอดภัย</a>
+    </nav>
+    <div slot="footnote">
+      <a href="backend-convention.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Backend Conventions</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="backend-convention.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Backend Conventions
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Reliability Guide · จากบั๊กจริงบน production</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Event ที่ไม่มีใครรับ<br>
+          <span class="text-[#7FE3DE]">ไม่ควรหายไปเงียบๆ</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          คู่มือนี้เขียนขึ้นหลังพบว่า event ที่ route ไปหา report-bc/sales-bc/supplier-bc
+          (ซึ่งยังไม่มี consumer เลยสักตัว) ถูกทิ้งอย่างเงียบๆ มาตลอด — ไม่มี error, ไม่มี log,
+          กู้คืนไม่ได้ · ตอนนี้มี dead-letter exchange แล้ว แต่ต้นเหตุ (ไม่มี consumer) ยังไม่ถูกแก้
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>erp.dlx/erp.dlq: ประกาศแล้วทุก BC</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>Broker policy: ผูกครบ 8 คิวบน production แล้ว</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#F59E0B"></span>ต้นเหตุ (ไม่มี consumer): ยังไม่แก้ — ดู srs-p6.html</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <div class="rulebox mt-12" style="border-color:var(--signal)">
+        <div class="rc mb-1" style="color:var(--signal)">อ่านย่อหน้านี้ก่อนถ้ามีเวลา 30 วินาที</div>
+        <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+          RMQ server ทุก BC ตั้ง <span class="mono text-[12px]">noAck:false</span> + <span class="mono text-[12px]">prefetchCount:1</span> —
+          ข้อความที่ไม่มี <span class="mono text-[12px]">@MessagePattern</span>/<span class="mono text-[12px]">@EventPattern</span> ตรงกันเลยจะโดน
+          <span class="mono text-[12px]">nack(msg, false, false)</span> ทันที · <b class="text-[var(--ink)]">ก่อน 2026-09-05 ไม่มี dead-letter
+          exchange</b> ข้อความนั้นจึง<b class="text-[var(--ink)]">หายถาวร ไม่มีร่องรอย</b> — ตอนนี้มี <span class="mono text-[12px]">erp.dlx</span>/<span class="mono text-[12px]">erp.dlq</span>
+          แล้ว ผูก broker policy เข้ากับทั้ง 8 คิวบน production จริง · <b style="color:var(--signal)">ที่ยังไม่แก้:</b> report-bc/sales-bc/supplier-bc
+          ยังไม่มี consumer เลยสักตัว (นี่คือ P6 CQRS Read Model ที่ยังไม่ได้ทำ — ดู srs-p6.html)
+        </p>
+      </div>
+
+      <!-- ========== 01 WHY ========== -->
+      <section id="why" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — ทำไมต้องมีคู่มือนี้</div>
+        <h2 class="display text-3xl mb-6">อาการที่ทำให้พบปัญหานี้</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ระหว่างตรวจ P6 (CQRS Read Model, ยังไม่ได้ implement) พบว่า <span class="mono text-[12px]">DOMAIN_EVENT_ROUTING</span>
+          route event หลายตัว (<span class="mono text-[12px]">lot.created</span>, <span class="mono text-[12px]">stock.adjusted</span>,
+          <span class="mono text-[12px]">item.updated</span> ฯลฯ) ไปหา report-bc จริง แต่ report-bc/sales-bc/supplier-bc
+          <b>ไม่มี consumer เลยสักตัว</b> — event เหล่านี้ถูก emit ไปแล้วในโปรดักชันตั้งแต่ก่อนหน้านี้ ทุกตัวถูกทิ้งอย่างเงียบๆ
+          ที่คิวปลายทางทันทีที่ consumer เชื่อมต่อคิว
+        </p>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ทำไมไม่มี error log ให้เห็น</div>
+          <p class="text-[13.5px]">
+            NestJS's <span class="mono text-[12px]">ServerRMQ</span> ไม่ throw หรือ log อะไรเลยตอน nack ข้อความที่ไม่มี handler ตรง —
+            มันแค่ปิดจบเงียบๆ ตามสเปกของ RMQ transport เอง ผลคือทีมพัฒนาไม่มีทางรู้เลยว่ามีข้อมูลหายไป
+            จนกว่าจะมีคนสังเกตว่า dashboard/รายงานที่ควรอ่านข้อมูลนี้ไม่อัปเดต ซึ่งอาจกินเวลาเป็นเดือน
+          </p>
+        </div>
+      </section>
+
+      <!-- ========== 02 TRANSPORT ========== -->
+      <section id="transport" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Transport &amp; Ack Contract</div>
+        <h2 class="display text-3xl mb-6">พื้นฐานที่ทุกคนต้องรู้ก่อนแตะโค้ด RMQ</h2>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>ค่า</th><th>ทำไมตั้งแบบนี้</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[12px]">TRANSPORT=rmq</td><td>ดีฟอลต์ทั้งแพลตฟอร์ม — อ่านจาก env เดียวกันทั้ง client registration (<span class="mono text-[12px]">CommonModule</span>) และ server listener (<span class="mono text-[12px]">bootstrapApplication</span>) เปลี่ยนค่าเดียวสลับทั้งระบบเป็น TCP ได้ถ้า broker ล่มยาว</td></tr>
+              <tr><td class="mono text-[12px]">noAck: false</td><td>manual ack — server ไม่ ack เองตอนสำเร็จ ต้องมี <span class="mono text-[12px]">RmqAckInterceptor</span> ทำแทนทุก handler (ดู backend-convention.html)</td></tr>
+              <tr><td class="mono text-[12px]">prefetchCount: 1</td><td>1 consumer ถือได้ทีละ 1 ข้อความ — ทำให้ทั้งระบบไวต่อบั๊ก "ลืม ack" มากเป็นพิเศษ (ดู §03)</td></tr>
+              <tr><td class="mono text-[12px]">heartbeatIntervalInSeconds: 20</td><td>ค่าดีฟอลต์ของ <span class="mono text-[12px]">amqp-connection-manager</span> (5s) จี๋เกินไปสำหรับ broker ที่อยู่ข้าม WAN — ปรับให้ทนแพ็กเก็ตหลุดเป็นช่วงสั้นๆ ได้</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc ok mb-1">Retry ฝั่งผู้เรียก (sendWithContext/emitWithContext)</div>
+          <p class="text-[13.5px]">
+            Timeout/connection error ได้ retry อัตโนมัติ (2 ครั้งรวมของเดิม) ก่อนตอบ <span class="mono text-[12px]">defaultValue</span>/<span class="mono text-[12px]">null</span> —
+            <b>error ทางธุรกิจจริง (404/400 ที่ unwrap ได้) ไม่ retry</b> เพราะ retry คำตอบที่ตัดสินใจแล้วมีแต่เพิ่ม latency ·
+            ผลข้างเคียง: handler ปลายทางต้อง<b>ทนถูกเรียกซ้ำได้</b> เพราะผู้เรียกอาจเห็นแค่ response หายไม่ใช่ว่างานไม่เกิด
+          </p>
+        </div>
+      </section>
+
+      <!-- ========== 03 HOL BLOCK ========== -->
+      <section id="holblock" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — Head-of-Line Block</div>
+        <h2 class="display text-3xl mb-6">บั๊กคนละตัวกับเรื่องนี้ — แต่มาจากค่าตั้งค่าเดียวกัน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <span class="mono text-[12px]">noAck:false</span> + <span class="mono text-[12px]">prefetchCount:1</span> เปิดช่องให้เกิด<b>สองอาการที่หน้าตาคล้ายกันแต่ต้นเหตุตรงข้ามกัน</b>
+          — คู่มือนี้แยกไว้ให้ชัดเพื่อไม่ให้วินิจฉัยผิดตัว
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>อาการ</th><th>ต้นเหตุ</th><th>สัญญาณที่ต่างกัน</th></tr></thead>
+            <tbody>
+              <tr><td><b>Head-of-line block</b> (§ตัวนี้)</td><td>Handler <b>มีอยู่จริง</b> แต่ลืมใส่ <span class="mono text-[12px]">@UseInterceptors(RmqAckInterceptor)</span> — ไม่มีใคร ack ข้อความที่สำเร็จ</td><td><span class="mono text-[12px]">messages_ready</span> ค้างสูงขึ้นเรื่อยๆ พร้อม <span class="mono text-[12px]">messages_unacknowledged</span> ปักหมุดที่จำนวน consumer เป๊ะ — caller timeout 15s <b>ทุกตัว</b> restart service ก็ไม่ช่วย (consumer ใหม่หยิบข้อความค้างตัวเดิมทันที)</td></tr>
+              <tr><td><b>Silent message loss</b> (§04 แก้แล้ว)</td><td>Handler <b>ไม่มีอยู่เลย</b> — <span class="mono text-[12px]">ServerRMQ</span> nack(no-requeue) ทันทีที่ event name ไม่ match</td><td>ไม่มี queue ไหนค้าง ไม่มี timeout ฝั่ง caller (เป็น event แบบ fire-and-forget) — สังเกตได้แค่ผลลัพธ์ปลายทางไม่เกิดขึ้น</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">วินิจฉัย head-of-line block</div>
+          <p class="text-[13.5px]">
+            เช็ค RabbitMQ management: คิวที่สงสัยมี <span class="mono text-[12px]">messages_ready</span> ไต่ขึ้นเรื่อยๆ ขณะที่ <span class="mono text-[12px]">messages_unacknowledged</span>
+            คงที่เท่ากับจำนวน consumer พอดี — แก้โดยเพิ่ม <span class="mono text-[12px]">RmqAckInterceptor</span> ให้ handler ที่ตกหล่น (ดู backend-convention.html)
+            แล้ว restart service (ข้อความที่ค้างจะถูกส่งใหม่ให้ handler ที่แก้แล้ว)
+          </p>
+        </div>
+      </section>
+
+      <!-- ========== 04 DLX ========== -->
+      <section id="dlx" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — Dead-Letter Exchange</div>
+        <h2 class="display text-3xl mb-6">erp.dlx / erp.dlq — เพิ่ม 2026-09-05</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <span class="mono text-[12px]">ensureDeadLetterInfrastructure()</span> (<span class="mono text-[12px]">libs/common/src/utils/microservice-transport.util.ts</span>)
+          รันทุกครั้งที่ BC บูต (เฉพาะเมื่อ <span class="mono text-[12px]">TRANSPORT=rmq</span>) ประกาศ 3 อย่างแบบ idempotent —
+          หลาย process แข่งกันประกาศพร้อมกันตอน deploy ปลอดภัย ไม่ error:
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>สิ่งที่ประกาศ</th><th>ชนิด</th><th>ทำไม</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[12px]">erp.dlx</td><td>Exchange (fanout, durable)</td><td>ปลายทางที่ข้อความ nack(no-requeue) ทุกคิวส่งมารวมกัน — <b>ใช้ fanout</b> เพราะข้อความเดิม publish ผ่าน default exchange (routing key = ชื่อคิว) ไม่มี exchange ของตัวเองให้ direct-route ตาม</td></tr>
+              <tr><td class="mono text-[12px]">erp.dlq</td><td>Queue (durable)</td><td>คิวเดียวรวมของทุก BC — ผูกกับ <span class="mono text-[12px]">erp.dlx</span> ด้วย binding key ว่าง (รับทุกอย่างจาก fanout)</td></tr>
+              <tr><td>Binding</td><td><span class="mono text-[12px]">erp.dlq</span> ← <span class="mono text-[12px]">erp.dlx</span></td><td>ให้ operator ตรวจสอบ/requeue ได้จากที่เดียว ไม่ต้องไล่ดูทีละ BC</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc ok mb-1">ทำไมเป็น fanout เดียวรวม ไม่ใช่แยกต่อ BC</div>
+          <p class="text-[13.5px]">
+            เป้าหมายรอบแรกคือ<b>หยุดข้อมูลหาย</b> ไม่ใช่แยกวิเคราะห์ต้นทางอัตโนมัติ — ข้อความที่ dead-letter ยังพก <span class="mono text-[12px]">x-death</span>
+            header ติดไปด้วย (RabbitMQ ใส่ให้เองเสมอ) ซึ่งบอกคิวต้นทาง/เหตุผล/เวลาไว้ครบอยู่แล้ว operator เปิดดู header
+            นั้นเพื่อแยกต้นทางได้โดยไม่ต้องแยกคิวปลายทางล่วงหน้า
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">Best-effort โดยเจตนา — ไม่บล็อกการบูต</div>
+          <p class="text-[13.5px]">
+            ถ้า broker ต่อไม่ได้ตอนเรียกฟังก์ชันนี้ (เช่น broker กำลัง restart พอดี) จะแค่ log error แล้วปล่อยให้ BC บูตต่อตามปกติ —
+            ผลคือกลับไปเป็นพฤติกรรมเดิม (ข้อความ nack แล้วหายถาวร) ชั่วคราวเท่านั้น ไม่ใช่ทำให้ทั้ง BC บูตไม่ขึ้น
+            เพราะ dead-letter infrastructure เป็น safety net ไม่ใช่ dependency ของ business logic
+          </p>
+        </div>
+      </section>
+
+      <!-- ========== 05 POLICY ========== -->
+      <section id="policy" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — Broker Policy</div>
+        <h2 class="display text-3xl mb-6">ทำไมแก้ที่ queue arguments ตรงๆ ไม่ได้</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          วิธีปกติที่จะให้คิวหนึ่ง dead-letter ไปที่ exchange คือประกาศคิวด้วย
+          <span class="mono text-[12px]">arguments: {'x-dead-letter-exchange': 'erp.dlx'}</span> ตอน <span class="mono text-[12px]">assertQueue</span> —
+          แต่คิวหลักของทั้ง 8 BC มีอยู่แล้วใน production <b>ก่อน</b> DLX จะถูกคิดขึ้น
+        </p>
+        <div class="rulebox mb-4" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">RabbitMQ ปฏิเสธการ redeclare คิวเดิมด้วย arguments ต่างกัน</div>
+          <p class="text-[13.5px]">
+            ทั้ง server (<span class="mono text-[12px]">buildServerOptions</span>) และทุก client ที่เรียกข้าม BC (<span class="mono text-[12px]">ClientRMQ</span>, ผ่าน
+            <span class="mono text-[12px]">buildClientProvider</span>) ต่างก็ <span class="mono text-[12px]">assertQueue()</span> คิวเดียวกันเองตอน connect — ถ้าใส่ <span class="mono text-[12px]">arguments</span>
+            ใหม่เข้าไปตรงๆ ใน <span class="mono text-[12px]">queueOptions</span> ของโค้ด จะได้ <span class="mono text-[12px]">PRECONDITION_FAILED - inequivalent arg
+            'x-dead-letter-exchange'</span> ทันทีที่ deploy — <b>ทุก client ที่เคยเรียกข้าม BC ต่อไม่ติดเลย</b> ไม่ใช่แค่ BC เจ้าของคิว
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">ทางที่ปลอดภัย — broker policy (ไม่ redeclare คิวเลย)</div>
+          <p class="text-[13.5px]">
+            RabbitMQ policy ผูก behavior เข้ากับคิวที่มีอยู่แล้วได้โดยไม่ต้อง assert คิวใหม่ — ใช้จริงบน production (2026-09-05):
+          </p>
+          <div class="code p-4 mt-3 mb-2">
+<pre><span class="c"># ผ่าน rabbitmqctl (บนเครื่อง broker) หรือ Management HTTP API ก็ได้ผลเหมือนกัน</span>
+rabbitmqctl set_policy dlx-erp <span class="s">'^erp_.*_queue$'</span> \
+  <span class="s">'{"dead-letter-exchange":"erp.dlx"}'</span> --apply-to queues</pre>
+          </div>
+          <p class="text-[13.5px]">
+            ยืนยันแล้วว่าคิวเดิมทั้ง 8 ตัวขึ้น <span class="mono text-[12px]">policy: "dlx-erp"</span> โดย <span class="mono text-[12px]">arguments</span> ยังเป็น <span class="mono text-[12px]">{}</span>
+            เหมือนเดิม — consumer/client ที่ต่ออยู่ไม่กระทบเลยแม้แต่วินาทีเดียว
+          </p>
+        </div>
+      </section>
+
+      <!-- ========== 06 OPS ========== -->
+      <section id="ops" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — Monitor &amp; กู้คืน</div>
+        <h2 class="display text-3xl mb-6">มีข้อความอยู่ใน erp.dlq แล้วทำอะไรต่อ</h2>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">Monitoring — สัญญาณที่ควร alert</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">erp.dlq</span> มี <span class="mono text-[12px]">messages_ready &gt; 0</span> ค้างนานกว่าสองสามนาที คือสัญญาณว่ามี event
+            ถูกทิ้งจริง — ต่างจาก head-of-line block (§03) ตรงที่ <b>ไม่มี caller คนไหน timeout ให้เห็น</b> เพราะ event
+            พวกนี้เป็น fire-and-forget การไม่ตั้ง alert ไว้เท่ากับกลับไปอยู่ในสถานะเดิมก่อนมี DLX (แค่ไม่ลบทิ้ง แต่ก็ไม่มีใครดู)
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">อ่าน x-death header เพื่อรู้ต้นทาง</div>
+          <p class="text-[13.5px]">
+            ทุกข้อความใน <span class="mono text-[12px]">erp.dlq</span> พก header <span class="mono text-[12px]">x-death</span> (array) ที่ RabbitMQ ใส่ให้เองเสมอ —
+            มี <span class="mono text-[12px]">queue</span> (คิวต้นทาง, บอก BC), <span class="mono text-[12px]">reason</span> (<span class="mono text-[12px]">rejected</span> สำหรับเคสนี้),
+            <span class="mono text-[12px]">time</span>, <span class="mono text-[12px]">count</span> — เปิดดูได้จาก RabbitMQ Management UI (Queues → erp.dlq → Get messages)
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">Requeue กลับไปคิวต้นทาง — ไม่มีปุ่มอัตโนมัติ ต้องทำมือ</div>
+          <p class="text-[13.5px]">
+            แพลตฟอร์มนี้<b>ไม่มี consumer ที่ report-bc/sales-bc/supplier-bc เลย</b> (§01) — requeue ข้อความกลับไปตอนนี้จะเจอ nack
+            ซ้ำเหมือนเดิม <b>ไม่มีประโยชน์จนกว่าจะมี consumer จริง</b> (ดู §07 และ srs-p6.html) เมื่อถึงตอนนั้นค่อย publish
+            ข้อความจาก <span class="mono text-[12px]">erp.dlq</span> กลับไปที่คิวต้นทาง (Management UI → Get messages → คัด payload → Publish message
+            ใหม่ไปคิวเดิม) — เก็บ payload ไว้นอกระบบระหว่างรอ ไม่ลบทิ้งจาก UI โดยไม่ได้ backup ก่อน
+          </p>
+        </div>
+      </section>
+
+      <!-- ========== 07 NEW CONSUMER ========== -->
+      <section id="newconsumer" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — เพิ่ม Consumer ใหม่</div>
+        <h2 class="display text-3xl mb-6">Checklist ก่อน merge handler ใหม่</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          เมื่อ P6 (หรือฟีเจอร์ไหนก็ตาม) เริ่มเพิ่ม <span class="mono text-[12px]">@EventPattern</span> ให้ report-bc/sales-bc/supplier-bc จริง
+          — เช็คทุกข้อนี้ก่อน merge:
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>เช็ค</th><th>ทำไม</th></tr></thead>
+            <tbody>
+              <tr><td>Controller มี <span class="mono text-[12px]">@UseInterceptors(RmqAckInterceptor)</span></td><td>ไม่งั้น handler ที่เพิ่งเพิ่มจะสร้าง head-of-line block ใหม่แทนที่จะแก้ปัญหาเดิม (§03)</td></tr>
+              <tr><td>Handler idempotent จริง (เช็ค <span class="mono text-[12px]">processed_events</span> ก่อน apply)</td><td>Retry ฝั่งผู้เรียก (§02) + at-least-once delivery ของ outbox relay ทำให้ event ซ้ำเป็นเรื่องปกติ ไม่ใช่ edge case</td></tr>
+              <tr><td>ทดสอบ <span class="mono text-[12px]">nest start</span> จริง ไม่ใช่แค่ jest</td><td>Route map/DI resolve ผิดพลาดหลายจุดในโปรเจกต์นี้ jest จับไม่ได้ ต้อง boot จริงเทียบด้วยเสมอ</td></tr>
+              <tr><td>event enum ใหม่เพิ่มใน <span class="mono text-[12px]">DOMAIN_EVENT_ROUTING</span></td><td>ไม่งั้น tsc พังทันที (<span class="mono text-[12px]">Record&lt;DomainEvent, …&gt;</span> บังคับให้ครบ) — ดู root CLAUDE.md</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mt-5">
+          <div class="rc mb-1">อ่านต่อ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <a href="backend-convention.html" class="underline" style="color:var(--accent)">Backend Conventions</a> — สัญญา ack เต็มรูป, naming ของ EventsController ·
+            <a href="srs-p6.html" class="underline" style="color:var(--accent)">SRS P6</a> — แผน CQRS Read Model ที่ยังไม่ implement (ต้นเหตุที่แท้จริงของปัญหานี้) ·
+            <a href="observability-logging-guide.html" class="underline" style="color:var(--accent)">Observability Guide</a> — ต่อ metric/alert ของ RabbitMQ เข้า Grafana
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · RABBITMQ RELIABILITY"
+        line2="erp.dlx/erp.dlq + broker policy verified against production 2026-09-05">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

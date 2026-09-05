@@ -20,6 +20,7 @@ class ErpDocnav extends HTMLElement {
     { href: 'postgresql-pgpool-cluster-guide.html', icon: '🔌', label: 'Connection Pooling (Pgpool-II)', desc: 'HA Cluster Setup · Watchdog Failover · Grafana' },
     { href: 'pgpool-access-control-hardening.html', icon: '🔒', label: 'Pgpool Access Control', desc: 'pool_hba.conf Hardening · Least-Privilege Role' },
     { href: 'ha-failover-operations-guide.html', icon: '⚡', label: 'HA & Failover Operations', desc: 'เครื่องไหนดับแล้วเกิดอะไร · Triage สำหรับ Junior' },
+    { href: 'rabbitmq-reliability-guide.html', icon: '🐰', label: 'RabbitMQ Reliability Guide', desc: 'Ack Contract · Head-of-Line Block · Dead-Letter Exchange' },
     { href: 'deployment-guide.html', icon: '🚀', label: 'Deployment Guide', desc: 'On-Premise · Docker Compose · Kong · Cloudflare Tunnel' },
     { href: 'iam-policy-engine-guide.html', icon: '🛡️', label: 'IAM Policy Engine', desc: 'Invariants · API Contract · Defect Log · ABAC' },
     { href: 'runbook.html', icon: '🚨', label: 'Runbook', desc: 'Incident Response · Symptom → Diagnosis → Fix → Verify' },

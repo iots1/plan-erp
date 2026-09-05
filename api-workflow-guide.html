@@ -559,6 +559,7 @@ sequenceDiagram
   <span class="s">"document_type"</span>: <span class="s">"VENDOR_BILL"</span>,       <span class="c">// หรือ "CREDIT_NOTE" = ใบลดหนี้ (ต้องส่ง reference_ap_invoice_id ด้วย)</span>
   <span class="s">"reference_ap_invoice_id"</span>: <span class="k">null</span>,       <span class="c">// ใบแจ้งหนี้เดิมที่ปรับปรุง — บังคับเมื่อ CREDIT_NOTE, ห้ามส่งเมื่อ VENDOR_BILL</span>
   <span class="s">"is_vat_included"</span>: <span class="k">false</span>,               <span class="c">// ราคาบนใบผู้ขายรวม VAT แล้วหรือยัง — AP Clerk เป็นคนตอบ · CREDIT_NOTE สืบทอดจากใบเดิม</span>
+  <span class="s">"vendor_tax_invoice_type"</span>: <span class="s">"full_tax_invoice"</span>, <span class="c">// หรือ "abbreviated_tax_invoice" — ไม่ส่ง = full_tax_invoice · อย่างย่อใช้เครดิตภาษีซื้อไม่ได้เลย (§82/5) แม้ผู้ขายจะจด VAT ก็ตาม</span>
   <span class="s">"due_date"</span>: <span class="k">null</span>,                      <span class="c">// ไม่ส่ง = document_date + credit_terms ของผู้ขาย · null = ไม่มีกำหนดชำระ</span>
   <span class="s">"wht_config_code"</span>: <span class="k">null</span>,               <span class="c">// เช่น "WHT3_SERVICE" ถ้าจ่ายค่าบริการที่ต้องหัก ณ ที่จ่าย</span>
   <span class="s">"discount_mode"</span>: <span class="s">"none"</span>,
@@ -632,6 +633,18 @@ sequenceDiagram
             ค่านี้ถูก <b>snapshot ลงหัวเอกสาร</b> (<span class="mono text-[12px]">is_supplier_vat_registered</span>) ไม่ใช่ถามใหม่ทุกครั้ง — เพื่อ (1) ตอบได้ว่าทำไมใบนี้ไม่มีภาษีซื้อ
             (2) แก้ DRAFT แล้วภาษีไม่เปลี่ยนไปตามสถานะผู้ขายที่ขยับหลังบันทึกบิล (3) แก้ DRAFT ได้แม้ supplier-bc ล่ม ·
             <b>ค่า default เป็น true</b> จึงมีผลเฉพาะรายที่ตั้งใจบันทึกไว้ว่าไม่ได้จด และ supplier-bc รุ่นเก่าที่ไม่ส่งฟิลด์นี้มาถือว่า "จด" (ฟิลด์ที่หายไปต้องไม่ตัดภาษีซื้อทิ้งทุกใบ)
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">ใบกำกับเต็มรูป vs อย่างย่อ — คนละคำถามกับ "ผู้ขายจด VAT ไหม" (2026-09-05)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">is_supplier_vat_registered</span> ตอบว่าผู้ขาย<b>อยู่ในระบบ VAT หรือไม่</b> · <span class="mono text-[12px]">vendor_tax_invoice_type</span> ตอบคนละคำถาม —
+            <b>ใบกระดาษที่ถืออยู่จริงเป็นใบกำกับภาษีเต็มรูปหรืออย่างย่อ</b> — ผู้ขายที่จด VAT แล้วยัง<b>ออกใบกำกับภาษีอย่างย่อได้ตามกฎหมาย</b>
+            (ป.รัษฎากร §86/6 — เคสร้านค้าปลีกหน้าร้าน) แต่<b>ผู้ซื้อเอาใบอย่างย่อไปเครดิตภาษีซื้อไม่ได้เลย</b> (§82/5 บังคับว่าเครดิตภาษีซื้อต้องมาจากใบกำกับภาษีเต็มรูปเท่านั้น)
+            — AP Clerk เป็นคนระบุจากใบกระดาษ ระบบเดาให้ไม่ได้<br>
+            <b>ไม่ส่ง = <span class="mono text-[12px]">full_tax_invoice</span></b> (ไม่เปลี่ยนพฤติกรรมของใบเก่าก่อนมีฟิลด์นี้) · ใบลดหนี้ (<span class="mono text-[12px]">CREDIT_NOTE</span>)
+            <b>สืบทอดค่านี้จากใบที่อ้าง</b> เหมือน <span class="mono text-[12px]">vat_rate</span>/FX snapshot — ปรับใบที่ไม่เคยเครดิตได้ตั้งแต่แรก ก็ยังเครดิตไม่ได้เหมือนเดิม ·
+            มีผลตรงกับรายงาน ภ.พ.30 ที่ C8 เท่านั้น — ไม่กระทบ GL posting ตอน submit (ดู C8 rulebox ด้านล่าง)
           </p>
         </div>
       </section>
@@ -1362,8 +1375,71 @@ sequenceDiagram
             ใบลดหนี้ (<span class="mono text-[12px]">CREDIT_NOTE</span>) ถูกหักออกจากยอดของฝั่งนั้นเสมอ — ทิศทางมาจาก
             <span class="mono text-[12px]">document_type</span> ไม่ใช่เครื่องหมายตัวเลข (แถวของมันเก็บเป็นค่าบวกเหมือนเอกสารอื่น) ·
             ใบเพิ่มหนี้ (<span class="mono text-[12px]">DEBIT_NOTE</span> — มีแค่ฝั่งขาย) บวกเข้าปกติไม่ต้องพลิกเครื่องหมาย ·
-            <b>ยังไม่รองรับ</b>: ยอดภาษีซื้อยกไปเดือนถัดไป, แยกใบกำกับเต็มรูป/อย่างย่อสำหรับสิทธิ์เครดิตภาษีซื้อ,
+            <b>ยังไม่รองรับ</b>: ยอดภาษีซื้อยกไปเดือนถัดไป (§82/3 — เครดิตภาษีซื้อใช้ได้ภายใน 6 เดือนนับแต่เดือนที่ออกใบกำกับ),
             ฟอร์มพิมพ์ 16 ช่องจริง (รอ print engine) — ดู <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §4
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">แยกใบกำกับเต็มรูป/อย่างย่อแล้ว — ปิดช่องโหว่เครดิตภาษีซื้อเกินสิทธิ์ (2026-09-05)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">purchases_standard_vat_price</span>/<span class="mono text-[12px]">purchases_zero_vat_price</span>/<span class="mono text-[12px]">purchases_exempt_vat_price</span>/<span class="mono text-[12px]">input_vat</span>
+            นับเฉพาะ AP Invoice ที่ <span class="mono text-[12px]">vendor_tax_invoice_type=full_tax_invoice</span> เท่านั้น (ดู A5) —
+            ใบที่เป็น <span class="mono text-[12px]">abbreviated_tax_invoice</span> ถูก<b>ตัดออกทั้งแถว</b>แม้จะ <span class="mono text-[12px]">SUBMITTED</span> แล้วก็ตาม
+            เพราะตามกฎหมาย (§82/5) ใบกำกับภาษีอย่างย่อไม่ใช่หลักฐานเครดิตภาษีซื้อที่ใช้ได้เลย ไม่ว่าผู้ขายจะจด VAT หรือไม่<br>
+            <b>ก่อนหน้านี้ v1 นับทุกใบ SUBMITTED เท่ากันหมด</b> — ถ้ามีใครเอาเลขจาก endpoint นี้ไปกรอกยื่นจริงตอนนั้น มีความเสี่ยงเครดิตภาษีซื้อเกินสิทธิ์ตามกฎหมาย
+            (พบระหว่าง audit ของ root <span class="mono text-[12px]">CLAUDE.md</span>) · ยืนยันแล้วบน production จริง: submit ใบ full + ใบ abbreviated (ฐานภาษีเท่ากัน)
+            แล้ว <span class="mono text-[12px]">purchases_exempt_vat_price</span> ไม่ขยับตามใบหลัง — รายละเอียดกฎเต็ม:
+            <a href="srs-p5.html" style="color:var(--teal);text-decoration:underline">SRS P5 — RULE · VENDOR TAX INVOICE TYPE</a>
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">C9 · ประวัติการเปลี่ยนค่าตั้งค่า (Setting Audit Log) <span class="mono text-[13px] text-[var(--muted)]">— Finance Manager · Auditor</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          เพิ่มเข้ามา 2026-09-05 — <span class="mono text-[12px]">finance_settings</span>/<span class="mono text-[12px]">sales_settings</span>/<span class="mono text-[12px]">supplier_settings</span>
+          (ดู §09 Master Data) เป็นแถวเดี่ยวที่ถูกเขียนทับทุกครั้งที่แก้ — เดิมมีแค่ <span class="mono text-[12px]">updated_at</span>/<span class="mono text-[12px]">updated_by</span>
+          บอกว่า "ใครแก้ล่าสุด" ไม่มีประวัติว่าเคยเป็นค่าอะไรมาก่อน ตรงกับหลักควบคุมภายในสากล (COSO Internal Control Framework)
+          ที่ parameter ซึ่งเป็น control ต้องตรวจสอบย้อนหลังได้ — <span class="mono text-[12px]">read-only</span> ทั้งหมด เขียนได้ทางเดียวคือเป็นผลข้างเคียงอัตโนมัติของ
+          <span class="mono text-[12px]">PATCH</span>/<span class="mono text-[12px]">PUT</span> ตัวจริง ไม่มี endpoint ให้สร้าง/แก้/ลบเอง
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/finance-setting-audit-logs</td><td class="mono text-[11px]">finance_setting_audit_log:view</td><td>ประวัติการเปลี่ยนค่า <span class="mono text-[12px]">finance_settings</span> + <span class="mono text-[12px]">tax_configs</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /sales-bc/v1/sales-setting-audit-logs</td><td class="mono text-[11px]">sales_setting_audit_log:view</td><td>ประวัติการเปลี่ยนค่า <span class="mono text-[12px]">sales_settings</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /supplier-bc/v1/supplier-setting-audit-logs</td><td class="mono text-[11px]">supplier_setting_audit_log:view</td><td>ประวัติการเปลี่ยนค่า <span class="mono text-[12px]">supplier_settings</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// GET /finance-bc/v1/finance-setting-audit-logs — ตัวอย่างจริงบน production (2026-09-05)</span>
+<span class="c">// PATCH /finance-settings {"price_tolerance_percent": 25} ตอน 20 อยู่</span>
+[
+  {
+    <span class="s">"entity_name"</span>: <span class="s">"finance_settings"</span>,
+    <span class="s">"entity_id"</span>: <span class="s">"841a…"</span>,
+    <span class="s">"field_name"</span>: <span class="s">"price_tolerance_percent"</span>,
+    <span class="s">"old_value"</span>: <span class="s">"20"</span>,      <span class="c">// เก็บเป็น string เสมอ ไม่ว่าคอลัมน์จริงเป็นชนิดไหน</span>
+    <span class="s">"new_value"</span>: <span class="s">"25"</span>,
+    <span class="s">"created_at"</span>: <span class="s">"2026-09-05T03:11:37.885Z"</span>,
+    <span class="s">"created_by"</span>: <span class="s">"019f761a-…"</span>  <span class="c">// ผู้ทำรายการจริง</span>
+  }
+]</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">1 แถวต่อ 1 ฟิลด์ที่เปลี่ยนจริง — ไม่ใช่ 1 แถวต่อ 1 การเรียก PATCH</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">PATCH</span> ที่ส่งค่าเดิมมา (ไม่เปลี่ยนอะไรจริง) <b>ไม่เขียนแถวเลย</b> — กันไม่ให้ log ท่วมด้วยการเรียกซ้ำที่ไม่มีผล ·
+            <span class="mono text-[12px]">PATCH</span> เดียวที่เปลี่ยน 2 ฟิลด์พร้อมกันได้ <b>2 แถว</b> (คนละ <span class="mono text-[12px]">field_name</span>) ·
+            คุมเฉพาะฟิลด์ที่เป็น business control (<span class="mono text-[12px]">price_tolerance_percent</span>/<span class="mono text-[12px]">party_currency_enforcement</span>/<span class="mono text-[12px]">ledger_frozen_upto</span>
+            + <span class="mono text-[12px]">tax_configs.rate</span>/<span class="mono text-[12px]">effective_from</span>/<span class="mono text-[12px]">effective_upto</span>/<span class="mono text-[12px]">is_active</span>) ไม่ใช่ทุกคอลัมน์
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">ไม่ผูก FK กลับตารางต้นทาง — เหมือน role_policy_audit_logs ของ iam</div>
+          <p class="text-[13.5px]">
+            audit trail ต้องอยู่รอดแม้แถวต้นทางถูกลบ/แก้ต่อไป — <span class="mono text-[12px]">entity_id</span> เป็นแค่ค่าอ้างอิง ไม่มี FK constraint จริง ·
+            รายละเอียดกฎเต็ม (ฟิลด์ที่คุม, ทำไมแยก 3 ตารางแทนที่จะรวมเป็นตารางเดียวข้าม BC): <a href="srs-p5.html" style="color:var(--teal);text-decoration:underline">SRS P5 — RULE · SETTING AUDIT LOG</a>
           </p>
         </div>
       </section>
@@ -1571,6 +1647,9 @@ sequenceDiagram
               <tr><td>sales</td><td class="mono text-[11.5px]">/sales-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบเสนอราคา (%)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/supplier-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบสั่งซื้อ (%)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/finance-settings</td><td><b>GET/PATCH</b> · กรอบราคาใบตั้งหนี้ (%) — <span class="mono text-[11px]">ledger_frozen_upto</span> แก้ที่นี่ไม่ได้ ต้องผ่าน close-period (ดู C6)</td></tr>
+              <tr><td>finance</td><td class="mono text-[11.5px]">/finance-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า finance_settings/tax_configs ทีละฟิลด์ (ดู C9)</td></tr>
+              <tr><td>sales</td><td class="mono text-[11.5px]">/sales-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า sales_settings ทีละฟิลด์ (ดู C9)</td></tr>
+              <tr><td>supplier</td><td class="mono text-[11.5px]">/supplier-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า supplier_settings ทีละฟิลด์ (ดู C9)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/suppliers · /supplier-groups</td><td>ผู้ขาย + กลุ่ม</td></tr>
               <tr><td>sales</td><td class="mono text-[11.5px]">/customers · /customer-groups</td><td>ลูกค้า + กลุ่ม (วงเงินเครดิต · price list เริ่มต้น)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/tax-configs</td><td>อัตรา VAT / หัก ณ ที่จ่าย · <b>ห้ามช่วงวันซ้อนกันใน code เดียว</b></td></tr>
@@ -1828,7 +1907,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">supplier-bc · ผู้ขาย · ใบสั่งซื้อ <span class="mono text-[13px] text-[var(--muted)]">— 26 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">supplier-bc · ผู้ขาย · ใบสั่งซื้อ <span class="mono text-[13px] text-[var(--muted)]">— 27 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1859,10 +1938,11 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/supplier-bc/v1/suppliers/{id}</td><td class="mono text-[11px]">supplier:update</td></tr>
                           <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-settings</td><td class="mono text-[11px]">supplier_setting:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-settings</td><td class="mono text-[11px]">supplier_setting:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-setting-audit-logs</td><td class="mono text-[11px]">supplier_setting_audit_log:view</td></tr>
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 46 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 47 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1912,11 +1992,12 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-returns/{id}/submit</td><td class="mono text-[11px]">sales_return:submit</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-settings</td><td class="mono text-[11px]">sales_setting:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-settings</td><td class="mono text-[11px]">sales_setting:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-setting-audit-logs</td><td class="mono text-[11px]">sales_setting_audit_log:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/sales-orders/{id}/cancel</td><td class="mono text-[11px]">sales_order:cancel</td></tr>
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 56 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 57 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -1941,6 +2022,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings</td><td class="mono text-[11px]">period:view</td></tr>
               <tr><td class="mono text-[11.5px]">PATCH</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings</td><td class="mono text-[11px]">finance_setting:update</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings/close-period</td><td class="mono text-[11px]">period:close</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-setting-audit-logs</td><td class="mono text-[11px]">finance_setting_audit_log:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/fx-revaluations</td><td class="mono text-[11px]">fx_revaluation:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/fx-revaluations/{id}</td><td class="mono text-[11px]">fx_revaluation:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td></tr>
