@@ -1,14 +1,16 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-03 (#8 billing_notes ข้ามสกุล + DEBIT_NOTE ฝั่งซื้อ — ตัดสินใจแล้วทั้งคู่ + แก้บั๊กระหว่างทาง 3 จุด, กำลัง commit)**
-> ก่อนหน้าในวันเดียวกัน: seed ตรวจซ้ำ ปิดงานแล้ว (`truncates:` ครบ ไม่ต้องแก้โค้ด) ·
-> audit log กลาง — ขอบเขตเริ่มเล็ก เสร็จหมด + commit + push + deploy + E2E ผ่าน
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-05 (audit ช่องโหว่กฎหมาย/บัญชีจาก HANDOFF เดิม → เลือกทำ 3 จุด: A1 แยกใบกำกับเต็มรูป/อย่างย่อ, B1 RabbitMQ dead-letter exchange, C audit log กลางสำหรับ settings — ทั้งหมด implement + migrate + deploy + E2E บน production ผ่านแล้ว)**
+> ก่อนหน้าในวันเดียวกัน (2026-09-03): #8 billing_notes ข้ามสกุล + DEBIT_NOTE ฝั่งซื้อ — ตัดสินใจแล้วทั้งคู่ + แก้บั๊กระหว่างทาง 3 จุด ·
+> seed ตรวจซ้ำ ปิดงานแล้ว (`truncates:` ครบ ไม่ต้องแก้โค้ด) ·
+> audit log กลาง (role/policy — ขอบเขตเริ่มเล็ก) เสร็จหมด + commit + push + deploy + E2E ผ่าน
 > ก่อนหน้า: 2026-09-03 (P4 #12 unrealised FX/TFRS 21 — **commit `6254aee`+`2483cf4` + push + deploy แล้ว**) ·
 > 2026-09-02 (dotenv tip mitigate + P3 #9 credit_limit เป็น THB — **commit `18f6acf`/`21b6bd4` + push แล้ว**) ·
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
+> ✅ **2026-09-05 audit ช่องโหว่กฎหมาย/บัญชี — 3 จุดที่เลือกทำเสร็จหมด + deploy + E2E บน production ผ่าน** (migration รันแล้วทั้ง 4 BC, `permissions:sync` + grant migration แล้ว, RabbitMQ broker policy ผูกแล้วจริง) — ดู §2 หัวข้อ **2026-09-05 · Legal/Accounting Audit**
 > **P2 audit ปิดครบ 100% แล้ว — P3–P4 เหลือแค่ #10, #11 (รู้ไว้ ไม่ใช่บั๊ก ไม่ต้องรีบ, ตั้งใจไม่ทำถาวร)**
 > ✅ **`meta.warnings` + บั๊ก auto-resolved price currency — commit `986b8b1` + push + deploy สำเร็จแล้ว** (deploy run 33639969936, 8 apps reload, ไม่มี migration)
 > ✅ **dotenv tip mitigate — commit `18f6acf` + push แล้ว**
@@ -28,6 +30,7 @@
 | อยากรู้ว่า | ไปที่ |
 |---|---|
 | ตอนนี้ระบบอยู่สถานะไหน / commit อะไรไปบ้าง | §1 |
+| 2026-09-05 audit ช่องโหว่กฎหมาย/บัญชี (A1/B1/C) — ทำไปถึงไหน | §2 หัวข้อ **2026-09-05 · Legal/Accounting Audit** (เสร็จหมด + deploy + E2E แล้ว) |
 | `meta.warnings` — สถานะล่าสุด | §2 หัวข้อ **`meta.warnings`** (commit+deploy แล้ว) |
 | บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 (commit+deploy แล้ว) |
 | dotenv tip / P3 #9 credit_limit — ทำไปถึงไหน | commit แล้วทั้งคู่ (`18f6acf`/`21b6bd4`) — ดู §2 หัวข้อ **P3 #9** |
@@ -51,29 +54,29 @@
 
 | Repo | HEAD ปัจจุบัน |
 |---|---|
-| `iotechsoft-company/erp-api` | `0930cb9` docs: bump plan-erp submodule — party-currency enforcement + *_PUBLIC_URL deployment gap |
-| `iots1/plan-erp` (submodule) | `a2485e6` docs: record party-currency enforcement + the *_PUBLIC_URL deployment gap |
+| `iotechsoft-company/erp-api` | `99dd443` docs: bump plan-erp submodule — RabbitMQ reliability guide + tax invoice type/audit log docs |
+| `iots1/plan-erp` (submodule) | `3ed572d` docs: RabbitMQ dead-letter reliability guide + vendor tax invoice type + setting audit log |
 
-ไล่ commit ของรอบ 2026-09-02 (เรียงเก่า→ใหม่ ใน `erp-api`):
+ไล่ commit ของรอบ 2026-09-05 (เรียงเก่า→ใหม่):
 
-| commit | เรื่อง |
-|---|---|
-| `04b810f` | feat: ปิด P2 audit — line `raw_*`, print currency, party-currency enforcement (50 ไฟล์) |
-| `215426e` | docs(env): เพิ่ม `SALES/SUPPLIER/FINANCE_PUBLIC_URL` ใน `.env.example` |
-| `0930cb9` | docs: bump submodule (เอกสารทั้งชุด) |
+| Repo | commit | เรื่อง |
+|---|---|---|
+| `erp-api` | `197f53e` | feat: separate full/abbreviated vendor tax invoices, RMQ dead-letter exchange, settings audit log (50 ไฟล์ — A1+B1+C ทั้งชุด) |
+| `plan-erp` | `3ed572d` | docs: RabbitMQ reliability guide + vendor tax invoice type + setting audit log (7 ไฟล์) |
+| `erp-api` | `99dd443` | docs: bump plan-erp submodule |
 
-**สุขภาพระบบตอนนี้** (ยืนยันด้วยการรันจริงทั้งหมด ไม่ใช่เดา):
+**สุขภาพระบบตอนนี้** (ยืนยันด้วยการรันจริงทั้งหมด ไม่ใช่เดา — รอบ 2026-09-05):
 
-- **1474 tests / 108 suites ผ่านทั้งหมด** (+20 จากรอบ P2 — 8 leaf util + 12 service)
-- **sales/supplier/finance `migration:generate` = `No changes`** หลังรัน migration รอบนี้ (4 ตัว) ·
-  inventory/iam/auth ไม่แตะ
-- boot จริงผ่านทั้ง 4 BC ที่แตะ — `finance-bc` 55 routes · `sales-bc` 46 · `supplier-bc` 26 ·
-  `report-bc` 18 · DI resolve ครบ ไม่มี error · **ไม่มี endpoint ใหม่** จำนวนเส้นรวมจึงไม่เปลี่ยน
-- eslint **0 error 0 warning** ทั้ง repo (warning เดิมที่ `jest-setup-env.js:67` ถูก `--fix` ไปแล้ว)
-- **deploy production สำเร็จ** (run `33544353910`) — 8 apps reload, migration รายงาน `No migrations are
-  pending` ทั้ง 3 BC เพราะ dev กับ prod **ใช้ Postgres ตัวเดียวกัน** migration จึงลงไปตั้งแต่ตอน implement
-  (ดู §4 กับดัก #10)
-- **E2E ยิงผ่าน domain จริงผ่านครบ 6 เคส** — ดู §"E2E บน production จริง" ในหัวข้อ P2#5/#6/#7
+- **1585 tests / 113 suites ผ่านทั้งหมด** (+ใหม่จากรอบนี้: 6 เคส AP invoice + 5 เคส finance-settings + 2 เคส tax-configs)
+- **finance/sales/supplier `migration:generate` = `No changes`** หลังรัน migration รอบนี้ (3 ไฟล์ — 1 คอลัมน์ใหม่ `ap_invoices.vendor_tax_invoice_type` + 3 ตารางใหม่ `*_setting_audit_logs`) ·
+  `npm run permissions:sync` แล้ว sync 3 permission ใหม่เข้า `erp_iam` + grant migration (`1788577073884-GrantSettingAuditLogPermissionsToMockPolicies`) รันแล้วบน DB จริง
+- build ผ่านทั้ง finance-bc/sales-bc/supplier-bc/report-bc/iam (webpack compiled successfully)
+- eslint **0 error 0 warning** ทั้ง repo
+- **deploy production สำเร็จ** (run `33940617869`) — 8 apps reload, migration รายงาน `No migrations are
+  pending` ทุก BC เพราะรัน migrate ไว้ก่อน deploy แล้ว (dev/prod ใช้ Postgres ตัวเดียวกัน — ดู §4 กับดัก #10)
+- **E2E บน production จริงผ่านครบทุกจุด** (ดูรายละเอียดเต็มที่ §2 หัวข้อ **2026-09-05 · Legal/Accounting Audit**):
+  submit ใบ AP invoice จริง 2 ใบ (full + abbreviated) ผ่าน GL posting แล้วยืนยัน ภ.พ.30 ไม่นับใบ abbreviated ·
+  audit log endpoint คืน 200 (ไม่ 403) + บันทึก diff ถูกต้องจาก PATCH จริง · RabbitMQ broker policy ผูกครบ 8 คิวจริงบน production vhost `/`
 
 **สิ่งที่ทำเสร็จในรอบก่อนหน้า** (ทั้งหมด implement + test + เอกสารครบ): Purchase Return, stock period
 lock, AP Invoice + 3-way match, Credit Limit (SO), เพดาน WHT ที่ payment, Receipt↔Delivery Note
@@ -88,6 +91,131 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### 2026-09-05 · Legal/Accounting Audit — A1 + B1 + C ✅ **เสร็จหมด + deploy + E2E บน production ผ่าน**
+
+ผู้ใช้ให้รีวิว `HANDOFF-Feature.md` + `HANDOFF-Backlog-Reporting-Print-Tax.md` หาช่องโหว่ที่ไม่ถูกต้องตาม
+กฎหมายไทย/ไม่สอดคล้องกับการทำงานจริง (P1–P5) + จุดที่ควรมี audit log พิเศษ — เจอ 6 ประเด็น (2 legal เสี่ยงสูง,
+2 business practice, จุด audit log ที่ขาด) ผู้ใช้เลือกทำ 3 จุดจากที่เสนอ: **A1** (แยกใบกำกับเต็มรูป/อย่างย่อ),
+**B1** (RabbitMQ dead-letter exchange), **C** (audit log กลางสำหรับ settings) — ที่เหลือ (หนังสือรับรองหัก
+ณ ที่จ่าย/ทวิ 50, ภ.ง.ด. filing, 6-เดือนอายุเครดิตภาษีซื้อ) ยังเป็น backlog เหมือนเดิม
+
+#### A1 · แยกใบกำกับภาษีเต็มรูป/อย่างย่อ — ปิดช่องโหว่เครดิตภาษีซื้อเกินสิทธิ์
+
+**ปัญหาที่พบ**: `APInvoicesService.sumVatBucketsForPeriod()` (ภ.พ.30 ฝั่งซื้อ) นับทุก AP Invoice ที่
+`SUBMITTED` เท่ากันหมด ไม่แยกว่าใบที่ผู้ขายออกให้เป็นใบกำกับภาษีเต็มรูปหรืออย่างย่อ — ตาม ป.รัษฎากร §82/5
+เครดิตภาษีซื้อต้องมาจาก**ใบกำกับภาษีเต็มรูปเท่านั้น** ใบอย่างย่อ (§86/6 — สิทธิ์ของผู้ขายค้าปลีก) ใช้เครดิต
+ไม่ได้เลยแม้ผู้ขายจะจด VAT ก็ตาม (`is_supplier_vat_registered` เป็นคนละคำถาม) — ถ้าเอาเลขจาก endpoint นี้
+ไปยื่นจริงตอนนั้น มีความเสี่ยงเครดิตภาษีซื้อเกินสิทธิ์ตามกฎหมาย
+
+**แก้จริง**: enum ใหม่ `VendorTaxInvoiceType` (`full_tax_invoice` default / `abbreviated_tax_invoice`) +
+คอลัมน์ `ap_invoices.vendor_tax_invoice_type` — AP Clerk ระบุจากใบกระดาษตอน create/update (DRAFT เท่านั้น)
+· ใบลดหนี้ (`CREDIT_NOTE`) **สืบทอดจากใบที่อ้าง** เหมือน `vat_rate`/FX snapshot ไม่ resolve ใหม่ ·
+`sumVatBucketsForPeriod()` กรอง `WHERE vendor_tax_invoice_type = 'full_tax_invoice'` — ตัดออก**ทั้งแถว**
+(ไม่ใช่แค่ `vat_amount`) เพราะเอกสารทั้งใบไม่ใช่หลักฐานที่ใช้รายงานภาษีซื้อได้เลย
+
+**เทสต์ที่เพิ่ม (+6)**: default เป็น `full_tax_invoice`, AP Clerk ระบุ `abbreviated_tax_invoice` เองได้,
+credit note inherit จากบิลแม้บิลเป็น abbreviated, update() แก้ได้เฉพาะ non-credit-note, query filter
+ที่ `sumVatBucketsForPeriod()` ต่อ `vendor_tax_invoice_type`
+
+**migration** `1788576929502-AddVendorTaxInvoiceTypeAndSettingAuditLogs.ts` (`erp_finance`, รวมกับ C) —
+`ADD COLUMN ... NOT NULL DEFAULT 'full_tax_invoice'` ปลอดภัยเพราะมี default (ค่านี้ = พฤติกรรมเดิมที่นับ
+ทุกใบเป็นเครดิตได้ ไม่เปลี่ยน retroactively) — **รันแล้วบน DB จริง** verify `migration:generate:finance` =
+`No changes`
+
+**E2E บน production จริง**: สร้าง AP invoice จริง 2 ใบจาก GRN จริง (`APINV-2026-00001` full_tax_invoice,
+`APINV-2026-00002` abbreviated_tax_invoice) → submit ผ่าน GL posting ทั้งคู่ (Dr 1150/Cr 2110 balance
+ถูกต้อง) → `GET /vat-returns?year=2026&month=9` **`purchases_exempt_vat_price` คงที่ 450 หลัง submit ใบ
+full เพียงใบเดียว และ**ไม่ขยับเป็น 900**หลัง submit ใบ abbreviated เพิ่ม** — พิสูจน์ว่ากรองถูกต้องจริงด้วย
+ข้อมูลจริงบน production ไม่ใช่แค่ unit test (เอกสารทดสอบทั้งสองใบผู้ใช้ยืนยันให้เก็บไว้ได้ ไม่ต้องลบ — dev DB)
+
+**เอกสาร**: `api-workflow-guide.html` A5 (ตัวอย่าง body + rulebox §82/5 vs §86/6) + C8 (ลบ "ยังไม่รองรับ"
+ที่ล้าสมัย + rulebox ยืนยันผลทดสอบจริง) · `srs-p5.html` rulebox ใหม่ `RULE · VENDOR TAX INVOICE TYPE`
+
+#### B1 · RabbitMQ Dead-Letter Exchange — ปิด (บางส่วน) ช่องโหว่ event หายเงียบ
+
+**ปัญหาเดิม** (จาก `HANDOFF-Backlog-Reporting-Print-Tax.md` §2): RMQ server ทุก BC ตั้ง `noAck:false` +
+`prefetchCount:1` — event ที่ route ไปหา BC ที่ไม่มี `@EventPattern` ตรงกันเลย (report-bc/sales-bc/
+supplier-bc ทั้งสามยังไม่มี consumer เลยสักตัว) จะโดน `nack(msg,false,false)` แล้ว**หายถาวรอย่างเงียบๆ**
+ไม่มี error ไม่มี log
+
+**แก้จริง**: `ensureDeadLetterInfrastructure()` ใหม่ใน `microservice-transport.util.ts` — ประกาศ exchange
+`erp.dlx` (fanout, durable) + queue `erp.dlq` (durable) + binding ทุกครั้งที่ BC บูต (idempotent, best-effort
+ไม่บล็อกบูตถ้า broker ต่อไม่ติด) เรียกจาก `bootstrapApplication()` ก่อน `buildServerOptions()` ·
+**ไม่แก้ที่ `queueOptions.arguments` ของคิวเดิมโดยตรง** — RabbitMQ ปฏิเสธการ redeclare คิวที่มีอยู่แล้วด้วย
+arguments ต่างกัน (`PRECONDITION_FAILED`) ซึ่งจะทำทุก client ข้าม BC ต่อไม่ติดทันทีที่ deploy — ใช้ **broker
+policy** แทน (ไม่ต้อง redeclare คิวเลย):
+
+```bash
+rabbitmqctl set_policy dlx-erp '^erp_.*_queue$' \
+  '{"dead-letter-exchange":"erp.dlx"}' --apply-to queues
+```
+
+**ยืนยันจริงบน production**: ผ่าน RabbitMQ Management API (`172.16.0.220:15672`, vhost `/` คือ production
+จริง ต่างจาก `/local-pp` ที่เป็น dev เครื่องนี้) — `erp.dlx`/`erp.dlq` ถูกสร้างจริงหลัง deploy · policy
+`dlx-erp` apply แล้ว ทั้ง 8 คิว (`erp_auth_queue` ... `erp_supplier_queue`) โชว์ `policy: "dlx-erp"` โดย
+`arguments` ยังเป็น `{}` เหมือนเดิม (ไม่กระทบ consumer ที่ต่ออยู่แม้แต่วินาทีเดียว)
+
+**ยังไม่แก้ต้นเหตุ** — report-bc/sales-bc/supplier-bc ยังไม่มี `@EventPattern` เลย (คือ P6 CQRS Read Model
+ที่ยังไม่ได้ทำ) event ที่ route มาตอนนี้จะไปนอนรอที่ `erp.dlq` แทนที่จะหายถาวร แต่ยังต้องมีคนทำ P6 จริงถึงจะ
+ใช้ข้อมูลนั้นได้ — ดู `srs-p6.html` (แก้ note ให้ตรงกับโค้ดจริงแล้ว) และ backlog handoff §2/§3
+
+**เอกสาร**: หน้าใหม่ `rabbitmq-reliability-guide.html` (7 หัวข้อเต็ม — ack contract, head-of-line block
+vs silent message loss, ทำไมต้องใช้ broker policy, วิธี monitor/กู้คืนจาก DLQ, checklist ก่อนเพิ่ม consumer
+ใหม่) ลงทะเบียนใน `index.html`/`components.js` แล้ว · ลิงก์จาก `backend-convention.html`/`srs-p6.html`
+
+#### C · Audit Log กลางสำหรับ Settings — ปิดช่องโหว่ "แก้ค่าควบคุมแล้วไม่มีร่องรอย"
+
+**ปัญหาที่พบ**: `finance_settings`/`sales_settings`/`supplier_settings` เป็น**แถวเดี่ยวที่ถูกเขียนทับ**
+ทุกครั้งที่ `PATCH`/`PUT` — มีแค่ `updated_at`/`updated_by` จาก `BaseEntity` บอก "ใครแก้ล่าสุด" **ไม่มี
+ประวัติว่าเคยเป็นค่าอะไรมาก่อน** — ถ้ามีคนดัน `price_tolerance_percent` ขึ้นชั่วคราวเพื่อดันใบราคาผิดปกติผ่าน
+แล้วเซ็ตกลับ ไม่มีร่องรอยเหลือเลย (ต่างจาก `role_policy_audit_logs`/`user_role_audit_logs` ของ iam-bc ที่มี
+audit log อยู่แล้ว — แต่คุมแค่สิทธิ์ ไม่คุม settings ทางการเงิน/ราคา)
+
+**แก้จริง**: util ใหม่ `diffAuditableFields()` ใน `@lib/common` (ใช้ร่วม 3 BC) + ตารางใหม่ 3 ตัว
+(`finance_setting_audit_logs` คุมทั้ง `finance_settings` และ `tax_configs` ด้วย `entity_name` แยก,
+`sales_setting_audit_logs`, `supplier_setting_audit_logs`) — 1 แถวต่อ 1 ฟิลด์ที่เปลี่ยนจริง (ไม่เปลี่ยน =
+ไม่เขียนแถว) ไม่ผูก FK กลับตารางต้นทาง (เหตุผลเดียวกับ `role_policy_audit_logs`) · `finance-setting-audit-log`
+เป็นโมดูลแยกต่างหาก (ไม่ใช่ของ `finance-setting` หรือ `tax-config` เอง) เพราะทั้งสองโมดูลต้องเขียนเข้ามันและ
+ห้าม import กันเอง (root CLAUDE.md § "Cross-module data access") — ทั้งสองโมดูล import โมดูลนี้แบบทางเดียว
+แทน · endpoint `GET /*-setting-audit-logs` read-only ล้วน (เหมือน `LedgerEntriesController`)
+
+**ฟิลด์ที่คุม**: `price_tolerance_percent`/`party_currency_enforcement`/`ledger_frozen_upto` (settings) +
+`rate`/`effective_from`/`effective_upto`/`is_active` (`tax_configs`) — เฉพาะ business control ไม่ใช่
+`code`/`name_th`/`name_en` ที่เป็น cosmetic
+
+**permission ใหม่ 3 ตัว**: `finance_setting_audit_log:view`, `sales_setting_audit_log:view`,
+`supplier_setting_audit_log:view` — **เรียนจากบั๊ก P4#12**: รัน `npm run permissions:sync` (ยืนยัน 3 added,
+0 removed, 216 unchanged) **ก่อน** เขียน grant migration เสมอ — migration
+`1788577073884-GrantSettingAuditLogPermissionsToMockPolicies.ts` (`erp_iam`) รันแล้วบน DB จริง
+
+**migration**: `1788576929502-AddVendorTaxInvoiceTypeAndSettingAuditLogs.ts` (`erp_finance`, รวมกับ A1) ·
+`1788576954611-AddSalesSettingAuditLogs.ts` (`erp_sales`) ·
+`1788576975252-AddSupplierSettingAuditLogs.ts` (`erp_supplier`) — ทั้งหมด `CREATE TABLE` ล้วน ไม่มี data
+risk เลย รันแล้วบน DB จริงทั้ง 3 BC verify `migration:generate` = `No changes` ทุกตัว
+
+**เทสต์ที่เพิ่ม (+7)**: `applyPeriodLock`/`updateSettings` บันทึก diff ถูกต้อง + ไม่เขียนแถวเมื่อไม่เปลี่ยน
+(finance) · เช่นกันสำหรับ `TaxConfigsService.update()`
+
+**E2E บน production จริง**: `GET /finance-setting-audit-logs`/`sales-setting-audit-logs`/
+`supplier-setting-audit-logs` → **200** (ไม่ 403 — permission grant ทำงานตั้งแต่ login ครั้งแรก ไม่ต้องรอ
+login ใหม่เหมือน P4#12) · `PATCH /finance-settings {price_tolerance_percent: 25}` (จาก 20) → `GET
+finance-setting-audit-logs` เห็นแถวใหม่ `{field_name: "price_tolerance_percent", old_value: "20",
+new_value: "25", created_by: <user จริง>}` ทันที → revert กลับ 20 แล้ว (มีแถว audit ของการ revert ด้วย)
+
+**เอกสาร**: `api-workflow-guide.html` C9 ใหม่ (endpoint + ตัวอย่าง response จริงจาก production) + แถวใน
+Master Data table + endpoint index (finance-bc 56→57, sales-bc 46→47, supplier-bc 26→27 endpoints) ·
+`srs-p5.html` rulebox ใหม่ `RULE · SETTING AUDIT LOG` (อ้างอิง COSO Internal Control Framework)
+
+**ตรวจแล้วรวมทั้ง 3 จุด**: 1585/1585 test ผ่าน (113 suites) · eslint 0/0 ทั้ง repo · build ผ่านทั้ง
+finance-bc/sales-bc/supplier-bc/report-bc/iam · deploy production สำเร็จ (run `33940617869`, 8 apps
+reload, 4 BC migration รายงาน `No migrations are pending` เพราะรันไว้ก่อน deploy แล้ว) · commit + push
+ทั้งสอง repo แล้ว (`erp-api` `197f53e`+`99dd443`, `plan-erp` `3ed572d`)
+
+**ที่ยังเป็น backlog** (ไม่ได้เลือกทำรอบนี้ — อยู่ใน backlog handoff เดิม): หนังสือรับรองหัก ณ ที่จ่าย/ทวิ 50
+(ต้องเพิ่ม `ap_invoices.supplier_tax_id` + `tax_configs.income_type` ก่อน), การยื่น ภ.ง.ด. ต่อกรมสรรพากร
+(ไม่เคยถูกพูดถึงในเอกสารเดิมเลย — คนละเรื่องกับหนังสือรับรอง), 6-เดือนอายุเครดิตภาษีซื้อ (§82/3), ยอดยกไป/
+สถานะ "ยื่นแล้ว" ต่อเดือนของ ภ.พ.30
 
 ### `meta.warnings` ใน JSON:API envelope ✅ **เสร็จสมบูรณ์ 2026-09-02 — commit `986b8b1` + push + deploy สำเร็จ**
 

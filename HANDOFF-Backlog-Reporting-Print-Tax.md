@@ -11,15 +11,21 @@
 > **อัปเดต 2026-09-04 (รอบสอง)** — §4 ภ.พ.30 **v1 (คำนวณอย่างเดียว) implement แล้ว**
 > (`GET /finance-bc/v1/vat-returns`) — ดู §4.3 · ที่เหลือ 3 หัวข้อ (§1 พิมพ์เอกสาร, §2 report-bc
 > consumer, §3 P6, §5 หนังสือหัก ณ ที่จ่าย) ยังเป็น backlog เหมือนเดิม
+>
+> **อัปเดต 2026-09-05** — จากการ review เอกสารนี้หาช่องโหว่กฎหมาย/บัญชี: **§2 ข้อ 1 (dead-letter
+> exchange) ทำแล้ว** (ดู `HANDOFF-Feature.md` § "2026-09-05 · Legal/Accounting Audit" ส่วน B1 +
+> `rabbitmq-reliability-guide.html`) — แต่ต้นเหตุจริง (ไม่มี consumer) ยังไม่แก้ ยังต้องรอ §3 P6 ·
+> **§4.4 ข้อ 1 (แยกใบกำกับเต็มรูป/อย่างย่อ) ทำแล้ว** ดู §4.4 ด้านล่าง — ที่เหลือทั้งหมด (§1, §3, §5,
+> §4.4 ข้อ 2–3) ยังเป็น backlog เหมือนเดิม
 
 ## 0 · สรุปสั้น — ทำไมแยกเป็น backlog แทนที่จะทำเลย
 
 | หัวข้อ | สถานะ | ขนาดคร่าว ๆ |
 |---|---|---|
 | §1 พิมพ์เอกสารจริงไม่ได้เลยสักใบ | Backlog — ต้องตัดสินใจว่า BC ไหนเรียก report-bc ยังไง ไม่ใช่ correctness bug เดียว แต่เป็นงานสร้างฟีเจอร์ใหม่ | หลายวัน (ทั้งชุด) |
-| §2 report-bc consumer หาย (finding เกี่ยวเนื่อง) | Backlog — ต้นเหตุของทั้ง P6 และ item.updated/stock.adjusted ที่เพิ่ง emit ได้จริง — แก้จริงต้องมี read model ให้ project เข้า (คือ P6 นั่นเอง) | รวมอยู่ใน P6 |
+| §2 report-bc consumer หาย (finding เกี่ยวเนื่อง) | ✅ **ข้อ 1 (dead-letter exchange) ทำแล้ว 2026-09-05** — ต้นเหตุจริง (ไม่มี consumer) ยังเป็น Backlog รวมอยู่ใน P6 | รวมอยู่ใน P6 (dead-letter exchange ปิดแล้ว ไม่รวม) |
 | §3 P6 ทั้งเฟส (CQRS Read Model) | Backlog — 0/2 แถวใน Gantt (`report: event consumers + read models` BE 56 · `report: APIs` BE 48) + FE 120 ชม. — รวม **224 ชม.** | ~224 ชม. (104 BE + 120 FE), W22–25 ใน Gantt เดิม |
-| §4 ภ.พ.30 (VAT return report) | **v1 implement แล้ว 2026-09-04** — คำนวณอย่างเดียว ไม่มี state/ฟอร์มพิมพ์ (ดู §4.3/§4.4) | ที่เหลือ: 3–4 วัน (§4.5) |
+| §4 ภ.พ.30 (VAT return report) | v1 implement แล้ว 2026-09-04 — **แยกใบกำกับเต็มรูป/อย่างย่อ (§4.4 ข้อ 1) ทำแล้ว 2026-09-05** — ที่เหลือ §4.4 ข้อ 2–3 | ที่เหลือ: 2–3 วัน (§4.5 ปรับแล้ว) |
 | §5 หนังสือรับรองหัก ณ ที่จ่าย | Backlog — เหมือน §1 (ต้องมี print path) + ยังขาดบาง snapshot field (`ap_invoices.supplier_tax_id`) ที่ต้องเพิ่มก่อน | 2–3 วัน (ประเมินใน §5.5) |
 
 **ลำดับที่แนะนำถ้าจะหยิบมาทำต่อ**: §2 (root cause) → §3 P6 แกนกลาง (event consumers +
@@ -141,11 +147,17 @@ finance-bc มี consumer จริงแล้ว — ปัญหาอยู
 
 ### ทางแก้ระยะสั้น (ทำได้โดยไม่ต้องรอ P6 เต็มเฟส)
 
-1. เพิ่ม dead-letter exchange ให้ RMQ setup — อย่างน้อยข้อความที่ถูก nack จะไปนอนรอที่ DLQ แทนที่จะ
-   หายจริง ให้ทีม ops เห็นและ requeue ได้ทีหลัง
+1. ~~เพิ่ม dead-letter exchange ให้ RMQ setup~~ ✅ **ทำแล้ว 2026-09-05** — `erp.dlx`/`erp.dlq` ประกาศ
+   ทุก BC ตอนบูต + broker policy `dlx-erp` ผูกเข้ากับทั้ง 8 คิวบน production จริงแล้ว (ไม่ redeclare
+   คิวเดิม — ดู `rabbitmq-reliability-guide.html` §05 ว่าทำไม) ข้อความที่ nack เพราะไม่มี handler ตรง
+   ไปนอนรอที่ `erp.dlq` แทนที่จะหายจริงแล้วตอนนี้ — รายละเอียดเต็ม: `HANDOFF-Feature.md` §
+   "2026-09-05 · Legal/Accounting Audit" ส่วน B1
 2. Monitoring: alert เมื่อ queue ของ report-bc มี `messages_ready` ค้างสูงผิดปกติ (สัญญาณเดียวกับที่
-   root CLAUDE.md ใช้วินิจฉัย ack bug — แต่ที่นี่ค้างเพราะไม่มี handler ไม่ใช่ handler ไม่ ack)
-3. ทั้งสองข้อนี้เป็น **infra fix เล็ก ไม่ต้องรอ P6** ควรพิจารณาทำแยกก่อนเพื่อหยุดเลือดที่ไหลอยู่ตอนนี้
+   root CLAUDE.md ใช้วินิจฉัย ack bug — แต่ที่นี่ค้างเพราะไม่มี handler ไม่ใช่ handler ไม่ ack) —
+   **ยังไม่ทำ** (ไม่มี Grafana alert rule ให้ `erp.dlq`/`messages_ready` ยัง ต้องต่อเข้า
+   `observability-logging-guide.html` เอง)
+3. ข้อ 1 ปิดแล้ว — **ต้นเหตุจริงยังไม่แก้**: report-bc/sales-bc/supplier-bc ยังไม่มี consumer เลยสักตัว
+   ข้อความที่ dead-letter ตอนนี้แค่ไม่หาย ไม่ได้แปลว่าถูกประมวลผล ยังต้องรอ P6 (§3) ถึงจะมี consumer จริง
 
 ---
 
@@ -256,13 +268,12 @@ combine logic + `businessMonthRange` boundary/rollover) · migration
 
 ### 4.4 สิ่งที่ยังเป็น backlog (ไม่อยู่ใน v1)
 
-1. **แยกใบกำกับเต็มรูป vs อย่างย่อ** — `Receipt.document_type` มีอยู่แล้ว (`TAX_INV`/`ABB_TAX_INV`/
-   plain receipt) ภาษีซื้อของผู้อื่นที่ซื้อจากเรา (ใบกำกับอย่างย่อ) **ใช้เครดิตภาษีไม่ได้** ตาม
-   ประมวลรัษฎากร — แต่นี่คือกฎของ**ผู้ซื้อ** ไม่ใช่ของเรา (เราคือผู้ออก) กฎที่เกี่ยวกับเราโดยตรงคือ
-   ภาษีซื้อฝั่งเรา (จาก `APInvoice` ที่รับจาก supplier) ต้องมาจากใบกำกับเต็มรูปเท่านั้น — **ต้องตรวจ
-   ว่า `APInvoice` มีการเก็บ document_type ของใบกำกับที่ supplier ออกให้หรือไม่** (ยังไม่ได้ตรวจใน
-   รอบนี้ — ต้องสำรวจก่อนออกแบบ query จริง) — v1 นับภาษีซื้อจากทุก `APInvoice` ที่ `SUBMITTED` เท่ากัน
-   หมด ไม่ได้กรองแยกด้วยเหตุผลนี้
+1. ~~**แยกใบกำกับเต็มรูป vs อย่างย่อ**~~ ✅ **ทำแล้ว 2026-09-05** — `ap_invoices.vendor_tax_invoice_type`
+   (enum `full_tax_invoice`/`abbreviated_tax_invoice`, AP Clerk ระบุจากใบกระดาษ) + `sumVatBucketsForPeriod()`
+   กรองเฉพาะ `full_tax_invoice` (ตัดทั้งแถว ไม่ใช่แค่ `vat_amount`) — ยืนยันด้วย E2E จริงบน production
+   (submit ใบ full + abbreviated, `purchases_exempt_vat_price` ไม่ขยับตามใบ abbreviated) รายละเอียดเต็ม:
+   `HANDOFF-Feature.md` § "2026-09-05 · Legal/Accounting Audit" ส่วน A1, `srs-p5.html` RULE · VENDOR TAX
+   INVOICE TYPE (§82/5, §86/6)
 2. **6 เดือนอายุใช้สิทธิภาษีซื้อ** — ถ้าใบกำกับซื้อเดือนก่อน ๆ ถูกบันทึกช้า ต้องมีทางระบุว่าจะใช้
    เครดิตในเดือนไหน (ปกติ ภ.พ.30 มีช่องสำหรับภาษีซื้อสะสมที่ยังไม่ได้ใช้) — v1 สมมติว่าทุกใบกำกับถูก
    บันทึกภายในเดือนที่เกิดจริงเสมอ ไม่มีแนวคิด "ภาษีซื้อที่ยังไม่ได้ใช้เครดิต" เลย
@@ -276,7 +287,8 @@ combine logic + `businessMonthRange` boundary/rollover) · migration
 ### 4.5 ประเมินขนาดงานคร่าว ๆ ที่เหลือ
 
 ฟอร์มพิมพ์จริง (ขึ้นกับ §1 เสร็จก่อน): 1 วัน · stateful "ยื่นแล้ว" + snapshot ต่อเดือน (ตาราง +
-migration + workflow): 1–2 วัน · แยกใบกำกับเต็มรูป/อย่างย่อ + 6 เดือนอายุเครดิต (ถ้าต้องการ): 1 วัน
+migration + workflow): 1–2 วัน · ~~แยกใบกำกับเต็มรูป/อย่างย่อ~~ ✅ ทำแล้ว 2026-09-05 (ดู §4.4 ข้อ 1) ·
+6 เดือนอายุเครดิต (§82/3, ถ้าต้องการ): 1 วัน
 
 ---
 
