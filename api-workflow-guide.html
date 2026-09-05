@@ -1622,13 +1622,15 @@ sequenceDiagram
 
         <h3 class="display text-xl mt-10 mb-4">E2 · P6 Read Model — แดชบอร์ดข้าม BC <span class="mono text-[13px] text-[var(--muted)]">— Manager · Analyst</span></h3>
         <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
-          เพิ่มเข้ามา 2026-09-05 — report-bc ได้ <span class="mono text-[12px]">@EventPattern</span> ตัวแรกของตัวเองแล้ว
-          (ก่อนหน้านี้ 0 ตัว แม้ <span class="mono text-[12px]">DOMAIN_EVENT_ROUTING</span> จะ route ทุก event มาให้แล้วก็ตาม — ดู
-          <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §2/§3) เลือกทำเฉพาะ 2 read model ที่ event ต้นทางมีอยู่จริงในโปรดักชัน
+          ครบทั้ง 4 read model แล้ว 2026-09-05 — เริ่มจาก 2 ตัวที่ event ต้นทางมีอยู่จริงในโปรดักชัน
           (<span class="mono text-[12px]">profit_by_lots</span> จาก <span class="mono text-[12px]">profit.calculated</span>,
-          <span class="mono text-[12px]">expiry_alerts</span> จาก <span class="mono text-[12px]">expiry.approaching</span>) —
-          <span class="mono text-[12px]">sales_summary</span>/<span class="mono text-[12px]">low_stock</span> ยังทำไม่ได้เพราะ event ต้นทาง
-          (<span class="mono text-[12px]">so.confirmed</span>/<span class="mono text-[12px]">invoice.issued</span>/<span class="mono text-[12px]">stock.low</span>) ยังไม่มีอยู่จริง
+          <span class="mono text-[12px]">expiry_alerts</span> จาก <span class="mono text-[12px]">expiry.approaching</span>) แล้วต่อด้วย
+          <span class="mono text-[12px]">low_stocks</span> (จาก <span class="mono text-[12px]">stock.low</span> — พบว่ามีอยู่แล้วในโปรดักชันจากสแกนกลางคืนของ
+          <span class="mono text-[12px]">ReorderAlertModule</span> ไม่ต้องเพิ่มฝั่ง producer เลย) และ <span class="mono text-[12px]">sales_summaries</span>
+          (rollup รายวัน จาก <span class="mono text-[12px]">invoice.issued</span> ที่เพิ่ม hook ใหม่ใน <span class="mono text-[12px]">ReceiptsService.issue()</span>
+          + <span class="mono text-[12px]">profit.calculated</span> เดิม — ตัดขอบเขต <span class="mono text-[12px]">so.confirmed</span> ออกจากแผนเดิมของ srs-p6.html §03
+          เพราะต้องสร้าง outbox module แรกของ sales-bc ทั้งหมดเพื่อรับรู้รายได้ตอน order commitment ซึ่งไม่ตรงกับที่อื่นในระบบ — ดู
+          <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §2/§3)
         </p>
         <div class="card overflow-hidden mb-5">
           <table class="d">
@@ -1636,8 +1638,21 @@ sequenceDiagram
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/profit-by-lots</td><td class="mono text-[11px]">profit_by_lot:view</td><td>กำไรขั้นต้นต่อล็อตต่อใบขาย — <span class="mono text-[12px]">filter=lot_id</span>/<span class="mono text-[12px]">product_id</span>/<span class="mono text-[12px]">sold_at</span> ได้</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td><td>ล็อตในหน้าต่างเตือนหมดอายุ — สำเนาข้าม BC ของรายงานที่ inventory-bc มีอยู่แล้ว (ดู E1)</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/low-stocks</td><td class="mono text-[11px]">low_stock:view</td><td>สินค้าที่สต็อกต่ำกว่าจุดสั่งซื้อ — สำเนาข้าม BC ของสแกนกลางคืน inventory-bc, upsert ต่อ <span class="mono text-[12px]">product_id</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/sales-summaries</td><td class="mono text-[11px]">sales_summary:view</td><td>ยอดขาย/กำไรขั้นต้น/จำนวนบิลรายวัน — 1 แถวต่อวัน (Bangkok), เพิ่มค่าทับทุกครั้งที่มี event ใหม่</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">expiry_alerts เดิม bind ผิด transport มาตั้งแต่ deploy เช้าวันเดียวกัน — พบและแก้ระหว่างทำ low_stocks</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">expiry.approaching</span>/<span class="mono text-[12px]">stock.low</span> มาจาก inventory-bc's
+            <span class="mono text-[12px]">emitWithContext(client, { cmd: '...' }, payload)</span> โดยตรง — pattern เป็น object และ envelope เป็น
+            <span class="mono text-[12px]">IMicroservicePayload&lt;T&gt;</span> ไม่ใช่ <span class="mono text-[12px]">IDomainEventEnvelope</span> ของ outbox/relay
+            ที่ <span class="mono text-[12px]">profit.calculated</span> ใช้ — <span class="mono text-[12px]">ExpiryAlertEventsController</span> ตอน deploy เช้าวันนั้น
+            bind ด้วย string pattern เปล่าซึ่ง<b>ไม่มีวันแมตช์กับ object pattern จริง</b> ทำให้ event ทุกตัวหายเข้า <span class="mono text-[12px]">erp.dlq</span> เงียบ ๆ
+            แก้แล้ววันเดียวกัน (ดู srs-p6.html §06) — <span class="mono text-[12px]">low_stocks</span> ใหม่ใช้ pattern ที่ถูกต้องตั้งแต่แรก
+          </p>
         </div>
         <div class="rulebox mb-4">
           <div class="rc mb-1">คนละ endpoint กับ inventory-bc's GET /expiry-alerts แม้ permission ชื่อเดียวกัน</div>

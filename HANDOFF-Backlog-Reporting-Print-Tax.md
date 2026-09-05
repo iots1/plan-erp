@@ -16,8 +16,9 @@
 > exchange) ทำแล้ว** (ดู `HANDOFF-Feature.md` § "2026-09-05 · Legal/Accounting Audit" ส่วน B1 +
 > `rabbitmq-reliability-guide.html`) — แต่ต้นเหตุจริง (ไม่มี consumer) ยังไม่แก้ ยังต้องรอ §3 P6 ·
 > **§4.4 ข้อ 1 (แยกใบกำกับเต็มรูป/อย่างย่อ) ทำแล้ว** ดู §4.4 ด้านล่าง ·
-> **§3 P6 เริ่มแล้วจริง 2/4 read model** (`profit_by_lot`, `expiry_alerts` — ดู §3.4) — ที่เหลือ
-> (§1, §3 อีก 2 ตัวที่ blocked, §5, §4.4 ข้อ 2–3) ยังเป็น backlog เหมือนเดิม
+> **§3 P6 ครบ 4/4 read model แล้ว** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary` —
+> ดู §3.4/§3.5) implement + migrate ผ่านหมด **ยังไม่ deploy** — ที่เหลือ (§1, §3 FE 120 ชม., §5, §4.4
+> ข้อ 2–3) ยังเป็น backlog เหมือนเดิม
 
 ## 0 · สรุปสั้น — ทำไมแยกเป็น backlog แทนที่จะทำเลย
 
@@ -25,7 +26,7 @@
 |---|---|---|
 | §1 พิมพ์เอกสารจริงไม่ได้เลยสักใบ | Backlog — ต้องตัดสินใจว่า BC ไหนเรียก report-bc ยังไง ไม่ใช่ correctness bug เดียว แต่เป็นงานสร้างฟีเจอร์ใหม่ | หลายวัน (ทั้งชุด) |
 | §2 report-bc consumer หาย (finding เกี่ยวเนื่อง) | ✅ **ข้อ 1 (dead-letter exchange) ทำแล้ว 2026-09-05** — ต้นเหตุจริง (ไม่มี consumer) ยังเป็น Backlog รวมอยู่ใน P6 | รวมอยู่ใน P6 (dead-letter exchange ปิดแล้ว ไม่รวม) |
-| §3 P6 ทั้งเฟส (CQRS Read Model) | **2/4 read model ทำแล้ว 2026-09-05** (`profit_by_lot`, `expiry_alerts` — consumer+ตาราง+API ครบ) · `sales_summary`/`low_stock` ยัง Blocked (event ต้นทางไม่มีอยู่จริง) · FE ยังไม่แตะ | เหลือ: FE 120 ชม. + งานฝั่ง producer สำหรับ 2 event ที่ยังไม่มี (ไม่ประเมินไว้ในเดิม) |
+| §3 P6 ทั้งเฟส (CQRS Read Model) | ✅ **4/4 read model ทำแล้ว 2026-09-05** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary` — consumer+ตาราง+API ครบ, migrate แล้ว) · **ยังไม่ deploy** · FE ยังไม่แตะ | เหลือ: FE 120 ชม. + deploy |
 | §4 ภ.พ.30 (VAT return report) | v1 implement แล้ว 2026-09-04 — **แยกใบกำกับเต็มรูป/อย่างย่อ (§4.4 ข้อ 1) ทำแล้ว 2026-09-05** — ที่เหลือ §4.4 ข้อ 2–3 | ที่เหลือ: 2–3 วัน (§4.5 ปรับแล้ว) |
 | §5 หนังสือรับรองหัก ณ ที่จ่าย | Backlog — เหมือน §1 (ต้องมี print path) + ยังขาดบาง snapshot field (`ap_invoices.supplier_tax_id`) ที่ต้องเพิ่มก่อน | 2–3 วัน (ประเมินใน §5.5) |
 
@@ -162,16 +163,16 @@ finance-bc มี consumer จริงแล้ว — ปัญหาอยู
 
 ---
 
-## 3 · P6 ทั้งเฟส — CQRS Read Model (2/4 read model ทำแล้ว 2026-09-05 · ~224 ชม. เดิม)
+## 3 · P6 ทั้งเฟส — CQRS Read Model (4/4 read model ทำแล้ว 2026-09-05 · ~224 ชม. เดิม)
 
 อ้างอิง `srs-p6.html` (มีแผนเต็มอยู่แล้ว หัวข้อ 01–05) และ `erp-architecture.html` แถว Gantt:
 
 | Task | ชม. | สถานะ |
 |---|---|---|
-| `report: event consumers + read models` | BE 56 | ✅ **2/4 ทำแล้ว 2026-09-05** — `profit_by_lot` (จาก `profit.calculated`) + `expiry_alerts` (จาก `expiry.approaching`) มี `@EventPattern` consumer + ตาราง + `processed_events` จริงแล้ว · `sales_summary`/`low_stock` ยัง **blocked** (ไม่ใช่แค่ยังไม่ทำ — event ต้นทางที่ต้องใช้ยังไม่มีอยู่จริง ดู §3.1) |
-| `report: APIs (sales/inv/expiry/profit-by-lot)` | BE 48 | ✅ **2/4 ทำแล้ว** — `GET /report-bc/v1/profit-by-lots`, `GET /report-bc/v1/expiry-alerts` (ดู `api-workflow-guide.html` E2) |
+| `report: event consumers + read models` | BE 56 | ✅ **4/4 ทำแล้ว 2026-09-05** — `profit_by_lot`/`expiry_alerts`/`low_stock`/`sales_summary` มี `@EventPattern` consumer + ตาราง + idempotency ครบ (ดู §3.1, §3.4, §3.5) |
+| `report: APIs (sales/inv/expiry/profit-by-lot)` | BE 48 | ✅ **4/4 ทำแล้ว** — `GET /report-bc/v1/profit-by-lots`, `/expiry-alerts`, `/low-stocks`, `/sales-summaries` (ดู `api-workflow-guide.html` E2) |
 | FE ที่เกี่ยวข้อง | FE 120 | `st-wait` (?) — รอทีม FE ตรวจ |
-| **รวม P6** | **224** | **2/4 read model ทำแล้ว (BE) · sales_summary/low_stock blocked · FE ยังไม่แตะ** |
+| **รวม P6** | **224** | **4/4 read model ทำแล้ว (BE) · FE ยังไม่แตะ · ยังไม่ deploy รอบ low_stock/sales_summary** |
 
 ### 3.1 ขอบเขตจาก srs-p6.html (ของเดิม ยังใช้ได้ทั้งหมด)
 
@@ -180,15 +181,16 @@ finance-bc มี consumer จริงแล้ว — ปัญหาอยู
 
   | Read Model | สร้างจาก event | ใช้ใน Dashboard | สถานะ |
   |---|---|---|---|
-  | `sales_summary` | `so.confirmed` · `invoice.issued` | ยอดขายรายวัน/เดือน | ❌ **Blocked** — ทั้งสอง event ยังไม่มีอยู่จริงใน `DomainEvent` enum (ตรวจแล้ว 2026-09-05) ต้องตัดสินใจ+emit ฝั่ง sales-bc/finance-bc ก่อน |
+  | `sales_summary` | ~~`so.confirmed` · `invoice.issued`~~ → **`invoice.issued` เท่านั้น** | ยอดขายรายวัน/เดือน | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/sales-summaries` · ตัดขอบเขต `so.confirmed` ออกโดยตัดสินใจร่วมกับผู้ใช้ (ดู §3.5) |
   | `profit_by_lot` | `profit.calculated` | กำไรขั้นต้นต่อล็อต | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/profit-by-lots` |
-  | `expiry_alerts` | `expiry.approaching` (เฉพาะตัวนี้พอ — ดูหมายเหตุ) | ล็อตใกล้หมดอายุ | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/expiry-alerts` |
-  | `low_stock` | `stock.deducted` · `stock.low` | สินค้าใกล้หมด | ❌ **Blocked** — `stock.low` ไม่มีอยู่จริงใน `DomainEvent` enum · ยังไม่ตัดสินใจว่า `stock.adjusted` (มีอยู่แล้ว) ควรกินด้วยหรือไม่ |
+  | `expiry_alerts` | `expiry.approaching` (เฉพาะตัวนี้พอ — ดูหมายเหตุ) | ล็อตใกล้หมดอายุ | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/expiry-alerts` (bind ผิด transport ตอน deploy เช้าวันเดียวกัน — แก้แล้ว ดู §3.5) |
+  | `low_stock` | ~~`stock.deducted` · `stock.low`~~ → **`stock.low` เท่านั้น** | สินค้าใกล้หมด | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/low-stocks` · `stock.low` มีอยู่แล้วจริงจากสแกนกลางคืน `ReorderAlertModule` (คนละ mechanism จาก `DomainEvent` enum — ดู §3.5) |
 
   (หมายเหตุ: `expiry_alerts` ที่ implement จริงไม่ได้กิน `lot.created` ตามที่แผนเดิมเขียนไว้ — payload ของ
   `expiry.approaching` เป็น snapshot ครบทุกฟิลด์ต่อล็อตอยู่แล้ว (ชื่อสินค้า/คลัง/ต้นทุน ฯลฯ) จึงไม่มีอะไรที่
   `lot.created` ต้องเติมเพิ่ม เป็นการตัดขอบเขตที่ตั้งใจ ไม่ใช่ตกหล่น — ดู `srs-p6.html` RULE ใหม่ในหัวข้อนี้ ·
-  ตารางนี้**ไม่ลบ stock.adjusted/item.updated ทิ้ง** เพราะยังเป็นคำถามเปิดสำหรับ `low_stock` ที่ยัง blocked อยู่ดี)
+  `low_stock` ที่ implement จริงก็ไม่ได้กิน `stock.deducted` ด้วยเหตุผลเดียวกัน — payload ของ `stock.low`
+  เป็น snapshot ครบทุกฟิลด์ต่อ shortfall อยู่แล้ว)
 
 - `RULE · NO SYNC CALL ON QUERY` — query dashboard ห้ามเรียก transactional service ต้อง pre-compute
   ล่วงหน้าเท่านั้น
@@ -199,13 +201,18 @@ finance-bc มี consumer จริงแล้ว — ปัญหาอยู
 Route table (`DOMAIN_EVENT_ROUTING`) และ outbox relay **มีอยู่แล้วทั้งคู่** (inventory-bc, finance-bc)
 ต่างจากตอนเขียนแผนเดิมที่ยังไม่มี infra นี้เลย — งานที่เหลือจริง ๆ แคบกว่าที่ srs-p6.html ประเมินไว้:
 
-1. ~~สร้าง outbox pattern~~ **มีแล้ว** — ข้ามได้
-2. ~~เขียน `@EventPattern` handler ใน report-bc ต่ออีเวนต์~~ ✅ **ทำแล้ว 2 ตัว 2026-09-05**
-   (`profit_by_lot`, `expiry_alert` — ทั้งคู่มี `@UseInterceptors(RmqAckInterceptor)` ตามกฎ) — เหลืออีก
-   2 ตัว (`sales_summary`, `low_stock`) ที่ยัง**เขียนไม่ได้เลยจนกว่าจะมี event ต้นทาง** ไม่ใช่แค่ยังไม่เขียน
+1. ~~สร้าง outbox pattern~~ **มีแล้ว** — ข้ามได้ (finance-bc's `ReceiptsService.issue()` เพิ่ม hook
+   `invoice.issued` เข้า outbox เดิมที่มีอยู่แล้ว ไม่ต้องสร้างใหม่)
+2. ~~เขียน `@EventPattern` handler ใน report-bc ต่ออีเวนต์~~ ✅ **ทำครบ 4 ตัวแล้ว 2026-09-05**
+   (`profit_by_lot`, `expiry_alert`, `low_stock`, `sales_summary` — ทุกตัวมี
+   `@UseInterceptors(RmqAckInterceptor)` ตามกฎ) — `expiry_alert`/`low_stock` bind แบบ object pattern +
+   `IMicroservicePayload<T>` (คนละ transport จาก `profit_by_lot`/`sales_summary` ที่ผ่าน outbox/relay
+   จริง — ดู §3.5)
 3. ~~สร้างตาราง `processed_events` + Read model 4 ตัว ใน `erp_report`~~ ✅ **`processed_events` +
-   2/4 read model ทำแล้ว** (`profit_by_lots`, `expiry_alerts`) — อีก 2 ตารางรอ event ต้นทางเหมือนข้อ 2
-4. ~~Query API ต่อ read model~~ ✅ **2/4 ทำแล้ว** (`GET /profit-by-lots`, `GET /expiry-alerts`)
+   4/4 read model ทำแล้ว** (`profit_by_lots`, `expiry_alerts`, `low_stocks`, `sales_summaries`) —
+   `processed_events` เพิ่มคอลัมน์ `consumer_name` กลางทาง (composite unique key ดู §3.5)
+4. ~~Query API ต่อ read model~~ ✅ **4/4 ทำแล้ว** (`GET /profit-by-lots`, `/expiry-alerts`,
+   `/low-stocks`, `/sales-summaries`)
 5. Dashboard FE (นอกขอบเขต backend)
 
 ### 3.3 คำเตือนสำหรับตอน implement
@@ -251,6 +258,44 @@ inventory-bc เกิดขึ้นเองถึงจะยิงทดส�
 · `api-workflow-guide.html` E2 ใหม่ (เทียบกับ `GET /inventory-bc/v1/expiry-alerts` ของจริงที่ยังสดกว่า)
 + endpoint index (report-bc 16→21 endpoints, พบ+แก้ doc drift เดิมที่ `POST .../invoices/mock-pdf`
 หายจาก index ไปด้วยระหว่างทาง)
+
+### 3.5 ผลตรวจสอบ 2026-09-05 (รอบสอง) — 4/4 read model ครบแล้ว ✅ **implement + migrate แล้ว, ยังไม่ deploy**
+
+ต่อจาก §3.4 — ผู้ใช้สั่งทำ `sales_summary`/`low_stock` ที่เหลือให้ครบ วิจัยก่อนแก้พบว่า**สิ่งที่ §3.1/§3.4
+บันทึกไว้เมื่อเช้าคลาดเคลื่อนบางส่วน**: `stock.low` **มีอยู่แล้วจริง**ในโปรดักชัน (สแกนกลางคืนของ
+`ReorderAlertModule`/`ReorderAlertsService.scanAndEmit()`) — เพียงแต่ไม่ใช่ `DomainEvent` enum member
+(เป็น `AppMicroservice.Report.cmd.InventoryEventResources.StockLow` คนละ mechanism, ส่งผ่าน
+`emitWithContext()` ไม่ใช่ outbox/relay) ดังนั้น `low_stock` จึงไม่ blocked จริงเหมือนที่บันทึกไว้ — แค่
+ต้องเขียน consumer ให้ตรง transport
+
+**บั๊กจริงที่พบ (ไม่ใช่แค่ scope เพิ่ม)** — `ExpiryAlertEventsController` ที่ deploy ไปตอน §3.4 (เช้าวัน
+เดียวกัน) bind ด้วย `@EventPattern(DomainEvent.ExpiryApproaching)` (string เปล่า) ซึ่ง**ไม่มีวันแมตช์กับ
+`expiry.approaching`จริง** เพราะ inventory-bc ยิงด้วย object pattern (`{ cmd: 'expiry.approaching' }`)
+ผ่าน `emitWithContext()` — envelope บนสายเป็น `IMicroservicePayload<T>` ไม่ใช่ `IDomainEventEnvelope`
+ของ outbox ด้วย ยืนยันจากซอร์ส NestJS เอง (`transformPatternToRoute()`) เหตุการณ์จริงทุกตัวหายเข้า
+`erp.dlq` เงียบ ๆ ตั้งแต่ deploy — **แก้แล้ว**: `@EventPattern({ cmd:
+AppMicroservice.Report.cmd.InventoryEventResources.ExpiryApproaching })` + `IMicroservicePayload<T>` +
+เอา `processed_events` claim ออก (ไม่มี UUID event_id ให้ claim ในทรานสปอร์ตนี้ — upsert-by-natural-key
+กันซ้ำแทน) `low_stock` ใหม่ใช้รูปแบบที่ถูกตั้งแต่แรก
+
+**บั๊กที่สอง (พบระหว่างทำ `sales_summary`)** — `processed_events.event_id` unique เดี่ยว ๆ ใช้ไม่ได้เมื่อ
+มี **2 consumer อิสระต่อกัน** claim event เดียวกัน (`sales_summary` ต้อง consume `profit.calculated` ซ้ำ
+กับ `profit_by_lot`) แก้โดยเพิ่ม `consumer_name` + composite unique key `(event_id, consumer_name)` ใน
+`ProcessedEventEntity` (shared abstract class — กระทบ finance-bc's `CogsService` ด้วย ต้อง backfill
+`consumer_name = 'cogs'` ให้ 2 แถวที่มีอยู่จริงก่อนตั้ง `NOT NULL`)
+
+**ตัดสินใจกับผู้ใช้**: `sales_summary` ใช้ `invoice.issued` เป็นตัวขับเดียว ไม่สร้าง sales-bc outbox
+module ใหม่เพื่อ `so.confirmed` — เหตุผลเดียวกับที่ `credit_limit`/aging ยึดเอกสารที่ออกจริงเสมอ ไม่ใช่
+ตอน order commitment `ReceiptsService.issue()` (finance-bc) เพิ่ม stage event ในทรานแซกชันเดียวกับขึ้น
+เลข/เปลี่ยนสถานะ ยิงทุก `document_type` (ใบเสร็จเงินสดก็นับ ไม่กรองเฉพาะใบกำกับภาษี)
+
+**migration**: `AddLowStockReadModel`, `AddConsumerNameToProcessedEvents` ×2 (erp_report + erp_finance,
+ฝั่ง finance มี backfill), `AddSalesSummaryReadModel` — รันแล้วบน DB จริงทั้งหมด · permission ใหม่ 2 ตัว
+(`low_stock:view`, `sales_summary:view`) sync + grant migration แล้ว
+
+**ตรวจแล้ว**: 1606/1606 test ผ่าน · eslint 0/0 · build ผ่านทั้ง report-bc/finance-bc · migration ทุก BC
+= `No changes` after · **ยังไม่ deploy รอบนี้** (ต่างจาก §3.4 ที่ deploy แล้วเช้าวันเดียวกัน) — commit/push
+รอ user confirm
 
 ---
 

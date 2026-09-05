@@ -1,7 +1,7 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-05 (P6 เริ่มแล้วจริง — 2/4 read model แรก `profit_by_lot`/`expiry_alerts` implement + migrate + deploy แล้ว, ดู §2 หัวข้อ P6)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-05 (P6 ครบ 4/4 read model แล้ว — `profit_by_lot`/`expiry_alerts`/`low_stock`/`sales_summary` implement + migrate แล้ว, ดู §2 หัวข้อ P6 · low_stock + sales_summary)**
 > ก่อนหน้าในวันเดียวกัน: audit ช่องโหว่กฎหมาย/บัญชีจาก HANDOFF เดิม → เลือกทำ 3 จุด: A1 แยกใบกำกับเต็มรูป/อย่างย่อ, B1 RabbitMQ dead-letter exchange, C audit log กลางสำหรับ settings — ทั้งหมด implement + migrate + deploy + E2E บน production ผ่านแล้ว
 > ก่อนหน้าในวันเดียวกัน (2026-09-03): #8 billing_notes ข้ามสกุล + DEBIT_NOTE ฝั่งซื้อ — ตัดสินใจแล้วทั้งคู่ + แก้บั๊กระหว่างทาง 3 จุด ·
 > seed ตรวจซ้ำ ปิดงานแล้ว (`truncates:` ครบ ไม่ต้องแก้โค้ด) ·
@@ -11,7 +11,7 @@
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
-> ✅ **2026-09-05 P6 — 2/4 read model แรก (`profit_by_lot`, `expiry_alerts`) implement + migrate + deploy แล้ว** — 20 เทสต์ใหม่ผ่าน, boot จริงแมป route ครบ · `sales_summary`/`low_stock` ยัง blocked จริง (event ต้นทางไม่มีอยู่) · **ยังไม่มี E2E ด้วย event จริง** (รอการขาย/สแกนหมดอายุรอบถัดไปเกิดเอง) — ดู §2 หัวข้อ **P6 · profit_by_lot + expiry_alerts**
+> ✅ **2026-09-05 P6 — ครบ 4/4 read model แล้ว** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary`) — implement + migrate ผ่านหมด, 1606/1606 test ผ่าน, eslint 0/0 · พบ+แก้บั๊กจริง 2 จุดระหว่างทาง (ดูรายละเอียด §2): `expiry_alerts` bind ผิด transport มาตั้งแต่เช้า (event จริงหายเข้า DLQ เงียบ ๆ) และ `processed_events` claim ชนกันเมื่อมี 2 consumer ต่อ 1 event · **ยังไม่ deploy รอบนี้ — รอ user confirm commit/push** — ดู §2 หัวข้อ **P6 · low_stock + sales_summary**
 > ✅ **2026-09-05 audit ช่องโหว่กฎหมาย/บัญชี — 3 จุดที่เลือกทำเสร็จหมด + deploy + E2E บน production ผ่าน** (migration รันแล้วทั้ง 4 BC, `permissions:sync` + grant migration แล้ว, RabbitMQ broker policy ผูกแล้วจริง) — ดู §2 หัวข้อ **2026-09-05 · Legal/Accounting Audit**
 > **P2 audit ปิดครบ 100% แล้ว — P3–P4 เหลือแค่ #10, #11 (รู้ไว้ ไม่ใช่บั๊ก ไม่ต้องรีบ, ตั้งใจไม่ทำถาวร)**
 > ✅ **`meta.warnings` + บั๊ก auto-resolved price currency — commit `986b8b1` + push + deploy สำเร็จแล้ว** (deploy run 33639969936, 8 apps reload, ไม่มี migration)
@@ -151,6 +151,78 @@ resolve ไม่มี error, dead-letter exchange (`erp.dlx`/`erp.dlq` จา�
 /inventory-bc/v1/expiry-alerts` ของจริงที่ยังสดกว่า — คนละ endpoint แม้ permission ชื่อเดียวกัน) +
 endpoint index (report-bc 16→21, พบ+แก้ doc drift เดิม `POST .../invoices/mock-pdf` หายจาก index) ·
 `HANDOFF-Backlog-Reporting-Print-Tax.md` §3 อัปเดตสถานะเต็ม (ดูรายละเอียดกฎ/เหตุผลออกแบบที่นั่น §3.4)
+
+---
+
+### 2026-09-05 · P6 · low_stock + sales_summary ✅ **4/4 read model ครบแล้ว — implement + migrate แล้ว, ยังไม่ deploy**
+
+ผู้ใช้สั่งต่อ P6 ให้ครบหลังจาก `profit_by_lot`/`expiry_alerts` (ด้านล่าง) — วิจัยก่อนแก้โค้ดพบ **บั๊กจริงใน
+สิ่งที่ deploy ไปแล้วเมื่อเช้าวันเดียวกัน** และเปลี่ยนขอบเขตงานที่วางแผนไว้ทั้งหมด:
+
+**บั๊ก #1 (แก้แล้ว) — `ExpiryAlertEventsController` bind ผิด transport มาตั้งแต่เช้า**:
+`expiry.approaching`/`stock.low` **ไม่ได้ผ่าน outbox/relay** เหมือน `profit.calculated` — inventory-bc
+ยิงตรงด้วย `MicroserviceClientService.emitWithContext(client, { cmd: '...' }, payload)` ซึ่ง pattern เป็น
+**object** ไม่ใช่ string เปล่า และ envelope บนสายเป็น `IMicroservicePayload<T>` (`{ payload, _context }`)
+ไม่ใช่ `IDomainEventEnvelope` — **ไม่มี UUID event_id ให้ claim เลย** `ExpiryAlertEventsController` ที่ผมเขียน
+เมื่อเช้า bind ด้วย `@EventPattern(DomainEvent.ExpiryApproaching)` (string เปล่า) ซึ่ง**ไม่มีวันแมตช์กับ
+object pattern จริง** — ยืนยันจากซอร์ส NestJS เอง (`transformPatternToRoute()` normalize คนละ route key
+ระหว่าง object กับ string) เหตุการณ์จริงทุกตัวหายเข้า `erp.dlq` เงียบ ๆ ตั้งแต่ deploy เมื่อเช้า (ไม่ crash
+เพราะ DLX ที่เพิ่งทำไปพอดี — บั๊กหนึ่งซ่อนอีกบั๊กหนึ่งไว้ได้พอดิบพอดี) **แก้แล้ว**: เปลี่ยนเป็น
+`@EventPattern({ cmd: AppMicroservice.Report.cmd.InventoryEventResources.ExpiryApproaching })` +
+`@Payload() message: IMicroservicePayload<T>` + เอา `processed_events` claim ออก (ไม่มี event_id ให้ claim
+— ใช้ upsert-by-`lot_id` เป็นตัวกัน redelivery แทน ซึ่งเดิมก็เป็นตัวกันหลักอยู่แล้ว)
+
+**บั๊ก #2 (พบระหว่างทาง, แก้แล้ว) — `processed_events.event_id` unique เดี่ยว ๆ กันสองคนละ consumer ไม่ได้**:
+`sales_summary` ต้อง consume `profit.calculated` ซ้ำ (ตัวที่สองอิสระจาก `profit_by_lot`) — ถ้า claim ด้วย
+`event_id` เดี่ยว ๆ ตัวที่สองจะแพ้ claim ของตัวแรกเสมอแล้ว**ไม่ทำงานเลยแบบเงียบ ๆ** แก้โดยเพิ่มคอลัมน์
+`consumer_name` และเปลี่ยน unique key เป็น `(event_id, consumer_name)` ใน `ProcessedEventEntity`
+(shared abstract class) — กระทบทุก BC ที่มีตาราง `processed_events` จริง คือ report-bc (0 แถว ตอนนั้น) และ
+finance-bc's `CogsService` (2 แถวจริง ต้อง backfill `consumer_name = 'cogs'` ก่อนตั้ง `NOT NULL`)
+
+**ขอบเขตที่ตัดสินใจกับผู้ใช้ — `sales_summary` ใช้ `invoice.issued` เท่านั้น ไม่ใช้ `so.confirmed`**:
+§03 เดิมของ srs-p6.html ระบุทั้งสองตัว — `so.confirmed` ต้องสร้าง outbox module แรกของ sales-bc ทั้งหมด
+เพื่อรับรู้รายได้ตอน order commitment ซึ่งไม่ตรงกับที่อื่นในระบบ (`credit_limit`/aging ยึดเอกสารที่ออก
+จริงเสมอ) — ผู้ใช้เลือก `invoice.issued` เป็นตัวขับเดียว (แนะนำ) `low_stock` กลับพบว่า `stock.low` **มีอยู่
+แล้วในโปรดักชัน** จากสแกนกลางคืนของ `ReorderAlertModule` (`ReorderAlertsService.scanAndEmit()`) — ไม่ต้อง
+เพิ่มฝั่ง producer เลย ต่างจากที่บันทึกไว้เมื่อเช้าว่า "ทั้งสามชื่อนี้ไม่มีอยู่จริง" (คลาดเคลื่อน — `stock.low`
+มีอยู่จริง แค่ไม่ใช่ `DomainEvent` enum member แต่เป็น `AppMicroservice.Report.cmd.InventoryEventResources.StockLow`
+คนละ mechanism)
+
+**สถาปัตยกรรมที่สร้างใหม่**:
+- `low_stocks` — mirror `expiry_alerts` เป๊ะ (upsert ต่อ `product_id`, ไม่มี `processed_events` claim,
+  เหตุผลเดียวกัน) — ไม่ต้องแตะฝั่ง producer เลยเพราะ `stock.low` มีอยู่แล้ว
+- `sales_summaries` — **daily rollup ไม่ใช่ per-event snapshot** แบบตารางอื่น: `period` (timestamptz,
+  เที่ยงคืน Bangkok ผ่าน `businessDayStart(toBusinessDate(...))` — ไม่ใช่ `date` column ตามกฎ CLAUDE.md)
+  เขียนด้วย `INSERT ... ON CONFLICT (period) DO UPDATE SET x = sales_summaries.x + EXCLUDED.x`
+  (เพิ่มค่าทับ ไม่ใช่ upsert เขียนทับ) สองอีเวนต์คนละคอลัมน์: `invoice.issued` → `total_sales`/
+  `order_count`, `profit.calculated` → `gross_profit` (คนละ handler ใน `SalesSummaryEventsController`
+  เดียวกัน ทั้งคู่ผ่าน outbox/relay จริงเหมือน `profit_by_lot` — claim ปกติด้วย `consumer_name = 'sales_summary'`)
+- `ReceiptsService.issue()` (finance-bc) เพิ่ม `this.outboxService.stage(manager, [...])` ในทรานแซกชัน
+  เดียวกับขึ้นเลข/เปลี่ยนสถานะ (ที่เดิม log ไว้ว่า "receipt.issued (no subscriber yet)" — แทนที่แล้ว) —
+  ยิงทุก `document_type` ไม่กรองเฉพาะใบกำกับภาษี เพราะใบเสร็จเงินสดก็เป็นรายได้ที่รับรู้จริง
+
+**migration**: `1788622105389-AddLowStockReadModel.ts`, `1788622410420-AddConsumerNameToProcessedEvents.ts`
+(erp_report, 0 แถว ก่อนแก้), `1788622456246-AddConsumerNameToProcessedEvents.ts` (erp_finance, **มี
+backfill** เพราะมี 2 แถวจริงอยู่แล้ว — เพิ่มคอลัมน์แบบ nullable ก่อน, `UPDATE ... SET consumer_name =
+'cogs'`, แล้วค่อย `ALTER COLUMN ... SET NOT NULL`), `1788622882556-AddSalesSummaryReadModel.ts` — รันแล้ว
+บน DB จริงทั้งหมด verify `migration:generate` = `No changes` ทุก BC
+
+**permission ใหม่ 2 ตัว**: `low_stock:view`, `sales_summary:view` — sync เข้า `erp_iam` แล้ว (ยืนยัน 2
+added, 0 removed, 221 unchanged) ก่อนเขียน grant migration เสมอ —
+`1788622929728-GrantP6LowStockAndSalesSummaryPermissionsToMockPolicies.ts` รันแล้วบน DB จริง
+
+**ตรวจแล้ว**: 1606/1606 test ผ่าน (117 suites) · eslint 0/0 · `nx build report-bc`/`finance-bc` ผ่าน ·
+migration ครบทุก BC ที่แตะ (report/finance/iam) = `No changes` after · **ยังไม่ได้ทดสอบด้วยเหตุการณ์จริง
+บนโปรดักชัน** (ยังไม่ได้ deploy รอบนี้) — ต่างจาก `profit_by_lot`/`expiry_alerts` ที่รอเหตุการณ์ธรรมชาติเกิด
+เอง งานนี้ยังไม่ได้ deploy เลย ต้องทำก่อนถึงจะเห็นแถวจริง
+
+**เอกสาร**: `srs-p6.html` §06 อัปเดตเป็น 4/4 + rulebox ใหม่อธิบายบั๊กทั้งสอง + การตัดขอบเขต so.confirmed ·
+`api-workflow-guide.html` E2 เพิ่ม endpoint 2 ตัว + rulebox อธิบายบั๊ก transport · ไฟล์นี้ (ย่อหน้านี้) +
+`HANDOFF-Backlog-Reporting-Print-Tax.md` §3 อัปเดตสถานะเต็ม
+
+**ที่ยังไม่ทำ**: `document_types` ผูกกับการออกเลขจริงของเอกสาร P4/P5 ยังเป็นงานค้าง ·
+`inventory_summary`/`customer_by_province` ในไดอะแกรม §04 ยังเป็น doc drift (ไม่มีอยู่ใน mapping §03)
+ไม่ใช่งานที่ต้องทำตาม · **commit/push/deploy ยังไม่ได้ทำ — รอ user confirm**
 
 ---
 
