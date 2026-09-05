@@ -1,7 +1,7 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-05 (P6 ครบ 4/4 read model แล้ว — `profit_by_lot`/`expiry_alerts`/`low_stock`/`sales_summary` implement + migrate แล้ว, ดู §2 หัวข้อ P6 · low_stock + sales_summary)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-05 (P6 ครบ 4/4 read model + deploy แล้ว, `sales_summary` E2E ผ่านบน production ด้วยเอกสารจริง — `low_stock`/`expiry_alerts` รอ cron คืนนี้ยืนยัน, ดู §2 หัวข้อ P6 · low_stock + sales_summary)**
 > ก่อนหน้าในวันเดียวกัน: audit ช่องโหว่กฎหมาย/บัญชีจาก HANDOFF เดิม → เลือกทำ 3 จุด: A1 แยกใบกำกับเต็มรูป/อย่างย่อ, B1 RabbitMQ dead-letter exchange, C audit log กลางสำหรับ settings — ทั้งหมด implement + migrate + deploy + E2E บน production ผ่านแล้ว
 > ก่อนหน้าในวันเดียวกัน (2026-09-03): #8 billing_notes ข้ามสกุล + DEBIT_NOTE ฝั่งซื้อ — ตัดสินใจแล้วทั้งคู่ + แก้บั๊กระหว่างทาง 3 จุด ·
 > seed ตรวจซ้ำ ปิดงานแล้ว (`truncates:` ครบ ไม่ต้องแก้โค้ด) ·
@@ -11,7 +11,7 @@
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
-> ✅ **2026-09-05 P6 — ครบ 4/4 read model แล้ว** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary`) — implement + migrate ผ่านหมด, 1606/1606 test ผ่าน, eslint 0/0 · พบ+แก้บั๊กจริง 2 จุดระหว่างทาง (ดูรายละเอียด §2): `expiry_alerts` bind ผิด transport มาตั้งแต่เช้า (event จริงหายเข้า DLQ เงียบ ๆ) และ `processed_events` claim ชนกันเมื่อมี 2 consumer ต่อ 1 event · **ยังไม่ deploy รอบนี้ — รอ user confirm commit/push** — ดู §2 หัวข้อ **P6 · low_stock + sales_summary**
+> ✅ **2026-09-05 P6 — ครบ 4/4 read model + deploy แล้ว** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary`) — implement + migrate + commit + push + deploy ผ่านหมด, 1606/1606 test ผ่าน, eslint 0/0 · พบ+แก้บั๊กจริง 2 จุดระหว่างทาง (ดูรายละเอียด §2): `expiry_alerts` bind ผิด transport มาตั้งแต่เช้า (event จริงหายเข้า DLQ เงียบ ๆ) และ `processed_events` claim ชนกันเมื่อมี 2 consumer ต่อ 1 event · **`sales_summary` ยิง E2E บน production ด้วยเอกสารจริงผ่านแล้ว** (ยอดสะสมทับกันถูกต้อง) · `low_stock`/`expiry_alerts` รอ cron กลางคืนยืนยัน (ไม่มี endpoint กดรันเอง) — ดู §2 หัวข้อ **P6 · low_stock + sales_summary**
 > ✅ **2026-09-05 audit ช่องโหว่กฎหมาย/บัญชี — 3 จุดที่เลือกทำเสร็จหมด + deploy + E2E บน production ผ่าน** (migration รันแล้วทั้ง 4 BC, `permissions:sync` + grant migration แล้ว, RabbitMQ broker policy ผูกแล้วจริง) — ดู §2 หัวข้อ **2026-09-05 · Legal/Accounting Audit**
 > **P2 audit ปิดครบ 100% แล้ว — P3–P4 เหลือแค่ #10, #11 (รู้ไว้ ไม่ใช่บั๊ก ไม่ต้องรีบ, ตั้งใจไม่ทำถาวร)**
 > ✅ **`meta.warnings` + บั๊ก auto-resolved price currency — commit `986b8b1` + push + deploy สำเร็จแล้ว** (deploy run 33639969936, 8 apps reload, ไม่มี migration)
@@ -154,7 +154,7 @@ endpoint index (report-bc 16→21, พบ+แก้ doc drift เดิม `POST
 
 ---
 
-### 2026-09-05 · P6 · low_stock + sales_summary ✅ **4/4 read model ครบแล้ว — implement + migrate แล้ว, ยังไม่ deploy**
+### 2026-09-05 · P6 · low_stock + sales_summary ✅ **4/4 read model ครบแล้ว — implement + migrate + deploy แล้ว, sales_summary E2E ผ่าน**
 
 ผู้ใช้สั่งต่อ P6 ให้ครบหลังจาก `profit_by_lot`/`expiry_alerts` (ด้านล่าง) — วิจัยก่อนแก้โค้ดพบ **บั๊กจริงใน
 สิ่งที่ deploy ไปแล้วเมื่อเช้าวันเดียวกัน** และเปลี่ยนขอบเขตงานที่วางแผนไว้ทั้งหมด:
@@ -212,9 +212,21 @@ added, 0 removed, 221 unchanged) ก่อนเขียน grant migration เ
 `1788622929728-GrantP6LowStockAndSalesSummaryPermissionsToMockPolicies.ts` รันแล้วบน DB จริง
 
 **ตรวจแล้ว**: 1606/1606 test ผ่าน (117 suites) · eslint 0/0 · `nx build report-bc`/`finance-bc` ผ่าน ·
-migration ครบทุก BC ที่แตะ (report/finance/iam) = `No changes` after · **ยังไม่ได้ทดสอบด้วยเหตุการณ์จริง
-บนโปรดักชัน** (ยังไม่ได้ deploy รอบนี้) — ต่างจาก `profit_by_lot`/`expiry_alerts` ที่รอเหตุการณ์ธรรมชาติเกิด
-เอง งานนี้ยังไม่ได้ deploy เลย ต้องทำก่อนถึงจะเห็นแถวจริง
+migration ครบทุก BC ที่แตะ (report/finance/iam) = `No changes` after
+
+**commit `a5563e5` (erp-api) + `8f8e962` (plan-erp) + push แล้ว → deploy pipeline รันอัตโนมัติสำเร็จ**
+(GitHub Actions run `33976232115`, 6m13s) — **`sales_summary` ยิง E2E ด้วยเอกสารจริงบน production แล้ว**:
+สร้าง+issue ใบเสร็จทดสอบ 2 ใบ (ลูกค้า `CUST-TEST-01`) — `RCPT-2026-00002` (฿100) แล้ว `RCPT-2026-00003`
+(฿250) — `GET /report-bc/v1/sales-summaries` ตอบกลับแถวเดียวถูกต้อง `total_sales: 100→350`,
+`order_count: 1→2`, `period` ตรง Bangkok midnight ของวันที่ออกจริง (`2026-09-04T17:00:00.000Z` =
+เที่ยงคืน 2026-09-05 เวลาไทย) — ยืนยันว่า **การเพิ่มค่าทับ (ไม่ใช่เขียนทับ) ทำงานถูกต้องจริงบน Postgres จริง**
+(ก่อนหน้านี้ตรวจแค่ unit test เท่านั้น) และ `processed_events` composite key ใหม่ไม่ชนกับของ
+`profit_by_lot` เลย
+
+**`low_stock`/`expiry_alerts` ยังไม่ได้ยิง E2E จริง** — ทั้งสองรันเฉพาะตอน `@Cron` กลางคืน
+(expiry `0 1 * * *`, reorder `0 2 * * *` เวลาไทย) ไม่มี endpoint ให้กดรันเองได้ ตรวจได้แค่ route/permission
+ทำงานถูกต้อง (`GET .../low-stocks`, `GET .../expiry-alerts` ตอบ `200` ข้อมูลว่างเปล่า ถูกต้องเพราะยังไม่ถึง
+รอบสแกนหลัง deploy) — ต้องรอ cron รอบถัดไปคืนนี้ถึงจะยืนยันบั๊ก transport ที่แก้ไปว่าใช้ได้จริงกับ event จริง
 
 **เอกสาร**: `srs-p6.html` §06 อัปเดตเป็น 4/4 + rulebox ใหม่อธิบายบั๊กทั้งสอง + การตัดขอบเขต so.confirmed ·
 `api-workflow-guide.html` E2 เพิ่ม endpoint 2 ตัว + rulebox อธิบายบั๊ก transport · ไฟล์นี้ (ย่อหน้านี้) +
@@ -222,7 +234,7 @@ migration ครบทุก BC ที่แตะ (report/finance/iam) = `No ch
 
 **ที่ยังไม่ทำ**: `document_types` ผูกกับการออกเลขจริงของเอกสาร P4/P5 ยังเป็นงานค้าง ·
 `inventory_summary`/`customer_by_province` ในไดอะแกรม §04 ยังเป็น doc drift (ไม่มีอยู่ใน mapping §03)
-ไม่ใช่งานที่ต้องทำตาม · **commit/push/deploy ยังไม่ได้ทำ — รอ user confirm**
+ไม่ใช่งานที่ต้องทำตาม · **ยังไม่ได้เช็คผล low_stock/expiry_alerts หลัง cron คืนนี้ — งานค้างต่อ**
 
 ---
 

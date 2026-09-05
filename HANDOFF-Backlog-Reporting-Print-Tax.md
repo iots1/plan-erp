@@ -17,7 +17,8 @@
 > `rabbitmq-reliability-guide.html`) — แต่ต้นเหตุจริง (ไม่มี consumer) ยังไม่แก้ ยังต้องรอ §3 P6 ·
 > **§4.4 ข้อ 1 (แยกใบกำกับเต็มรูป/อย่างย่อ) ทำแล้ว** ดู §4.4 ด้านล่าง ·
 > **§3 P6 ครบ 4/4 read model แล้ว** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary` —
-> ดู §3.4/§3.5) implement + migrate ผ่านหมด **ยังไม่ deploy** — ที่เหลือ (§1, §3 FE 120 ชม., §5, §4.4
+> ดู §3.4/§3.5) implement + migrate + deploy ผ่านหมด, `sales_summary` E2E บน production ผ่าน —
+> ที่เหลือ (§1, §3 FE 120 ชม., §3 low_stock/expiry_alerts รอ cron ยืนยัน, §5, §4.4
 > ข้อ 2–3) ยังเป็น backlog เหมือนเดิม
 
 ## 0 · สรุปสั้น — ทำไมแยกเป็น backlog แทนที่จะทำเลย
@@ -26,7 +27,7 @@
 |---|---|---|
 | §1 พิมพ์เอกสารจริงไม่ได้เลยสักใบ | Backlog — ต้องตัดสินใจว่า BC ไหนเรียก report-bc ยังไง ไม่ใช่ correctness bug เดียว แต่เป็นงานสร้างฟีเจอร์ใหม่ | หลายวัน (ทั้งชุด) |
 | §2 report-bc consumer หาย (finding เกี่ยวเนื่อง) | ✅ **ข้อ 1 (dead-letter exchange) ทำแล้ว 2026-09-05** — ต้นเหตุจริง (ไม่มี consumer) ยังเป็น Backlog รวมอยู่ใน P6 | รวมอยู่ใน P6 (dead-letter exchange ปิดแล้ว ไม่รวม) |
-| §3 P6 ทั้งเฟส (CQRS Read Model) | ✅ **4/4 read model ทำแล้ว 2026-09-05** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary` — consumer+ตาราง+API ครบ, migrate แล้ว) · **ยังไม่ deploy** · FE ยังไม่แตะ | เหลือ: FE 120 ชม. + deploy |
+| §3 P6 ทั้งเฟส (CQRS Read Model) | ✅ **4/4 read model ทำแล้ว + deploy แล้ว 2026-09-05** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary` — consumer+ตาราง+API ครบ) · `sales_summary` E2E บน production ผ่าน · `low_stock`/`expiry_alerts` รอ cron กลางคืนยืนยัน · FE ยังไม่แตะ | เหลือ: FE 120 ชม. |
 | §4 ภ.พ.30 (VAT return report) | v1 implement แล้ว 2026-09-04 — **แยกใบกำกับเต็มรูป/อย่างย่อ (§4.4 ข้อ 1) ทำแล้ว 2026-09-05** — ที่เหลือ §4.4 ข้อ 2–3 | ที่เหลือ: 2–3 วัน (§4.5 ปรับแล้ว) |
 | §5 หนังสือรับรองหัก ณ ที่จ่าย | Backlog — เหมือน §1 (ต้องมี print path) + ยังขาดบาง snapshot field (`ap_invoices.supplier_tax_id`) ที่ต้องเพิ่มก่อน | 2–3 วัน (ประเมินใน §5.5) |
 
@@ -172,7 +173,7 @@ finance-bc มี consumer จริงแล้ว — ปัญหาอยู
 | `report: event consumers + read models` | BE 56 | ✅ **4/4 ทำแล้ว 2026-09-05** — `profit_by_lot`/`expiry_alerts`/`low_stock`/`sales_summary` มี `@EventPattern` consumer + ตาราง + idempotency ครบ (ดู §3.1, §3.4, §3.5) |
 | `report: APIs (sales/inv/expiry/profit-by-lot)` | BE 48 | ✅ **4/4 ทำแล้ว** — `GET /report-bc/v1/profit-by-lots`, `/expiry-alerts`, `/low-stocks`, `/sales-summaries` (ดู `api-workflow-guide.html` E2) |
 | FE ที่เกี่ยวข้อง | FE 120 | `st-wait` (?) — รอทีม FE ตรวจ |
-| **รวม P6** | **224** | **4/4 read model ทำแล้ว (BE) · FE ยังไม่แตะ · ยังไม่ deploy รอบ low_stock/sales_summary** |
+| **รวม P6** | **224** | **4/4 read model ทำแล้ว + deploy แล้ว (BE) · `sales_summary` E2E ผ่าน · `low_stock`/`expiry_alerts` รอ cron ยืนยัน · FE ยังไม่แตะ** |
 
 ### 3.1 ขอบเขตจาก srs-p6.html (ของเดิม ยังใช้ได้ทั้งหมด)
 
@@ -259,7 +260,7 @@ inventory-bc เกิดขึ้นเองถึงจะยิงทดส�
 + endpoint index (report-bc 16→21 endpoints, พบ+แก้ doc drift เดิมที่ `POST .../invoices/mock-pdf`
 หายจาก index ไปด้วยระหว่างทาง)
 
-### 3.5 ผลตรวจสอบ 2026-09-05 (รอบสอง) — 4/4 read model ครบแล้ว ✅ **implement + migrate แล้ว, ยังไม่ deploy**
+### 3.5 ผลตรวจสอบ 2026-09-05 (รอบสอง) — 4/4 read model ครบแล้ว ✅ **implement + migrate + deploy แล้ว, sales_summary E2E ผ่าน**
 
 ต่อจาก §3.4 — ผู้ใช้สั่งทำ `sales_summary`/`low_stock` ที่เหลือให้ครบ วิจัยก่อนแก้พบว่า**สิ่งที่ §3.1/§3.4
 บันทึกไว้เมื่อเช้าคลาดเคลื่อนบางส่วน**: `stock.low` **มีอยู่แล้วจริง**ในโปรดักชัน (สแกนกลางคืนของ
@@ -294,8 +295,16 @@ module ใหม่เพื่อ `so.confirmed` — เหตุผลเด�
 (`low_stock:view`, `sales_summary:view`) sync + grant migration แล้ว
 
 **ตรวจแล้ว**: 1606/1606 test ผ่าน · eslint 0/0 · build ผ่านทั้ง report-bc/finance-bc · migration ทุก BC
-= `No changes` after · **ยังไม่ deploy รอบนี้** (ต่างจาก §3.4 ที่ deploy แล้วเช้าวันเดียวกัน) — commit/push
-รอ user confirm
+= `No changes` after
+
+**commit `a5563e5`/`8f8e962` + push + deploy สำเร็จ** (GitHub Actions run `33976232115`, 6m13s) ·
+**`sales_summary` ยิง E2E บน production ด้วยเอกสารจริงแล้ว**: ออก+issue ใบเสร็จทดสอบ 2 ใบ
+(`RCPT-2026-00002` ฿100, `RCPT-2026-00003` ฿250) — `GET /report-bc/v1/sales-summaries` ตอบยอดสะสมถูกต้อง
+`total_sales 100→350`, `order_count 1→2`, `period` ตรง Bangkok midnight ยืนยันว่าการเพิ่มค่าทับบน
+Postgres จริงทำงานถูกต้อง (ก่อนหน้านี้ตรวจแค่ unit test) และ `processed_events` composite key ไม่ชนกับ
+`profit_by_lot` จริง · **`low_stock`/`expiry_alerts` ยังไม่ได้ยิง E2E** (รอ `@Cron` กลางคืน — expiry 01:00,
+reorder 02:00 เวลาไทย, ไม่มี endpoint กดรันเอง) ตรวจได้แค่ route/permission ตอบถูกต้อง (ข้อมูลว่างเปล่า
+ถูกต้องเพราะยังไม่ถึงรอบสแกนหลัง deploy)
 
 ---
 
