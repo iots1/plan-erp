@@ -231,10 +231,11 @@ dto (create/response ×2), service, controllers (2), constants, module + ลง�
   ตรงจำนวน leaf account จริง → เช็คว่าปิดซ้ำได้ 409/400 → เช็ค `GET
   /gl-account-year-end-balances?fiscal_year=...` คืนค่าตรงกับที่ query `ledger_entries` เองได้ (เหมือน
   gl-accounts smoke's trial-balance cross-check) — **ข้อควรระวัง**: การปิดปีบัญชีเป็น one-way ratchet
-  จริงบน DB ที่ใช้ร่วมกับ production (§4 กับดัก #10 ของ HANDOFF-Feature.md) **ห้าม smoke test ปิดปี
-  บัญชีจริงที่มีผลกับรายงานจริงเด็ดขาด** — ถ้าจะเทสข้อนี้ต้องคุยกับ user ก่อนเลือกวิธี (ปีทดสอบใน
-  อนาคตที่ไม่กระทบใคร หรือข้ามการเทสระดับนี้ไปเป็น unit-only เหมือนที่เจอกับ smoke ข้อ payment ของ
-  gl-accounts ในรอบก่อน)
+  จริงบน DB ที่ใช้ร่วมกับ production (§4 กับดัก #10 ของ HANDOFF-Feature.md) แต่ **ยังไม่มีลูกค้าจริงบน
+  cluster นี้ (ยืนยันจาก user 2026-09-06 — มีแต่ dev)** จึงเทสจริงได้โดยไม่ต้องกังวลเหมือนตอนคิดแผนนี้
+  รอบแรก — เลือกปีทดสอบที่ไม่ชนของจริง (เช่นปีอนาคตไกลๆ) แล้วปิดจริงได้เลย **แต่ต้องเช็คสถานะนี้ซ้ำ**
+  ก่อนรันครั้งถัดไปเสมอ เผื่อเริ่มมีลูกค้าจริงใช้งานแล้ว (ดู memory
+  `project_dev_prod_shared_db_no_customers_yet`)
 - **Admin UI**: manual QA (ไม่มี automated test เหมือนทุกหน้า admin ในโปรเจกต์นี้)
 
 ## 9 · ขอบเขตที่ไม่อยู่ในรอบนี้
