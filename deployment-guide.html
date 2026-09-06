@@ -722,6 +722,16 @@ docker ps -a --format '{{.Names}}\t{{.Ports}}'  <span class="c"># รวม cont
           ไม่ต้องแก้โค้ดแอปฝั่งไหนเลย รายละเอียดเต็มอยู่ที่ <span class="mono text-[12px]">infrastructure/kong/</span>
           ใน repo หลัก
         </p>
+        <div class="edge mb-6">
+          <div class="tag mb-1">ทางเลือกที่เบากว่าสำหรับลูกค้าที่เครื่องจำกัด</div>
+          <p class="text-[13px]">
+            Kong ต้องแบก Postgres+Konga+Mongo เป็น stack แยก (~4-5 GB disk, ดันให้ RAM แนะนำขยับเป็น 16 GB — §02) —
+            ถ้าดีลไม่ได้ใช้ Kong plugin เฉพาะทางเลย <span class="mono text-[12px]">Caddy</span> (binary เดียว ไม่มี database,
+            ACME ในตัว) ทำ path routing + TLS แบบเดียวกันได้เบากว่ามาก ดู
+            <a href="caddy-reverse-proxy-guide.html#vskong" class="underline" style="color:var(--accent)">caddy-reverse-proxy-guide.html §06</a>
+            สำหรับตารางเทียบและตอนไหนควรเลือกอันไหน
+          </p>
+        </div>
 
         <div class="code p-5 mb-6">
 <pre>cp -r erp-api/infrastructure/kong /root/infra-erp/kong  <span class="c"># วางคู่กับ datastore stack เหมือน §04</span>

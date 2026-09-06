@@ -22,6 +22,7 @@ class ErpDocnav extends HTMLElement {
     { href: 'ha-failover-operations-guide.html', icon: '⚡', label: 'HA & Failover Operations', desc: 'เครื่องไหนดับแล้วเกิดอะไร · Triage สำหรับ Junior' },
     { href: 'rabbitmq-reliability-guide.html', icon: '🐰', label: 'RabbitMQ Reliability Guide', desc: 'Ack Contract · Head-of-Line Block · Dead-Letter Exchange' },
     { href: 'deployment-guide.html', icon: '🚀', label: 'Deployment Guide', desc: 'On-Premise · Docker Compose · Kong · Cloudflare Tunnel' },
+    { href: 'caddy-reverse-proxy-guide.html', icon: '🌀', label: 'Caddy Reverse Proxy Guide', desc: 'Local Dev Setup · Caddy vs Kong สำหรับ Production' },
     { href: 'iam-policy-engine-guide.html', icon: '🛡️', label: 'IAM Policy Engine', desc: 'Invariants · API Contract · Defect Log · ABAC' },
     { href: 'runbook.html', icon: '🚨', label: 'Runbook', desc: 'Incident Response · Symptom → Diagnosis → Fix → Verify' },
   ];

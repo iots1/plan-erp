@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caddy Reverse Proxy Guide — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="🌀" title="Caddy" subtitle="REVERSE PROXY GUIDE" width="280">
+    <nav slot="nav">
+      <a href="#why"        class="navlink"><span class="n">01</span> ทำไมต้องมี Caddy</a>
+      <a href="#devsetup"   class="navlink"><span class="n">02</span> Local Dev — ติดตั้งครั้งเดียว</a>
+      <a href="#dailyuse"   class="navlink"><span class="n">03</span> ใช้งานประจำวัน (BE/FE)</a>
+      <a href="#mapping"    class="navlink"><span class="n">04</span> Generator แม็พ prefix ยังไง</a>
+      <a href="#pitfall"    class="navlink"><span class="n">05</span> บั๊กที่เจอมาแล้ว — Caddy ค้างหลาย process</a>
+      <a href="#vskong"     class="navlink"><span class="n">06</span> Caddy vs Kong — เลือกยังไงตอน deploy จริง</a>
+      <a href="#prod"       class="navlink"><span class="n">07</span> ตั้ง Caddy เป็น Production Gateway</a>
+      <a href="#checklist"  class="navlink"><span class="n">08</span> Checklist เพิ่ม BC ใหม่</a>
+    </nav>
+    <div slot="footnote">
+      <a href="deployment-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Deployment Guide (Kong)</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="index.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่สารบัญเอกสาร
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Reverse Proxy Guide · Local Dev + Production ทางเลือก</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          หนึ่งโดเมน แทนที่จะจำ<br>
+          <span class="text-[#7FE3DE]">8 พอร์ตของ 8 BC</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          <span class="mono text-[13px]">infrastructure/caddy/</span> ให้ BE/FE เรียกทุก BC ผ่าน
+          <span class="mono text-[13px]">http://erp-api.internal/&lt;bc-prefix&gt;/v1/...</span> เดียว
+          แทนการจำ <span class="mono text-[13px]">localhost:3001..3008</span> — และ Caddy ตัวเดียวกันนี้
+          ยังเป็น<b>ทางเลือกที่เบากว่า Kong</b> สำหรับลูกค้าที่เครื่องจำกัดทรัพยากรตอน deploy จริงด้วย
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>Local dev: ใช้แล้ว ทดสอบผ่าน 8 BC</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>Config: generate อัตโนมัติจาก .env</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#F59E0B"></span>Production: ยังไม่ใช้จริง — Kong คือของที่ deploy อยู่ปัจจุบัน</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <div class="rulebox mt-12" style="border-color:var(--signal)">
+        <div class="rc mb-1" style="color:var(--signal)">อ่านย่อหน้านี้ก่อนถ้ามีเวลา 30 วินาที</div>
+        <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+          <span class="mono text-[12px]">infrastructure/caddy/Caddyfile</span> เป็นไฟล์ที่<b class="text-[var(--ink)]">generate อัตโนมัติ ไม่แก้มือ</b> —
+          source of truth คือ <span class="mono text-[12px]">.env</span> รากโปรเจกต์ (คู่ <span class="mono text-[12px]">*_MODULE_HTTP_PORT</span>/
+          <span class="mono text-[12px]">*_PREFIX_NAME</span>) รันด้วย <span class="mono text-[12px]">pnpm caddy:generate</span> ทุกครั้งที่ค่าพวกนี้เปลี่ยน ·
+          วันนี้ใช้เพื่อ<b class="text-[var(--ink)]">ความสะดวกตอน dev เท่านั้น</b> — ระบบ production จริงยังใช้ Kong ตาม
+          <a href="deployment-guide.html#kong" class="underline" style="color:var(--accent)">deployment-guide.html §06</a>,
+          ส่วน Caddy-เป็น-production-gateway ใน §07 คือ<b class="text-[var(--ink)]">ข้อเสนอสำหรับลูกค้าที่เครื่องจำกัด</b> ยังไม่ได้ตรวจสอบ/ใช้จริงหน้างาน
+        </p>
+      </div>
+
+      <!-- ========== 01 WHY ========== -->
+      <section id="why" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — ทำไมต้องมีคู่มือนี้</div>
+        <h2 class="display text-3xl mb-6">ปัญหาที่ Caddy แก้ให้</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          erp-api เป็น 8 BC แยกกัน แต่ละตัว bind คนละพอร์ต (<span class="mono text-[12px]">3001–3008</span>)
+          ด้วย prefix ของตัวเอง (<span class="mono text-[12px]">app.setGlobalPrefix('&lt;prefix&gt;/&lt;version&gt;')</span>
+          — ดู <span class="mono text-[12px]">libs/common/src/utils/bootstrap.util.ts</span>) — งานฝั่ง FE ที่ต้องยิงหลาย BC
+          พร้อมกัน (เช่นหน้า System Settings ที่คุยกับ 4 BC) จะต้องจำ/สลับพอร์ตไปมา และ CORS ระหว่าง origin ต่างกันก็ยุ่งยากกว่าที่ควร
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>ไม่มี Caddy</th><th>มี Caddy</th></tr></thead>
+            <tbody>
+              <tr><td>จำ 8 พอร์ต: <span class="mono text-[12px]">localhost:3001..3008</span></td><td>โดเมนเดียว: <span class="mono text-[12px]">http://erp-api.internal</span></td></tr>
+              <tr><td>FE ต้อง config base URL แยกทีละ BC</td><td>ทุก BC อยู่ใต้ path เดียวกัน — เปลี่ยนแค่ prefix</td></tr>
+              <tr><td>CORS ข้าม origin ทุกครั้งที่ข้าม BC</td><td>ทุก request มาจาก origin เดียว (โดเมน Caddy)</td></tr>
+              <tr><td>ต้องคอยเช็คว่า BC ไหน "รันอยู่พอร์ตอะไร" หลัง merge ใหม่</td><td>รัน <span class="mono text-[12px]">pnpm caddy:generate</span> ครั้งเดียว รู้ทันที (มี warning ถ้า map ไม่ได้)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 DEV SETUP ========== -->
+      <section id="devsetup" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — Local Dev: ติดตั้งครั้งเดียว</div>
+        <h2 class="display text-3xl mb-6">Setup สำหรับเครื่อง BE/FE ทุกคน</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง Caddy</h3>
+          <div class="code p-4 mb-2">
+<pre><span class="c"># macOS</span>
+brew install caddy
+
+<span class="c"># หรือดูวิธีติดตั้งแพลตฟอร์มอื่นที่ caddyserver.com/docs/install</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ผูกโดเมนกับเครื่องตัวเอง</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เพิ่มบรรทัดนี้ใน <span class="mono text-[12px]">/etc/hosts</span> (macOS/Linux) หรือ
+            <span class="mono text-[12px]">C:\Windows\System32\drivers\etc\hosts</span> (Windows):
+          </p>
+          <div class="code p-4 mb-2">
+<pre>127.0.0.1 erp-api.internal</pre>
+          </div>
+          <div class="edge">
+            <div class="tag mb-1">ทำไมเป็น .internal ไม่ใช่ .local</div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">.local</span> ชนกับ mDNS/Bonjour (macOS/Linux ใช้ resolve ชื่อเครื่องในวง LAN อยู่แล้ว)
+              — เลือก <span class="mono text-[12px]">.internal</span> แทนเพื่อไม่ให้ปนกับ service discovery ของ OS เอง
+              เปลี่ยนชื่อได้เองผ่าน <span class="mono text-[12px]">LOCAL_DOMAIN=</span> ใน <span class="mono text-[12px]">.env</span>
+              ถ้าอยากใช้ชื่ออื่น (จำได้ไหมว่าต้องแก้ <span class="mono text-[12px]">/etc/hosts</span> ให้ตรงด้วยเสมอ)
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">Generate Caddyfile ครั้งแรก</h3>
+          <div class="code p-4 mb-2">
+<pre>pnpm caddy:generate</pre>
+          </div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            อ่าน <span class="mono text-[12px]">.env</span> รากโปรเจกต์แล้วเขียน <span class="mono text-[12px]">infrastructure/caddy/Caddyfile</span>
+            (gitignored — ต่างคนต่างมีของตัวเองตาม <span class="mono text-[12px]">.env</span> ของเครื่องนั้น) พร้อม log ว่า
+            map ได้กี่ route + warning ถ้ามี <span class="mono text-[12px]">*_MODULE_HTTP_PORT</span> ตัวไหน map prefix ไม่ได้
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 DAILY USE ========== -->
+      <section id="dailyuse" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — ใช้งานประจำวัน</div>
+        <h2 class="display text-3xl mb-6">3 คำสั่งที่ต้องรู้</h2>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>คำสั่ง</th><th>ใช้ตอนไหน</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[12px]">pnpm caddy:generate</td><td>generate ครั้งเดียว หลังแก้ <span class="mono text-[12px]">.env</span> (เพิ่ม/ลบ BC, เปลี่ยนพอร์ต/prefix)</td></tr>
+              <tr><td class="mono text-[12px]">pnpm caddy:watch</td><td>เปิดทิ้งไว้ระหว่าง dev — regenerate อัตโนมัติทุกครั้งที่ save <span class="mono text-[12px]">.env</span></td></tr>
+              <tr><td class="mono text-[12px]">pnpm caddy:run</td><td>generate ครั้งเดียว + สตาร์ท Caddy รอรับ request ทันที (foreground — ต้องเปิด terminal ทิ้งไว้)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          จากนั้นสตาร์ท BC ตามปกติ (<span class="mono text-[12px]">pnpm start:dev:&lt;service&gt;</span> หรือ
+          <span class="mono text-[12px]">pnpm start:dev:all</span>) แล้วเรียกผ่านโดเมนเดียวได้เลย — <b>ไม่ต้อง</b>เปลี่ยนพอร์ตที่แต่ละ BC bind
+          หรือแก้โค้ดฝั่งแอปเลยแม้แต่บรรทัดเดียว Caddy แค่ proxy request ที่เข้ามาต่อไปยัง <span class="mono text-[12px]">localhost:&lt;port&gt;</span> เดิม
+        </p>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>BC</th><th>Prefix</th><th>ตัวอย่าง URL ผ่าน Caddy</th></tr></thead>
+            <tbody>
+              <tr><td>auth</td><td class="mono text-[12px]">auth/v1</td><td class="mono text-[12px]">http://erp-api.internal/auth/v1/login</td></tr>
+              <tr><td>iam</td><td class="mono text-[12px]">iam/v1</td><td class="mono text-[12px]">http://erp-api.internal/iam/v1/users</td></tr>
+              <tr><td>inventory-bc</td><td class="mono text-[12px]">inventory-bc/v1</td><td class="mono text-[12px]">http://erp-api.internal/inventory-bc/v1/products</td></tr>
+              <tr><td>supplier-bc</td><td class="mono text-[12px]">supplier-bc/v1</td><td class="mono text-[12px]">http://erp-api.internal/supplier-bc/v1/suppliers</td></tr>
+              <tr><td>sales-bc</td><td class="mono text-[12px]">sales-bc/v1</td><td class="mono text-[12px]">http://erp-api.internal/sales-bc/v1/quotations</td></tr>
+              <tr><td>finance-bc</td><td class="mono text-[12px]">finance-bc/v1</td><td class="mono text-[12px]">http://erp-api.internal/finance-bc/v1/receipts</td></tr>
+              <tr><td>report-bc</td><td class="mono text-[12px]">report-bc/v1</td><td class="mono text-[12px]">http://erp-api.internal/report-bc/v1/print-templates</td></tr>
+              <tr><td>storage</td><td class="mono text-[12px]">storage/v1</td><td class="mono text-[12px]">http://erp-api.internal/storage/v1/...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox ok">
+          <div class="rc mb-1">FE: ตั้ง base URL เดียวพอ</div>
+          <p class="text-[13.5px]">
+            ทุก BC อยู่ใต้โดเมนเดียวแล้ว — ฝั่ง frontend ตั้งค่าเดียว เช่น
+            <span class="mono text-[12px]">NEXT_PUBLIC_API_ORIGIN=http://erp-api.internal</span> แล้วต่อ path เอาเอง
+            (<span class="mono text-[12px]">${'{'}ORIGIN{'}'}/inventory-bc/v1/products</span>) แทนที่จะมีตัวแปร origin แยกทีละ BC
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 MAPPING ========== -->
+      <section id="mapping" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — Generator แม็พ prefix ยังไง</div>
+        <h2 class="display text-3xl mb-6">กฎการจับคู่ (mirrors bootstrap.util.ts)</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <span class="mono text-[12px]">scripts/generate-caddyfile.mjs</span> หาทุกตัวแปรที่ลงท้ายด้วย
+          <span class="mono text-[12px]">_MODULE_HTTP_PORT</span> ใน <span class="mono text-[12px]">.env</span> แล้วพยายามหา
+          <span class="mono text-[12px]">&lt;KEY&gt;_PREFIX_NAME</span> คู่กัน — ถ้าไม่เจอ จะลองตัด <span class="mono text-[12px]">_BC</span>
+          ท้าย key ออกก่อนแล้วลองอีกครั้ง (เพราะสอง env family นี้ไม่ได้ตั้งชื่อ suffix ตรงกันเป๊ะทุกตัว):
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>*_MODULE_HTTP_PORT</th><th>ลองหาตรงๆ ก่อน</th><th>Fallback (ตัด _BC)</th><th>ผลลัพธ์</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[12px]">AUTH_MODULE_HTTP_PORT</td><td class="mono text-[12px]">AUTH_PREFIX_NAME</td><td>—</td><td>match ตรงๆ</td></tr>
+              <tr><td class="mono text-[12px]">INVENTORY_BC_MODULE_HTTP_PORT</td><td class="mono text-[12px]">INVENTORY_BC_PREFIX_NAME (ไม่มี)</td><td class="mono text-[12px]">INVENTORY_PREFIX_NAME</td><td>match ผ่าน fallback</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          จับคู่ได้แล้วจึงเขียน <span class="mono text-[12px]">reverse_proxy /&lt;prefix&gt;/* localhost:&lt;port&gt;</span> —
+          <b>ไม่ strip path</b> ก่อน proxy เพราะแอปแต่ละตัวตั้ง <span class="mono text-[12px]">app.setGlobalPrefix('&lt;prefix&gt;/&lt;version&gt;')</span>
+          เองอยู่แล้ว route จริงจึงขึ้นต้นด้วย <span class="mono text-[12px]">/&lt;prefix&gt;/...</span> เป๊ะ ๆ — ตัด path ออกจะได้ 404 ทันที
+          (หลักการเดียวกับ <span class="mono text-[12px]">strip_path=false</span> ที่ Kong ใช้ตาม
+          <a href="deployment-guide.html#kong" class="underline" style="color:var(--accent)">deployment-guide.html §06</a>)
+        </p>
+        <div class="rulebox mb-4" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">Map ไม่ได้ = skip พร้อม warning เสมอ ไม่เดาให้</div>
+          <p class="text-[13.5px]">
+            ถ้า <span class="mono text-[12px]">*_MODULE_HTTP_PORT</span> ตัวไหนหา <span class="mono text-[12px]">*_PREFIX_NAME</span> คู่กันไม่เจอเลย
+            (แอปยังไม่ scaffold จริง) script จะ <span class="mono text-[12px]">console.warn</span> แล้วข้ามไปเฉยๆ — เช็ค log ตอนรัน
+            <span class="mono text-[12px]">pnpm caddy:generate</span> เสมอหลังเพิ่ม BC ใหม่ ว่า route ที่คาดว่าจะมีขึ้นจริงหรือไม่
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 PITFALL ========== -->
+      <section id="pitfall" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — บั๊กที่เจอมาแล้ว</div>
+        <h2 class="display text-3xl mb-6">Caddy ค้างหลาย process — หน้า Scalar/Swagger ขึ้นขาว</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <span class="mono text-[12px]">pnpm caddy:run</span> เป็นคำสั่งที่<b>ค้างอยู่ foreground ตลอด</b> — ถ้าสั่งซ้ำโดยไม่ปิดตัวเก่าก่อน
+          (เปิด terminal ใหม่, รันซ้ำหลังแก้ <span class="mono text-[12px]">.env</span>) จะได้ Caddy process ใหม่ซ้อนขึ้นมาอีกตัวโดยไม่มี error เตือน —
+          macOS/Linux ยอมให้หลาย process bind พอร์ต 80 พร้อมกันได้ (SO_REUSEPORT)
+        </p>
+        <div class="rulebox mb-4" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">อาการ — เจอจริงตอนเปิด http://.../inventory-bc/v1/api-docs</div>
+          <p class="text-[13.5px]">
+            หน้า Scalar โหลด HTML ได้ (ขึ้นหน้าเปล่า) แต่<b>ขึ้นขาวไม่มีอะไรเกิดขึ้น</b> — เพราะหน้านั้น fetch สเปก
+            (<span class="mono text-[12px]">/&lt;prefix&gt;/v1/json-docs</span>) เพิ่มอีกทีด้วย JavaScript ฝั่ง browser
+          </p>
+        </div>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>สาเหตุ</th><th>สัญญาณที่ยืนยันได้</th></tr></thead>
+            <tbody>
+              <tr><td>มี Caddy process เก่าหลายตัวค้างที่ config คนละเวอร์ชัน (คนละเวลาที่ generate)</td><td class="mono text-[12px]">lsof -iTCP:80 -sTCP:LISTEN</td> เจอ PID มากกว่า 1 ตัว เวลาเริ่มต่างกัน</tr>
+              <tr><td>เคอร์เนลสุ่มว่าจะส่ง request ไปให้ process ไหนตอบ — request หน้า HTML กับ request fetch spec อาจตกคนละ process กัน</td><td>request บาง endpoint ได้ <span class="mono text-[12px]">200 OK</span> แต่ <span class="mono text-[12px]">Content-Length: 0</span> และ<b>ไม่มี</b> security header ที่ backend จริงต้องใส่ (เช่น <span class="mono text-[12px]">x-content-type-options</span>) — แปลว่า response นั้นไม่เคยไปถึง backend จริงเลย</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox ok mb-8">
+          <div class="rc mb-1">แก้</div>
+          <div class="code p-4 mt-2 mb-2">
+<pre><span class="c"># หาว่ามีกี่ process ค้างอยู่</span>
+lsof -iTCP:80 -sTCP:LISTEN -n -P
+
+<span class="c"># ปิดให้เหลือตัวเดียว (หรือ pkill ทั้งหมดแล้วเริ่มใหม่)</span>
+pkill caddy
+pnpm caddy:run</pre>
+          </div>
+          <p class="text-[13.5px]">
+            <b>ก่อนสั่ง <span class="mono text-[12px]">pnpm caddy:run</span> ทุกครั้ง</b> เช็คก่อนว่ามีตัวเก่าค้างอยู่ไหมด้วยคำสั่งข้างบน
+            — วินิจฉัยแบบนี้เหมือนกับ head-of-line block ของ RabbitMQ ใน
+            <a href="rabbitmq-reliability-guide.html" class="underline" style="color:var(--accent)">rabbitmq-reliability-guide.html §03</a>:
+            อาการหน้าตาเหมือนบั๊กสุ่มๆ แต่จริงๆ คือ process เก่าที่ไม่มีใครฆ่าทิ้ง
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 VS KONG ========== -->
+      <section id="vskong" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — Caddy vs Kong</div>
+        <h2 class="display text-3xl mb-6">เลือกยังไงตอน deploy ให้ลูกค้าจริง</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          Kong (<a href="deployment-guide.html#kong" class="underline" style="color:var(--accent)">deployment-guide.html §06</a>)
+          คือของที่ deploy จริงอยู่ตอนนี้ — มี Admin API + plugin ecosystem (ACME, rate-limit, auth plugin ฯลฯ)
+          แต่ต้องแบก <b>Postgres + Konga + Mongo</b> เป็น stack แยกอีกก้อน (~4-5 GB disk ตาม
+          deployment-guide.html §02, ดันให้ RAM แนะนำขยับจาก 8 GB เป็น 16 GB) — Caddy ทำ path routing + TLS แบบเดียวกันได้
+          โดยเป็น<b>binary เดียวไม่มี database</b>
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th></th><th>Kong</th><th>Caddy</th></tr></thead>
+            <tbody>
+              <tr><td>Dependency</td><td>Kong + Postgres (ของ Kong เอง) + Konga UI + Mongo (ของ Konga)</td><td>ไม่มี — binary เดียว ไม่มี database</td></tr>
+              <tr><td>Disk เพิ่ม</td><td>~4-5 GB (Docker images ทั้ง stack)</td><td>~40-50 MB (binary เดียว)</td></tr>
+              <tr><td>RAM เพิ่ม</td><td>เป็นเหตุผลหลักที่ต้องขยับจาก 8→16 GB (deployment-guide.html §02)</td><td>หลักสิบ MB ระหว่างรัน</td></tr>
+              <tr><td>TLS จริง (domain สาธารณะ)</td><td>ต้องพ่วง Cloudflare Tunnel/ACME plugin แยก ตั้งค่าเยอะกว่า (§07-08 ของ deployment-guide.html)</td><td><b>ในตัวเลย</b> — ขอ Let's Encrypt cert อัตโนมัติแค่ domain resolve มาถึงเครื่องและเปิดพอร์ต 80/443</td></tr>
+              <tr><td>Admin UI / plugin</td><td>Konga UI, ปรับ rate-limit/auth/logging ผ่าน plugin ได้หลากหลาย</td><td>ไม่มี Admin UI แบบ Kong — แก้ config ผ่านไฟล์/JSON API เท่านั้น</td></tr>
+              <tr><td>Config เปลี่ยนแบบ zero-downtime</td><td>ผ่าน Admin API ได้</td><td><span class="mono text-[12px]">caddy reload</span> — graceful, ไม่ drop connection ที่ค้างอยู่</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox ok mb-4">
+          <div class="rc mb-1">เลือก Caddy เมื่อ</div>
+          <p class="text-[13.5px]">
+            ลูกค้าเครื่องเล็ก/งบจำกัด, ต้องการแค่ path routing + HTTPS จริงให้ 8 BC ไม่ได้ใช้ Kong plugin
+            เฉพาะทางไหนเลย (rate-limit ระดับ gateway, custom auth plugin ฯลฯ) — ประหยัด RAM/disk ได้จริงตามตาราง
+            และตั้ง TLS ง่ายกว่าเดิมด้วยซ้ำ (ไม่ต้องพึ่ง Cloudflare Tunnel ถ้าลูกค้ามี public IP + domain ของตัวเอง)
+          </p>
+        </div>
+        <div class="rulebox mb-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ยังเลือก Kong เมื่อ</div>
+          <p class="text-[13.5px]">
+            ต้องใช้ Kong plugin จริง (rate-limit ต่อ consumer, custom auth ที่ gateway, request/response transform),
+            มี Admin API ให้ทีม ops ปรับ route ได้โดยไม่ต้องแตะไฟล์, หรือระบบเดิมผูกกับ infra Kong อยู่แล้ว —
+            การย้ายฐานลูกค้าเดิมจาก Kong ไป Caddy ไม่ใช่เป้าหมายของคู่มือนี้ นี่คือ<b>ทางเลือกสำหรับดีลใหม่ที่เครื่องจำกัด</b>เท่านั้น
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 PROD SETUP ========== -->
+      <section id="prod" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — ตั้ง Caddy เป็น Production Gateway</div>
+        <h2 class="display text-3xl mb-6">โครงร่างสำหรับดีลที่ตัดสินใจใช้ Caddy แทน Kong</h2>
+        <div class="edge mb-6">
+          <div class="tag mb-1">ยังไม่ได้ทดสอบ/ใช้จริงหน้างาน</div>
+          <p class="text-[13px]">
+            ส่วนนี้เป็นโครงร่างจากหลักการเดียวกับ §02-04 (ที่ใช้จริงกับ local dev แล้ว) ต่อยอดไปเป็น production —
+            <b>ต้องทดสอบเต็มรูปแบบก่อนใช้กับลูกค้าจริง</b> โดยเฉพาะ ACME ผ่าน domain สาธารณะจริง และพฤติกรรมตอน reload ระหว่างมี traffic
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">โครงสร้าง Caddyfile สำหรับ domain สาธารณะ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ต่างจาก local dev (§02-04) 2 จุด: ใช้ domain จริงแทน <span class="mono text-[12px]">erp-api.internal</span>
+            และ<b>ไม่ต้องมี</b> <span class="mono text-[12px]">auto_https off</span> — ปล่อยให้ Caddy ขอ Let's Encrypt cert เอง:
+          </p>
+          <div class="code p-4 mb-2">
+<pre><span class="c"># infrastructure/caddy/Caddyfile.prod — ตัวอย่าง ไม่ใช่ไฟล์ generate อัตโนมัติ</span>
+erp-api.example.com {
+	encode gzip
+
+	<span class="c"># reverse_proxy /&lt;prefix&gt;/* localhost:&lt;port&gt; — เหมือน dev ทุกอย่าง</span>
+	<span class="c"># ต่างแค่ upstream host อาจเป็น container network แทน localhost ถ้าใช้ Docker</span>
+	reverse_proxy /auth/*         localhost:3001
+	reverse_proxy /iam/*          localhost:3002
+	reverse_proxy /inventory-bc/* localhost:3003
+	reverse_proxy /supplier-bc/*  localhost:3004
+	reverse_proxy /sales-bc/*     localhost:3005
+	reverse_proxy /finance-bc/*   localhost:3006
+	reverse_proxy /report-bc/*    localhost:3007
+	reverse_proxy /storage/*      localhost:3008
+}</pre>
+          </div>
+          <div class="rulebox">
+            <div class="rc mb-1">แนวทาง — ยังใช้ generator ตัวเดิมได้ ไม่ต้องเขียนสองชุด</div>
+            <p class="text-[13.5px]">
+              <span class="mono text-[12px]">scripts/generate-caddyfile.mjs</span> อ่าน <span class="mono text-[12px]">LOCAL_DOMAIN</span>
+              จาก <span class="mono text-[12px]">.env</span> อยู่แล้ว — ตั้งค่านั้นเป็น domain จริงบนเครื่อง production
+              (เช่น <span class="mono text-[12px]">LOCAL_DOMAIN=erp-api.example.com</span>) แล้วลบ/ปรับ block
+              <span class="mono text-[12px]">{'{'} auto_https off {'}'}</span> ที่ script เขียนให้เสมอ ก่อนตั้งเป็น production จริง —
+              ยังไม่คุ้มที่จะแยก flag <span class="mono text-[12px]">--prod</span> ในตัว generator จนกว่าจะมีดีลจริงที่ใช้ path นี้
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">รันเป็น systemd service (ไม่ใช่ foreground)</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">brew services</span>/<span class="mono text-[12px]">caddy run</span> ตรงๆ ใช้ได้แค่ dev —
+            production ต้องมี process manager คุมให้ restart อัตโนมัติเมื่อ crash/reboot:
+          </p>
+          <div class="code p-4 mb-2">
+<pre><span class="c"># ติดตั้งผ่าน apt/dnf package จะได้ systemd unit ให้เลย (แนะนำ)</span>
+<span class="c"># ดู https://caddyserver.com/docs/install#debian-ubuntu-raspbian</span>
+sudo systemctl enable --now caddy
+
+<span class="c"># วางไฟล์ config ที่ /etc/caddy/Caddyfile แล้ว reload (ไม่ downtime)</span>
+sudo systemctl reload caddy</pre>
+          </div>
+          <div class="rulebox" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">กันบั๊ก §05 ซ้ำในระดับ production</div>
+            <p class="text-[13.5px]">
+              systemd คุมให้มี Caddy instance เดียวเสมอ (unit เดียว, <span class="mono text-[12px]">systemctl status caddy</span>
+              เช็คได้ตรงๆ) — <b>ห้าม</b>รัน <span class="mono text-[12px]">caddy run</span> มือเพิ่มบน production เด็ดขาด
+              เพราะจะกลับไปเจอปัญหาเดียวกับ §05 (หลาย process แย่งพอร์ต 80/443) ซึ่งบน production คือ downtime บางส่วนที่วินิจฉัยยากกว่าเดิม
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">Diagram เทียบ — hop เดียวกัน แค่สลับตัวกลาง</h3>
+          <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    U["ผู้ใช้งาน<br/>(อินเทอร์เน็ต)"] -->|"HTTPS<br/>erp-api.example.com"| C["Caddy<br/>(auto ACME + path routing)"]
+    C -->|"reverse_proxy /&lt;prefix&gt;/*<br/>(ไม่ strip path)"| BC1["auth :3001"]
+    C --> BC2["iam :3002"]
+    C --> BC3["... (8 BCs)"]
+    BC1 --> DB[("PostgreSQL<br/>Redis · RabbitMQ")]
+    BC2 --> DB
+</pre>
+          </div>
+          <p class="text-sm mt-4" style="color:var(--ink-soft)">
+            เทียบกับ diagram Kong+Cloudflare Tunnel เต็มรูปใน
+            <a href="deployment-guide.html#architecture" class="underline" style="color:var(--accent)">deployment-guide.html §01</a> —
+            สังเกตว่า Caddy แทนที่ทั้ง <span class="mono text-[12px]">cloudflared</span> และ <span class="mono text-[12px]">Kong</span>
+            ได้ในตัวเดียว (TLS termination + path routing) ถ้าลูกค้ามี public IP/domain ของตัวเองอยู่แล้ว —
+            ถ้าลูกค้า<b>ไม่มี</b> public IP คงที่ (สถานการณ์เดียวกับที่ deployment-guide.html §01 อธิบาย)
+            ยังต้องพ่วง Cloudflare Tunnel เข้าไปเหมือนเดิม เพียงแต่ปลายทางของ tunnel เปลี่ยนจาก Kong เป็น Caddy แทน
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 CHECKLIST ========== -->
+      <section id="checklist" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — Checklist</div>
+        <h2 class="display text-3xl mb-6">เพิ่ม BC ใหม่ — อย่าลืม Caddy</h2>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>เช็ค</th><th>ทำไม</th></tr></thead>
+            <tbody>
+              <tr><td>BC ใหม่มีคู่ <span class="mono text-[12px]">*_MODULE_HTTP_PORT</span> + <span class="mono text-[12px]">*_PREFIX_NAME</span> ใน <span class="mono text-[12px]">.env</span>/<span class="mono text-[12px]">.env.example</span></td><td>ไม่มีคู่นี้ generator จะ skip พร้อม warning เสมอ (§04)</td></tr>
+              <tr><td>รัน <span class="mono text-[12px]">pnpm caddy:generate</span> แล้วเช็ค log ว่า route ใหม่ขึ้นจริง</td><td>ยืนยันว่า prefix ไม่ชนกับ BC อื่น (generator เตือนอัตโนมัติถ้าชน — เลือกตัวที่มี <span class="mono text-[12px]">apps/&lt;name&gt;</span> จริงให้)</td></tr>
+              <tr><td>อัปเดตตาราง §03 ในคู่มือนี้ + <span class="mono text-[12px]">infrastructure/caddy/README.md</span></td><td>BE/FE คนอื่นจะได้เห็น path ใหม่โดยไม่ต้องไปงมใน <span class="mono text-[12px]">.env</span> เอง</td></tr>
+              <tr><td>ถ้า deploy จริงใช้ Caddy (§07) — เพิ่ม <span class="mono text-[12px]">reverse_proxy</span> block ให้ <span class="mono text-[12px]">Caddyfile.prod</span> ด้วย</td><td><span class="mono text-[12px]">Caddyfile.prod</span> ไม่ได้ generate อัตโนมัติเหมือน dev — ต้องแก้มือ</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox">
+          <div class="rc mb-1">อ่านต่อ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <a href="deployment-guide.html" class="underline" style="color:var(--accent)">Deployment Guide</a> — Kong + Cloudflare Tunnel เต็มรูป (ของที่ deploy จริงอยู่วันนี้) ·
+            <a href="backend-convention.html" class="underline" style="color:var(--accent)">Backend Conventions</a> — <span class="mono text-[12px]">setGlobalPrefix</span> และ microservice transport ·
+            <a href="rabbitmq-reliability-guide.html" class="underline" style="color:var(--accent)">RabbitMQ Reliability Guide</a> — บั๊กคนละตัวแต่วินิจฉัยด้วยวิธีคล้ายกัน (§05)
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · CADDY REVERSE PROXY"
+        line2="Local dev: ใช้งานจริง · Production: ข้อเสนอสำหรับลูกค้าที่เครื่องจำกัดทรัพยากร ยังไม่ทดสอบหน้างาน">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+</body>
+</html>
