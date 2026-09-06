@@ -1089,7 +1089,7 @@ sequenceDiagram
           <p class="text-[13.5px]">
             <b>จุดที่ FE พลาดได้ง่ายที่สุดของฟีเจอร์นี้</b> — <span class="mono text-[12px]">allocated_amount</span> คือ"ยอดหนี้บนใบกำกับที่ต้องการปิด" จึงเป็น THB <b>ที่อัตราซึ่ง snapshot ไว้บนใบนั้น</b> พูดง่ายๆ คือ<b>ส่ง <span class="mono text-[12px]">total</span> ของใบนั้นมาตรงๆ</b> ไม่ต้องแปลงอะไร ไม่ว่าเงินสดจะเข้ามาที่อัตราเท่าไร ·
             ส่วน <span class="mono text-[12px]">paid_amount</span>/<span class="mono text-[12px]">wht_amount</span> เป็น THB <b>ที่อัตราของใบจ่ายเอง</b> (<span class="mono text-[12px]">currency_rate</span> ที่ส่งมา)<br>
-            <b>ดังนั้นสองยอดนี้จะไม่เท่ากันเป็นเรื่องปกติ</b> — ใบ USD 100 บันทึกไว้อัตรา 35 (<span class="mono text-[12px]">total</span> = 3,500) ลูกค้าจ่ายครบตอนอัตรา 36 → ส่ง <span class="mono text-[12px]">paid_amount: 3600</span> กับ <span class="mono text-[12px]">allocated_amount: 3500</span> แล้วใบนั้น<b>ปิดครบพอดี</b> · ผลต่าง 100 บาทไม่ใช่ยอดค้างและไม่ใช่เครดิตลูกค้า — ระบบโพสต์เป็น<b>กำไรจากอัตราแลกเปลี่ยน</b> (<span class="mono text-[12px]">4300</span> / ขาดทุนที่ <span class="mono text-[12px]">5300</span>) ให้ตอน submit เอง ·
+            <b>ดังนั้นสองยอดนี้จะไม่เท่ากันเป็นเรื่องปกติ</b> — ใบ USD 100 บันทึกไว้อัตรา 35 (<span class="mono text-[12px]">total</span> = 3,500) ลูกค้าจ่ายครบตอนอัตรา 36 → ส่ง <span class="mono text-[12px]">paid_amount: 3600</span> กับ <span class="mono text-[12px]">allocated_amount: 3500</span> แล้วใบนั้น<b>ปิดครบพอดี</b> · ผลต่าง 100 บาทไม่ใช่ยอดค้างและไม่ใช่เครดิตลูกค้า — ระบบโพสต์เป็น<b>กำไรจากอัตราแลกเปลี่ยน</b> (บัญชีตาม role <span class="mono text-[12px]">ForeignExchangeGain</span> / ขาดทุนตาม role <span class="mono text-[12px]">ForeignExchangeLoss</span> — รหัสบัญชีจริงตั้งค่าได้ต่อ deployment ตั้งแต่ 2026-09-06 ดู <span class="mono text-[12px]">HANDOFF-Configurable-Chart-Of-Accounts.md</span>) ให้ตอน submit เอง ·
             อย่าพยายามให้ผู้ใช้ "ปรับยอดให้ตรง" เพราะจะกลายเป็นตัดหนี้ผิดจำนวนทันที<br>
             <b>เพดานที่ FE ต้องคิด อยู่ฝั่งสกุลที่ทำรายการ</b> — <span class="mono text-[12px]">Σ (allocated_amount ÷ อัตราของใบนั้น) ≤ paid_amount ÷ currency_rate + wht_amount ÷ currency_rate</span> · ถ้าคิดเพดานเป็น THB ตรงๆ จะขึ้น 400 ทั้งที่ผู้ใช้กรอกถูก ·
             <b>ตัดข้ามสกุลไม่ได้เลย</b> (400) — ใบจ่ายสกุลหนึ่งตัดได้เฉพาะเอกสารสกุลเดียวกัน จึงควรกรองรายการใบที่ให้เลือกด้วย <span class="mono text-[12px]">currency</span> ตั้งแต่บน UI
@@ -1250,9 +1250,9 @@ sequenceDiagram
           <p class="text-[13.5px]">
             ทุก receipt/AP invoice ต่างสกุล (ไม่ใช่ THB) ที่ยังมียอดค้างชำระ ณ <span class="mono text-[12px]">upto</span> จะถูกตีราคาใหม่ด้วยอัตราใน
             <span class="mono text-[12px]">closing_rates</span> · ก่อนตีราคารอบใหม่ ระบบ<b>กลับรายการ run ก่อนหน้าที่ยัง POSTED ทั้งหมดก่อนเสมอ</b> (auto-reverse ต้นงวด)
-            แล้วคำนวณสดจากอัตราที่เอกสารบันทึกไว้จริง — ไม่ต่อยอดจากอัตราปิดงวดคราวก่อน · โพสต์ลงบัญชีแยกจาก realised FX
-            (<span class="mono text-[12px]">4301</span> กำไรยังไม่เกิดขึ้นจริง / <span class="mono text-[12px]">5301</span> ขาดทุนยังไม่เกิดขึ้นจริง)
-            เพราะเป็นตัวเลขประมาณการที่จะถูกกลับทั้งหมดที่ต้นงวดถัดไป ไม่ใช่กำไร/ขาดทุนที่เกิดขึ้นจริงแบบ <span class="mono text-[12px]">4300</span>/<span class="mono text-[12px]">5300</span> ·
+            แล้วคำนวณสดจากอัตราที่เอกสารบันทึกไว้จริง — ไม่ต่อยอดจากอัตราปิดงวดคราวก่อน · โพสต์ลงบัญชีตาม role แยกจาก realised FX
+            (<span class="mono text-[12px]">UnrealisedForeignExchangeGain</span> กำไรยังไม่เกิดขึ้นจริง / <span class="mono text-[12px]">UnrealisedForeignExchangeLoss</span> ขาดทุนยังไม่เกิดขึ้นจริง — รหัสบัญชีจริงตั้งค่าได้ต่อ deployment)
+            เพราะเป็นตัวเลขประมาณการที่จะถูกกลับทั้งหมดที่ต้นงวดถัดไป ไม่ใช่กำไร/ขาดทุนที่เกิดขึ้นจริงแบบ role <span class="mono text-[12px]">ForeignExchangeGain</span>/<span class="mono text-[12px]">ForeignExchangeLoss</span> ·
             รายละเอียดกฎทั้งหมด: <a href="srs-p5.html" style="color:var(--teal);text-decoration:underline">SRS P5 — RULE · UNREALISED FX (TFRS 21)</a>
           </p>
         </div>

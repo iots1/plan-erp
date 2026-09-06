@@ -94,6 +94,55 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-06 · Configurable Chart of Accounts (`gl_accounts`) ✅ **backend + Admin UI + permission fix — ยังมี 2 จุดค้าง**
+
+รายละเอียดเต็ม/decision log: `HANDOFF-Configurable-Chart-Of-Accounts.md`. สรุปสั้น:
+
+**Backend** (`apps/finance-bc`, commit `c5c61e4`) — `gl_accounts` เป็น nested-set tree ที่ตั้งค่าได้ต่อ
+deployment แทน `GlAccount` TS enum เดิม (ลบทิ้งแล้ว) · seed มาตรฐาน 216 บัญชี · 14 `account_role`
+คงที่ (`resolveIdByRole()`, cache ในหน่วยความจำ, invalidate ทุกครั้งที่เขียน) ที่ posting service ทั้ง 5
+ตัว (payment/receipt/COGS/AP invoice/FX revaluation, รวม 32 จุด) เรียกแทนการ hard-code `code` ·
+ย้าย role ข้ามบัญชีได้ผ่าน `PATCH /gl-accounts/:id/role` โดยไม่ต้องแก้โค้ด · migration C (backfill
+`ledger_entries.account` enum → `account_id` FK) ผ่าน mapping รหัสเดิม→รหัสผังใหม่ 14 คู่ ตรวจ
+`ledger_entries` ทุกแถวมี `account_id` ที่ resolve ได้จริงก่อนรัน — verify แล้วด้วย `pg_dump` ก่อน/หลัง
+
+**เจอบั๊กแพลตฟอร์มจริงระหว่างทำ**: `TransformInterceptor`'s bare-array branch (`GET
+/gl-accounts/tree` เป็น endpoint แรกในทั้งระบบที่คืน array เปล่าผ่าน `@ResourceType()`) ไม่เคยใส่
+`status` เข้า envelope เลย เพราะ `createSuccessCollectionResponse()` ไม่มี default เหมือนฝั่ง
+paginated — แก้ใน `libs/common` แล้ว + regression test 5 เคส (ไม่กระทบ BC อื่น ตรวจแล้ว)
+
+**Admin UI** (`apps/iam`, commit `709dbe4`) — hosted ที่ `apps/iam/views/pages/gl-accounts/`
+เหมือนทรัพยากรข้ามบริบทอื่น (`warehouses`/`uoms`) · list เป็น **indented tree จริง** (ต่างจาก
+`warehouses` ที่เป็น flat table แม้เป็น nested-set เหมือนกัน — แผนสั่งให้ทำ tree เพราะยังไม่มี
+tree-rendering component ให้ก็อปในระบบเลย) พร้อม expand/collapse (localStorage) + search/type filter
+(flatten เมื่อ filter active) · ย้าย role แยกเป็น dialog ต่างหาก ไม่ใช่ฟิลด์ในฟอร์ม edit ปกติ (กระทบบัญชี
+อีกใบเสมอ)
+
+**แก้กับดัก permission 2-plane** (commit ถัดมา, migration `SeedGlAccountsUiPermission` +
+`ReapplyGlAccountPermissionsToMockPolicies`) — grant migration เดิม (`GrantGlAccountPermissionsToMockPolicies`)
+shipped **ใน commit เดียวกัน**กับ `@RequirePermission()` ที่มันพึ่งพา ซึ่งเป็นกับดักเดียวกับที่ §4
+เตือนไว้ (ดู `ReapplyVatReturnPermissionsToMockPolicies`) — เขียน migration ใหม่ 2 ไฟล์แก้:
+ui-plane (4 permission ใหม่ `page:view_gl_accounts`+3 `component:*`) ใช้ pattern self-upsert
+(`ON CONFLICT ... DO UPDATE`) ที่ปลอดภัยไม่ว่าจะรันก่อน/หลัง `permissions:sync`, ส่วน api-plane
+เป็น Reapply migration แบบเดิม (idempotent, `NOT EXISTS`-guard) — รันทั้งคู่แล้วบน DB จริง ยืนยันด้วย
+query ตรงว่าทั้ง 8 permission (4 api + 4 ui) ผูกกับทั้ง 2 mock policy ครบ **หมายเหตุ**: dev/prod ใช้
+Postgres ตัวเดียวกัน (§4 กับดัก #10) — migration ที่รันตอน implement ก็คือรันบน production ไปแล้ว
+ไม่ใช่แค่ dev เฉยๆ
+
+**ยังค้างจริง (ไม่ใช่แค่ backlog D2-D4 ที่ตัดออกจากขอบเขตแล้วตามคำสั่งผู้ใช้)**:
+1. **Smoke test §8.3 ข้อ 6** — ยังไม่ได้ยิงเอกสารจริงที่โพสต์ GL (เช่น submit AP Invoice/Payment Entry)
+   **หลัง**ย้าย role เพื่อพิสูจน์ว่า posting เดินตาม role ใหม่ ไม่ใช่ค้าง cache เก่า — ตรวจแล้วพบว่าทุก
+   flow ที่โพสต์ GL จริงต้องมี valid `customer_id`/`supplier_id` ที่ verify ผ่าน RPC ข้าม BC จริง (ไม่ใช่แค่
+   UUID เปล่าๆ) ยกเว้น `POST /finance-settings/close-period` ซึ่ง**เป็น one-way ratchet ปิดงวดถาวร** —
+   ไม่ควรเรียกมั่วบน DB ที่ใช้ร่วมกับ production (ตาม §4 กับดัก #10) เพื่อเทสเฉยๆ ยังไม่ได้ตัดสินใจว่าจะทำ
+   ยังไง (รอ user เลือก: เพิ่ม sales-bc เป็น dependency ของ smoke suite / เชื่อ unit test ที่ mock
+   `resolveIdByRole()` ต่อ posting service ทั้ง 5 ตัวว่าครอบความเสี่ยงจริงพอแล้ว)
+2. **Manual QA UI (§8.4)** — เครื่องมือ browser (claude-in-chrome) ใช้ไม่ได้ใน session ที่ทำงานนี้ —
+   ตรวจได้แค่ curl ดู HTML/bundle render ไม่พัง (ไม่ error, element id ครบ) ยังไม่มีใคร click-through จริง
+   (tree expand/collapse, สร้าง/แก้/ลบ, ย้าย role ผ่าน dialog) — รอ session ที่มี browser tool หรือมนุษย์ตรวจ
+
+---
+
 ### 2026-09-05 · P6 · profit_by_lot + expiry_alerts ✅ **2/4 read model แรก — implement + migrate + deploy แล้ว**
 
 หลังปิด A1/B1/C (ด้านล่าง) ผู้ใช้ถามว่า P6 เสร็จหรือยัง (**ยัง 0%**) แล้วสั่งให้ทำ "task ที่ไม่ติด block"
@@ -1237,6 +1286,14 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     `PUT /customers/:id` (ไม่ใช่ `PATCH`) ขณะที่ `finance-settings` เป็น `PATCH` และ
     `sales-settings`/`supplier-settings` เป็น `PUT` · ยิงผิด verb ได้ **404 `Cannot PATCH …`** ซึ่ง
     หน้าตาเหมือน "ไม่มี resource นี้" ทั้งที่มีอยู่ — เปิด controller ดูก่อนเสมอ อย่าเดาจาก REST convention
+13. **(จาก 2026-09-06, gl-accounts) `TransformInterceptor`'s bare-array branch ไม่เคยใส่ `status`
+    เข้า envelope** — `createSuccessCollectionResponse()` ไม่มี default เหมือนฝั่ง paginated
+    (`createPaginatedResponse` มี) จึง endpoint ไหนก็ตามที่คืน `Promise<Entity[]>` เปล่าๆ (ไม่มี
+    pagination) ผ่าน `@ResourceType()` จะได้ envelope ที่ไม่มี `status.code` เลย — บั๊กแฝงอยู่ตั้งแต่
+    วันแรกของ `TransformInterceptor` ไม่มี endpoint ไหนเคยคืน bare array มาก่อนจนกระทั่ง
+    `GET /gl-accounts/tree` เป็นตัวแรก แก้แล้วใน `libs/common` (`transform-interceptor.util.ts`)
+    พร้อม regression test 5 เคสครอบทั้ง 4 shape — ถ้าจะเขียน endpoint ใหม่ที่คืน array เปล่าๆ
+    (ไม่ paginate) ตรวจ response จริงว่ามี `status` เสมอ อย่าเชื่อแค่ shape ถูก
 
 ---
 
