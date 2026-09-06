@@ -63,12 +63,12 @@
         </p>
         <div class="mt-9 flex flex-wrap gap-2.5">
           <span class="chip">21 Business Flows</span>
-          <span class="chip">308 REST Endpoints</span>
+          <span class="chip">332 REST Endpoints</span>
           <span class="chip">8 Bounded Contexts</span>
           <span class="chip">JSON:API Envelope</span>
         </div>
         <p class="mt-7 mono text-[11px] text-[#7B8CA6]">
-          endpoint ทุกเส้นในเอกสารนี้ดึงจากโค้ดจริงใน <span class="text-[#9FB0C6]">iots1/erp-api</span> ไม่ได้เขียนจากแผน · ปรับปรุงล่าสุด 2026-09-01
+          endpoint ทุกเส้นในเอกสารนี้ดึงจากโค้ดจริงใน <span class="text-[#9FB0C6]">iots1/erp-api</span> ไม่ได้เขียนจากแผน · ปรับปรุงล่าสุด 2026-09-06
         </p>
       </div>
     </header>
@@ -688,6 +688,7 @@ sequenceDiagram
               <tr><td class="mono">4</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/send</td><td class="mono text-[11px]">quotation:send</td><td>DRAFT → <b>SENT</b> · ล็อกการแก้ไข</td></tr>
               <tr><td class="mono">5</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/approve</td><td class="mono text-[11px]">quotation:approve</td><td>SENT → <b>APPROVED</b> (ลูกค้าตกลง)</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/cancel</td><td class="mono text-[11px]">quotation:cancel</td><td>ยกเลิก</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/print</td><td class="mono text-[11px]">quotation:print</td><td><b>ใหม่ (P2, 2026-09-06)</b> พิมพ์เป็น PDF จริง — ทำได้ทุกสถานะ ไม่เปลี่ยนสถานะเอกสาร ดู E3</td></tr>
             </tbody>
           </table>
         </div>
@@ -935,6 +936,7 @@ sequenceDiagram
               <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/issue</td><td class="mono text-[11px]">receipt:issue</td><td><b>ออกเลขที่แบบไม่ข้ามลำดับ + ลงบัญชี</b> · ล็อกถาวร</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/void</td><td class="mono text-[11px]">receipt:void</td><td>ยกเลิกใบที่ออกแล้ว · <b>เก็บเลขไว้ ไม่นำกลับมาใช้ซ้ำ</b></td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">DELETE /finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:update</td><td>ลบได้เฉพาะ DRAFT (ไม่มีเลข = ไม่มีตัวตนทางกฎหมาย)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/print</td><td class="mono text-[11px]">receipt:print</td><td><b>ใหม่ (P2, 2026-09-06)</b> พิมพ์เป็น PDF จริง — ทำได้ทั้ง DRAFT/ISSUED ไม่เปลี่ยนสถานะเอกสาร ดู E3</td></tr>
             </tbody>
           </table>
         </div>
@@ -1595,28 +1597,102 @@ sequenceDiagram
           </p>
         </div>
 
-        <h3 class="display text-xl mt-10 mb-4">E3 · พิมพ์เอกสาร (PDF)</h3>
+        <h3 class="display text-xl mt-10 mb-4">E3.1 · พิมพ์ใบเสนอราคา / ใบเสร็จ-ใบกำกับภาษี <span class="mono text-[13px] text-[var(--muted)]">— ใหม่ 2026-09-06 (P0-P2 ของ HANDOFF-Document-Print-Pipeline.md)</span></h3>
+        <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
+          2 เอกสารแรกของระบบนี้ที่พิมพ์เป็น PDF จริงได้ผ่าน endpoint เดียวจบ — FE <b>ไม่ต้องประกอบ params เอง</b>
+          และไม่ต้องรู้จัก <span class="mono text-[12px]">print_templates</span>/<span class="mono text-[12px]">document_types</span>
+          เลย ต่างจาก E3.2 ด้านล่าง: BC เจ้าของเอกสาร (sales-bc/finance-bc) โหลดข้อมูลของตัวเอง ประกอบ params เอง
+          แล้วส่งให้ report-bc เรนเดอร์ผ่าน RPC ภายใน — FE เห็นแค่ endpoint เดียว
+        </p>
+        <div class="diagram mb-6">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as ผู้ใช้
+  participant SAL as sales-bc / finance-bc
+  participant REP as report-bc
+  participant FIN as finance-bc – company profile
+  participant STO as storage-bc
+  U->>SAL: POST /quotations/{id}/print หรือ /receipts/{id}/print
+  SAL->>SAL: โหลดเอกสาร + items ของตัวเอง → ประกอบ params
+  SAL->>REP: RPC report.printDocument (document_type_code, params, idempotency_key?)
+  REP->>REP: หา print_templates จาก document_types.code
+  REP->>FIN: RPC ขอ company profile (ชื่อ/ที่อยู่/เลขผู้เสียภาษี) — cache 5 นาที
+  REP->>REP: render HTML → Gotenberg → PDF
+  REP->>STO: อัปโหลด PDF + ขอ presigned URL (1 ชม.)
+  REP->>REP: INSERT document_prints (copy_number/is_original คำนวณที่นี่)
+  REP-->>SAL: { id, url, copy_number, is_original }
+  SAL-->>U: 200 พร้อม url ให้เปิด/ดาวน์โหลด
+</pre>
+        </div>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/print</td><td class="mono text-[11px]">quotation:print</td><td>พิมพ์ใบเสนอราคา — ทำได้ทุกสถานะ</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์ใบเสร็จ/ใบกำกับภาษี (ทั้ง 8 <span class="mono text-[12px]">document_type</span>) — ทำได้ทั้ง DRAFT/ISSUED</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-prints</td><td class="mono text-[11px]">document_print:view</td><td>ประวัติการพิมพ์ทั้งระบบ — filter ด้วย <span class="mono text-[12px]">source_document_id</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-prints/{id}</td><td class="mono text-[11px]">document_print:view</td><td>รายละเอียด + ออก presigned URL ใหม่ (ไม่นับเป็นการพิมพ์ซ้ำ)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /finance-bc/v1/receipts/{id}/print — body ว่างได้ ({}), ทุกฟิลด์ไม่บังคับ</span>
+{
+  <span class="s">"locale"</span>: <span class="s">"th"</span>,                                          <span class="c">// "th" | "en" — ไม่ระบุ = "th"</span>
+  <span class="s">"idempotency_key"</span>: <span class="s">"b6e6c6b0-6b3e-4b3e-8b3e-6b3e4b3e8b3e"</span>,  <span class="c">// กันกดพิมพ์ซ้ำ (แนะนำให้ FE สุ่ม UUID ต่อการกดปุ่ม 1 ครั้ง)</span>
+  <span class="s">"print_reason"</span>: <span class="k">null</span>                                     <span class="c">// ใช้เมื่อพิมพ์ใบแทน (ยังไม่บังคับกรอกในเวอร์ชันนี้)</span>
+}
+
+<span class="c">// ตอบกลับ (JSON:API)</span>
+{ <span class="s">"data"</span>: { <span class="s">"type"</span>: <span class="s">"receipts"</span>, <span class="s">"id"</span>: <span class="s">"6ed5…"</span>, <span class="s">"attributes"</span>: {
+  <span class="s">"url"</span>: <span class="s">"https://…/receipt_full_tax_invoice-….pdf?X-Amz-…"</span>,  <span class="c">// presigned URL อายุ 1 ชม.</span>
+  <span class="s">"copy_number"</span>: <span class="t">1</span>, <span class="s">"is_original"</span>: <span class="t">true</span>
+} } }</pre>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">copy_number / is_original คำนวณฝั่ง backend เท่านั้น — FE แค่แสดงผล</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">copy_number</span>: <b>1</b> = พิมพ์ครั้งแรกของเอกสารที่มีเลขที่แล้ว (ต้นฉบับ, <span class="mono text-[12px]">is_original: true</span>),
+            <b>2+</b> = พิมพ์ซ้ำ (สำเนา) · <b>0</b> = เอกสารยังเป็น <span class="mono text-[12px]">DRAFT</span> (ใบเสร็จที่ยังไม่ออกเลขที่ —
+            <span class="mono text-[12px]">document_number</span> เป็น <span class="mono text-[12px]">null</span>) — PDF จะมีลายน้ำ DRAFT บังคับเสมอ ·
+            ใบเสนอราคามีเลขที่ตั้งแต่สร้าง จึงไม่เจอ <span class="mono text-[12px]">copy_number: 0</span> ยกเว้นกรณีพิเศษในอนาคต<br>
+            <b>ส่ง <span class="mono text-[12px]">idempotency_key</span> เดิมซ้ำ = ได้ผลลัพธ์เดิมเป๊ะ</b> (คนละ URL เพราะ presigned URL เซ็นใหม่ทุกครั้ง แต่ <span class="mono text-[12px]">id</span>/<span class="mono text-[12px]">copy_number</span> เดิม)
+            ไม่เพิ่มสำเนา — FE ควรสุ่ม UUID ใหม่ทุกครั้งที่ผู้ใช้ตั้งใจกดปุ่ม "พิมพ์" จริง ๆ (ไม่ใช่ทุกครั้งที่ re-render component)
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">ต้นฉบับ/สำเนา/ใบแทน — ยังไม่ต้องพิมพ์คำ ๆ นั้นเอง (รอฝ่ายบัญชียืนยัน)</div>
+          <p class="text-[13.5px]">
+            เทมเพลตทั้ง 2 ใบตอนนี้ยังเป็น <b>draft placeholder</b> (P3 จะใส่ HTML จริง) — ข้อความ "ต้นฉบับ"/"สำเนา"/"ใบแทน" ที่ต้องพิมพ์ตาม
+            ป.รัษฎากร §86/12 ยังไม่ได้ต่อเข้า <span class="mono text-[12px]">copy_number</span> เพราะเงื่อนไขที่แน่ชัดต้องรอฝ่ายบัญชียืนยันก่อน —
+            <b>ห้าม FE เดาข้อความเองตอนนี้</b> ระหว่างรอ P5 ให้แสดงแค่ <span class="mono text-[12px]">copy_number</span>/<span class="mono text-[12px]">is_original</span> ดิบ ๆ พอ
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">E3.2 · พิมพ์เอกสารอื่น (เทมเพลต/render ดิบ) <span class="mono text-[13px] text-[var(--muted)]">— อีก 23 เอกสาร</span></h3>
         <div class="card overflow-hidden mb-8">
           <table class="d">
             <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/print-templates</td><td class="mono text-[11px]">report:print_template_read</td><td>รายการเทมเพลต</td></tr>
               <tr><td class="mono text-[11.5px]">POST /report-bc/v1/print-templates/{id}/render</td><td class="mono text-[11px]">report:print_template_render</td><td><b>สร้าง PDF</b> จาก <span class="mono text-[12px]">params</span> ที่ผู้เรียกส่งมาเอง</td></tr>
-              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_read</td><td>ประเภทเอกสาร + รูปแบบเลขรัน</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_read</td><td>ประเภทเอกสาร + รูปแบบเลขรัน — ครบทั้ง 25 เอกสารในระบบแล้ว (2026-09-06)</td></tr>
               <tr><td class="mono text-[11.5px]">POST /report-bc/v1/document-types/{id}/running-number/next</td><td class="mono text-[11px]">report:document_type_running_number_generate</td><td>ขอเลขรันถัดไป</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/print-template-histories</td><td class="mono text-[11px]">report:print_template_history_read</td><td>ประวัติเวอร์ชันเทมเพลต</td></tr>
             </tbody>
           </table>
         </div>
         <div class="rulebox mb-8">
-          <div class="rc mb-1">render ไม่รู้จักเอกสารของระบบนี้เลย — FE ต้องประกอบ params เอง (ตรวจซ้ำ 2026-09-04)</div>
+          <div class="rc mb-1">render ดิบยังไม่รู้จักเอกสารของระบบนี้ — ใช้ทางนี้เฉพาะ 23 เอกสารที่ยังไม่มี endpoint เฉพาะแบบ E3.1 (ตรวจซ้ำ 2026-09-06)</div>
           <p class="text-[13.5px]">
             <span class="mono text-[12px]">POST /print-templates/{id}/render</span> รับ <span class="mono text-[12px]">params</span> เป็น key-value ล้วน ๆ ที่ผู้เรียกส่งมาเอง —
-            <b>ไม่มีทางส่ง <span class="mono text-[12px]">receipt_id</span>/<span class="mono text-[12px]">quotation_id</span>/<span class="mono text-[12px]">ap_invoice_id</span> แล้วให้ backend ไปดึงข้อมูลจริงมาแทน</b>
-            ไม่ว่าจะเรียก endpoint ไหนในหน้านี้ก็ตาม — FE ต้อง <span class="mono text-[12px]">GET</span> เอกสารจริงจาก BC เจ้าของก่อน (เช่น
-            <span class="mono text-[12px]">GET /finance-bc/v1/receipts/{id}</span>) แล้วประกอบฟิลด์เองเป็น <span class="mono text-[12px]">params</span> ก่อนเรียก render ·
-            เทมเพลต <span class="mono text-[12px]">PAYMENT_RECEIPT</span> ที่มีอยู่ตอนนี้เป็นตัวอย่างที่ยังผูกกับ mock data คนละโครงสร้างกับ <span class="mono text-[12px]">Receipt</span> ของระบบนี้ —
-            ยังพิมพ์ใบเสร็จ/ใบกำกับ/ใบเสนอราคา/ใบสั่งซื้อจริงของระบบนี้ผ่าน API ไม่ได้เลยสักใบ (backlog เต็ม: <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §1)
+            <b>ไม่มีทางส่ง <span class="mono text-[12px]">ap_invoice_id</span>/<span class="mono text-[12px]">purchase_order_id</span> แล้วให้ backend ไปดึงข้อมูลจริงมาแทน</b>
+            สำหรับเอกสารที่<b>ยังไม่มี</b> endpoint <span class="mono text-[12px]">/print</span> เฉพาะตัว (ทุกใบยกเว้นใบเสนอราคา/ใบเสร็จ-ใบกำกับภาษี — ดู E3.1) FE ต้อง
+            <span class="mono text-[12px]">GET</span> เอกสารจริงจาก BC เจ้าของก่อน แล้วประกอบฟิลด์เองเป็น <span class="mono text-[12px]">params</span> ก่อนเรียก render ·
+            <span class="mono text-[12px]">print_templates</span>/<span class="mono text-[12px]">document_types</span> มีครบ 25 แถวจับคู่กันแล้วสำหรับทุกเอกสารในระบบ
+            (สร้าง 2026-09-06 พร้อม <span class="mono text-[12px]">running_number_format</span> จริงตรงกับพรีฟิกซ์ที่แต่ละ BC ใช้อยู่) แต่ HTML ยังเป็น draft placeholder ทุกใบ
+            รอ P3/P4 ใส่เลย์เอาต์จริง (backlog: <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §1, <span class="mono text-[12px]">HANDOFF-Document-Print-Pipeline.md</span> §7)
           </p>
         </div>
 
@@ -1705,6 +1781,8 @@ sequenceDiagram
               <tr><td>supplier</td><td class="mono text-[11.5px]">/suppliers · /supplier-groups</td><td>ผู้ขาย + กลุ่ม</td></tr>
               <tr><td>sales</td><td class="mono text-[11.5px]">/customers · /customer-groups</td><td>ลูกค้า + กลุ่ม (วงเงินเครดิต · price list เริ่มต้น)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/tax-configs</td><td>อัตรา VAT / หัก ณ ที่จ่าย · <b>ห้ามช่วงวันซ้อนกันใน code เดียว</b></td></tr>
+              <tr><td>finance</td><td class="mono text-[11.5px]">/company-profiles</td><td><b>ใหม่ (P0, 2026-09-06) · GET/PATCH เท่านั้น</b> · ชื่อบริษัท/ที่อยู่/เลขผู้เสียภาษี — ใช้ผสมเข้าทุก PDF ที่พิมพ์ผ่าน E3.1 อัตโนมัติ FE ไม่ต้องส่งเอง</td></tr>
+              <tr><td>finance</td><td class="mono text-[11.5px]">/company-branches</td><td><b>ใหม่ (P0, 2026-09-06)</b> · สาขา (<span class="mono text-[11px]">branch_code='00000'</span> = สำนักงานใหญ่ เซ็ตไว้ให้ตั้งแต่ seed) · CRUD ปกติ, <span class="mono text-[11px]">is_head_office</span> ตั้งได้ทีละสาขาเดียว (ตั้งใหม่แล้วอันเดิมถูกปลดอัตโนมัติ)</td></tr>
               <tr><td>iam</td><td class="mono text-[11.5px]">/users · /roles · /policies · /permissions · /access-keys</td><td>ผู้ใช้ · บทบาท · นโยบายสิทธิ์ · คีย์สำหรับระบบภายนอก</td></tr>
             </tbody>
           </table>
@@ -1994,7 +2072,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 47 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 48 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2024,6 +2102,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}</td><td class="mono text-[11px]">quotation:update</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}/approve</td><td class="mono text-[11px]">quotation:approve</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}/cancel</td><td class="mono text-[11px]">quotation:cancel</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}/print</td><td class="mono text-[11px]">quotation:print</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}/send</td><td class="mono text-[11px]">quotation:send</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/attachments</td><td class="mono text-[11px]">quotation:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{quotation_id}/attachments</td><td class="mono text-[11px]">quotation:update</td></tr>
@@ -2049,7 +2128,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 57 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 67 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2071,6 +2150,13 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/billing-notes/{id}/issue</td><td class="mono text-[11px]">billing_note:issue</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/cogs-entries/{id}</td><td class="mono text-[11px]">cogs_entry:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/company-branches</td><td class="mono text-[11px]">company_branch:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/company-branches</td><td class="mono text-[11px]">company_branch:view</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/finance-bc/v1/company-branches/{id}</td><td class="mono text-[11px]">company_branch:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/company-branches/{id}</td><td class="mono text-[11px]">company_branch:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/company-branches/{id}</td><td class="mono text-[11px]">company_branch:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/company-profiles</td><td class="mono text-[11px]">company_profile:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PATCH</td><td class="mono text-[11.5px]">/finance-bc/v1/company-profiles</td><td class="mono text-[11px]">company_profile:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings</td><td class="mono text-[11px]">period:view</td></tr>
               <tr><td class="mono text-[11.5px]">PATCH</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings</td><td class="mono text-[11px]">finance_setting:update</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/finance-settings/close-period</td><td class="mono text-[11px]">period:close</td></tr>
@@ -2096,6 +2182,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:update</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}/issue</td><td class="mono text-[11px]">receipt:issue</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}/print</td><td class="mono text-[11px]">receipt:print</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{id}/void</td><td class="mono text-[11px]">receipt:void</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/attachments</td><td class="mono text-[11px]">receipt:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/receipts/{receipt_id}/attachments</td><td class="mono text-[11px]">receipt:update</td></tr>
@@ -2116,7 +2203,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">report-bc · เทมเพลต · เลขรัน · PDF · P6 Read Model <span class="mono text-[13px] text-[var(--muted)]">— 21 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">report-bc · เทมเพลต · เลขรัน · PDF · P6 Read Model <span class="mono text-[13px] text-[var(--muted)]">— 23 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2126,6 +2213,8 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/profit-by-lots/{id}</td><td class="mono text-[11px]">profit_by_lot:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/expiry-alerts/{id}</td><td class="mono text-[11px]">expiry_alert:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-prints</td><td class="mono text-[11px]">document_print:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-prints/{id}</td><td class="mono text-[11px]">document_print:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_read</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}</td><td class="mono text-[11px]">report:document_type_delete</td></tr>
@@ -2145,7 +2234,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 314 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 332 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->
