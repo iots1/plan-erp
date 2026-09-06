@@ -11,8 +11,10 @@
 > **อ่านคู่กับ**: `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 (สถานะ as-is ของ print engine, ตรวจไว้
 > 2026-09-04 — ยังถูกต้องทุกข้อ) · `srs-p6.html` §06 · `backend-convention.html`
 >
-> **สถานะ 2026-09-06: ตัดสินใจ design ครบแล้ว 6 ข้อ (ดู §8.1) — เริ่ม P0 เขียนโค้ดได้ทันที**
-> ที่เหลือเปิดอยู่ 5 ข้อแต่ไม่บล็อก P0–P1 (§8.2) · ข้อที่ต้องรอ**ฝ่ายบัญชี**คือเรื่อง
+> **สถานะ 2026-09-06: P0 ✅ + P1 ✅ deploy แล้วทั้งคู่ (ดู §7)** — `company_profiles`/`company_branches`
+> (P0) และ `document_prints` + `report.printDocument` RPC (P1) ใช้งานได้จริงบนโปรดักชันแล้ว รอแค่ **P2**
+> (endpoint `POST /:id/print` ของ 2 เอกสารแรก) ถึงจะเห็นการพิมพ์จริงครบวงจร
+> ที่เหลือเปิดอยู่ 5 ข้อแต่ไม่บล็อก P2 (§8.2) · ข้อที่ต้องรอ**ฝ่ายบัญชี**คือเรื่อง
 > ต้นฉบับ/สำเนา/ใบแทน (§6.2) ซึ่งไปโผล่ที่ P5 ปลายทาง
 
 ---
@@ -275,19 +277,45 @@ export class CompanyBranch extends BaseEntity {
 
 ## 7 · แผนงานเป็นเฟส
 
-*(ขอบเขตด้านล่างล็อกตามการตัดสินใจ 2026-09-06 แล้ว — เริ่ม P0 ได้ทันทีโดยไม่ต้องรอคำตอบเพิ่ม)*
+*(ขอบเขตด้านล่างล็อกตามการตัดสินใจ 2026-09-06 แล้ว)*
 
-| เฟส | ขอบเขต | ประมาณ | ขึ้นกับ |
+| เฟส | ขอบเขต | ประมาณ | สถานะ |
 |---|---|---|---|
-| **P0** | `company_profiles` + `company_branches` ใน **finance-bc** (entity + migration + CRUD + สิทธิ์ + seed สำนักงานใหญ่ `00000`) | 0.5–1 วัน | — *(พร้อมเริ่ม)* |
-| **P1** | `document_prints` + `report.printDocument` RPC + resolve เทมเพลตผ่าน `document_types` + `copy_number` (0 สำหรับ DRAFT) + snapshot `params` + ดึง/cache company profile + ธง `is_draft` + `GET /document-prints` | 1.5–2 วัน | P0 |
-| **P2** | endpoint `POST /:id/print` + mapper ของ **ใบกำกับภาษีเต็มรูป** (finance-bc) และ **ใบเสนอราคา** (sales-bc) | 1–1.5 วัน | P1 |
-| **P3** | HTML จริงของ 2 ใบนั้น (แทน draft placeholder) + layout ร่วมที่มีลายน้ำ DRAFT — ใช้เอนจิน `banded` สำหรับรายการยาวข้ามหน้า | 1–2 วัน | P2 |
-| **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | P3 |
-| **P5** | ใบแทน/สำเนา ตามข้อสรุป §6.2 + ฟอร์ม ภ.พ.30 (`HANDOFF-Backlog-Reporting-Print-Tax.md` §4.4 ข้อ 4) | 1–2 วัน | P4 + คำตอบฝ่ายบัญชี |
+| **P0** | `company_profiles` + `company_branches` ใน **finance-bc** (entity + migration + CRUD + สิทธิ์ + seed สำนักงานใหญ่ `00000`) | 0.5–1 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** |
+| **P1** | `document_prints` + `report.printDocument` RPC + resolve เทมเพลตผ่าน `document_types` (เพิ่ม `findByCode()`) + `copy_number` (0 สำหรับ DRAFT, `SELECT...FOR UPDATE` กันชนกัน) + snapshot `params` + ดึง/cache company profile ผ่าน RPC ใหม่ `finance.getCompanyProfile` + ธง `is_draft` + `idempotency_key` + `GET /document-prints` | 1.5–2 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** — ดู §7.1 |
+| **P2** | endpoint `POST /:id/print` + mapper ของ **ใบกำกับภาษีเต็มรูป** (finance-bc) และ **ใบเสนอราคา** (sales-bc) | 1–1.5 วัน | ⬜ ถัดไป |
+| **P3** | HTML จริงของ 2 ใบนั้น (แทน draft placeholder) + layout ร่วมที่มีลายน้ำ DRAFT — ใช้เอนจิน `banded` สำหรับรายการยาวข้ามหน้า | 1–2 วัน | ⬜ |
+| **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | ⬜ |
+| **P5** | ใบแทน/สำเนา ตามข้อสรุป §6.2 + ฟอร์ม ภ.พ.30 (`HANDOFF-Backlog-Reporting-Print-Tax.md` §4.4 ข้อ 4) | 1–2 วัน | ⬜ รอคำตอบฝ่ายบัญชี |
 
 **ทำ P0→P3 ก่อนแล้วหยุดรีวิว** — จะได้เห็นของจริง 2 ใบพิมพ์ออกมาได้ก่อนลงทุนทำอีก 23 ใบ
-(รวม P0–P3 ≈ **4–6 วัน**)
+(รวม P0–P3 ≈ **4–6 วัน**, ใช้ไปแล้ว P0+P1)
+
+### 7.1 ผลตรวจสอบ P1 — 2026-09-06 ✅ **implement + migrate + deploy แล้ว**
+
+**สิ่งที่เพิ่มเข้าไปนอกเหนือจาก schema ที่ร่างไว้ใน §4**:
+- `DocumentTypesService.findByCode()` — ของเดิมมีแค่ `findById()` (โดย uuid) ไม่มีค้นด้วย `code` เลย
+  ซึ่ง RPC ต้องใช้ `code` เป็น natural key (BC ผู้เรียกรู้แค่ `document_type_code`, ไม่รู้ uuid)
+- `libs/common/src/interfaces/`: `ICompanyProfileLookupResult`, `IPrintDocumentRequest`,
+  `IPrintDocumentResult` — คู่กับ `AppMicroservice.Finance.cmd.CompanyProfileResources
+  .GetCompanyProfile` และ `AppMicroservice.Report.cmd.PrintDocumentResources.PrintDocument`
+  ที่เพิ่มใหม่ (ตามแบบ `ReceiptResources`/`InventoryEventResources` ที่มีอยู่แล้ว)
+- `CompanyProfileProxyService` (report-bc → finance-bc) — cache 5 นาทีผ่าน `sendWithContext`'s
+  built-in Redis cache (ข้อมูลนี้แทบไม่เปลี่ยน)
+- **`file_hash` (SHA-256) ตั้งใจเลื่อนออกไป** — เก็บ `null` ก่อน เพื่อไม่ต้องแก้ return shape ของ
+  `PrintTemplatesService.render()` ที่ deploy จริงอยู่แล้ว (ยังไม่มี hash ให้ใช้จากตรงนั้น)
+
+**ตรวจแล้ว**: unit test ใหม่ 7 ตัวผ่านหมด (`copy_number`/`is_original` ทั้ง 3 เคส, merge company
+profile ทั้ง fallback, กันซ้ำด้วย `idempotency_key`) · `nest build report-bc`/`finance-bc` ผ่าน ·
+migration (`document_prints` + FK จริงไปหา `document_types`/`print_templates`) รันแล้ว, `migration:generate` = `No changes` · permission ใหม่ `document_print:view` sync + grant แล้ว ·
+commit + push + deploy สำเร็จ · `GET /report-bc/v1/document-prints` ยืนยันแล้วบนโปรดักชัน (ตอบ
+`200` ว่างเปล่า ถูกต้องเพราะยังไม่มี P2 มาเรียก RPC จริง)
+
+**ยังไม่ได้ยิง E2E ผ่าน RMQ จริง** — `report.printDocument` เป็น request/reply ผ่าน RabbitMQ
+ไม่มีทางยิงผ่าน HTTP ได้ตรง ๆ (ต่างจาก REST endpoint) และตอนนี้ยังไม่มี BC ไหนเรียกจริง (รอ P2) —
+ตรรกะทั้งหมดตรวจผ่าน unit test แล้ว แต่การเดินสายจริงผ่าน RMQ (คิว → ack → reply) จะพิสูจน์ได้ครั้ง
+แรกก็ตอน P2 มี endpoint จริงมาเรียก ไม่ใช่ก่อนหน้านั้น — เขียน mock caller แยกตอนนี้เท่ากับพิสูจน์แค่
+transport เดิมของ NestJS ที่ proxy-service คู่อื่นในระบบพิสูจน์ไว้แล้วซ้ำอีกรอบ ไม่ได้พิสูจน์อะไรใหม่
 
 ---
 
