@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Runbook: อัปโหลดรูปสินค้าไม่สำเร็จ (Storage 403) — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="R" title="Runbook" subtitle="PRODUCT IMAGE · STORAGE 403" width="280">
+    <nav slot="nav">
+      <a href="#symptom"    class="navlink"><span class="n">1</span> อาการ</a>
+      <a href="#impact"     class="navlink"><span class="n">2</span> ผลกระทบ</a>
+      <a href="#diagnosis"  class="navlink"><span class="n">3</span> วินิจฉัย</a>
+      <a href="#rootcause"  class="navlink"><span class="n">4</span> สาเหตุ</a>
+      <a href="#fix"        class="navlink"><span class="n">5</span> การแก้ไข</a>
+      <a href="#verify"     class="navlink"><span class="n">6</span> ยืนยัน + ป้องกัน</a>
+    </nav>
+    <div slot="footnote">
+      <a href="runbook.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ Runbook Index</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="runbook.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Runbook Index
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Runbook · Application / Storage</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          อัปโหลดรูปสินค้าไม่สำเร็จ<br>
+          <span class="text-[#7FE3DE]">เพราะ storage ตอบ 403 ให้ HeadObject</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          ไฟล์อัปขึ้น bucket เรียบร้อยแล้ว แต่ขั้น confirm บอกว่า
+          <b class="text-white font-medium">"ยังไม่ได้อัปโหลด"</b> — และการอัปใหม่ตามที่ข้อความบอกก็ไม่ช่วย
+          เพราะปัญหาไม่ได้อยู่ที่ไฟล์เลย
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Severity: High (ผู้ใช้เพิ่มรูปสินค้าไม่ได้)</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Est. fix time: 10–15 นาที (แก้ config + restart)</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 1 SYMPTOM ========== -->
+      <section id="symptom" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">1 — อาการ (Symptom)</div>
+        <h2 class="display text-3xl mb-6">ข้อความที่เห็นจริง มี 2 แบบ ขึ้นกับว่าโค้ดเวอร์ชันไหน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          ทั้งสองแบบคืออาการของ<b>สาเหตุเดียวกัน</b> — ต่างกันแค่ว่าเวอร์ชันที่รันอยู่รายงานมันตรงหรือไม่ตรง
+          ผู้ใช้ทำอะไร: เข้าแก้ไขสินค้าที่มีอยู่แล้ว แล้วเพิ่มรูปภายหลัง (Flow A · presigned upload)
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">แบบที่ 1 · ก่อนแก้ — ข้อความชี้ไปคนละทางกับสาเหตุ</div>
+        <div class="code p-5 mb-3">
+<pre><span class="c">// POST /products/:id/images  → 400</span>
+<span class="c">// (message จริงเป็นบรรทัดเดียว ตัดบรรทัดที่นี่เพื่อให้อ่านได้)</span>
+{
+  <span class="s">"status"</span>: {
+    <span class="s">"code"</span>: <span class="k">400</span>,
+    <span class="s">"message"</span>: <span class="s">"No uploaded object found at '&lt;object-key&gt;'
+       — upload the file to the presigned URL before confirming."</span>
+  },
+  <span class="s">"errors"</span>: [ { <span class="s">"code"</span>: <span class="s">"BAD_REQUEST"</span>, <span class="s">"title"</span>: <span class="s">"Invalid Request"</span> } ]
+}</pre>
+        </div>
+        <div class="edge mb-8">
+          <div class="tag mb-1">กับดักของข้อความนี้</div>
+          <p class="text-[13px]">
+            มันบอกให้ไป "อัปโหลดไฟล์ก่อน" ซึ่งเป็นสิ่งที่ทำไปแล้ว และทำซ้ำอีกกี่ครั้งก็ไม่หาย —
+            คนที่เจอครั้งแรกจะเสียเวลาไล่หาว่าทำไมไฟล์ "ไม่ขึ้น" ทั้งที่มันขึ้นไปนอนอยู่ใน bucket เรียบร้อยแล้ว
+          </p>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">แบบที่ 2 · หลังแก้ — ข้อความตรงตามความจริงแล้ว (แต่ยังไม่หาย)</div>
+        <div class="code p-5 mb-3">
+<pre><span class="c">// POST /products/:id/images  → 503</span>
+{
+  <span class="s">"status"</span>: {
+    <span class="s">"code"</span>: <span class="k">503</span>,
+    <span class="s">"message"</span>: <span class="s">"Failed to verify the uploaded object
+       — the storage service is unavailable."</span>
+  },
+  <span class="s">"errors"</span>: [ { <span class="s">"code"</span>: <span class="s">"SERVICE_UNAVAILABLE"</span>, <span class="s">"title"</span>: <span class="s">"Service Unavailable"</span> } ]
+}</pre>
+        </div>
+        <p class="text-sm mb-6" style="color:var(--ink-soft)">
+          เห็น 503 = ดี แปลว่าเวอร์ชันที่รันอยู่มี fix เรื่องการแยกประเภท error แล้ว และมันกำลังบอกความจริงว่า
+          <b>"ตรวจสอบไม่ได้"</b> ไม่ใช่ <b>"ไม่มีไฟล์"</b> — เหลือแค่ไปแก้ที่ต้นเหตุตาม §5
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">บรรทัด log ที่ชี้ขาด (storage-bc)</div>
+        <div class="code p-5">
+<pre>{<span class="s">"message"</span>:<span class="s">"Failed to verify file"</span>,<span class="s">"context"</span>:{
+  <span class="s">"key"</span>:<span class="s">"inventory/products/&lt;id&gt;/&lt;name&gt;.webp"</span>,
+  <span class="s">"status"</span>:<span class="k">403</span>,            <span class="c">// ← ไม่ใช่ 404</span>
+  <span class="s">"error_name"</span>:<span class="s">"Unknown"</span>    <span class="c">// ← S3 parse error body ไม่ได้ = body ไม่ใช่ XML ของ S3</span>
+},<span class="s">"details"</span>:<span class="s">"UnknownError"</span>}</pre>
+        </div>
+        <div class="rulebox mt-4"><div class="rc mb-1">สองค่านี้คือคำวินิจฉัยทั้งหมด</div><p class="text-[13.5px]"><span class="mono text-[12px]">status</span> + <span class="mono text-[12px]">error_name</span> ถูกเพิ่มเข้า log เพราะขาดตัวใดตัวหนึ่งก็แยกไม่ออก: <b>403 ที่ชื่อ <span class="mono text-[12px]">SignatureDoesNotMatch</span></b> (credential ผิดจริง) กับ <b>403 ที่ไม่มีชื่อ</b> (มีอะไรขวางอยู่หน้า bucket) ต้องแก้คนละทางกันคนละเรื่อง · ถ้า log ของคุณยังไม่มี 2 field นี้ แปลว่ารันเวอร์ชันเก่ากว่า fix</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 2 IMPACT ========== -->
+      <section id="impact" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">2 — ผลกระทบ (Impact)</div>
+        <h2 class="display text-3xl mb-6">ผู้ใช้เพิ่มรูปไม่ได้ และ error โยนความผิดให้ผู้ใช้</h2>
+        <div class="overflow-x-auto mb-6">
+          <table class="d">
+            <thead><tr><th>ด้าน</th><th>ผลกระทบ</th></tr></thead>
+            <tbody>
+              <tr><td>ฟีเจอร์</td><td>เพิ่ม/เปลี่ยนรูปสินค้าของสินค้าที่มีอยู่แล้ว (Flow A) ล้มเหลว — <b>อัตราล้มเหลวไม่คงที่</b> วัดได้ตั้งแต่ ~1 ใน 6 จนถึงล้มทุกครั้ง</td></tr>
+              <tr><td>ข้อมูล</td><td>ไม่เสียหาย — ไฟล์อยู่ใน bucket ครบ เพียงไม่มีแถวใน <span class="mono text-[12px]">product_images</span> ชี้ถึง</td></tr>
+              <tr><td>ขยะที่ทิ้งไว้</td><td>object ที่อัปแล้วแต่ confirm ไม่ผ่านจะค้างใน bucket โดยไม่มีใครอ้างถึง (orphan) — ไม่มีใครลบให้</td></tr>
+              <tr><td>Flow B (multipart create)</td><td><b>ไม่กระทบ</b> — ไม่ได้ใช้ <span class="mono text-[12px]">HeadObject</span> ยืนยัน จึงยังสร้างสินค้าพร้อมรูปได้ปกติ</td></tr>
+              <tr><td>ทรัพยากรอื่น</td><td>กระทบทุก resource ที่สืบทอด <span class="mono text-[12px]">BaseAttachmentService</span> เท่ากันหมด — receipt / quotation / purchase-order attachments ไม่ใช่แค่รูปสินค้า</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox ok"><div class="rc mb-1">รีบแค่ไหน</div><p class="text-[13.5px]">ไม่ใช่ outage — ระบบอื่นทำงานปกติหมด แต่เป็นงานที่ผู้ใช้ทำไม่ได้และ<b>แก้เองไม่ได้</b>ด้วย เพราะข้อความบอกให้ทำสิ่งที่ไม่ช่วย ควรแก้ภายในวันเดียวกัน · ถ้าต้องบรรเทาเฉพาะหน้าให้ผู้ใช้ใช้ Flow B (สร้างสินค้าพร้อมแนบรูปในคลิกเดียว) ไปก่อน</p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 3 DIAGNOSIS ========== -->
+      <section id="diagnosis" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">3 — วินิจฉัย (Diagnosis)</div>
+        <h2 class="display text-3xl mb-6">พิสูจน์ให้ได้ก่อนว่า "ไฟล์อยู่จริง แต่ storage ตอบ 403"</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">อ่าน log ของ storage-bc — ดู status กับ error_name</h3>
+          <div class="code p-5">
+<pre>grep -o <span class="s">'{"message":"Failed to verify file".*}'</span> /root/.pm2/logs/storage-error-*.log | tail -3</pre>
+          </div>
+          <p class="text-sm mt-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">status: 403</span> → ใช่เคสนี้ ทำต่อข้อ 2 ·
+            <span class="mono text-[12px]">status: 404</span> → <b>ไม่ใช่เคสนี้</b> ไฟล์ไม่มีอยู่จริง ไปดูว่าขั้น PUT ของ client ล้มเหลวหรือไม่ ·
+            ไม่มี log เลย → RPC ไม่ถึง storage-bc ให้เช็ค consumer ของ <span class="mono text-[12px]">erp_storage_queue</span> ตาม
+            <a href="rabbitmq-reliability-guide.html" style="color:var(--accent);text-decoration:underline">RabbitMQ Reliability Guide</a>
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยืนยันว่า object อยู่ใน bucket จริง</h3>
+          <div class="code p-5">
+<pre><span class="c"># ดูจากในคอนเทนเนอร์ของ object store ตรง ๆ — ไม่ผ่าน API ใด ๆ</span>
+docker exec &lt;minio-container&gt; ls -la <span class="s">'/data/&lt;bucket&gt;/inventory/products/&lt;product-id&gt;/&lt;object-key&gt;'</span></pre>
+          </div>
+          <p class="text-sm mt-3" style="color:var(--ink-soft)">
+            เห็นไฟล์ <span class="mono text-[12px]">xl.meta</span> = object มีจริง (MinIO เก็บไฟล์เล็กแบบ inline ไว้ใน metadata นี้
+            จึงไม่เห็นไฟล์ข้อมูลแยก — เป็นเรื่องปกติ ไม่ใช่ความผิดปกติ)
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยิง HeadObject ตรง ๆ เทียบ 2 endpoint</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            นี่คือขั้นที่ชี้ขาด — ยิงคำสั่งเดียวกัน key เดียวกัน credential เดียวกัน ต่างกันแค่ปลายทาง
+            ให้ยิง<b>หลายครั้ง</b> เพราะอาการไม่คงที่ ยิงครั้งเดียวได้ 200 ไม่ได้แปลว่าไม่มีปัญหา
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># ผ่าน public domain (มี CDN/WAF/reverse proxy คั่น) — ยิง 6 ครั้ง</span>
+for i in $(seq 6); <span class="k">do</span> aws s3api head-object \
+  --endpoint-url https://files.example.com \
+  --bucket &lt;bucket&gt; --key <span class="s">'&lt;object-key&gt;'</span> &gt;/dev/null 2&gt;&amp;1; <span class="k">echo</span> $?; <span class="k">done</span>
+
+<span class="c"># ผ่าน endpoint ภายใน (ตรงถึง object store) — ยิง 6 ครั้ง</span>
+for i in $(seq 6); <span class="k">do</span> aws s3api head-object \
+  --endpoint-url http://&lt;storage-host&gt;:9000 \
+  --bucket &lt;bucket&gt; --key <span class="s">'&lt;object-key&gt;'</span> &gt;/dev/null 2&gt;&amp;1; <span class="k">echo</span> $?; <span class="k">done</span></pre>
+          </div>
+          <div class="rulebox mt-3"><div class="rc mb-1">ผลที่ยืนยันว่าเป็นเคสนี้</div><p class="text-[13.5px]">internal ผ่านทุกครั้ง · public มี 403 ปนมาเป็นบางครั้ง (ครั้งที่วัดจริง: internal 6/6 สำเร็จ · public สลับ 403/200 และช่วงที่หนักที่สุดคือ 403 ทุกครั้ง) — ถ้าทั้งสอง endpoint ให้ผลเหมือนกัน แปลว่าไม่ใช่เคสนี้</p></div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">ดูว่า storage-bc ถูกตั้งให้ยิงไปทางไหน</h3>
+          <div class="code p-5">
+<pre>grep -E <span class="s">'^STORAGE_S3_(PUBLIC_)?ENDPOINT='</span> &lt;repo-dir&gt;/.env</pre>
+          </div>
+          <p class="text-sm mt-3" style="color:var(--ink-soft)">
+            ถ้า <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> เป็น public domain = ยืนยันสาเหตุตาม §4 ·
+            ถ้าเป็น endpoint ภายในอยู่แล้วแต่ยัง 403 ให้ดู <span class="mono text-[12px]">error_name</span> จากข้อ 1 อีกครั้ง —
+            ถ้าเป็นชื่อ auth จริง (<span class="mono text-[12px]">SignatureDoesNotMatch</span>, <span class="mono text-[12px]">InvalidAccessKeyId</span>)
+            แปลว่า credential ผิดจริง ไม่ใช่เคสนี้
+          </p>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3 mt-10">⚠️ 4 ทางที่เคยเดินผิดในเคสนี้ — ข้ามไปได้เลย</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
+          ทั้งสี่ข้อดูน่าเชื่อมาก และแต่ละข้อกินเวลาไปหลายสิบนาที บันทึกไว้เพื่อให้คนถัดไปไม่ต้องเดินซ้ำ
+        </p>
+        <div class="overflow-x-auto mb-6">
+          <table class="d">
+            <thead><tr><th>เบาะแสที่ดูน่าเชื่อ</th><th>ทำไมไม่ใช่</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>repro ด้วย cURL แล้วเห็นว่า <b>ไม่มีเนื้อไฟล์</b> ใน multipart body</td>
+                <td>DevTools <span class="mono text-[12px]">Copy as cURL</span> <b>ไม่ copy เนื้อไฟล์ binary</b> ของ <span class="mono text-[12px]">FormData</span> มาให้ — field ไฟล์จะว่างเสมอไม่ว่า browser จะส่งจริงหรือไม่ · อย่าใช้วิธีนี้ทดสอบ flow ที่มีไฟล์แนบ ให้ดู "Request payload size" สด ๆ ใน Network tab แทน</td>
+              </tr>
+              <tr>
+                <td>log ของ object store มี <span class="mono text-[12px]">drive path full</span></td>
+                <td>เป็นเหตุการณ์<b>เก่า</b> (คนละสัปดาห์) และ MinIO ใช้ <span class="mono text-[12px]">logOnceIf</span> จึง log ซ้ำแค่ครั้งเดียว ทำให้ดูเหมือนเพิ่งเกิด · เช็ค <span class="mono text-[12px]">df -h</span> กับ log ของ<b>วันนี้</b>ก่อนเชื่อ</td>
+              </tr>
+              <tr>
+                <td>RabbitMQ มี 2 vhost ชื่อ queue ซ้ำกัน — ตัวหนึ่งไม่มี consumer เลย</td>
+                <td>vhost ที่ไม่มี consumer เป็นของ <b>local dev</b> ของนักพัฒนา ไม่ใช่ที่ deploy ใช้ · ยืนยันด้วย <span class="mono text-[12px]">RABBITMQ_VHOST</span> ใน <span class="mono text-[12px]">.env</span> ของเครื่องนั้น ไม่ใช่ของ repo บนเครื่องตัวเอง</td>
+              </tr>
+              <tr>
+                <td>presigned URL มี <span class="mono text-[12px]">x-amz-checksum-crc32=AAAAAA==</span> (= checksum ของไฟล์ว่าง)</td>
+                <td>AWS SDK รุ่นใหม่ใส่ checksum นี้ให้เองตอน presign (ตอนนั้นยังไม่มี body ให้คำนวณ) · ดูน่าสงสัยมากแต่ไม่ได้ทำให้ PUT ล้มเหลว — PUT ได้ 200 และไฟล์ลง bucket ครบ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="edge">
+          <div class="tag mb-1">บทเรียนของ §3</div>
+          <p class="text-[13px]">
+            ทุกทางที่ผิดข้างบนถูกตัดออกได้ด้วยหลักฐานชิ้นเดียวกัน: <b>ยิง HeadObject ตรง ๆ เทียบ 2 endpoint</b> (ข้อ 3)
+            ถ้าทำข้อนี้ก่อน จะประหยัดเวลาไปได้มาก — เพราะมันแยก "ของอยู่ไหม" ออกจาก "เส้นทางไปถึงของมีปัญหาไหม" ในคำสั่งเดียว
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 4 ROOT CAUSE ========== -->
+      <section id="rootcause" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">4 — สาเหตุ (Root Cause)</div>
+        <h2 class="display text-3xl mb-6">ข้อบกพร่อง 3 ชั้นซ้อนกัน แต่ละชั้นบังชั้นถัดไป</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ชั้นที่ 3 เป็นตัว<b>ก่อ</b>ปัญหา ส่วนชั้นที่ 1–2 เป็นตัวทำให้<b>มองไม่เห็น</b>ว่าปัญหาอยู่ที่ไหน
+          นี่คือเหตุผลที่ error message ชี้ไปคนละทางกับสาเหตุจริงทั้งหมด
+        </p>
+
+        <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  A["ชั้น 3 · ต้นเหตุ<br/>STORAGE_S3_ENDPOINT ชี้ไป public domain<br/>→ HeadObject ที่ไม่เคยต้องออกนอก DC วิ่งผ่าน CDN/WAF<br/>→ WAF ตอบ 403 เป็นบางครั้ง"]
+  B["ชั้น 2 · ตัวบัง<br/>headObject() เชื่อ err.name ก่อน status code<br/>HEAD ไม่มี body ตามสเปก SDK จึงตั้งชื่อจาก status line<br/>→ 403 ถูกนับเป็น NotFound"]
+  C["ชั้น 1 · ตัวบัง<br/>sendWithContext ส่ง null เป็น defaultValue<br/>แต่ HeadObject ก็คืน null เป็นคำตอบปกติได้<br/>→ 'ตอบว่าไม่มี' กับ 'ไม่ได้คำตอบ' กลายเป็นค่าเดียวกัน"]
+  D["ผู้ใช้เห็น<br/>400 'upload the file before confirming'"]
+  A --> B --> C --> D
+  D -.->|"อัปโหลดใหม่ก็ไม่หาย<br/>เพราะไฟล์ไม่เคยเป็นปัญหา"| A
+</pre>
+        </div>
+
+        <div class="grid sm:grid-cols-3 gap-5 mt-8 mb-6">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้น 3 · ต้นเหตุ</div>
+            <h3 class="font-semibold mb-2 text-[15px]">endpoint เดียวถูกใช้ 2 หน้าที่</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              presigned URL <b>ต้อง</b> เป็น public domain (browser ต้องเข้าถึงได้) แต่ API call ของ service เอง
+              <b>ไม่ควร</b> ออกไปทางนั้น — เอา WAF มาขวาง request ที่วิ่งอยู่ใน DC และ WAF มีสิทธิ์ตอบ 403
+              กับ request ที่เซ็นถูกต้องเมื่อไหร่ก็ได้
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้น 2 · ตัวบัง</div>
+            <h3 class="font-semibold mb-2 text-[15px]">เชื่อชื่อ error แทน status</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              HTTP HEAD ไม่มี response body ตามสเปก SDK จึงประกอบ error จาก status line ได้อย่างเดียว
+              และใช้ชื่อ <span class="mono text-[12px]">NotFound</span> กับหลายสถานะ — <b>403 จึงกลายเป็น "ไม่มีไฟล์"</b>
+            </p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้น 1 · ตัวบัง</div>
+            <h3 class="font-semibold mb-2 text-[15px]"><span class="mono text-[12px]">null</span> สองความหมาย</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+              <span class="mono text-[12px]">sendWithContext</span> เป็น no-throw: คืน <span class="mono text-[12px]">defaultValue</span>
+              เมื่อ RPC ล้มเหลว — แต่ถ้า <span class="mono text-[12px]">defaultValue</span> เป็น <span class="mono text-[12px]">null</span>
+              และ callee ก็คืน <span class="mono text-[12px]">null</span> ได้เอง ผู้เรียกจะแยกไม่ออก
+            </p>
+          </div>
+        </div>
+
+        <div class="rulebox"><div class="rc mb-1">เส้นแบ่งที่ต้องรักษาไว้</div><p class="text-[13.5px]"><b>503 = ยังตอบไม่ได้ (retry ได้)</b> · <b>400/404 = ตอบแล้วว่าไม่มี (retry ไปก็ได้คำตอบเดิม)</b> — ถ้าสองอย่างนี้ยุบเป็นค่าเดียว ผู้เรียกจะเลือกทางผิดเสมอ และผู้ใช้จะได้คำแนะนำที่แก้ปัญหาไม่ได้ · กฎเต็มดูที่ <a href="backend-convention.html#microservice" style="color:var(--teal);text-decoration:underline">Backend Convention §08</a></p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 5 FIX ========== -->
+      <section id="fix" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">5 — การแก้ไข (Fix)</div>
+        <h2 class="display text-3xl mb-6">แก้ config ก่อน (ทำให้หายทันที) แล้วค่อยดูว่าโค้ดครบหรือยัง</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">แยก endpoint ออกเป็น 2 ตัวใน <span class="mono text-[13px]">.env</span></h3>
+          <div class="code p-5 mb-3">
+<pre><span class="c"># สิ่งที่ storage-bc เรียกเอง (HeadObject/PutObject/DeleteObject) — ต้องเป็น endpoint ภายใน</span>
+STORAGE_S3_ENDPOINT=http://&lt;storage-host&gt;:9000
+<span class="c"># origin ที่ถูกเซ็นลงใน presigned URL ที่ส่งให้ browser — ต้องเป็น public domain</span>
+STORAGE_S3_PUBLIC_ENDPOINT=https://files.example.com</pre>
+          </div>
+          <div class="rulebox"><div class="rc mb-1">⚠️ .env บนเครื่องอาจไม่ใช่ของจริง</div><p class="text-[13.5px]">ถ้า deploy pipeline มี step ที่เขียน <span class="mono text-[12px]">.env</span> จาก secret (ในโปรเจกต์นี้คือ <span class="mono text-[12px]">Sync .env from GitHub Environment secret</span> ที่อ่านจาก <span class="mono text-[12px]">ENV_FILE</span>) <b>การแก้มือบนเครื่องจะถูกทับทุก deploy</b> — แก้ที่ secret ต้นทางด้วย ไม่งั้นอาการจะกลับมาเองแบบไม่มีใครเข้าใจว่าทำไม · วิธีจับ: ดู <span class="mono text-[12px]">stat -c '%y' .env</span> ถ้า mtime ตรงกับเวลา deploy พอดี = ถูกเขียนทับ</p></div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">restart เฉพาะ storage-bc</h3>
+          <div class="code p-5">
+<pre>pm2 restart storage --update-env
+
+<span class="c"># ยืนยันว่า restart จริง (uptime ต้องรีเซ็ต, restarts ต้องเพิ่ม 1)</span>
+pm2 list | grep storage</pre>
+          </div>
+          <p class="text-sm mt-3" style="color:var(--ink-soft)">
+            ต้องมี <span class="mono text-[12px]">--update-env</span> — process ที่รันอยู่<b>ไม่เคยอ่าน <span class="mono text-[12px]">.env</span> ซ้ำ</b>
+            การแก้ไฟล์เฉย ๆ ไม่มีผลจนกว่าจะ restart
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คว่าโค้ดที่รันอยู่มี fix ทั้ง 3 จุดหรือยัง</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ข้อ 1–2 ทำให้หายเดี๋ยวนั้น แต่ถ้าขาด fix เหล่านี้ ครั้งหน้าที่ storage มีปัญหาจริง ๆ อาการจะกลับไป
+            "โยนความผิดให้ผู้ใช้" อีก
+          </p>
+          <div class="overflow-x-auto mb-3">
+            <table class="d">
+              <thead><tr><th>#</th><th>ไฟล์</th><th>สิ่งที่ต้องมี</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td><span class="mono text-[12px]">libs/common/.../storage-object.service.ts</span></td><td>ใช้ sentinel ที่ callee คืนเองไม่ได้เป็น <span class="mono text-[12px]">defaultValue</span> แล้ว throw <span class="mono text-[12px]">503</span> เมื่อได้ sentinel — เหลือ <span class="mono text-[12px]">null</span> ไว้หมายถึง "ไม่มีจริง" อย่างเดียว</td></tr>
+                <tr><td>2</td><td><span class="mono text-[12px]">apps/storage/src/storage.service.ts</span></td><td>ให้ status เป็นตัวตัดสิน: <span class="mono text-[12px]">null</span> เฉพาะ 404 ที่ยืนยันได้ · 403 ที่ S3 ไม่ได้ตั้งชื่อเป็น auth error → <span class="mono text-[12px]">503</span> · log ทั้ง <span class="mono text-[12px]">status</span> + <span class="mono text-[12px]">error_name</span></td></tr>
+                <tr><td>3</td><td><span class="mono text-[12px]">apps/storage/src/storage.service.ts</span></td><td>แยก client 2 ตัว — <span class="mono text-[12px]">s3Client</span> (internal) สำหรับยิง · <span class="mono text-[12px]">presignClient</span> (public) สำหรับเซ็นเท่านั้น</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code p-5">
+<pre><span class="c"># เช็คเร็ว ๆ ว่า build ที่รันอยู่มี fix #3 (ชื่อ env var ใหม่ต้องติดมาใน bundle)</span>
+grep -c STORAGE_S3_PUBLIC_ENDPOINT &lt;repo-dir&gt;/dist/apps/storage/main.js</pre>
+          </div>
+          <div class="edge mt-3">
+            <div class="tag mb-1">ทำไมเซ็น URL ด้วย client ที่เข้าถึง origin นั้นไม่ได้ก็ได้</div>
+            <p class="text-[13px]">
+              การ presign เป็นการ<b>คำนวณลายเซ็นแบบ offline</b> ไม่เปิด socket ไปหา endpoint เลย —
+              จึงเซ็น URL สำหรับ public domain ได้จากเครื่องที่ออกไป public domain นั้นไม่ได้ด้วยซ้ำ
+              นี่คือเหตุผลที่แยก client ได้โดยไม่ต้องแลกอะไร
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">(ทางเลือก) ให้ frontend retry ขั้น confirm</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เพราะพิสูจน์แล้วว่าอาการหายเองเมื่อลองใหม่ การ retry ทำให้ผู้ใช้ไม่ต้องเจอ error เลยในเคส transient
+            แต่ต้อง<b>แคบ</b> — retry เฉพาะ <span class="mono text-[12px]">503</span>:
+          </p>
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>status</th><th>retry?</th><th>เพราะ</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">503</span></td><td>✅ retry</td><td>การันตีว่ายังไม่เขียน DB — <span class="mono text-[12px]">HeadObject</span> ถูกเช็คก่อน insert เสมอ</td></tr>
+                <tr><td><span class="mono text-[12px]">400</span></td><td>❌ ไม่ retry</td><td>เป็นคำตอบชี้ขาดว่าไม่มีไฟล์ retry ไปก็ได้คำตอบเดิม เสียเวลาเปล่า</td></tr>
+                <tr><td><span class="mono text-[12px]">500</span></td><td>❌ ไม่ retry</td><td>อาจ insert แถวสำเร็จไปแล้ว retry จะได้รูปซ้ำ 2 ใบ</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-sm mt-3" style="color:var(--ink-soft)">
+            และ<b>อย่า</b> retry ตั้งแต่ขั้นขอ presigned URL — จะได้ <span class="mono text-[12px]">object_key</span> ใหม่
+            ทำให้ไฟล์ที่อัปไปแล้วกลายเป็นขยะค้าง bucket
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 6 VERIFY ========== -->
+      <section id="verify" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">6 — ยืนยัน + ป้องกัน (Verify / Prevent)</div>
+        <h2 class="display text-3xl mb-6">ยิงครบ flow หลายรอบ — รอบเดียวไม่พอ</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          อาการนี้<b>ไม่คงที่</b> เคยวัดได้ตั้งแต่ล้ม 1 ใน 6 จนถึงล้มทุกครั้ง — ทดสอบรอบเดียวผ่านแล้วสรุปว่าหาย
+          คือวิธีที่ทำให้เชื่อว่าหายทั้งที่ยังไม่หาย ให้ยิงอย่างน้อย 5 รอบติดกัน
+        </p>
+        <div class="code p-5 mb-6">
+<pre><span class="c"># ครบ flow: presigned-url → PUT → confirm · ต้องได้ 201 ทุกรอบ</span>
+for i in $(seq 5); <span class="k">do</span>
+  R=$(curl -s -X POST <span class="s">"$API/products/$PID/images/presigned-url"</span> \
+        -H <span class="s">"Authorization: Bearer $TOKEN"</span> -H <span class="s">'Content-Type: application/json'</span> \
+        --data-raw <span class="s">'{"original_name":"t.webp","mime_type":"image/webp"}'</span>)
+  U=$(<span class="k">echo</span> <span class="s">"$R"</span> | jq -r .data.attributes.upload_url)
+  K=$(<span class="k">echo</span> <span class="s">"$R"</span> | jq -r .data.attributes.object_key)
+  curl -s -o /dev/null -X PUT <span class="s">"$U"</span> -H <span class="s">'Content-Type: image/webp'</span> --data-binary @t.webp
+  curl -s -o /dev/null -w <span class="s">"รอบ $i: %{http_code}\n"</span> -X POST <span class="s">"$API/products/$PID/images"</span> \
+    -H <span class="s">"Authorization: Bearer $TOKEN"</span> -H <span class="s">'Content-Type: application/json'</span> \
+    --data-raw <span class="s">"{\"bucket\":\"$BUCKET\",\"object_key\":\"$K\",\"original_name\":\"t.webp\",\"mime_type\":\"image/webp\"}"</span>
+<span class="k">done</span></pre>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-5 mb-8">
+          <div class="p-5 rounded-xl" style="background:rgba(10,162,160,.06);border:1px solid rgba(10,162,160,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--teal)">✅ หายจริง</div>
+            <ul class="text-sm space-y-1.5" style="color:var(--ink-soft)">
+              <li>confirm ได้ <span class="mono text-[12px]">201</span> ครบ 5/5</li>
+              <li><span class="mono text-[12px]">upload_url</span> ยังเป็น <b>public domain</b> (ไม่ใช่ IP ภายใน)</li>
+              <li>ไม่มีบรรทัด <span class="mono text-[12px]">Failed to verify file</span> ใหม่ใน log</li>
+            </ul>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--signal)">❌ พลาดที่ตรวจง่าย ๆ</div>
+            <ul class="text-sm space-y-1.5" style="color:var(--ink-soft)">
+              <li><span class="mono text-[12px]">upload_url</span> กลายเป็น IP ภายใน = ตั้ง <span class="mono text-[12px]">PUBLIC_ENDPOINT</span> ผิด/ขาด → <b>browser จะ PUT ไม่ได้</b></li>
+              <li>ลืมลบรูปทดสอบที่ confirm สำเร็จออกจากสินค้าจริง</li>
+              <li>แก้ <span class="mono text-[12px]">.env</span> แต่ไม่ restart → ยังไม่มีผล</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ป้องกันระยะยาว</div>
+        <div class="overflow-x-auto mb-6">
+          <table class="d">
+            <thead><tr><th>มาตรการ</th><th>กันอะไร</th></tr></thead>
+            <tbody>
+              <tr><td>ห้ามให้ service เรียก object store ผ่าน public domain ของตัวเอง</td><td>กัน WAF/CDN เข้ามาอยู่ในเส้นทางของ request ที่ไม่เคยต้องออกนอก DC — ต้นเหตุของเคสนี้</td></tr>
+              <tr><td>log <span class="mono text-[12px]">status</span> + <span class="mono text-[12px]">error_name</span> ทุกครั้งที่จัดประเภท error ของ S3</td><td>กันการวินิจฉัยไม่ได้ — เคสนี้ใช้เวลานานเพราะ log เดิมไม่มี 2 field นี้</td></tr>
+              <tr><td>ห้ามใช้ <span class="mono text-[12px]">null</span> เป็น <span class="mono text-[12px]">defaultValue</span> ของ RPC ที่ callee คืน <span class="mono text-[12px]">null</span> ได้เอง</td><td>กัน "ล้มเหลว" กับ "ไม่มี" ยุบเป็นค่าเดียว → ดู <a href="backend-convention.html#microservice" style="color:var(--accent);text-decoration:underline">Backend Convention §08</a></td></tr>
+              <tr><td>เก็บกวาด orphan object ใน bucket เป็นรอบ</td><td>object ที่อัปแล้ว confirm ไม่ผ่านจะค้างไว้ตลอดไปโดยไม่มีใครอ้างถึง</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox ok"><div class="rc mb-1">อ่านเชิงลึกต่อ</div><p class="text-[13.5px]"><a href="product-image-upload-guide.html#gotchas" style="color:var(--teal);text-decoration:underline">Product Image Upload Guide §08 ข้อ 5</a> — บันทึกบั๊กนี้แบบละเอียดพร้อม fix ทั้ง 3 จุด · <a href="product-image-upload-guide.html#flow-a" style="color:var(--teal);text-decoration:underline">§04 Flow A</a> — sequence diagram ที่รวม branch 503 แล้ว · <a href="backend-convention.html#microservice" style="color:var(--teal);text-decoration:underline">Backend Convention §08</a> — กฎ <span class="mono text-[12px]">defaultValue</span> ที่ใช้กับทุก RPC ในระบบ</p></div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · RUNBOOK · PRODUCT IMAGE CONFIRM / STORAGE 403"
+        line2="INVENTORY-BC · STORAGE-BC · PRESIGNED UPLOAD · WAF">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>

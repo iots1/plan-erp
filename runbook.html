@@ -34,6 +34,9 @@
       <a href="runbook-pm2-logs-disk-full.html" class="navlink"><span class="n" style="color:var(--signal)">02</span> Disk เต็มจาก pm2 Logs</a>
       <a href="runbook-proxmox-cpu-mce.html" class="navlink"><span class="n" style="color:var(--signal)">03</span> Proxmox Host รีบูตเอง (CPU MCE)</a>
       <a href="runbook-standby-stuck-down.html" class="navlink"><span class="n" style="color:var(--signal)">04</span> Standby ค้าง down หลัง apt Auto-Upgrade</a>
+      <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
+      <div class="navsub">Application</div>
+      <a href="runbook-image-confirm-storage-403.html" class="navlink"><span class="n" style="color:var(--signal)">05</span> อัปโหลดรูปสินค้าไม่สำเร็จ (Storage 403)</a>
     </nav>
     <div slot="footnote">
       <a href="postgresql-pgpool-cluster-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ Pgpool-II Cluster Guide (Setup/Deep-dive)</a>
@@ -190,8 +193,21 @@
             </p>
           </a>
         </div>
+
+        <h2 class="display text-3xl mb-6 mt-14">Application</h2>
+        <div class="grid sm:grid-cols-2 gap-5">
+          <a href="runbook-image-confirm-storage-403.html" class="bc-card block p-6 no-underline">
+            <div class="chip mb-4"><span class="dot" style="background:var(--signal)"></span>STORAGE · PRESIGNED UPLOAD</div>
+            <h3 class="text-lg font-semibold mb-2" style="color:var(--ink)">อัปโหลดรูปสินค้าไม่สำเร็จ (Storage 403)</h3>
+            <p class="text-sm" style="color:var(--muted)">
+              ไฟล์อยู่ใน bucket แล้วแต่ confirm บอก <span class="mono text-[12px]">"upload the file before confirming"</span> ·
+              403 จาก WAF ถูกตีเป็น "ไม่มีไฟล์" — รวม 4 ทางที่เคยเดินผิดเพื่อให้ข้ามไปได้เลย
+            </p>
+          </a>
+        </div>
+
         <p class="mt-8 text-[13.5px]" style="color:var(--muted)">
-          ยังไม่มี runbook สำหรับหมวดอื่น (RabbitMQ jam, MinIO/storage, IAM permission sync ฯลฯ) — เพิ่มเข้ามาเมื่อเจอเหตุการณ์จริงและอยากกันไม่ให้ทีมเสียเวลาซ้ำ
+          ยังไม่มี runbook สำหรับหมวดอื่น (RabbitMQ jam, IAM permission sync ฯลฯ) — เพิ่มเข้ามาเมื่อเจอเหตุการณ์จริงและอยากกันไม่ให้ทีมเสียเวลาซ้ำ
         </p>
       </section>
 

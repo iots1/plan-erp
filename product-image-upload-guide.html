@@ -171,12 +171,37 @@ CREATE UNIQUE INDEX <span class="s">"uq_product_images_primary"</span> ON <span 
             <thead><tr><th>cmd</th><th>Input</th><th>Output</th></tr></thead>
             <tbody>
               <tr><td>GeneratePresignedUpload</td><td>bucket, key, original_name, mime_type</td><td>{ bucket, path, upload_url } — PUT URL อายุ 5 นาที</td></tr>
-              <tr><td>HeadObject</td><td>bucket, key</td><td>{ size, content_type, etag } | null — null = ยังไม่มีการอัปโหลดจริง</td></tr>
+              <tr><td>HeadObject</td><td>bucket, key</td><td>{ size, content_type, etag } | null — null = <b>404 ที่ยืนยันได้</b> เท่านั้น (ยังไม่มีการอัปโหลดจริง) · สถานะอื่นทั้งหมด throw ไม่คืน null</td></tr>
             </tbody>
           </table>
         </div>
         <div class="rulebox"><div class="rc mb-1">headObject คืน null <b>เฉพาะ 404 ที่ชัดเจน</b> — ไม่ throw</div><p class="text-[13.5px]">"ยังไม่ได้อัปโหลด" เป็น outcome ปกติที่ caller ต้องตัดสินใจเอง (เช่น client ขอ presigned URL แล้วไม่เคย PUT จริง) — ไม่ใช่ error ของ storage-bc</p>
         <p class="text-[13.5px] mt-3">แต่ <b>ต้องเป็น <span class="mono text-[12px]">404</span> ที่ยืนยันได้เท่านั้น</b> (แก้ 2026-09-07) — HTTP HEAD ไม่มี response body ตามสเปก ทำให้ AWS SDK ประกอบ error จาก status line ได้อย่างเดียว และตั้งชื่อ <span class="mono text-[12px]">NotFound</span> ให้หลายสถานะ ถ้าเชื่อชื่อ error แทน status code จะทำให้ <span class="mono text-[12px]">403</span> จากอะไรที่ขวางอยู่หน้า bucket (WAF / reverse proxy / CDN) กลายเป็น "ไม่มีไฟล์" ทั้งที่ไฟล์อยู่จริง · ทุกสถานะที่ไม่ใช่ 404 คือ "<b>ตรวจสอบไม่ได้</b>" ไม่ใช่ "ไม่มี" → ต้องเป็น <span class="mono text-[12px]">503</span> ที่ retry ได้ ดู §08 ข้อ 5</p></div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3 mt-8">S3 client มี 2 ตัว — เซ็น URL กับ ยิง request ใช้คนละ endpoint</div>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
+          สองงานนี้มีข้อกำหนด<b>ตรงข้ามกัน</b> และถ้าใช้ endpoint เดียวร่วมกัน จะมีฝ่ายหนึ่งพังเสมอ
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>client</th><th>endpoint</th><th>ใช้ทำอะไร</th><th>ทำไมต้องเป็น endpoint นั้น</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="mono text-[12px]">s3Client</span></td>
+                <td><span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span><br>(ภายใน)</td>
+                <td>HeadObject · PutObject · DeleteObject</td>
+                <td>request พวกนี้<b>ไม่เคยต้องออกนอก DC</b> — ส่งออกทาง public domain คือเอา CDN/WAF มาขวางเส้นทางที่ไม่ต้องมีอะไรขวาง</td>
+              </tr>
+              <tr>
+                <td><span class="mono text-[12px]">presignClient</span></td>
+                <td><span class="mono text-[12px]">STORAGE_S3_PUBLIC_ENDPOINT</span><br>(public · fallback ไปตัวบนถ้าไม่ตั้ง)</td>
+                <td><b>เซ็น URL เท่านั้น</b> — ไม่เคยยิง request</td>
+                <td>presigned URL ใช้ได้กับ<b>เฉพาะ origin ที่ถูกเซ็นมาให้</b> — ถ้าเซ็นด้วย endpoint ภายใน browser จะเข้าไม่ถึงเลย</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox ok"><div class="rc mb-1">ทำไมแยกได้โดยไม่ต้องแลกอะไร</div><p class="text-[13.5px]">การ presign เป็นการ<b>คำนวณลายเซ็นแบบ offline</b> ไม่เปิด socket ไปหา endpoint เลย — จึงเซ็น URL สำหรับ public domain ได้จากเครื่องที่ออกไป public domain นั้นไม่ได้ด้วยซ้ำ · ตั้ง <span class="mono text-[12px]">STORAGE_S3_PUBLIC_ENDPOINT</span> เฉพาะเมื่อ browser กับ backend เข้าถึง object store คนละที่อยู่ ถ้าเป็น dev ที่ที่อยู่เดียวใช้ได้ทั้งคู่ ปล่อยว่างไว้ได้ (fallback อัตโนมัติ) · เบื้องหลังของกฎนี้อยู่ใน §08 ข้อ 5 และ <a href="runbook-image-confirm-storage-403.html" style="color:var(--teal);text-decoration:underline">Runbook: อัปโหลดรูปสินค้าไม่สำเร็จ (Storage 403)</a></p></div>
       </section>
 
       <div class="rule my-14"></div>
@@ -440,11 +465,13 @@ sequenceDiagram
         <div class="eyebrow text-[var(--accent)] mb-3">08 — ปัญหาที่เจอระหว่างทดสอบจริง (curl + ไฟล์จริง)</div>
         <h2 class="display text-3xl mb-6">5 บั๊กที่ยืนยัน/แก้ระหว่างทดสอบ end-to-end</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          3 ข้อแรกเจอตอนทดสอบด้วยไฟล์จริง (jpeg + png ชื่อไทย) ผ่าน superadmin เต็ม flow บนเครื่อง dev — ข้อ 5 เจอจากผู้ใช้จริงรายงานเข้ามาหลัง deploy
-          (ไม่ใช่จากการทดสอบ) และเป็นข้อเดียวที่ <b>ข้อความ error ชี้ไปคนละทางกับสาเหตุ</b> จึงใช้เวลาไล่นานที่สุด — ข้อ 4 เจอทีหลัง
-          ตอนย้าย <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> จาก internal IP ไปเป็น public domain จริงบน
-          ovh-dev (รายละเอียด deploy เต็มอยู่ที่ <a href="deployment-guide.html#bugs" style="color:var(--accent);text-decoration:underline">Deployment Guide §09</a>)
+          <b>ข้อ 1–3</b> เจอตอนทดสอบด้วยไฟล์จริง (jpeg + png ชื่อไทย) ผ่าน superadmin เต็ม flow บนเครื่อง dev ·
+          <b>ข้อ 4</b> เจอทีหลังตอนย้าย <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> จาก IP ภายในไปเป็น public domain
+          (รายละเอียด deploy เต็มอยู่ที่ <a href="deployment-guide.html#bugs" style="color:var(--accent);text-decoration:underline">Deployment Guide §09</a>) ·
+          <b>ข้อ 5</b> เจอจาก<b>ผู้ใช้จริงรายงานเข้ามาหลัง deploy</b> ไม่ใช่จากการทดสอบ — และเป็นข้อเดียวที่
+          <b>ข้อความ error ชี้ไปคนละทางกับสาเหตุ</b> จึงใช้เวลาไล่นานที่สุดในทั้ง 5 ข้อ
         </p>
+        <div class="rulebox mb-8"><div class="rc mb-1">ข้อ 4 กับ ข้อ 5 เป็นเรื่องเดียวกันคนละอาการ</div><p class="text-[13.5px]">ทั้งคู่มาจากการที่ <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> ตัวเดียวถูกใช้ทำ 2 หน้าที่ — ข้อ 4 คืออาการฝั่ง<b>เซ็น URL</b> (browser resolve host ไม่ได้) ข้อ 5 คืออาการฝั่ง<b>ยิง request เอง</b> (WAF ตอบ 403) · การแยกเป็น 2 client ตาม §03 ปิดทั้งสองอาการที่รากเดียวกัน</p></div>
 
         <div class="step">
           <span class="sn">1</span>
@@ -520,41 +547,59 @@ sequenceDiagram
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
             พิสูจน์ว่าไฟล์อยู่จริงด้วยการ <span class="mono text-[12px]">docker exec</span> เข้าไป <span class="mono text-[12px]">ls</span> ใน container ของ MinIO
             (เจอ <span class="mono text-[12px]">xl.meta</span> ขนาดตรงกับไฟล์ที่อัป) และ signed GET ก็ดาวน์โหลดกลับมาได้ครบ — แต่ confirm ยังตอบว่าไม่เจอ
-            ต้นเหตุมี <b>2 ชั้นซ้อนกัน</b> และแต่ละชั้นทำให้อีกชั้นมองไม่เห็น:
+            ต้นเหตุมี <b>3 ชั้นซ้อนกัน</b> — ชั้นที่ 3 เป็นตัว<b>ก่อ</b>ปัญหา ส่วนชั้นที่ 1–2 เป็นตัวทำให้
+            <b>มองไม่เห็น</b>ว่าปัญหาอยู่ที่ไหน จึงไล่หาสาเหตุยากผิดปกติ:
           </p>
-          <div class="grid sm:grid-cols-2 gap-4 mb-3">
+          <div class="grid sm:grid-cols-3 gap-4 mb-3">
             <div class="card p-5">
-              <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นที่ 1 · null สองความหมาย</div>
+              <div class="mono text-[11px] mb-2" style="color:var(--signal)">ชั้นที่ 3 · ต้นเหตุ</div>
+              <p class="text-sm" style="color:var(--ink-soft)">
+                <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> ชี้ไป <b>public domain</b> ทำให้ S3 call ที่ storage-bc
+                ทำเอง — รวม <span class="mono text-[12px]">HeadObject</span> ที่ไม่เคยต้องออกนอก DC — วิ่งผ่าน CDN/WAF
+                และ WAF มีสิทธิ์ตอบ <span class="mono text-[12px]">403</span> กับ request ที่เซ็นถูกต้องเมื่อไหร่ก็ได้ ·
+                วัดเทียบกัน: endpoint ภายใน <b>6/6 สำเร็จ</b> · public 403 ปนกับ 200 (ช่วงที่หนักสุดคือ 403 ทุกครั้ง)
+              </p>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นที่ 2 · ตัวบัง · เชื่อชื่อ error แทน status</div>
+              <p class="text-sm" style="color:var(--ink-soft)">
+                <span class="mono text-[12px]">headObject()</span> เช็ค <span class="mono text-[12px]">err.name === 'NotFound'</span>
+                <b>ก่อน</b> status code — HEAD ไม่มี body ตามสเปก SDK จึงตั้งชื่อจาก status line และใช้ชื่อ
+                <span class="mono text-[12px]">NotFound</span> กับหลายสถานะ ทำให้ <span class="mono text-[12px]">403</span> ของชั้นที่ 3
+                ถูกนับเป็น "ไม่มีไฟล์"
+              </p>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นที่ 1 · ตัวบัง · null สองความหมาย</div>
               <p class="text-sm" style="color:var(--ink-soft)">
                 <span class="mono text-[12px]">StorageObjectService.headObject()</span> ส่ง <span class="mono text-[12px]">null</span>
                 เป็น <span class="mono text-[12px]">defaultValue</span> ของ <span class="mono text-[12px]">sendWithContext()</span> ซึ่งเป็น no-throw
                 — แต่ <span class="mono text-[12px]">null</span> ก็เป็นคำตอบที่ถูกต้องของ <span class="mono text-[12px]">HeadObject</span> ("ยังไม่อัปโหลด") อยู่แล้ว
-                ผลคือ RMQ timeout / storage ล่ม กับ "ไม่มีไฟล์จริง" มาถึงผู้เรียกเป็นค่าเดียวกันเป๊ะ
-              </p>
-            </div>
-            <div class="card p-5">
-              <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นที่ 2 · เชื่อชื่อ error แทน status</div>
-              <p class="text-sm" style="color:var(--ink-soft)">
-                <span class="mono text-[12px]">headObject()</span> เช็ค <span class="mono text-[12px]">err.name === 'NotFound'</span>
-                <b>ก่อน</b> status code — HEAD ไม่มี body ตามสเปก SDK จึงตั้งชื่อจาก status line และใช้ชื่อ
-                <span class="mono text-[12px]">NotFound</span> กับหลายสถานะ ทำให้ <span class="mono text-[12px]">403</span> ชั่วคราวจากชั้นหน้า bucket
-                ถูกนับเป็น "ไม่มีไฟล์"
+                ผลคือ RPC ล้มเหลว กับ "ไม่มีไฟล์จริง" มาถึงผู้เรียกเป็นค่าเดียวกันเป๊ะ
               </p>
             </div>
           </div>
           <div class="edge">
-            <div class="tag mb-1">Fix (3 จุด)</div>
+            <div class="tag mb-1">Fix · ข้อ 1 รักษาโรค · ข้อ 2–4 ทำให้ครั้งหน้ารายงานตรง</div>
             <p class="text-[13px]">
-              <b>1)</b> <span class="mono text-[12px]">storage-object.service.ts</span> — ใช้ sentinel ที่ callee คืนไม่ได้เป็น <span class="mono text-[12px]">defaultValue</span>
+              <b>1) แยก endpoint เป็น 2 ตัว</b> (<span class="mono text-[12px]">storage.service.ts</span>) —
+              <span class="mono text-[12px]">s3Client</span> ใช้ <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> (ภายใน) สำหรับ
+              Head/Put/Delete · <span class="mono text-[12px]">presignClient</span> ใช้ <span class="mono text-[12px]">STORAGE_S3_PUBLIC_ENDPOINT</span>
+              สำหรับ<b>เซ็น URL เท่านั้น</b> เพราะ presigned URL ใช้ได้กับ origin ที่ถูกเซ็นมาให้เท่านั้น จึงต้องเป็น public domain
+              (ดู §03 · การเซ็นเป็น offline ไม่เปิด socket จึงเซ็นให้ origin ที่ตัวเองเข้าไม่ถึงได้)
+            </p>
+            <p class="text-[13px] mt-2">
+              <b>2)</b> <span class="mono text-[12px]">storage-object.service.ts</span> — ใช้ sentinel ที่ callee คืนไม่ได้เป็น <span class="mono text-[12px]">defaultValue</span>
               แล้ว throw <span class="mono text-[12px]">503</span> เมื่อได้ sentinel กลับมา เหลือ <span class="mono text-[12px]">null</span> ไว้หมายถึง "ไม่มีจริง" อย่างเดียว
               (ดู <a href="backend-convention.html#microservice" style="color:var(--accent);text-decoration:underline">Backend Convention §08</a> — กฎนี้ใช้กับทุก RPC ที่ <span class="mono text-[12px]">null</span> เป็นคำตอบที่ถูกต้อง)
-              · <b>2)</b> <span class="mono text-[12px]">storage.service.ts</span> — ให้ status code เป็นตัวตัดสิน: <span class="mono text-[12px]">null</span> เฉพาะ 404 ที่ยืนยันได้,
+              · <b>3)</b> <span class="mono text-[12px]">storage.service.ts</span> — ให้ status code เป็นตัวตัดสิน: <span class="mono text-[12px]">null</span> เฉพาะ 404 ที่ยืนยันได้,
               403 ที่ S3 ไม่ได้ตั้งชื่อเป็น auth error → <span class="mono text-[12px]">503</span> (ไม่ใช่ <span class="mono text-[12px]">ForbiddenException</span> ที่กล่าวหา credential ผิด ๆ)
-              · <b>3)</b> ฝั่ง frontend retry ขั้น confirm เฉพาะ <span class="mono text-[12px]">503</span> เท่านั้น — ไม่ retry <span class="mono text-[12px]">400</span> (คำตอบชี้ขาด retry ไปก็เหมือนเดิม)
+              · <b>4)</b> ฝั่ง frontend retry ขั้น confirm เฉพาะ <span class="mono text-[12px]">503</span> เท่านั้น — ไม่ retry <span class="mono text-[12px]">400</span> (คำตอบชี้ขาด retry ไปก็เหมือนเดิม)
               และไม่ retry <span class="mono text-[12px]">500</span> เปล่า ๆ (อาจ insert row สำเร็จไปแล้ว → รูปซ้ำ) ส่วน <span class="mono text-[12px]">503</span> การันตีว่ายังไม่เขียน DB เพราะ
               <span class="mono text-[12px]">HeadObject</span> ถูกเช็คก่อน insert เสมอ
             </p>
           </div>
+          <div class="rulebox mt-3"><div class="rc mb-1">⚠️ .env บนเครื่องอาจถูกเขียนทับทุก deploy</div><p class="text-[13.5px]">ข้อ 1 แก้ที่ค่า env — แต่ถ้า pipeline มี step ที่เขียน <span class="mono text-[12px]">.env</span> จาก secret (โปรเจกต์นี้มี) <b>การแก้มือบนเครื่องจะหายทุก deploy</b> และอาการจะกลับมาเองแบบไม่มีใครเข้าใจว่าทำไม ต้องแก้ที่ secret ต้นทางด้วย · วิธีจับ: <span class="mono text-[12px]">stat -c '%y' .env</span> ถ้า mtime ตรงกับเวลา deploy พอดี = ถูกเขียนทับ</p></div>
           <div class="rulebox mt-3"><div class="rc mb-1">บทเรียนที่กว้างกว่าฟีเจอร์นี้</div><p class="text-[13.5px]">ข้อความ error ที่ผิดทำให้เสียเวลาไล่ผิดทางหลายชั่วโมง — ไปสงสัย disk เต็ม, vhost ของ RabbitMQ ไม่ตรง, checksum ใน presigned URL ก่อนจะเจอว่าเป็นการแยกประเภท error ที่ปลายทาง · ตอนนี้ <span class="mono text-[12px]">translateS3Error()</span> log ทั้ง <span class="mono text-[12px]">status</span> และ <span class="mono text-[12px]">error_name</span> ทุกครั้ง เพราะขาดตัวใดตัวหนึ่งก็วินิจฉัยไม่ได้: 403 ที่ชื่อ <span class="mono text-[12px]">SignatureDoesNotMatch</span> กับ 403 ที่ไม่มีชื่อ ต้องแก้คนละทางกันคนละเรื่อง</p></div>
         </div>
       </section>
@@ -582,11 +627,28 @@ sequenceDiagram
             <div class="mono text-[11px] mb-3" style="color:var(--accent)">AUTOMATED · Jest (Unit)</div>
             <ul class="text-sm space-y-1.5" style="color:var(--ink-soft)">
               <li><span class="mono text-[12px]">multipart-json-body.util.spec.ts</span> — 11 tests</li>
-              <li><span class="mono text-[12px]">storage.service.spec.ts</span> — 7 tests</li>
+              <li><span class="mono text-[12px]">storage.service.spec.ts</span> — <b>16 tests</b> (เดิม 7 · +9 จาก §08 ข้อ 5)</li>
               <li><span class="mono text-[12px]">product-images.service.spec.ts</span> — 13 tests</li>
               <li><span class="mono text-[12px]">products.service.spec.ts</span> (createWithImages) — 4 tests</li>
             </ul>
           </div>
+        </div>
+
+        <div class="edge mb-6">
+          <div class="tag mb-1">test ที่เพิ่มจาก §08 ข้อ 5 — คุมพฤติกรรมที่เคยพลาด</div>
+          <p class="text-[13px]">
+            <b>การแยกประเภท error:</b> 403 ที่ชื่อ <span class="mono text-[12px]">NotFound</span> ต้อง<b>ไม่</b>ถูกนับเป็นไฟล์หาย ·
+            403 ที่ชื่อ auth จริง → <span class="mono text-[12px]">Forbidden</span> · 403 ที่ไม่มีชื่อ → <span class="mono text-[12px]">ServiceUnavailable</span> ·
+            <span class="mono text-[12px]">NotFound</span> ที่ไม่มี status → ยังคืน <span class="mono text-[12px]">null</span> ·
+            <span class="mono text-[12px]">throw null</span> ต้องไม่ทำให้ crash
+            <br><b>การแยก client:</b> เซ็น upload/download URL ต้องใช้ public endpoint · <span class="mono text-[12px]">HeadObject</span> ต้องยิงออก API endpoint ·
+            ไม่ตั้ง public endpoint → fallback ไป API endpoint
+          </p>
+          <p class="text-[13px] mt-2">
+            สองตัวแรกยืนยันแล้วว่าเป็น regression guard จริง (ย้อนเงื่อนไขกลับเป็นแบบเดิมแล้ว test fail ตรงตัวที่ควร fail) ·
+            ส่วน <b>retry ฝั่ง frontend ยังไม่มี test</b> เพราะ <span class="mono text-[12px]">packages/shared</span> ยังไม่มี test setup —
+            ตรงนี้เป็นช่องว่างที่รู้ตัว
+          </p>
         </div>
 
         <div class="rulebox ok"><div class="rc mb-1">Mock pattern</div><p class="text-[13.5px]">Service มักถูก instantiate ตรง (<span class="mono text-[12px]">new XxxService(...)</span>) กับ mock repository/manager แทนที่จะผ่าน Nest TestingModule — ให้ logic จริงของ service รันกับ mock repo, spy เฉพาะ <span class="mono text-[12px]">BaseServiceOperations.prototype</span> ตอนต้องการแยกจาก base-class internals (ดู <span class="mono text-[12px]">.claude/skills/testing/SKILL.md</span>)</p></div>
