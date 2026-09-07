@@ -866,7 +866,7 @@ sequenceDiagram
 <pre class="code p-4"><span class="c"># mock user จาก SeedAuthMockupData (dev เท่านั้น)</span>
 curl -X POST http://localhost:3001/auth/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"superadmin","password":"ErpSuper26"}'
+  -d '{"username":"superadmin","password":"&lt;ดู ERP_E2E_PASSWORD ใน .env&gt;"}'
 
 <span class="c"># 200 OK</span>
 { "access_token": "eyJhbGciOi...", "csrf_token": "64b85dd8...", "token_type": "Bearer", "expires_in": 28800 }</pre>
