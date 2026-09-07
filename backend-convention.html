@@ -419,6 +419,24 @@ findAll(<span class="d">@ValidatedQuery</span>(<span class="t">QueryParamsDTO</s
 
         <div class="rulebox mb-4"><div class="rc mb-1">HANDLER · @UseInterceptors(RmqAckInterceptor) บังคับ</div><p class="text-[13.5px]">ทุก controller ที่มี <span class="mono text-[12px]">@MessagePattern</span>/<span class="mono text-[12px]">@EventPattern</span> ต้องมี <span class="mono text-[12px]">RmqAckInterceptor</span> — server รัน <span class="mono text-[12px]">noAck: false</span> + <span class="mono text-[12px]">prefetchCount: 1</span> และ NestJS <b>ไม่ ack ให้เองตอนสำเร็จ</b> ถ้าลืม queue จะ head-of-line block ถาวร (อาการ: caller timeout 15s ทุกตัว โดยไม่มี error log ใด ๆ, restart service ก็ไม่ช่วย) ดู pattern ที่ <span class="mono text-[12px]">SupplierEventsController</span>/<span class="mono text-[12px]">ProductEventsController</span> · ตั้งแต่ 2026-09-05 ข้อความที่ nack เพราะไม่มี handler ตรงกันเลยไปนอนรอที่ dead-letter queue แทนที่จะหายถาวร — ดู <a href="rabbitmq-reliability-guide.html" style="color:var(--teal);text-decoration:underline">RabbitMQ Reliability Guide</a></p></div>
 
+        <div class="rulebox mb-4"><div class="rc mb-1">⚠️ <span class="mono text-[12px]">defaultValue</span> ต้องเป็นค่าที่ callee คืนเองไม่ได้ — สำคัญเมื่อ <span class="mono text-[12px]">null</span> คือคำตอบที่ถูกต้อง</div><p class="text-[13.5px]">สัญญา "ไม่ throw เอง" ข้างบนหมายความว่า <b>ความล้มเหลวของ transport ถูกแทนด้วย <span class="mono text-[12px]">defaultValue</span></b> — ดังนั้นถ้าส่ง <span class="mono text-[12px]">null</span> เป็น <span class="mono text-[12px]">defaultValue</span> ให้ handler ที่ <b>คืน <span class="mono text-[12px]">null</span> เป็นคำตอบปกติได้อยู่แล้ว</b> ผู้เรียกจะแยกไม่ออกระหว่าง "callee ตอบมาว่าไม่มี" กับ "ไม่เคยได้คำตอบเลย" เพราะทั้งสองกรณีมาถึงเป็น <span class="mono text-[12px]">null</span> เหมือนกันเป๊ะ</p>
+        <p class="text-[13.5px] mt-3">เจอจริง 2026-09-07 · <span class="mono text-[12px]">Storage.cmd.HeadObject</span> คืน <span class="mono text-[12px]">null</span> เมื่อ object ไม่มีอยู่จริง (เป็น outcome ปกติที่ผู้เรียกต้องตัดสินใจเอง) แต่ <span class="mono text-[12px]">StorageObjectService.headObject()</span> ก็ส่ง <span class="mono text-[12px]">null</span> เป็น <span class="mono text-[12px]">defaultValue</span> ด้วย → RMQ timeout หรือ storage ล่มชั่วคราวครั้งใด ก็ถูกรายงานเป็น <span class="mono text-[12px]">400</span> "ยังไม่ได้อัปโหลดไฟล์" ทั้งที่ไฟล์อยู่ใน bucket แล้วจริง ผู้ใช้จึงเห็นข้อความที่บอกให้อัปโหลดใหม่ ซึ่งเป็นสิ่งที่แก้ปัญหาไม่ได้เลย · กระทบทุก resource ที่สืบทอด <span class="mono text-[12px]">BaseAttachmentService</span> เท่ากันหมด (product images, receipt/quotation/purchase-order attachments) ไม่ใช่แค่ endpoint เดียว</p>
+        <p class="text-[13.5px] mt-3"><b>วิธีที่ถูก</b> — ส่ง sentinel ที่ callee ไม่มีทางคืนออกมาได้ แล้วแปลความที่ขอบ ก่อนส่งต่อให้ layer อื่น:</p>
+        <div class="code p-4 mt-2">
+<pre><span class="c">// null = "callee ตอบว่าไม่มี" เท่านั้น · sentinel = "ไม่ได้คำตอบ"</span>
+<span class="k">const</span> RPC_FAILED = Object.freeze({ __rpcFailure: <span class="k">true</span> }) <span class="k">as unknown as</span> IStorageHeadObjectResult;
+
+<span class="k">const</span> result = <span class="k">await</span> <span class="d">this</span>.microserviceClient.sendWithContext&lt;...&gt;(
+  logger, client, { cmd: AppMicroservice.Storage.cmd.HeadObject }, { bucket, key },
+  RPC_FAILED,
+);
+<span class="k">if</span> (result === RPC_FAILED) {
+  <span class="k">throw new</span> ServiceUnavailableException(<span class="s">'...'</span>); <span class="c">// 503 — ตอบไม่ได้ ลองใหม่ได้</span>
+}
+<span class="k">return</span> result; <span class="c">// null ที่เหลือ = ไม่มีจริง → ผู้เรียก map เป็น 400 ได้อย่างมั่นใจ</span></pre>
+        </div>
+        <p class="text-[13.5px] mt-3">เส้นแบ่งที่ต้องรักษาไว้: <b>503 = ยังตอบไม่ได้ (retry ได้)</b> · <b>400/404 = ตอบแล้วว่าไม่มี (retry ไปก็ได้คำตอบเดิม)</b> — ถ้าสองอย่างนี้ยุบเป็นค่าเดียวกัน ผู้เรียกจะเลือกทางที่ผิดเสมอ และ error ที่ผู้ใช้เห็นจะชี้ไปคนละทางกับสาเหตุจริง</p></div>
+
         <div class="eyebrow text-[var(--muted)] mb-3">⚠️ Gotcha · Global filter/interceptor ไม่ไปถึง microservice instance</div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-5 leading-[1.85]">
           <span class="mono text-[13px]">app.connectMicroservice()</span> (ใน <span class="mono text-[13px]">bootstrap.util.ts</span>) เรียกแบบ<b>ไม่ใส่ <span class="mono text-[13px]">{ inheritAppConfig: true }</span> โดยตั้งใจ</b>

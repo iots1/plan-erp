@@ -149,13 +149,49 @@ $ ls -lS /root/.pm2/logs | head -4
           <span class="sn">2</span>
           <h3 class="font-semibold text-[16px] mb-2">หาว่าใครกิน — เทียบ 3 ผู้ต้องสงสัยหลัก</h3>
           <div class="code p-5 mb-3">
-<pre>du -sh /root/.pm2/logs /var/log /var/lib/docker 2>/dev/null | sort -h</pre>
+<pre><span class="c"># -x = ไม่ข้าม filesystem — สำคัญ: /var/lib/docker/rootfs/overlayfs/* เป็น mount แยก</span>
+<span class="c"># ถ้าไม่ใส่ -x docker จะดูใหญ่เกินจริงหลายเท่า (เคยเห็น 8.4G ที่จริงกินบน / แค่ 861M)</span>
+du -xh --max-depth=1 / 2>/dev/null | sort -rh | head
+du -xsh /root/.pm2/logs /var/log /var/lib/docker /root/.vscode-server 2>/dev/null | sort -rh</pre>
           </div>
-          <p class="text-sm" style="color:var(--ink-soft)">
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
             ถ้า <span class="mono text-[12px]">/root/.pm2/logs</span> ขึ้นมาเป็นอันดับต้น ๆ (หลักหลายร้อย MB ถึง GB)
-            แปลว่าใช่เคสนี้ — ถ้าเป็น <span class="mono text-[12px]">/var/lib/docker</span> ให้ไปทาง
-            <span class="mono text-[12px]">docker system prune</span> แทน ไม่ใช่ runbook นี้
+            แปลว่าใช่เคสนี้ ให้ทำต่อข้อ 3 · ถ้าไม่ใช่ ให้แยกทางตามตารางนี้ก่อน — <b>อย่าเริ่มลบไฟล์จนรู้ว่าใครกิน</b>
           </p>
+          <div class="overflow-x-auto mb-3">
+            <table class="d">
+              <thead><tr><th>ตัวที่ใหญ่สุด</th><th>แปลว่า</th><th>ไปทางไหน</th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono text-[12px]">/root/.pm2/logs</span></td><td>log ของ BC ที่รันด้วย pm2</td><td>runbook นี้ ข้อ 3 ต่อ</td></tr>
+                <tr><td><span class="mono text-[12px]">/var/lib/docker/containers</span></td><td>container log (json-file) ไม่มีเพดาน</td><td>ดูกล่องเตือนข้างล่าง — <b>ไม่ใช่</b> <span class="mono text-[12px]">docker system prune</span></td></tr>
+                <tr><td><span class="mono text-[12px]">/var/lib/docker</span> ส่วนอื่น / <span class="mono text-[12px]">containerd</span></td><td>image + snapshot ค้าง</td><td><span class="mono text-[12px]">docker system prune</span> · <span class="mono text-[12px]">docker system df</span> ดูก่อนว่าเคลมคืนได้เท่าไหร่</td></tr>
+                <tr><td><span class="mono text-[12px]">/var/log</span></td><td>syslog/journal</td><td>เช็ค logrotate + <span class="mono text-[12px]">journalctl --vacuum-size=200M</span></td></tr>
+                <tr><td><span class="mono text-[12px]">/root/.vscode-server</span></td><td>VS Code Remote (extension + cache)</td><td>ลบ extension/cache ที่ไม่ใช้ — โตเงียบ ๆ ถึงหลาย GB ได้</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="edge">
+            <div class="tag mb-1">⚠️ docker system prune ไม่ลบ container log</div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">prune</span> เก็บกวาด image/build cache/container ที่หยุดแล้ว —
+              แต่ <span class="mono text-[12px]">*-json.log</span> ของ container ที่ <b>ยังรันอยู่</b> ไม่ถูกแตะเลย
+              คนที่ prune แล้วเห็นว่า disk ไม่ลดจะตันอยู่ตรงนี้ ให้วัดตรง ๆ ว่าตัวไหนโต:
+            </p>
+            <div class="code p-4 mt-3">
+<pre>du -ch /var/lib/docker/containers/*/*-json.log | sort -rh | head
+
+<span class="c"># แปลง container id → ชื่อ</span>
+docker inspect --format <span class="s">'{{.Name}} {{.Config.Image}}'</span> &lt;id&gt;
+
+<span class="c"># บรรเทาทันที (ไม่ต้อง restart container — truncate ไฟล์ที่เปิดอยู่ได้)</span>
+truncate -s 0 /var/lib/docker/containers/&lt;id&gt;/&lt;id&gt;-json.log</pre>
+            </div>
+            <p class="text-[13px] mt-3">
+              การแก้ถาวรคือตั้งเพดานให้ json-file driver — ดู
+              <a href="deployment-guide.html#operations" style="color:var(--accent);text-decoration:underline">Deployment Guide §10 ข้อ 3</a>
+              (ต้อง recreate container ค่าถึงมีผล ไม่ย้อนหลังเหมือน <span class="mono text-[12px]">pm2-logrotate</span>)
+            </p>
+          </div>
         </div>
 
         <div class="step">

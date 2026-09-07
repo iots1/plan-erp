@@ -175,7 +175,8 @@ CREATE UNIQUE INDEX <span class="s">"uq_product_images_primary"</span> ON <span 
             </tbody>
           </table>
         </div>
-        <div class="rulebox"><div class="rc mb-1">headObject คืน null ไม่ throw</div><p class="text-[13.5px]">"ยังไม่ได้อัปโหลด" เป็น outcome ปกติที่ caller ต้องตัดสินใจเอง (เช่น client ขอ presigned URL แล้วไม่เคย PUT จริง) — ไม่ใช่ error ของ storage-bc</p></div>
+        <div class="rulebox"><div class="rc mb-1">headObject คืน null <b>เฉพาะ 404 ที่ชัดเจน</b> — ไม่ throw</div><p class="text-[13.5px]">"ยังไม่ได้อัปโหลด" เป็น outcome ปกติที่ caller ต้องตัดสินใจเอง (เช่น client ขอ presigned URL แล้วไม่เคย PUT จริง) — ไม่ใช่ error ของ storage-bc</p>
+        <p class="text-[13.5px] mt-3">แต่ <b>ต้องเป็น <span class="mono text-[12px]">404</span> ที่ยืนยันได้เท่านั้น</b> (แก้ 2026-09-07) — HTTP HEAD ไม่มี response body ตามสเปก ทำให้ AWS SDK ประกอบ error จาก status line ได้อย่างเดียว และตั้งชื่อ <span class="mono text-[12px]">NotFound</span> ให้หลายสถานะ ถ้าเชื่อชื่อ error แทน status code จะทำให้ <span class="mono text-[12px]">403</span> จากอะไรที่ขวางอยู่หน้า bucket (WAF / reverse proxy / CDN) กลายเป็น "ไม่มีไฟล์" ทั้งที่ไฟล์อยู่จริง · ทุกสถานะที่ไม่ใช่ 404 คือ "<b>ตรวจสอบไม่ได้</b>" ไม่ใช่ "ไม่มี" → ต้องเป็น <span class="mono text-[12px]">503</span> ที่ retry ได้ ดู §08 ข้อ 5</p></div>
       </section>
 
       <div class="rule my-14"></div>
@@ -253,9 +254,12 @@ sequenceDiagram
             BE-->>FE: 400 Bad Request (ownership guard)
         else object_key ถูกต้อง
             BE->>ST: HeadObject(bucket, key)
-            alt ยังไม่เคยอัปโหลดจริง (client ขอ URL แล้วไม่ PUT)
+            alt ยังไม่เคยอัปโหลดจริง (404 ที่ยืนยันได้)
                 ST-->>BE: null
                 BE-->>FE: 400 Bad Request (no uploaded object found)
+            else ตรวจสอบไม่ได้ (403 / timeout / storage ล่ม)
+                ST-->>BE: throw ServiceUnavailable
+                BE-->>FE: 503 Service Unavailable (retry ได้ — FE retry ให้เอง)
             else อัปโหลดสำเร็จแล้วจริง
                 ST-->>BE: size, content_type, etag
                 opt is_primary = true ในคำขอ
@@ -434,9 +438,10 @@ sequenceDiagram
       <!-- ========== 08 GOTCHAS ========== -->
       <section id="gotchas" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">08 — ปัญหาที่เจอระหว่างทดสอบจริง (curl + ไฟล์จริง)</div>
-        <h2 class="display text-3xl mb-6">4 บั๊กที่ยืนยัน/แก้ระหว่างทดสอบ end-to-end</h2>
+        <h2 class="display text-3xl mb-6">5 บั๊กที่ยืนยัน/แก้ระหว่างทดสอบ end-to-end</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          3 ข้อแรกเจอตอนทดสอบด้วยไฟล์จริง (jpeg + png ชื่อไทย) ผ่าน superadmin เต็ม flow บนเครื่อง dev — ข้อ 4 เจอทีหลัง
+          3 ข้อแรกเจอตอนทดสอบด้วยไฟล์จริง (jpeg + png ชื่อไทย) ผ่าน superadmin เต็ม flow บนเครื่อง dev — ข้อ 5 เจอจากผู้ใช้จริงรายงานเข้ามาหลัง deploy
+          (ไม่ใช่จากการทดสอบ) และเป็นข้อเดียวที่ <b>ข้อความ error ชี้ไปคนละทางกับสาเหตุ</b> จึงใช้เวลาไล่นานที่สุด — ข้อ 4 เจอทีหลัง
           ตอนย้าย <span class="mono text-[12px]">STORAGE_S3_ENDPOINT</span> จาก internal IP ไปเป็น public domain จริงบน
           ovh-dev (รายละเอียด deploy เต็มอยู่ที่ <a href="deployment-guide.html#bugs" style="color:var(--accent);text-decoration:underline">Deployment Guide §09</a>)
         </p>
@@ -502,6 +507,55 @@ sequenceDiagram
             <div class="tag mb-1">Fix</div>
             <p class="text-[13px]"><span class="mono text-[12px]">STORAGE_S3_FORCE_PATH_STYLE</span> ไม่ได้อยู่ใน Joi validation schema (<span class="mono text-[12px]">libs/config</span>) จึงมาเป็น<b>สตริง</b> <span class="mono text-[12px]">"true"</span> ไม่ใช่ boolean แท้ — coerce ให้ชัดเจนใน <span class="mono text-[12px]">storage.service.ts</span>: <span class="mono text-[12px]">forcePathStyle: configService.get(..., 'true') !== 'false'</span> รายละเอียดการ debug เต็ม + วิธียืนยันดูที่ Deployment Guide §09 บั๊ก #6</p>
           </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">5</span>
+          <h3 class="font-semibold text-[16px] mb-2">storage ล่มชั่วคราว ถูกรายงานเป็น "คุณยังไม่ได้อัปโหลดไฟล์" (2026-09-07)</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            อาการที่ผู้ใช้เจอ: แก้ไขสินค้าที่มีอยู่แล้วและเพิ่มรูปภายหลัง แล้วได้ <span class="mono text-[12px]">400</span>
+            <span class="mono text-[12px]">"No uploaded object found at '...' — upload the file to the presigned URL before confirming."</span>
+            ทั้งที่อัปโหลดไปแล้ว — และการอัปโหลดใหม่ตามที่ข้อความบอกก็ไม่ช่วยอะไร
+          </p>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            พิสูจน์ว่าไฟล์อยู่จริงด้วยการ <span class="mono text-[12px]">docker exec</span> เข้าไป <span class="mono text-[12px]">ls</span> ใน container ของ MinIO
+            (เจอ <span class="mono text-[12px]">xl.meta</span> ขนาดตรงกับไฟล์ที่อัป) และ signed GET ก็ดาวน์โหลดกลับมาได้ครบ — แต่ confirm ยังตอบว่าไม่เจอ
+            ต้นเหตุมี <b>2 ชั้นซ้อนกัน</b> และแต่ละชั้นทำให้อีกชั้นมองไม่เห็น:
+          </p>
+          <div class="grid sm:grid-cols-2 gap-4 mb-3">
+            <div class="card p-5">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นที่ 1 · null สองความหมาย</div>
+              <p class="text-sm" style="color:var(--ink-soft)">
+                <span class="mono text-[12px]">StorageObjectService.headObject()</span> ส่ง <span class="mono text-[12px]">null</span>
+                เป็น <span class="mono text-[12px]">defaultValue</span> ของ <span class="mono text-[12px]">sendWithContext()</span> ซึ่งเป็น no-throw
+                — แต่ <span class="mono text-[12px]">null</span> ก็เป็นคำตอบที่ถูกต้องของ <span class="mono text-[12px]">HeadObject</span> ("ยังไม่อัปโหลด") อยู่แล้ว
+                ผลคือ RMQ timeout / storage ล่ม กับ "ไม่มีไฟล์จริง" มาถึงผู้เรียกเป็นค่าเดียวกันเป๊ะ
+              </p>
+            </div>
+            <div class="card p-5">
+              <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้นที่ 2 · เชื่อชื่อ error แทน status</div>
+              <p class="text-sm" style="color:var(--ink-soft)">
+                <span class="mono text-[12px]">headObject()</span> เช็ค <span class="mono text-[12px]">err.name === 'NotFound'</span>
+                <b>ก่อน</b> status code — HEAD ไม่มี body ตามสเปก SDK จึงตั้งชื่อจาก status line และใช้ชื่อ
+                <span class="mono text-[12px]">NotFound</span> กับหลายสถานะ ทำให้ <span class="mono text-[12px]">403</span> ชั่วคราวจากชั้นหน้า bucket
+                ถูกนับเป็น "ไม่มีไฟล์"
+              </p>
+            </div>
+          </div>
+          <div class="edge">
+            <div class="tag mb-1">Fix (3 จุด)</div>
+            <p class="text-[13px]">
+              <b>1)</b> <span class="mono text-[12px]">storage-object.service.ts</span> — ใช้ sentinel ที่ callee คืนไม่ได้เป็น <span class="mono text-[12px]">defaultValue</span>
+              แล้ว throw <span class="mono text-[12px]">503</span> เมื่อได้ sentinel กลับมา เหลือ <span class="mono text-[12px]">null</span> ไว้หมายถึง "ไม่มีจริง" อย่างเดียว
+              (ดู <a href="backend-convention.html#microservice" style="color:var(--accent);text-decoration:underline">Backend Convention §08</a> — กฎนี้ใช้กับทุก RPC ที่ <span class="mono text-[12px]">null</span> เป็นคำตอบที่ถูกต้อง)
+              · <b>2)</b> <span class="mono text-[12px]">storage.service.ts</span> — ให้ status code เป็นตัวตัดสิน: <span class="mono text-[12px]">null</span> เฉพาะ 404 ที่ยืนยันได้,
+              403 ที่ S3 ไม่ได้ตั้งชื่อเป็น auth error → <span class="mono text-[12px]">503</span> (ไม่ใช่ <span class="mono text-[12px]">ForbiddenException</span> ที่กล่าวหา credential ผิด ๆ)
+              · <b>3)</b> ฝั่ง frontend retry ขั้น confirm เฉพาะ <span class="mono text-[12px]">503</span> เท่านั้น — ไม่ retry <span class="mono text-[12px]">400</span> (คำตอบชี้ขาด retry ไปก็เหมือนเดิม)
+              และไม่ retry <span class="mono text-[12px]">500</span> เปล่า ๆ (อาจ insert row สำเร็จไปแล้ว → รูปซ้ำ) ส่วน <span class="mono text-[12px]">503</span> การันตีว่ายังไม่เขียน DB เพราะ
+              <span class="mono text-[12px]">HeadObject</span> ถูกเช็คก่อน insert เสมอ
+            </p>
+          </div>
+          <div class="rulebox mt-3"><div class="rc mb-1">บทเรียนที่กว้างกว่าฟีเจอร์นี้</div><p class="text-[13.5px]">ข้อความ error ที่ผิดทำให้เสียเวลาไล่ผิดทางหลายชั่วโมง — ไปสงสัย disk เต็ม, vhost ของ RabbitMQ ไม่ตรง, checksum ใน presigned URL ก่อนจะเจอว่าเป็นการแยกประเภท error ที่ปลายทาง · ตอนนี้ <span class="mono text-[12px]">translateS3Error()</span> log ทั้ง <span class="mono text-[12px]">status</span> และ <span class="mono text-[12px]">error_name</span> ทุกครั้ง เพราะขาดตัวใดตัวหนึ่งก็วินิจฉัยไม่ได้: 403 ที่ชื่อ <span class="mono text-[12px]">SignatureDoesNotMatch</span> กับ 403 ที่ไม่มีชื่อ ต้องแก้คนละทางกันคนละเรื่อง</p></div>
         </div>
       </section>
 

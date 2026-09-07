@@ -189,9 +189,13 @@
               <li><span class="mono text-[12px]">local.file_match</span> glob ต้องมี <span class="mono text-[12px]">*</span> ครบทุก path segment ที่ logger สร้างจริง — ไม่ match แล้วเงียบ ไม่มี error (§08 บั๊ก #4)</li>
               <li>prometheus ต้อง start ด้วย <span class="mono text-[12px]">--web.enable-remote-write-receiver</span> ไม่งั้น Tempo metrics-generator remote_write เข้าไม่ได้</li>
               <li>แก้ <span class="mono text-[12px]">grafana-datasources.yaml</span> ต้อง bump <span class="mono text-[12px]">version:</span> ทุกครั้ง ไม่งั้น Grafana ไม่ apply ค่าใหม่ (§08 บั๊ก #5)</li>
+              <li><span class="mono text-[12px]">ERP_API_LOGS_DIR</span> default เป็น <span class="mono text-[12px]">../../logs</span> ซึ่ง resolve เทียบกับ<b>ที่อยู่ของไฟล์ compose</b> — ถูกเฉพาะเมื่อรัน stack จาก <span class="mono text-[12px]">infrastructure/observability</span> ใน checkout ถ้า copy stack ไปไว้ที่อื่น (ตาม RULE ของ Deployment Guide §04) ต้องตั้งเป็น absolute path เอง ไม่งั้น<b>เงียบ</b>: Alloy start ปกติ tail directory ที่ไม่มีอยู่ Loki ไม่มี log ของแอปเลย แต่ trace/metric ยังมาครบ ดูเหมือนระบบปกติ</li>
             </ul>
           </div>
         </div>
+
+        <div class="rulebox mt-6"><div class="rc mb-1">⚠️ stack นี้เป็นตัวที่ log ของ container ตัวเองโตเร็วที่สุดบนเครื่อง</div><p class="text-[13.5px]">อย่าสับสนระหว่าง <b>log ที่ Loki เก็บให้</b> กับ <b>log ที่ container ของ stack นี้พ่นออกมาเอง</b> — อย่างหลังไปลงที่ <span class="mono text-[12px]">/var/lib/docker/containers/*/*-json.log</span> ซึ่ง <span class="mono text-[12px]">json-file</span> driver ของ docker <b>ไม่ rotate ให้ถ้าไม่สั่ง</b> วัดจริงบนเครื่อง dev: <span class="mono text-[12px]">tempo</span> 109 MB และ <span class="mono text-[12px]">loki</span> 88 MB ใน 9 วัน เป็นสองอันดับแรกของทั้งเครื่อง แซง Kong ที่ log ทุก request ด้วยซ้ำ</p>
+        <p class="text-[13.5px] mt-3">ประเด็นคือ retention ของ Loki/Tempo (ที่ตั้งใน <span class="mono text-[12px]">loki-config.yaml</span>/<span class="mono text-[12px]">tempo.yaml</span>) คุมแค่ <b>data ที่มันเก็บ</b> ไม่ได้คุม log ของตัวมันเอง — ต้องตั้ง <span class="mono text-[12px]">logging:</span> ใน compose แยก ดู <a href="deployment-guide.html#operations" style="color:var(--accent);text-decoration:underline">Deployment Guide §10 ข้อ 3</a> · การมี observability stack ไม่ได้แปลว่า log ทุกสายถูกดูแลแล้ว: มี 3 สายบนเครื่องนี้และ stack นี้เห็นแค่สายเดียว (ตารางเทียบทั้ง 3 สายอยู่ใน Deployment Guide §10)</p></div>
       </section>
 
       <div class="rule my-14"></div>

@@ -239,6 +239,16 @@ npm install -g pnpm pm2</pre>
           PostgreSQL + Redis + RabbitMQ ผ่าน Docker Compose — รายละเอียดเต็มอยู่ที่
           <span class="mono text-[12px]">infrastructure/infra-erp/</span> ใน repo หลัก (ไม่ใช่เอกสารนี้)
         </p>
+        <div class="rulebox mb-6"><div class="rc mb-1">ขอบเขต · service ไหนใน stack นี้ที่ production ใช้จริง</div><p class="text-[13.5px]">
+          stack นี้ไม่ได้ถูกใช้ทั้งก้อนเสมอ — <b><span class="mono text-[12px]">erp-redis</span> · <span class="mono text-[12px]">erp-rabbitmq</span> · <span class="mono text-[12px]">erp-minio</span> · <span class="mono text-[12px]">erp-gotenberg</span> คือของจริงที่แอปต่อ</b>
+          แต่ <b><span class="mono text-[12px]">erp-db</span> เป็นตัวสำหรับ dev/standalone เท่านั้น</b> ฐานข้อมูลของ production
+          เป็น <b>PostgreSQL cluster แยกบน VM</b> (primary + standby หลายตัว) ที่แอปเข้าถึงผ่าน <b>pgpool VIP</b> ไม่ได้ต่อคอนเทนเนอร์นี้เลย —
+          ดู <a href="postgresql-pgpool-cluster-guide.html" style="color:var(--teal);text-decoration:underline">PostgreSQL + Pgpool Cluster Guide</a> และ
+          <a href="ha-failover-operations-guide.html" style="color:var(--teal);text-decoration:underline">HA Failover Operations</a>
+        </p>
+        <p class="text-[13.5px] mt-3">วิธีเช็คว่าเครื่องหนึ่ง ๆ ใช้แบบไหน: ดู <span class="mono text-[12px]">*_DB_HOST</span>/<span class="mono text-[12px]">*_DB_PORT</span> ใน
+          <span class="mono text-[12px]">.env</span> ของแอป ถ้าชี้ไป VIP ของ pgpool (คนละ host/port กับที่ compose เปิดไว้) แปลว่า
+          <span class="mono text-[12px]">erp-db</span> ที่รันอยู่<b>ไม่มีใครใช้</b> — บนเครื่องที่ disk จำกัด ควรพิจารณาปิดทิ้ง เพราะมันยังกิน volume และ log อยู่</p></div>
         <div class="code p-5 mb-6">
 <pre><span class="c"># แนะนำ: วางไว้นอก repo checkout เช่น /root/infra-erp (ไม่ใช่ /root/erp-api/infrastructure/infra-erp)</span>
 <span class="c"># เพื่อไม่ให้ deploy script (git reset --hard) มีผลกับ data/credentials</span>
@@ -248,12 +258,51 @@ cp .env.example .env
 <span class="c"># แก้ POSTGRES_PASSWORD / REDIS_PASSWORD / RABBITMQ_PASSWORD ให้เป็นค่าจริง</span>
 docker compose up -d</pre>
         </div>
-        <div class="rulebox">
+        <div class="rulebox mb-4">
           <div class="rc mb-1">RULE</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
             <span class="mono text-[12px]">infrastructure/&lt;stack&gt;/</span> ใน repo คือ<b>template</b>เสมอ —ของจริงที่รันอยู่ควร
             อยู่นอก checkout ของแอป กันไม่ให้ <span class="mono text-[12px]">deploy-app.sh</span>-style script (ที่ทำ
             <span class="mono text-[12px]">git reset --hard</span>) กระทบ data/credentials โดยไม่ตั้งใจ
+          </p>
+        </div>
+
+        <div class="edge">
+          <div class="tag mb-1">⚠️ postgres:18 เปลี่ยน PGDATA — mount ผิดจุดแล้ว data (ของ dev) หายเงียบ ๆ</div>
+          <p class="text-[13px]">
+            มีผลกับ <span class="mono text-[12px]">erp-db</span> ของ compose เท่านั้น (dev/standalone — production ใช้ pgpool cluster ตาม RULE ข้างบน)
+            แต่ควรรู้ไว้เพราะอาการเงียบมาก และ pattern เดียวกันนี้ผิดได้กับทุก stack ที่ยก compose ของ postgres รุ่นเก่ามาใช้ต่อ
+          </p>
+          <p class="text-[13px] mt-2">
+            <span class="mono text-[12px]">postgres:18</span> ย้ายไปใช้ layout แบบ Debian แล้วตั้ง
+            <span class="mono text-[12px]">PGDATA=/var/lib/postgresql/18/docker</span> ซึ่ง<b>ไม่ได้อยู่ใต้</b>
+            <span class="mono text-[12px]">/var/lib/postgresql/data</span> ที่ compose ของ postgres ≤17 ทุกไฟล์ใช้กันมา —
+            ถ้ายัง mount ที่ <span class="mono text-[12px]">.../data</span> ตาม pattern เดิม volume จะเก็บโฟลเดอร์ว่าง
+            ส่วน cluster จริงไปอยู่ใน writable layer ของ container และ<b>หายทั้งหมดเมื่อ container ถูก recreate</b>
+            (อัปเดต image, <span class="mono text-[12px]">--force-recreate</span>, ย้ายเครื่อง) ความร้ายคืออาการเงียบ:
+            DB ขึ้นปกติ ใช้งานได้ แล้วว่างเปล่าหลัง recreate ครั้งถัดไป
+          </p>
+          <p class="text-[13px] mt-2">
+            ไม่ใช่ความแปลกของ docker — เป็นการที่ image <b>ไปตรงกับ layout ที่ Debian/Ubuntu ใช้มาตลอด</b> และเป็น layout เดียวกับที่
+            PostgreSQL cluster ตัวจริงบน VM ใช้อยู่ (<span class="mono text-[12px]">/var/lib/postgresql/&lt;version&gt;/main</span> จากแพ็กเกจ pgdg)
+            คือมี subdirectory ต่อเวอร์ชันเสมอ ต่างกันแค่ชื่อ leaf (<span class="mono text-[12px]">docker</span> เทียบกับ <span class="mono text-[12px]">main</span>)
+          </p>
+          <div class="code p-4 mt-3">
+<pre><span class="c"># ✅ ถูก — mount ที่ parent ให้ครอบ PGDATA ทุกเวอร์ชัน</span>
+<span class="d">volumes:</span>
+  - ./data/erp_data:/var/lib/postgresql        <span class="c"># data จริงลงที่ ./data/erp_data/18/docker</span>
+
+<span class="c"># ❌ ผิดสำหรับ pg18 — PGDATA อยู่นอก mount</span>
+  - ./data/erp_data:/var/lib/postgresql/data
+
+<span class="c"># ยืนยันเสมอหลังตั้ง stack (ต้องตรงกับ path ใน mount)</span>
+docker exec &lt;container&gt; psql -U &lt;user&gt; -d &lt;db&gt; -tAc <span class="s">'show data_directory'</span>
+ls ./data/erp_data                             <span class="c"># ต้องเห็นโฟลเดอร์ชื่อเวอร์ชัน เช่น 18/</span></pre>
+          </div>
+          <p class="text-[13px] mt-3">
+            การ mount ที่ parent ยังทำให้ major upgrade ง่ายขึ้นด้วย — ขึ้นเวอร์ชันใหม่จะสร้าง subdirectory ใหม่
+            ข้าง ๆ ของเดิมที่ยังอยู่บน host ทำให้ <span class="mono text-[12px]">pg_upgrade</span> ทำกับ directory ที่มีอยู่จริง
+            ไม่ใช่ volume ที่หายไปแล้ว
           </p>
         </div>
       </section>
@@ -1307,9 +1356,9 @@ cluster/2 + pm2 reload   →  0 request พัง   <span class="c">(250/250 ต
       <!-- ========== 10 DAY-2 OPERATIONS ========== -->
       <section id="operations" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">10 — Day-2 Operations</div>
-        <h2 class="display text-3xl mb-6">สองอย่างที่ไม่ตั้งแล้วพังแน่นอน</h2>
+        <h2 class="display text-3xl mb-6">สามอย่างที่ไม่ตั้งแล้วพังแน่นอน</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          ทั้งสองข้อนี้ไม่ทำให้ระบบพังตอน deploy — มันพัง<b>ทีหลัง</b> ตอนไฟดับ หรือตอน disk เต็มในอีกหลายเดือน
+          ทั้งสามข้อนี้ไม่ทำให้ระบบพังตอน deploy — มันพัง<b>ทีหลัง</b> ตอนไฟดับ หรือตอน disk เต็มในอีกหลายเดือน
           ซึ่งเป็นเวลาที่ไม่มีใครนั่งเฝ้าอยู่ สำหรับเครื่อง on-premise ที่ลูกค้าดูแลเอง ทั้งคู่คือ
           <b>ขั้นตอนบังคับตอนส่งมอบ</b> ไม่ใช่ของเสริม
         </p>
@@ -1375,32 +1424,103 @@ du -sh /root/.pm2/logs                      <span class="c"># เช็คขน
           </div>
         </div>
 
-        <h3 class="font-semibold text-[16px] mt-10 mb-3">log มี 2 ระบบ แยกกันคนละทาง — อย่าสับสน</h3>
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">docker log cap — กัน container กิน disk จนทั้งเครื่องล่ม</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">json-file</span> ซึ่งเป็น log driver default ของ docker
+            <b>เก็บทุก byte ที่ container เขียนไว้ตลอดไป ไม่ rotate เอง</b> ถ้าไม่สั่ง — และบนเครื่องนี้
+            container log, ระบบปฏิบัติการ และ <b>data ของ datastore เอง</b>
+            (<span class="mono text-[12px]">minio_data</span>, <span class="mono text-[12px]">erp_data</span>, ...) อยู่บน
+            filesystem เดียวกันหมด service ตัวใดเข้า error loop จึงลากทั้งเครื่องลงไปด้วยได้
+          </p>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เกิดขึ้นจริง 2026-08-14: disk เต็ม 100% → <span class="mono text-[12px]">rsyslogd</span> เขียน
+            <span class="mono text-[12px]">/var/log/syslog</span> ไม่ได้ ~5,200 ครั้ง ·
+            <span class="mono text-[12px]">dockerd</span> เขียน container log ไม่ได้ ·
+            MinIO รายงาน <span class="mono text-[12px]">drive path full</span> ตอน scanner เขียน
+            <span class="mono text-[12px]">.usage-cache.bin</span> · boot นั้นอยู่ได้ 35 นาทีแล้วเครื่องดับไป <b>5 วัน</b>
+            — MinIO เป็นเพียงเหยื่อรายหนึ่ง ไม่ใช่ต้นเหตุ
+          </p>
+        <div class="code p-5 mb-4">
+<pre><span class="c"># 1) ค่า default ของทั้ง host — ครอบ container ที่ไม่ได้ระบุ logging เอง</span>
+cat &gt; /etc/docker/daemon.json &lt;&lt;'EOF'
+{ <span class="s">"log-driver"</span>: <span class="s">"json-file"</span>, <span class="s">"log-opts"</span>: { <span class="s">"max-size"</span>: <span class="s">"50m"</span>, <span class="s">"max-file"</span>: <span class="s">"3"</span> } }
+EOF
+
+dockerd --validate --config-file /etc/docker/daemon.json   <span class="c"># ต้องได้ "configuration OK"</span>
+
+<span class="c"># 2) ตรวจว่าตัวไหนโตอยู่ตอนนี้ (เรียงจากใหญ่สุด)</span>
+du -ch /var/lib/docker/containers/*/*-json.log | sort -rh | head</pre>
+        </div>
+          <div class="edge mb-3">
+            <div class="tag mb-1">daemon.json ไม่มีผลย้อนหลัง และต้อง restart ไม่ใช่ reload</div>
+            <p class="text-[13px]">
+              <span class="mono text-[12px]">log-opts</span> <b>ไม่อยู่ในชุดที่ reload ด้วย SIGHUP ได้</b> — ต้อง
+              <span class="mono text-[12px]">systemctl restart docker</span> เต็ม ๆ และถ้า
+              <span class="mono text-[12px]">live-restore</span> ยังเป็น <span class="mono text-[12px]">false</span> (ค่า default)
+              การ restart จะ<b>ดับ container ทุกตัว</b> รวม Kong ที่เป็นทางเข้าของทั้งระบบ ·
+              ที่สำคัญกว่านั้น: ค่านี้มีผลกับ container ที่ <b>สร้างใหม่</b> เท่านั้น ตัวที่รันอยู่แล้วยังไม่มีเพดานจนกว่าจะถูก recreate
+              → ในทางปฏิบัติ <span class="mono text-[12px]">docker compose up -d</span> ด้วย compose ที่มี
+              <span class="mono text-[12px]">logging:</span> ให้ผลเหมือนกันโดย<b>ไม่ต้อง restart dockerd เลย</b>
+            </p>
+          </div>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ระบุใน compose ของทุก stack ด้วย (YAML anchor ทำให้เขียนครั้งเดียว) — เพดานนี้จะติดไปกับ stack
+            แม้ย้ายไป host ที่ไม่มี <span class="mono text-[12px]">daemon.json</span> ตัวนี้:
+          </p>
+        <div class="code p-5 mb-4">
+<pre><span class="c"># infrastructure/{infra-erp,kong,observability}/docker-compose.yml</span>
+<span class="d">x-logging:</span> <span class="t">&amp;default-logging</span>
+  <span class="d">driver:</span> json-file
+  <span class="d">options:</span>
+    <span class="d">max-size:</span> <span class="s">"50m"</span>
+    <span class="d">max-file:</span> <span class="s">"3"</span>
+
+<span class="d">services:</span>
+  <span class="d">kong:</span>
+    <span class="d">image:</span> kong:3.7
+    <span class="d">logging:</span> <span class="t">*default-logging</span></pre>
+        </div>
+          <div class="rulebox"><div class="rc mb-1">ตัวที่ต้องจับตาที่สุด</div><p class="text-[13.5px]"><b><span class="mono text-[12px]">kong</span></b> — <span class="mono text-[12px]">KONG_PROXY_ACCESS_LOG: /dev/stdout</span> ส่ง log 1 บรรทัดต่อ 1 request ที่ proxy ผ่าน ทำให้ log โต<b>ตาม traffic</b> ไม่ใช่ตาม incident เหมือนตัวอื่น · รองลงมาคือ <span class="mono text-[12px]">tempo</span> กับ <span class="mono text-[12px]">loki</span> (วัดได้ 109 MB และ 88 MB ใน 9 วัน โดยไม่มีอะไรหยุด) · เพดาน 50m × 3 = 150 MB ต่อ service ทำให้ worst case ทั้ง stack คำนวณได้ แทนที่จะไม่มีขอบเขต</p></div>
+        </div>
+
+        <h3 class="font-semibold text-[16px] mt-10 mb-3">log มี 3 ระบบ แยกกันคนละทาง — อย่าสับสน</h3>
         <p class="text-sm mb-5" style="color:var(--ink-soft)">
-          เครื่องนี้มี log 2 สายที่<b>ไม่เกี่ยวกันเลย</b> คนละไฟล์ คนละกลไก rotate คนละปลายทาง —
+          เครื่องนี้มี log 3 สายที่<b>ไม่เกี่ยวกันเลย</b> คนละไฟล์ คนละกลไก rotate คนละปลายทาง —
           การตั้ง <span class="mono text-[12px]">pm2-logrotate</span> จึง<b>ไม่</b>กระทบ pipeline ที่ส่งเข้า Loki
           (Alloy tail คนละ path กัน) และในทางกลับกัน log ที่เห็นใน Grafana ก็<b>ไม่ใช่</b>ทุกอย่างที่ process พ่นออกมา
+        </p>
+        <p class="text-sm mb-5" style="color:var(--ink-soft)">
+          สายที่ 3 คือ <b>container log ของ docker</b> ซึ่งมาจากคนละแหล่งกับสองสายแรกทั้งหมด: สองสายแรกมาจาก
+          NestJS BC ที่รันด้วย pm2 <b>บน host ตรง ๆ</b> ส่วนสายนี้มาจาก datastore/gateway ที่รันใน container
+          (Kong, Postgres, MinIO, Tempo, Loki, ...) — <span class="mono text-[12px]">pm2-logrotate</span> ไม่แตะมันเลย
+          และมันคือสายที่ทำให้เครื่องล่มเมื่อ 2026-08-14 ตามข้อ 3 ข้างบน
         </p>
         <div class="diagram">
 <pre class="mermaid">
 flowchart LR
-  A["NestJS BC process"]
+  A["NestJS BC process<br/>(pm2, บน host)"]
   A -->|"stdout / stderr"| B["/root/.pm2/logs/*.log"]
   A -->|"pino-roll transport"| C["/var/log/erp-api/*/http/*.log"]
   B --> D["pm2-logrotate<br/>rotate + gzip"]
   C --> E["Grafana Alloy<br/>tail glob"]
   E --> F[("Loki")]
+  G["docker container<br/>(kong, minio, tempo, ...)"]
+  G -->|"stdout / stderr"| H["/var/lib/docker/containers/<br/>*/*-json.log"]
+  H --> I["json-file driver<br/>max-size + max-file"]
 </pre>
         </div>
         <div class="overflow-x-auto mt-6">
           <table class="d">
-            <thead><tr><th></th><th>pm2 logs</th><th>HTTP access log</th></tr></thead>
+            <thead><tr><th></th><th>pm2 logs</th><th>HTTP access log</th><th>docker container logs</th></tr></thead>
             <tbody>
-              <tr><td>ที่อยู่</td><td><span class="mono text-[12px]">/root/.pm2/logs/</span></td><td><span class="mono text-[12px]">/var/log/erp-api/*/http/</span></td></tr>
-              <tr><td>เนื้อหา</td><td>stdout/stderr ดิบ · stack trace · crash</td><td>structured JSON ต่อ request (pino)</td></tr>
-              <tr><td>rotate ด้วย</td><td><span class="mono text-[12px]">pm2-logrotate</span></td><td><span class="mono text-[12px]">pino-roll</span> (ในแอปเอง)</td></tr>
-              <tr><td>เข้า Loki?</td><td><b>ไม่</b> — ดูได้เฉพาะบนเครื่อง</td><td>ใช่ ผ่าน Alloy</td></tr>
-              <tr><td>ใช้ตอน</td><td>process ตาย/ไม่ start — <span class="mono text-[12px]">pm2 logs &lt;name&gt; --err</span></td><td>ตาม request/trace — Grafana + <span class="mono text-[12px]">trace_id</span></td></tr>
+              <tr><td>ที่อยู่</td><td><span class="mono text-[12px]">/root/.pm2/logs/</span></td><td><span class="mono text-[12px]">/var/log/erp-api/*/http/</span></td><td><span class="mono text-[12px]">/var/lib/docker/containers/*/</span></td></tr>
+              <tr><td>มาจาก</td><td>NestJS BC (pm2, บน host)</td><td>NestJS BC (pm2, บน host)</td><td>Kong · Postgres · MinIO · RabbitMQ · Tempo/Loki/Grafana</td></tr>
+              <tr><td>เนื้อหา</td><td>stdout/stderr ดิบ · stack trace · crash</td><td>structured JSON ต่อ request (pino)</td><td>stdout/stderr ของ container (รวม Kong access log ทุก request)</td></tr>
+              <tr><td>rotate ด้วย</td><td><span class="mono text-[12px]">pm2-logrotate</span></td><td><span class="mono text-[12px]">pino-roll</span> (ในแอปเอง)</td><td><span class="mono text-[12px]">json-file</span> driver — <b>ต้องตั้งเอง</b> (§10 ข้อ 3)</td></tr>
+              <tr><td>เข้า Loki?</td><td><b>ไม่</b> — ดูได้เฉพาะบนเครื่อง</td><td>ใช่ ผ่าน Alloy</td><td><b>ไม่</b> — <span class="mono text-[12px]">docker logs &lt;name&gt;</span></td></tr>
+              <tr><td>ใช้ตอน</td><td>process ตาย/ไม่ start — <span class="mono text-[12px]">pm2 logs &lt;name&gt; --err</span></td><td>ตาม request/trace — Grafana + <span class="mono text-[12px]">trace_id</span></td><td>datastore/gateway ผิดปกติ — เช่น MinIO <span class="mono text-[12px]">drive path full</span></td></tr>
             </tbody>
           </table>
         </div>
