@@ -94,6 +94,45 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-07 · Fiscal Year Closing / ยอดยกมา (D2) ✅ **backend + Admin UI + smoke — implement ครบ**
+
+Backlog D2 จากแผน chart-of-accounts (`HANDOFF-Configurable-Chart-Of-Accounts.md` §9/§11) — เต็มแผนอยู่ที่
+`HANDOFF-Fiscal-Year-Closing.md`. สรุปสั้น:
+
+**Backend** (`apps/finance-bc/src/modules/fiscal-year-close/`, โมดูลใหม่คัดลอกโครง `fx-revaluation/`) —
+`finance_settings.fiscal_year_start_month` (1-12, default 1) + `resolveFiscalYear()`/`fiscalYearBounds()`
+ใหม่ใน `@lib/common/utils/fiscal-year.util.ts` · `POST /fiscal-year-closes` ปิดปีบัญชีถาวร (guard 3 ชั้น:
+ปิดซ้ำไม่ได้, ต้องเรียงลำดับ, ต้องปิดงวดรายเดือนครบทั้งปีก่อน) โพสต์ direct-method closing entry ล้าง
+REVENUE/EXPENSE เข้า role ใหม่ `RetainedEarnings` (บัญชีที่ 15, ผูกกับ `3200-00` ที่ seed ไว้แล้ว) · snapshot
+ถาวร `gl_account_year_end_balances` (opening/period_activity/closing_balance แบบ raw debit-credit
+เหมือน `TrialBalancesService.build()`) · `GET /gl-account-year-end-balances` คือ endpoint "ยอดยกมา"
+ที่ตอบโจทย์ `balances[]` ของระบบอ้างอิงที่เทียบไว้ตอนเริ่มทำ chart-of-accounts
+
+**เจอบั๊กจริงระหว่างทำที่ unit test (mock) จับไม่ได้แต่ smoke (DB จริง) จับได้**: `Repository.findOne({
+order: {...} })` ที่ไม่มี `where` เลย — TypeORM เวอร์ชันปัจจุบัน throw `"You must provide selection
+conditions"` แทนที่จะคืนแถวแรกตาม order เฉยๆ (ต่างจากพฤติกรรมเก่าที่คุ้นเคย) ต้องใส่ `where: {}` เสมอ
+(ตรงกับที่ `FinanceSettingsService.getOrCreate()` ทำอยู่แล้วโดยบังเอิญ) — แก้แล้ว เพิ่มคอมเมนต์เตือนไว้
+
+**Admin UI** (`apps/iam`) — หน้าเดียว `views/fiscal-year-closes` (list + ปุ่ม "ปิดปีบัญชี" เปิด dialog
+ยืนยัน ไม่มีฟอร์มสร้าง/แก้เลยเพราะเป็น action ทางเดียว) ปุ่ม "ดูยอดยกมาต่อบัญชี" ลิงก์ตรงไป raw API
+response (ไม่ได้ทำหน้าตารางแยกให้ `gl_account_year_end_balances` เต็มรูปตามที่แผนเสนอไว้ — ลดขอบเขต
+เพื่อความเร็ว ถ้าต้องการหน้าเต็มทีหลังค่อยทำเพิ่ม)
+
+**Smoke** (`apps/finance-bc/test/smoke/fiscal-year-close.smoke.mjs`) — **ไม่ปิดปีบัญชีจริง**: การปิดปีบัญชี
+ไม่มี reverse เลย (ต่างจาก gl-accounts/payment ที่ cancel คืนได้) ปิดปีจริงบน DB ที่ใช้ร่วมกันจะกินเลข
+ปีถาวรและบังคับให้ปีถัดไปต้องปิดตามลำดับตลอดไป — ทดสอบด้วยการยิง `POST /fiscal-year-closes` กับปีปัจจุบัน
+(ที่ยังไม่ปิดงวดครบแน่ๆ) แล้วเช็คว่าถูกปฏิเสธ 400 ถูกต้อง (พิสูจน์ guard/permission/route จริงโดยไม่ทำ
+irreversible action) · ระหว่างทางเจอ **CASH role ค้างอยู่ที่บัญชีผิด** (`1111-02` แทนที่จะเป็น `1111-01`)
+จาก run ก่อนหน้าที่ crash กลางคันเพราะ auth service ไม่เสถียรในเครื่อง — แก้กลับด้วย SQL ตรงแล้ว ยืนยันว่า
+`1111-01` (`is_locked=true`) ถือ CASH role ถูกต้องแล้ว
+
+**Permission 2-plane** — ทำถูกตั้งแต่ต้นรอบนี้ (เรียนจากบั๊ก gl-accounts): `permissions:sync` ก่อน แล้วค่อย
+`GrantFiscalYearClosePermissionsToMockPolicies` (api-plane 3 ตัว) · ui-plane 2 ตัว
+(`page:view_fiscal_year_closes`/`component:close_fiscal_year`) ใช้ `SeedFiscalYearClosesUiPermission`
+self-upsert pattern ปลอดภัยไม่ว่าจะรันก่อน/หลัง sync
+
+---
+
 ### 2026-09-06 · Configurable Chart of Accounts (`gl_accounts`) ✅ **backend + Admin UI + permission fix — ยังมี 2 จุดค้าง**
 
 รายละเอียดเต็ม/decision log: `HANDOFF-Configurable-Chart-Of-Accounts.md`. สรุปสั้น:
