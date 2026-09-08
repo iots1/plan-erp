@@ -1,7 +1,8 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-08 (audit doc drift — เอกสาร 3 ไฟล์เคยขัดกับโค้ดจริง แก้ให้ตรงแล้ว, ดู §0 แถว "doc drift" + §1 ท้ายหัวข้อ)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-09 (print pipeline P3 — ใบกำกับภาษีเต็มรูป + ใบเสนอราคาพิมพ์ออกมาเป็นเอกสารจริงได้แล้ว · เจอบั๊กจริง 3 ตัวระหว่างทาง · ดู §2 หัวข้อ 2026-09-09)**
+> ก่อนหน้า 2026-09-08: audit doc drift — เอกสาร 3 ไฟล์เคยขัดกับโค้ดจริง แก้ให้ตรงแล้ว (ดู §0 แถว "doc drift" + §1)
 > ก่อนหน้าในวันเดียวกัน (2026-09-08): `tax_configs` version อัตราภาษีได้แล้ว (constraint + supersede endpoint + Admin UI) · smoke runner รับ `needs:` · smoke ตัวแรกของ iam — ดู §2 หัวข้อ **2026-09-08**
 > ก่อนหน้า 2026-09-07: Fiscal Year Closing / ยอดยกมา D2 — backend + Admin UI + smoke (§2) · storage — presigned URL เซ็นด้วย public origin, error taxonomy ของ S3 · docker log retention + PGDATA ของ postgres:18 · Discord notification ตอน deploy สำเร็จ (งาน infra ไม่มีหัวข้อใน §2 — ดู §1 "รอบ 2026-09-07")
 > ก่อนหน้า 2026-09-06: Configurable Chart of Accounts + Admin UI (**ยังมี 2 จุดค้าง** — §2) · **document print pipeline P0→P2 — พิมพ์เอกสารครบวงจรได้จริงแล้ว 2 ใบ** (สถานะอยู่ที่ `HANDOFF-Document-Print-Pipeline.md` §7/§7.2 ไม่ได้ทำสำเนาไว้ใน §2)
@@ -15,6 +16,7 @@
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
+> ✅ **2026-09-09 print pipeline P3 — พิมพ์เอกสารจริงได้ 2 ใบแล้ว** (`receipt_full_tax_invoice`, `quotation_standard` เป็น `banded` v3 บนโปรดักชัน) · mapper เลิกส่ง `items_text` เปลี่ยนเป็น `items[]` ที่ format มาแล้วทั้งหมด + `toThaiBahtText()`/`formatAmount()`/`formatQuantity()` ใน `@lib/common` · **เจอบั๊กจริง 3 ตัวที่ unit test จับไม่ได้เลย**: paginator หา `tbody` แบบไม่ scope (แถวสินค้าไปโผล่ในหัวเอกสาร หน้าเละแต่ไม่ error), `quotations-print.smoke.mjs` ไม่ได้ประกาศ `needs` (503 อ่านเหมือน sales-bc พัง), `mergeParams()` ให้ผู้เรียก override ตัวตนผู้ออกเอกสาร/ลายน้ำ DRAFT ได้ · **ค้าง (ไม่ใช่บั๊ก)**: `company_profiles` ยังว่างทุกช่อง เอกสารจึงพิมพ์โดยไม่มีผู้ออก — §86/4(1)–(2) บังคับ ต้องกรอกก่อนใช้จริง — ดู §2 หัวข้อ **2026-09-09**
 > ✅ **2026-09-08 audit doc drift — เอกสารตรงกับโค้ดแล้ว 3 ไฟล์** · `HANDOFF-Document-Print-Pipeline.md` §7 ค้างที่ "P2 ⬜ ถัดไป" อยู่ 2 วันหลัง P2 ขึ้นโปรดักชัน (commit `d8b472b`) เพราะ doc-bump `10ab25d` แก้แต่ `api-workflow-guide.html` · `srs-p3.html` §"ยังไม่ได้ทำ · รอบถัดไป" ยังบอกว่า outbox/`stock.deducted`/`lot.created` ไม่ถูก emit จริง ทั้งที่ §07 ของหน้าเดียวกันเขียนไว้แล้วตั้งแต่ 2026-08 ว่ามีจริง และ Purchase Return ก็ทำแล้วใน P4 M4 · `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 ยังพาดหัวว่า "พิมพ์เอกสารจริงไม่ได้เลยสักใบ" — **บทเรียน: doc-bump ที่ตามหลังโค้ดคนละคอมมิตคือจุดที่ drift เกิด · เฟส/งานที่ปิด ให้แก้ตารางสถานะในคอมมิตเดียวกับโค้ด**
 > ✅ **2026-09-06 document print pipeline P0+P1+P2 — deploy แล้วทั้งสามเฟส** (`company_profiles`/`company_branches` · `document_prints` + `report.printDocument` RPC · `POST /quotations/:id/print` + `POST /receipts/:id/print`) — พิมพ์ครบวงจรจริง (RMQ → Gotenberg → storage → แถว `document_prints`) มี smoke คุมทั้งสองใบ · **ถัดไป P3** (HTML จริงแทน draft placeholder + เอนจิน `banded`) — เจ้าของสถานะคือ `HANDOFF-Document-Print-Pipeline.md` §7
 > ✅ **2026-09-05 P6 — ครบ 4/4 read model + deploy แล้ว** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary`) — implement + migrate + commit + push + deploy ผ่านหมด, 1606/1606 test ผ่าน, eslint 0/0 · พบ+แก้บั๊กจริง 2 จุดระหว่างทาง (ดูรายละเอียด §2): `expiry_alerts` bind ผิด transport มาตั้งแต่เช้า (event จริงหายเข้า DLQ เงียบ ๆ) และ `processed_events` claim ชนกันเมื่อมี 2 consumer ต่อ 1 event · **`sales_summary` ยิง E2E บน production ด้วยเอกสารจริงผ่านแล้ว** (ยอดสะสมทับกันถูกต้อง) · `low_stock`/`expiry_alerts` รอ cron กลางคืนยืนยัน (ไม่มี endpoint กดรันเอง) — ดู §2 หัวข้อ **P6 · low_stock + sales_summary**
@@ -43,7 +45,8 @@
 | บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 (commit+deploy แล้ว) |
 | dotenv tip / P3 #9 credit_limit — ทำไปถึงไหน | commit แล้วทั้งคู่ (`18f6acf`/`21b6bd4`) — ดู §2 หัวข้อ **P3 #9** |
 | P4 #12 unrealised FX (TFRS 21) — ทำไปถึงไหน | §2 หัวข้อ **P4 #12** (เสร็จหมด + deploy + E2E บน production แล้ว 2026-09-03) |
-| **พิมพ์เอกสาร** — ทำไปถึงไหน / เฟสถัดไปคืออะไร | `HANDOFF-Document-Print-Pipeline.md` §7 (P0+P1+P2 deploy แล้ว · §7.2 = ผลตรวจสอบ P2 · **P3 ถัดไป**) — ไฟล์นั้นเป็นเจ้าของสถานะ ไม่ใช่ที่นี่ |
+| **พิมพ์เอกสาร** — ทำไปถึงไหน / เฟสถัดไปคืออะไร | `HANDOFF-Document-Print-Pipeline.md` §7 (P0–P3 เสร็จแล้ว · §7.3 = ผลตรวจสอบ P3 · **P4 ถัดไป** = อีก 23 ใบ) — ไฟล์นั้นเป็นเจ้าของสถานะ ไม่ใช่ที่นี่ |
+| ทำไมพิมพ์ออกมาแล้วไม่มีชื่อบริษัทผู้ขาย | `company_profiles` ยังว่างทุกช่อง — กรอกผ่าน `PATCH /finance-bc/v1/company-profiles/:id` (ดู §2 หัวข้อ **2026-09-09** และ print pipeline §7.3) |
 | ผังบัญชีที่ตั้งค่าได้ (`gl_accounts`) — เหลืออะไร | §2 หัวข้อ **2026-09-06 · Configurable Chart of Accounts** (**ค้าง 2 จุด**: smoke §8.3 ข้อ 6 ที่ยังไม่ตัดสินใจ + manual QA UI ที่ยังไม่มีใคร click-through) |
 | ปิดปีบัญชี / ยอดยกมา (D2) — ทำไปถึงไหน | §2 หัวข้อ **2026-09-07 · Fiscal Year Closing / ยอดยกมา (D2)** (backend + Admin UI + smoke ครบ) · งานต่อยอดที่ยังไม่ทำอยู่ใน `HANDOFF-Fiscal-Year-Closing.md` §9 (งบการเงิน D3, manual journal entry, import/export ผังบัญชี D4) |
 | `tax_configs` version อัตราภาษี — ทำไปถึงไหน | §2 หัวข้อ **2026-09-08 · `tax_configs`** (constraint + supersede + Admin UI + smoke ครบ) |
@@ -56,7 +59,7 @@
 | จะทำ audit หาช่องโหว่รอบใหม่ | §5 |
 
 **ที่แนะนำถ้าจะทำต่อเลย** (ปรับใหม่ 2026-09-08 · ไม่มีข้อไหนบล็อกอีกข้อ):
-1. **print pipeline P3** (1–2 วัน) — HTML จริงของใบกำกับเต็มรูป + ใบเสนอราคา แทน draft placeholder, ย้าย `simple` → `banded` (ตอนนี้รายการสินค้ายัดเป็นข้อความก้อนเดียวใน `items_text`), ลายน้ำ DRAFT · ปลดล็อกทั้ง §5 WHT, ฟอร์ม ภ.พ.30 และอีก 23 ใบที่รออยู่หลังมัน
+1. **กรอก `company_profiles`** (5 นาที, ต้องใช้ข้อมูลจริงของบริษัท) — จนกว่าจะกรอก เอกสารทุกใบที่พิมพ์ออกมาไม่มีชื่อ/เลขผู้เสียภาษี/ที่อยู่ผู้ขาย ซึ่ง §86/4(1)–(2) บังคับ · ~~print pipeline P3~~ ✅ เสร็จแล้ว 2026-09-09 → **P4** (ขยายอีก 23 ใบ, ~0.5 วัน/ใบ) ใช้ 2 ใบที่ทำแล้วเป็นแม่แบบ
 2. **ปิด 2 จุดค้างของ `gl_accounts`** — smoke §8.3 ข้อ 6 ถูกลงเยอะแล้วหลัง smoke runner รับ `needs:` (2026-09-08) · manual QA UI ทำได้เลยใน session ที่มี browser tool
 3. **ยืนยันผล cron `low_stock`/`expiry_alerts`** — ค้างมาตั้งแต่คืน 2026-09-05 ยังไม่มีใครกลับไปดู (query ตารางอ่านเอาก็พอ ไม่มี endpoint กดรัน)
 4. ถ้าจะเริ่ม **§5 หนังสือรับรองหัก ณ ที่จ่าย** — บล็อกเกอร์ยังจริง: `ap_invoices` ไม่มี `supplier_tax_id` snapshot (ยืนยันกับโค้ดแล้ว 2026-09-08) ต้องเพิ่มคอลัมน์ + migration ก่อน · ส่วน "ข้อมูลบริษัทผู้ออก" ปิดไปแล้วด้วย `company_profiles` จาก print P0
@@ -162,6 +165,37 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### 2026-09-09 · print pipeline P3 — เทมเพลตจริง 2 ใบ ✅ **เสร็จ + อัปโหลดขึ้นโปรดักชันแล้ว (v3)**
+
+รายละเอียดเต็ม: `HANDOFF-Document-Print-Pipeline.md` §7.3 · สรุปสั้น:
+
+**ส่งมอบ** — `receipt_full_tax_invoice` (ใบกำกับภาษีเต็มรูป/ใบเสร็จรับเงิน) และ `quotation_standard`
+(ใบเสนอราคา) เป็นเทมเพลต `banded` จริง: ตารางรายการมีเส้นครบพร้อม filler เต็มกล่อง, หัวเอกสาร/หัว
+คอลัมน์ซ้ำทุกหน้า, "มีต่อหน้า N", สรุปยอดแยก VAT (§86/4(6)), จำนวนเงินเป็นตัวอักษร, ช่องเซ็น, ลายน้ำ
+DRAFT · ต้นฉบับ HTML เก็บใน repo ที่ `apps/report-bc/.../assets/templates/` (แหล่งความจริงยังเป็นแถวใน
+`print_templates` — ไฟล์มีไว้ review + apply ซ้ำกับ deployment ใหม่)
+
+**บั๊กจริง 3 ตัวที่เจอ** (ทุกตัวมองไม่เห็นจาก unit test — ต้องพิมพ์จริงถึงเจอ):
+1. paginator หา `tbody`/`thead` แบบไม่ scope → แถวสินค้าไปโผล่ในตารางของหัวเอกสาร **หน้าเละแต่ไม่ error**
+2. `quotations-print.smoke.mjs` ไม่ได้ประกาศ `needs` → 503 ที่อ่านเหมือน sales-bc พัง (กับดักตาม `CLAUDE.md`)
+3. `mergeParams()` ให้ BC ผู้เรียก override `company_*` และ `draft_watermark_text` ได้ → ปลอมตัวตนผู้ออก
+   เอกสาร/พิมพ์ร่างแบบไม่มีลายน้ำได้ · สลับให้คีย์ของเซิร์ฟเวอร์ชนะเสมอ
+
+**เพิ่ม schema** — `customer_address` ทั้ง `receipts` และ `quotations` (§86/4(3) บังคับให้ใบกำกับภาษี
+แสดงที่อยู่ผู้ซื้อ แต่ไม่เคย snapshot มาก่อน) + `address` ใน `ICustomerLookupResult` · migration รันบน
+DB จริงแล้วทั้ง 2 BC (nullable ไม่ backfill — เอกสารเก่าไม่มีค่านี้จริง)
+
+**🔴 ค้างจริง (ไม่ใช่โค้ด)** — `company_profiles` ของ deployment นี้**ว่างทุกช่อง** (P0 จงใจ seed แถว
+เปล่าแทนที่จะเดาค่า) เอกสารทุกใบจึงพิมพ์โดยไม่มีชื่อ/เลขผู้เสียภาษี/ที่อยู่ผู้ขาย · smoke เตือนทุกครั้ง
+แต่ไม่ทำให้ verify แดง เพราะเป็นข้อมูลของ deployment ไม่ใช่ความถูกต้องของโค้ด · **ต้องกรอกก่อนเอา
+เอกสารไปให้ลูกค้า**
+
+**ยืนยัน** — `pnpm verify finance-bc`/`sales-bc`/`report-bc` เขียวครบ · smoke ยิงพิมพ์จริงผ่าน
+RMQ → Gotenberg → storage แล้วเช็คกลับว่าเป็น `banded` v3, snapshot มี `items[]`, ลายน้ำตรงสถานะ,
+PDF จริง ~70KB · render ด้วย Chrome ในเครื่องแล้วดูหน้ากระดาษจริง (34 บรรทัด → 3 หน้า)
+
+---
 
 ### 2026-09-08 · `tax_configs` เคย version อัตราภาษีไม่ได้เลย ✅ **แก้ constraint + supersede endpoint + Admin UI + smoke — ครบ**
 

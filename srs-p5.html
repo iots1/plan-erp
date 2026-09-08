@@ -164,6 +164,7 @@ erDiagram
         string customer_name_th "snapshot 86/4(2)"
         string customer_name_en "snapshot"
         string customer_tax_id "snapshot · required only for FULL_TAX_INVOICE/INV_TAX_INVOICE"
+        string customer_address "snapshot 86/4(3) · null for documents raised before the column existed"
         uuid delivery_note_id "ref sales-bc · claimed link is verified — see RULE AR DELIVERY MATCH"
         timestamptz document_date "selects the tax rate · Asia/Bangkok"
         timestamptz due_date "document_date + customers.credit_terms · null = no terms"

@@ -11,7 +11,14 @@
 > **อ่านคู่กับ**: `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 (สถานะ as-is ของ print engine, ตรวจไว้
 > 2026-09-04 — ยังถูกต้องทุกข้อ) · `srs-p6.html` §06 · `backend-convention.html`
 >
-> **สถานะ 2026-09-08: P0 ✅ + P1 ✅ + P2 ✅ deploy แล้วทั้งสามเฟส (ดู §7)** —
+> **สถานะ 2026-09-09: P0 ✅ + P1 ✅ + P2 ✅ + P3 ✅ (ดู §7)** — พิมพ์ **ใบกำกับภาษีเต็มรูป** และ
+> **ใบเสนอราคา** ออกมาเป็นเอกสารจริงหน้าตาใช้งานได้แล้ว (banded, ตารางรายการมีเส้น + filler,
+> ยอดรวมแยก VAT, จำนวนเงินเป็นตัวอักษร, ลายน้ำ DRAFT, เลขหน้า/มีต่อหน้า) — ถัดไปคือ **P4**
+> (ขยายอีก 23 ใบ) · ⚠️ **ตัวบล็อกที่เหลือไม่ใช่โค้ด**: `company_profiles` ของ deployment นี้ยังว่าง
+> ทุกช่อง เอกสารทุกใบจึงพิมพ์โดยไม่มีชื่อ/เลขผู้เสียภาษี/ที่อยู่ผู้ขาย ซึ่ง §86/4(1)–(2) บังคับ —
+> ต้องกรอกก่อนเอาไปใช้จริง (ดู §7.3)
+>
+> *(สถานะเดิม 2026-09-08: P0+P1+P2)* —
 > `company_profiles`/`company_branches` (P0), `document_prints` + `report.printDocument` RPC (P1)
 > และ `POST /quotations/:id/print` + `POST /receipts/:id/print` (P2 · commit `d8b472b`) ใช้งานได้จริง
 > บนโปรดักชันแล้ว **พิมพ์เอกสารครบวงจรได้แล้ว 2 ใบ** — ถัดไปคือ **P3** (HTML จริงของ 2 ใบนั้นแทน
@@ -291,8 +298,8 @@ export class CompanyBranch extends BaseEntity {
 | **P0** | `company_profiles` + `company_branches` ใน **finance-bc** (entity + migration + CRUD + สิทธิ์ + seed สำนักงานใหญ่ `00000`) | 0.5–1 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** |
 | **P1** | `document_prints` + `report.printDocument` RPC + resolve เทมเพลตผ่าน `document_types` (เพิ่ม `findByCode()`) + `copy_number` (0 สำหรับ DRAFT, `SELECT...FOR UPDATE` กันชนกัน) + snapshot `params` + ดึง/cache company profile ผ่าน RPC ใหม่ `finance.getCompanyProfile` + ธง `is_draft` + `idempotency_key` + `GET /document-prints` | 1.5–2 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** — ดู §7.1 |
 | **P2** | endpoint `POST /:id/print` + mapper ของ **ใบกำกับภาษีเต็มรูป** (finance-bc) และ **ใบเสนอราคา** (sales-bc) | 1–1.5 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** (commit `d8b472b`) — ดู §7.2 |
-| **P3** | HTML จริงของ 2 ใบนั้น (แทน draft placeholder) + layout ร่วมที่มีลายน้ำ DRAFT — ใช้เอนจิน `banded` สำหรับรายการยาวข้ามหน้า | 1–2 วัน | ⬜ **ถัดไป** |
-| **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | ⬜ |
+| **P3** | HTML จริงของ 2 ใบนั้น (แทน draft placeholder) + layout ร่วมที่มีลายน้ำ DRAFT — ใช้เอนจิน `banded` สำหรับรายการยาวข้ามหน้า | 1–2 วัน | ✅ **เสร็จ 2026-09-09** (เทมเพลตอยู่ที่ v3 บนโปรดักชัน) — ดู §7.3 |
+| **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | ⬜ **ถัดไป** — ก็อป 2 ใบที่ทำแล้วเป็นแม่แบบได้เลย |
 | **P5** | ใบแทน/สำเนา ตามข้อสรุป §6.2 + ฟอร์ม ภ.พ.30 (`HANDOFF-Backlog-Reporting-Print-Tax.md` §4.4 ข้อ 4) | 1–2 วัน | ⬜ รอคำตอบฝ่ายบัญชี |
 
 **ทำ P0→P3 ก่อนแล้วหยุดรีวิว** — จะได้เห็นของจริง 2 ใบพิมพ์ออกมาได้ก่อนลงทุนทำอีก 23 ใบ
@@ -363,6 +370,63 @@ Gotenberg render จริง → อัปโหลดผ่าน storage จ�
 พิสูจน์ pipeline จะกลายเป็นพิสูจน์ว่าไม่มีอะไรทำงาน · ทั้งสองไฟล์ใช้เอกสารที่มีอยู่แล้วในคลัสเตอร์
 (ไม่สร้างใหม่) เพราะการพิมพ์ไม่แก้เอกสาร — สถานะที่หยิบได้ (DRAFT หรือ ISSUED) พา `claimCopyNumber()`
 ไปคนละกิ่ง และ assert ไว้ทั้งสองกิ่ง
+
+### 7.3 ผลตรวจสอบ P3 — 2026-09-09 ✅ **เทมเพลตจริง 2 ใบ ใช้งานได้บนโปรดักชัน**
+
+**สิ่งที่ส่งมอบ**: `receipt_full_tax_invoice` + `quotation_standard` เป็น `template_engine: 'banded'`
+เวอร์ชัน 3 (v1 = P0 placeholder, ยัง restore ได้จาก version history) · ต้นฉบับที่เขียนไว้อยู่ใน repo ที่
+`apps/report-bc/src/modules/print-template/assets/templates/` พร้อม `_README.md` ที่บอกว่า **แหล่งความ
+จริงคือแถวใน `print_templates`** ไม่ใช่ไฟล์ — ไฟล์มีไว้ให้ review ใน PR และ apply ซ้ำกับ deployment ใหม่
+(อัปโหลดผ่าน `PUT /print-templates/:id` ซึ่งเขียนไฟล์ลง MinIO ให้เองอยู่แล้ว ไม่ต้องมีกลไก seed ใหม่)
+
+**mapper เปลี่ยนสัญญา**: `toPrintParams()` ทั้งสองฝั่งเลิกส่ง `items_text` (ข้อความก้อนเดียว) เปลี่ยนเป็น
+`items[]` ที่มีคีย์ `items` เป๊ะ ๆ เพราะ paginator วนจาก `D.items` โดยตรง · **ทุกค่าถูก format มาแล้วจาก
+ฝั่ง BC** เพราะ in-page renderer ไม่มี filter/locale/rounding เลย — เลขดิบจะพิมพ์ออกมาเป็น `1234.5`
+บนใบกำกับภาษี · เพิ่ม `formatAmount()` (ไม่มีรหัสสกุลนำหน้า สำหรับคอลัมน์เงิน), `formatQuantity()`,
+`formatDiscountLabel()` (พิมพ์ "10%" ไม่ใช่จำนวนเงินที่คำนวณได้แล้ว) และ `toThaiBahtText()` (บาทถ้วน/
+สตางค์ · กฎ สิบ/ยี่สิบ/เอ็ด ครบ, `เอ็ด` เป็นกฎภายในกลุ่มล้าน) ใน `@lib/common`
+
+**ลายน้ำ DRAFT เป็นสตริง ไม่ใช่ flag**: engine ไม่มี conditional เลย `{{#if}}` จึงทำไม่ได้ — report-bc
+เติม `draft_watermark_text` เป็นข้อความจริงเมื่อเอกสารยังไม่มีเลข และเป็น `''` เมื่อออกเลขแล้ว
+เทมเพลตพิมพ์มันทุกครั้งโดยไม่ต้องตัดสินใจอะไร
+
+**บั๊กจริง 3 ตัวที่เจอระหว่างทาง** (ไม่มีอันไหน unit test จับได้):
+
+1. **paginator หา `tbody`/`thead` แบบไม่ scope** — `page.querySelector('tbody')` เจอตารางใน
+   band `page-header` ก่อน (ที่นี่คือตารางเลขที่/วันที่เอกสาร) แถวสินค้าทุกแถวจึงถูกยัดเข้าไปใน
+   **หัวเอกสาร** และตารางรายการจริงเหลือแต่หัวคอลัมน์ลอยอยู่ท้ายหน้า — หน้าออกมาเละแต่ **ไม่ error**
+   ปัญหานี้แฝงมาตั้งแต่เขียน engine เพราะไม่เคยมีเทมเพลตจริงที่มีตารางในหัวกระดาษ · แก้เป็น
+   `page.querySelector('.rp-box thead' / '.rp-box tbody')` = engine แตะเฉพาะกล่องที่ตัวเองสร้าง
+2. **`quotations-print.smoke.mjs` ไม่ได้ประกาศ `needs`** — commit `3f796d6` เติมให้ receipts-print
+   กับ gl-accounts แต่ตกไฟล์นี้ · `pnpm verify sales-bc` จึงพิมพ์ใส่ report-bc ที่ไม่ได้สตาร์ท แล้วได้
+   503 ที่อ่านเหมือน sales-bc พัง ตรงกับกับดักที่ root `CLAUDE.md` เตือนไว้เป๊ะ · เพิ่ม
+   `needs: ['report-bc', 'storage', 'finance-bc']` — **finance-bc อยู่ในนั้นเพื่อ report-bc** ไม่ใช่
+   เพื่อ sales-bc: report-bc ไป RPC ขอ company profile จาก finance-bc และถ้า finance-bc ล่ม
+   **การพิมพ์ยังสำเร็จแต่ได้เอกสารที่ไม่มีตัวตนผู้ออก** — ผิดเงียบ ๆ ไม่ใช่ล้ม
+3. **`mergeParams()` ให้ผู้เรียก override ตัวตนผู้ออกเอกสารได้** — `...params` ถูก spread ทีหลัง
+   คีย์ `company_*`/`is_draft` ที่เซิร์ฟเวอร์เติม · BC ไหนก็ส่ง `company_tax_id` ของตัวเองมาทับได้ และ
+   ส่ง `draft_watermark_text: ''` เพื่อพิมพ์ร่างแบบไม่มีลายน้ำได้ · สลับลำดับให้คีย์ที่เซิร์ฟเวอร์เป็น
+   เจ้าของชนะเสมอ (ข้อมูลเอกสารของผู้เรียกยังเป็นของผู้เรียกทั้งหมด — สองชุดนี้ไม่ทับกันเลยในทุกเทมเพลต)
+
+**ช่องว่างที่ต้องเติมก่อนใช้จริง (ไม่ใช่บั๊ก)**:
+
+- 🔴 **`company_profiles` ว่างทุกช่อง** — `getOrCreate()` ของ P0 จงใจสร้างแถวเปล่าที่ผิดแบบเห็นชัด
+  แทนที่จะเดาค่า ตอนนี้ยังไม่มีใครกรอก · เอกสารทุกใบจึงพิมพ์โดยไม่มีชื่อ/เลขผู้เสียภาษี/ที่อยู่ผู้ขาย
+  ซึ่ง §86/4(1)–(2) บังคับ · smoke ทั้งสองไฟล์ log คำเตือนนี้ทุกครั้งจนกว่าจะกรอก (ไม่ทำให้ verify แดง
+  เพราะเป็นเรื่องข้อมูลของ deployment ไม่ใช่ความถูกต้องของโค้ด)
+- **`customer_address` ไม่เคยถูก snapshot** — §86/4(3) บังคับให้มีที่อยู่ผู้ซื้อบนใบกำกับภาษี แต่ทั้ง
+  `receipts` และ `quotations` เก็บแค่ชื่อ+เลขผู้เสียภาษี (docblock ของ `ICustomerLookupResult` อ้าง
+  §86/4(2) ไว้เองแต่ตกข้อ (3)) · เพิ่มคอลัมน์ `customer_address` ทั้งสองตาราง (nullable, ไม่ backfill —
+  เอกสารเก่าไม่มีค่านี้จริง ๆ), เติม `address` เข้า lookup contract, snapshot ตอน create และ
+  re-snapshot ตอน update เหมือน `customer_name_*` · migration รันบน DB จริงแล้วทั้ง `erp_sales`
+  และ `erp_finance`
+
+**ยืนยันด้วยการรันจริง**: `pnpm verify finance-bc` / `sales-bc` / `report-bc` เขียวครบทั้งสามตัว ·
+smoke ยิงพิมพ์จริงผ่าน RMQ → Gotenberg → storage แล้วอ่าน `document_prints` กลับมาเช็คว่าเป็น
+`banded` v3 จริง, snapshot มี `items[]` จริง, ลายน้ำตรงกับสถานะเอกสาร และดาวน์โหลด PDF จาก presigned
+URL มาเช็คว่าเป็น `%PDF-` ขนาด ~70KB · นอกจากนี้ยัง render เทมเพลตด้วย Chrome headless ในเครื่อง
+(ประกอบ `__RP_DATA__` แบบเดียวกับ `BandedRenderService`) แล้ว**ดูหน้ากระดาษจริง**: 34 บรรทัด → 3 หน้า,
+หัวเอกสาร/หัวคอลัมน์ซ้ำทุกหน้า, filler เต็มกล่อง, สรุปยอดอยู่หน้าสุดท้าย, ลายน้ำ DRAFT เอียงกลางหน้า
 
 ---
 
