@@ -20,13 +20,22 @@
 > ดู §3.4/§3.5) implement + migrate + deploy ผ่านหมด, `sales_summary` E2E บน production ผ่าน —
 > ที่เหลือ (§1, §3 FE 120 ชม., §3 low_stock/expiry_alerts รอ cron ยืนยัน, §5, §4.4
 > ข้อ 2–3) ยังเป็น backlog เหมือนเดิม
+>
+> **อัปเดต 2026-09-08 (audit doc drift)** — **§1 ไม่ใช่ backlog แล้ว**: print pipeline P0+P1+P2
+> ขึ้นโปรดักชันครบ (`company_profiles`, `document_prints` + `report.printDocument` RPC,
+> `POST /quotations/:id/print` + `POST /receipts/:id/print`) — **พิมพ์เอกสารครบวงจรได้จริงแล้ว 2 ใบ**
+> เหลือ P3–P5 ที่ติดตามใน `HANDOFF-Document-Print-Pipeline.md` §7 (เอกสารนั้นเป็นเจ้าของสถานะเรื่องนี้
+> แล้ว ไม่ใช่ §1 ที่นี่) · **§2 ต้นเหตุจริงปิดไปแล้วด้วย** — "ไม่มี consumer" หมดไปตอน §3 P6 ครบ 4/4
+> · ที่เหลือจริงในไฟล์นี้: **§3 FE (120 ชม.)** · **§4.4 ข้อ 2–4** · **§5 หนังสือหัก ณ ที่จ่าย**
+> (ยังติด `ap_invoices.supplier_tax_id` ที่ยังไม่มีในโค้ด — ยืนยันแล้ว 2026-09-08 · แต่ช่องว่าง
+> "ข้อมูลบริษัทผู้ออก" ปิดแล้วด้วย `company_profiles` จาก print P0)
 
 ## 0 · สรุปสั้น — ทำไมแยกเป็น backlog แทนที่จะทำเลย
 
 | หัวข้อ | สถานะ | ขนาดคร่าว ๆ |
 |---|---|---|
-| §1 พิมพ์เอกสารจริงไม่ได้เลยสักใบ | Backlog — ต้องตัดสินใจว่า BC ไหนเรียก report-bc ยังไง ไม่ใช่ correctness bug เดียว แต่เป็นงานสร้างฟีเจอร์ใหม่ | หลายวัน (ทั้งชุด) |
-| §2 report-bc consumer หาย (finding เกี่ยวเนื่อง) | ✅ **ข้อ 1 (dead-letter exchange) ทำแล้ว 2026-09-05** — ต้นเหตุจริง (ไม่มี consumer) ยังเป็น Backlog รวมอยู่ใน P6 | รวมอยู่ใน P6 (dead-letter exchange ปิดแล้ว ไม่รวม) |
+| §1 พิมพ์เอกสารจริงไม่ได้เลยสักใบ | ✅ **ปิดหัวข้อนี้แล้ว 2026-09-06** — พิมพ์ได้จริง 2 ใบ (print pipeline P0+P1+P2 deploy แล้ว) · P3–P5 ที่เหลือย้ายไปติดตามที่ `HANDOFF-Document-Print-Pipeline.md` §7 | เหลือ P3 ≈ 1–2 วัน, P4 ≈ 0.5 วัน/ใบ |
+| §2 report-bc consumer หาย (finding เกี่ยวเนื่อง) | ✅ **ปิดครบแล้ว** — ข้อ 1 (dead-letter exchange) 2026-09-05 · ต้นเหตุจริง (ไม่มี consumer) หมดไปตอน §3 P6 ครบ 4/4 (2026-09-05) | — |
 | §3 P6 ทั้งเฟส (CQRS Read Model) | ✅ **4/4 read model ทำแล้ว + deploy แล้ว 2026-09-05** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary` — consumer+ตาราง+API ครบ) · `sales_summary` E2E บน production ผ่าน · `low_stock`/`expiry_alerts` รอ cron กลางคืนยืนยัน · FE ยังไม่แตะ | เหลือ: FE 120 ชม. |
 | §4 ภ.พ.30 (VAT return report) | v1 implement แล้ว 2026-09-04 — **แยกใบกำกับเต็มรูป/อย่างย่อ (§4.4 ข้อ 1) ทำแล้ว 2026-09-05** — ที่เหลือ §4.4 ข้อ 2–3 | ที่เหลือ: 2–3 วัน (§4.5 ปรับแล้ว) |
 | §5 หนังสือรับรองหัก ณ ที่จ่าย | Backlog — เหมือน §1 (ต้องมี print path) + ยังขาดบาง snapshot field (`ap_invoices.supplier_tax_id`) ที่ต้องเพิ่มก่อน | 2–3 วัน (ประเมินใน §5.5) |
@@ -38,8 +47,13 @@
 
 ---
 
-## 1 · พิมพ์เอกสารจริงไม่ได้เลยสักใบ — print engine ต่อไม่ครบวงจร
+## 1 · ~~พิมพ์เอกสารจริงไม่ได้เลยสักใบ~~ — print engine ต่อครบวงจรแล้ว ✅ *(หัวข้อนี้เป็นบันทึกสถานะ as-is ของ 2026-09-04 เก็บไว้อ่านเป็นที่มา — สถานะปัจจุบันอยู่ที่ `HANDOFF-Document-Print-Pipeline.md` §7)*
 
+> **อัปเดต 2026-09-08** — P2 ขึ้นโปรดักชันแล้ว (commit `d8b472b`): `POST /quotations/:id/print` +
+> `POST /receipts/:id/print` เรียก `report.printDocument` จริงผ่าน RMQ → render → เก็บ
+> `document_prints` · **ประโยคหัวข้อ "ไม่ได้เลยสักใบ" ไม่จริงอีกแล้ว** เหลือ P3 (HTML จริงแทน draft
+> placeholder + เอนจิน `banded`), P4 (อีก 23 ใบ), P5 (สำเนา/ใบแทน รอฝ่ายบัญชี)
+>
 > **อัปเดต 2026-09-06 — มีเอกสารออกแบบแยกแล้ว: [`HANDOFF-Document-Print-Pipeline.md`](HANDOFF-Document-Print-Pipeline.md)**
 > ตอบ design decision ทั้ง 3 ข้อของ §1.3 ด้านล่างครบแล้ว (ใครเรียกใคร · ผูกเทมเพลตยังไง · snapshot พอไหม)
 > พร้อม schema `document_prints` (ประวัติการพิมพ์ — ของที่ยังไม่มีเลยวันนี้) และแผนงาน P0–P5 ·

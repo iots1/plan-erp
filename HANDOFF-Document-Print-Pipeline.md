@@ -11,11 +11,18 @@
 > **อ่านคู่กับ**: `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 (สถานะ as-is ของ print engine, ตรวจไว้
 > 2026-09-04 — ยังถูกต้องทุกข้อ) · `srs-p6.html` §06 · `backend-convention.html`
 >
-> **สถานะ 2026-09-06: P0 ✅ + P1 ✅ deploy แล้วทั้งคู่ (ดู §7)** — `company_profiles`/`company_branches`
-> (P0) และ `document_prints` + `report.printDocument` RPC (P1) ใช้งานได้จริงบนโปรดักชันแล้ว รอแค่ **P2**
-> (endpoint `POST /:id/print` ของ 2 เอกสารแรก) ถึงจะเห็นการพิมพ์จริงครบวงจร
-> ที่เหลือเปิดอยู่ 5 ข้อแต่ไม่บล็อก P2 (§8.2) · ข้อที่ต้องรอ**ฝ่ายบัญชี**คือเรื่อง
+> **สถานะ 2026-09-08: P0 ✅ + P1 ✅ + P2 ✅ deploy แล้วทั้งสามเฟส (ดู §7)** —
+> `company_profiles`/`company_branches` (P0), `document_prints` + `report.printDocument` RPC (P1)
+> และ `POST /quotations/:id/print` + `POST /receipts/:id/print` (P2 · commit `d8b472b`) ใช้งานได้จริง
+> บนโปรดักชันแล้ว **พิมพ์เอกสารครบวงจรได้แล้ว 2 ใบ** — ถัดไปคือ **P3** (HTML จริงของ 2 ใบนั้นแทน
+> draft placeholder + ย้ายจากเอนจิน `simple` → `banded` + ลายน้ำ DRAFT)
+> ที่เหลือเปิดอยู่ 5 ข้อแต่ไม่บล็อก P3 (§8.2) · ข้อที่ต้องรอ**ฝ่ายบัญชี**คือเรื่อง
 > ต้นฉบับ/สำเนา/ใบแทน (§6.2) ซึ่งไปโผล่ที่ P5 ปลายทาง
+>
+> ⚠️ **ตารางเฟสใน §7 เคยค้างที่ "P2 ⬜ ถัดไป" อยู่ 2 วันหลัง P2 ขึ้นโปรดักชันไปแล้ว** — doc-bump
+> `10ab25d` อัปเดตแต่ `api-workflow-guide.html` (รายการ endpoint) ไม่ได้แตะตารางนี้ · เจอตอน audit
+> 2026-09-08 ที่ไปอ่านโค้ดจริงเทียบ ไม่ใช่เจอจากตัวเอกสาร — **เฟสถัดไปที่ปิดงาน ให้แก้ตาราง §7 +
+> บล็อกสถานะหัวไฟล์นี้ในคอมมิตเดียวกับโค้ด** ไม่ใช่รอ doc-bump รอบถัดไป
 
 ---
 
@@ -283,13 +290,13 @@ export class CompanyBranch extends BaseEntity {
 |---|---|---|---|
 | **P0** | `company_profiles` + `company_branches` ใน **finance-bc** (entity + migration + CRUD + สิทธิ์ + seed สำนักงานใหญ่ `00000`) | 0.5–1 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** |
 | **P1** | `document_prints` + `report.printDocument` RPC + resolve เทมเพลตผ่าน `document_types` (เพิ่ม `findByCode()`) + `copy_number` (0 สำหรับ DRAFT, `SELECT...FOR UPDATE` กันชนกัน) + snapshot `params` + ดึง/cache company profile ผ่าน RPC ใหม่ `finance.getCompanyProfile` + ธง `is_draft` + `idempotency_key` + `GET /document-prints` | 1.5–2 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** — ดู §7.1 |
-| **P2** | endpoint `POST /:id/print` + mapper ของ **ใบกำกับภาษีเต็มรูป** (finance-bc) และ **ใบเสนอราคา** (sales-bc) | 1–1.5 วัน | ⬜ ถัดไป |
-| **P3** | HTML จริงของ 2 ใบนั้น (แทน draft placeholder) + layout ร่วมที่มีลายน้ำ DRAFT — ใช้เอนจิน `banded` สำหรับรายการยาวข้ามหน้า | 1–2 วัน | ⬜ |
+| **P2** | endpoint `POST /:id/print` + mapper ของ **ใบกำกับภาษีเต็มรูป** (finance-bc) และ **ใบเสนอราคา** (sales-bc) | 1–1.5 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** (commit `d8b472b`) — ดู §7.2 |
+| **P3** | HTML จริงของ 2 ใบนั้น (แทน draft placeholder) + layout ร่วมที่มีลายน้ำ DRAFT — ใช้เอนจิน `banded` สำหรับรายการยาวข้ามหน้า | 1–2 วัน | ⬜ **ถัดไป** |
 | **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | ⬜ |
 | **P5** | ใบแทน/สำเนา ตามข้อสรุป §6.2 + ฟอร์ม ภ.พ.30 (`HANDOFF-Backlog-Reporting-Print-Tax.md` §4.4 ข้อ 4) | 1–2 วัน | ⬜ รอคำตอบฝ่ายบัญชี |
 
 **ทำ P0→P3 ก่อนแล้วหยุดรีวิว** — จะได้เห็นของจริง 2 ใบพิมพ์ออกมาได้ก่อนลงทุนทำอีก 23 ใบ
-(รวม P0–P3 ≈ **4–6 วัน**, ใช้ไปแล้ว P0+P1)
+(รวม P0–P3 ≈ **4–6 วัน**, ใช้ไปแล้ว P0+P1+P2 — เหลือแค่ P3 ก่อนถึงจุดหยุดรีวิว)
 
 ### 7.1 ผลตรวจสอบ P1 — 2026-09-06 ✅ **implement + migrate + deploy แล้ว**
 
@@ -311,11 +318,51 @@ migration (`document_prints` + FK จริงไปหา `document_types`/`pri
 commit + push + deploy สำเร็จ · `GET /report-bc/v1/document-prints` ยืนยันแล้วบนโปรดักชัน (ตอบ
 `200` ว่างเปล่า ถูกต้องเพราะยังไม่มี P2 มาเรียก RPC จริง)
 
-**ยังไม่ได้ยิง E2E ผ่าน RMQ จริง** — `report.printDocument` เป็น request/reply ผ่าน RabbitMQ
+**ยังไม่ได้ยิง E2E ผ่าน RMQ จริง** *(ปิดแล้วที่ P2 — smoke ทั้งสองไฟล์ใน §7.2 เดินสายจริงครบวงจร)* — `report.printDocument` เป็น request/reply ผ่าน RabbitMQ
 ไม่มีทางยิงผ่าน HTTP ได้ตรง ๆ (ต่างจาก REST endpoint) และตอนนี้ยังไม่มี BC ไหนเรียกจริง (รอ P2) —
 ตรรกะทั้งหมดตรวจผ่าน unit test แล้ว แต่การเดินสายจริงผ่าน RMQ (คิว → ack → reply) จะพิสูจน์ได้ครั้ง
 แรกก็ตอน P2 มี endpoint จริงมาเรียก ไม่ใช่ก่อนหน้านั้น — เขียน mock caller แยกตอนนี้เท่ากับพิสูจน์แค่
 transport เดิมของ NestJS ที่ proxy-service คู่อื่นในระบบพิสูจน์ไว้แล้วซ้ำอีกรอบ ไม่ได้พิสูจน์อะไรใหม่
+
+### 7.2 ผลตรวจสอบ P2 — 2026-09-06 ✅ **implement + deploy แล้ว** (commit `d8b472b`, 27 ไฟล์)
+
+`POST /sales-bc/v1/quotations/:id/print` (`quotation:print`) และ
+`POST /finance-bc/v1/receipts/:id/print` (`receipt:print`) — body เป็น optional ทั้งคู่
+(`locale` / `idempotency_key` / `print_reason`)
+
+**สิ่งที่ต่างจากที่ร่างไว้ (ไม่ใช่แค่ทำตามแผน)**:
+- **ครอบทุก `document_type` ของสองเอกสารนั้น ไม่ใช่แค่ 2 แบบ** — แผน §8.1 ข้อ 4 เขียนว่า "ใบกำกับ
+  ภาษีเต็มรูป + ใบเสนอราคา" แต่การ resolve เทมเพลตทำเป็น**ตาราง map** จึงได้ครบในราคาเดียวกัน:
+  `RECEIPT_PRINT_DOCUMENT_TYPE_CODE` (8 ค่า → `receipt_plain` … `receipt_debit_note`) และ
+  `QUOTATION_PRINT_DOCUMENT_TYPE_CODE` (4 ค่า → `quotation_standard` … `quotation_tender`) ·
+  เก็บ map ไว้ที่ BC เจ้าของเอกสาร ไม่ใช่เดา `code` ที่จุดเรียก — เปลี่ยนชื่อ code ทีหลังแก้ที่เดียว
+- **`toPrintParams()` เป็น pure function แยกไฟล์** (`receipt-print-params.util.ts` /
+  `quotation-print-params.util.ts`) ไม่ได้อยู่ใน service — mapping "ฟิลด์ไหนไปโผล่ตำแหน่งไหนบนใบพิมพ์"
+  ทดสอบได้โดยไม่ต้องมี DB (unit spec 113 + 107 บรรทัด)
+- **`items_text` เป็นของชั่วคราวที่ P3 ต้องรื้อ** — เทมเพลตทุกใบยังเป็น draft placeholder
+  (`template_engine: 'simple'`) ซึ่งแทนค่า `{{key}}` แบน ๆ และ**วนซ้ำต่อบรรทัดไม่ได้** จึงยัดรายการ
+  สินค้าเป็นข้อความหลายบรรทัดก้อนเดียวไปก่อน · P3 ที่ย้ายไป `banded` คือจุดที่ตารางบรรทัดจริงมาแทน
+- **การพิมพ์ไม่ใช่ state transition** — `print()` ไม่แตะแถวของเอกสารเลย (ต่างจาก `issue()`/`void()`) ·
+  `document_number` ของใบ `DRAFT` เป็น `null` แล้วส่งผ่านตรง ๆ — นั่นคือสัญญาณที่ report-bc ใช้บังคับ
+  ลายน้ำ DRAFT + `copy_number: 0` (§6.3) ไม่ใช่สิ่งที่ BC ผู้เรียกตัดสินใจเอง
+- **`null` จาก proxy = 503 ไม่ใช่ผลลัพธ์ว่าง** — `PrintDocumentProxyService` ใช้ `sendWithContext`
+  แบบ no-throw ตามแบบ proxy ตัวอื่นทั้งระบบ แล้ว service ชั้นบนแปลงเป็น `ServiceUnavailableException`
+
+**ตรวจแล้ว**: unit spec ใหม่ทั้ง mapper และ `print()` (resolve `copy_number`, DRAFT passthrough,
+503 เมื่อ report-bc ไม่ตอบ) · e2e-spec ทั้งสอง controller — รวม `receipts.e2e-spec.ts` ซึ่งเป็น
+**ครั้งแรกที่ `ReceiptsController` มี e2e harness เลย** · migration `erp_iam`
+`1788701251784-GrantQuotationAndReceiptPrintPermissionsToMockPolicies` (รัน `permissions:sync` ก่อน
+ตามกฎลำดับ deploy ใน `.claude/rules/permissions.md`) — รอบ verify 2026-09-08 รายงาน `erp_iam`
+pending 0 ยืนยันว่ารันบน DB จริงแล้ว
+
+**smoke 2 ไฟล์ = จุดที่พิสูจน์ของจริง** (`apps/finance-bc/test/smoke/receipts-print.smoke.mjs`,
+`apps/sales-bc/test/smoke/quotations-print.smoke.mjs`) — เดินครบสาย: AuthGuard/PermissionGuard จริง →
+RMQ round trip ไป `report.printDocument` → report-bc RPC กลับมาถาม company profile ที่ finance-bc →
+Gotenberg render จริง → อัปโหลดผ่าน storage จริง → แถว `document_prints` จริงใน `erp_report` ·
+ประกาศ `needs: ['report-bc', 'storage']` ไว้ ไม่งั้นทั้งสองตัวล่มแล้ว endpoint ตอบ 503 และเทสที่มีไว้
+พิสูจน์ pipeline จะกลายเป็นพิสูจน์ว่าไม่มีอะไรทำงาน · ทั้งสองไฟล์ใช้เอกสารที่มีอยู่แล้วในคลัสเตอร์
+(ไม่สร้างใหม่) เพราะการพิมพ์ไม่แก้เอกสาร — สถานะที่หยิบได้ (DRAFT หรือ ISSUED) พา `claimCopyNumber()`
+ไปคนละกิ่ง และ assert ไว้ทั้งสองกิ่ง
 
 ---
 

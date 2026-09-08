@@ -1,7 +1,11 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-05 (P6 ครบ 4/4 read model + deploy แล้ว, `sales_summary` E2E ผ่านบน production ด้วยเอกสารจริง — `low_stock`/`expiry_alerts` รอ cron คืนนี้ยืนยัน, ดู §2 หัวข้อ P6 · low_stock + sales_summary)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-08 (audit doc drift — เอกสาร 3 ไฟล์เคยขัดกับโค้ดจริง แก้ให้ตรงแล้ว, ดู §0 แถว "doc drift" + §1 ท้ายหัวข้อ)**
+> ก่อนหน้าในวันเดียวกัน (2026-09-08): `tax_configs` version อัตราภาษีได้แล้ว (constraint + supersede endpoint + Admin UI) · smoke runner รับ `needs:` · smoke ตัวแรกของ iam — ดู §2 หัวข้อ **2026-09-08**
+> ก่อนหน้า 2026-09-07: Fiscal Year Closing / ยอดยกมา D2 — backend + Admin UI + smoke (§2) · storage — presigned URL เซ็นด้วย public origin, error taxonomy ของ S3 · docker log retention + PGDATA ของ postgres:18 · Discord notification ตอน deploy สำเร็จ (งาน infra ไม่มีหัวข้อใน §2 — ดู §1 "รอบ 2026-09-07")
+> ก่อนหน้า 2026-09-06: Configurable Chart of Accounts + Admin UI (**ยังมี 2 จุดค้าง** — §2) · **document print pipeline P0→P2 — พิมพ์เอกสารครบวงจรได้จริงแล้ว 2 ใบ** (สถานะอยู่ที่ `HANDOFF-Document-Print-Pipeline.md` §7/§7.2 ไม่ได้ทำสำเนาไว้ใน §2)
+> ก่อนหน้า 2026-09-05: P6 ครบ 4/4 read model + deploy แล้ว, `sales_summary` E2E ผ่านบน production ด้วยเอกสารจริง — `low_stock`/`expiry_alerts` **ยังไม่มีใครกลับไปยืนยันผล cron** (ค้างมาตั้งแต่คืน 2026-09-05, ดู §2 หัวข้อ P6 · low_stock + sales_summary)
 > ก่อนหน้าในวันเดียวกัน: audit ช่องโหว่กฎหมาย/บัญชีจาก HANDOFF เดิม → เลือกทำ 3 จุด: A1 แยกใบกำกับเต็มรูป/อย่างย่อ, B1 RabbitMQ dead-letter exchange, C audit log กลางสำหรับ settings — ทั้งหมด implement + migrate + deploy + E2E บน production ผ่านแล้ว
 > ก่อนหน้าในวันเดียวกัน (2026-09-03): #8 billing_notes ข้ามสกุล + DEBIT_NOTE ฝั่งซื้อ — ตัดสินใจแล้วทั้งคู่ + แก้บั๊กระหว่างทาง 3 จุด ·
 > seed ตรวจซ้ำ ปิดงานแล้ว (`truncates:` ครบ ไม่ต้องแก้โค้ด) ·
@@ -11,6 +15,8 @@
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
+> ✅ **2026-09-08 audit doc drift — เอกสารตรงกับโค้ดแล้ว 3 ไฟล์** · `HANDOFF-Document-Print-Pipeline.md` §7 ค้างที่ "P2 ⬜ ถัดไป" อยู่ 2 วันหลัง P2 ขึ้นโปรดักชัน (commit `d8b472b`) เพราะ doc-bump `10ab25d` แก้แต่ `api-workflow-guide.html` · `srs-p3.html` §"ยังไม่ได้ทำ · รอบถัดไป" ยังบอกว่า outbox/`stock.deducted`/`lot.created` ไม่ถูก emit จริง ทั้งที่ §07 ของหน้าเดียวกันเขียนไว้แล้วตั้งแต่ 2026-08 ว่ามีจริง และ Purchase Return ก็ทำแล้วใน P4 M4 · `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 ยังพาดหัวว่า "พิมพ์เอกสารจริงไม่ได้เลยสักใบ" — **บทเรียน: doc-bump ที่ตามหลังโค้ดคนละคอมมิตคือจุดที่ drift เกิด · เฟส/งานที่ปิด ให้แก้ตารางสถานะในคอมมิตเดียวกับโค้ด**
+> ✅ **2026-09-06 document print pipeline P0+P1+P2 — deploy แล้วทั้งสามเฟส** (`company_profiles`/`company_branches` · `document_prints` + `report.printDocument` RPC · `POST /quotations/:id/print` + `POST /receipts/:id/print`) — พิมพ์ครบวงจรจริง (RMQ → Gotenberg → storage → แถว `document_prints`) มี smoke คุมทั้งสองใบ · **ถัดไป P3** (HTML จริงแทน draft placeholder + เอนจิน `banded`) — เจ้าของสถานะคือ `HANDOFF-Document-Print-Pipeline.md` §7
 > ✅ **2026-09-05 P6 — ครบ 4/4 read model + deploy แล้ว** (`profit_by_lot`, `expiry_alerts`, `low_stock`, `sales_summary`) — implement + migrate + commit + push + deploy ผ่านหมด, 1606/1606 test ผ่าน, eslint 0/0 · พบ+แก้บั๊กจริง 2 จุดระหว่างทาง (ดูรายละเอียด §2): `expiry_alerts` bind ผิด transport มาตั้งแต่เช้า (event จริงหายเข้า DLQ เงียบ ๆ) และ `processed_events` claim ชนกันเมื่อมี 2 consumer ต่อ 1 event · **`sales_summary` ยิง E2E บน production ด้วยเอกสารจริงผ่านแล้ว** (ยอดสะสมทับกันถูกต้อง) · `low_stock`/`expiry_alerts` รอ cron กลางคืนยืนยัน (ไม่มี endpoint กดรันเอง) — ดู §2 หัวข้อ **P6 · low_stock + sales_summary**
 > ✅ **2026-09-05 audit ช่องโหว่กฎหมาย/บัญชี — 3 จุดที่เลือกทำเสร็จหมด + deploy + E2E บน production ผ่าน** (migration รันแล้วทั้ง 4 BC, `permissions:sync` + grant migration แล้ว, RabbitMQ broker policy ผูกแล้วจริง) — ดู §2 หัวข้อ **2026-09-05 · Legal/Accounting Audit**
 > **P2 audit ปิดครบ 100% แล้ว — P3–P4 เหลือแค่ #10, #11 (รู้ไว้ ไม่ใช่บั๊ก ไม่ต้องรีบ, ตั้งใจไม่ทำถาวร)**
@@ -36,28 +42,44 @@
 | `meta.warnings` — สถานะล่าสุด | §2 หัวข้อ **`meta.warnings`** (commit+deploy แล้ว) |
 | บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 (commit+deploy แล้ว) |
 | dotenv tip / P3 #9 credit_limit — ทำไปถึงไหน | commit แล้วทั้งคู่ (`18f6acf`/`21b6bd4`) — ดู §2 หัวข้อ **P3 #9** |
-| P4 #12 unrealised FX (TFRS 21) — ทำไปถึงไหน | §2 หัวข้อ **P4 #12** (เสร็จหมด รอ deploy) |
+| P4 #12 unrealised FX (TFRS 21) — ทำไปถึงไหน | §2 หัวข้อ **P4 #12** (เสร็จหมด + deploy + E2E บน production แล้ว 2026-09-03) |
+| **พิมพ์เอกสาร** — ทำไปถึงไหน / เฟสถัดไปคืออะไร | `HANDOFF-Document-Print-Pipeline.md` §7 (P0+P1+P2 deploy แล้ว · §7.2 = ผลตรวจสอบ P2 · **P3 ถัดไป**) — ไฟล์นั้นเป็นเจ้าของสถานะ ไม่ใช่ที่นี่ |
+| ผังบัญชีที่ตั้งค่าได้ (`gl_accounts`) — เหลืออะไร | §2 หัวข้อ **2026-09-06 · Configurable Chart of Accounts** (**ค้าง 2 จุด**: smoke §8.3 ข้อ 6 ที่ยังไม่ตัดสินใจ + manual QA UI ที่ยังไม่มีใคร click-through) |
+| ปิดปีบัญชี / ยอดยกมา (D2) — ทำไปถึงไหน | §2 หัวข้อ **2026-09-07 · Fiscal Year Closing / ยอดยกมา (D2)** (backend + Admin UI + smoke ครบ) · งานต่อยอดที่ยังไม่ทำอยู่ใน `HANDOFF-Fiscal-Year-Closing.md` §9 (งบการเงิน D3, manual journal entry, import/export ผังบัญชี D4) |
+| `tax_configs` version อัตราภาษี — ทำไปถึงไหน | §2 หัวข้อ **2026-09-08 · `tax_configs`** (constraint + supersede + Admin UI + smoke ครบ) |
+| **doc drift** — เอกสารไหนเคยไม่ตรงกับโค้ด และแก้อะไรไป | §1 ท้ายหัวข้อ ("รอบ 2026-09-08 · audit doc drift") — 3 ไฟล์: print pipeline §7, `srs-p3.html`, backlog §1 |
+| งานที่ยังเหลือทั้งระบบ (ไม่ใช่แค่ในไฟล์นี้) | `HANDOFF-Backlog-Reporting-Print-Tax.md` (§3 FE, §4.4, §5 WHT) · `HANDOFF-Document-Print-Pipeline.md` §7 (P3–P5) · `HANDOFF-Fiscal-Year-Closing.md` §9 · `HANDOFF-Postgresql.md` §2–§3 (**ไม่มี backup เลย = ความเสี่ยงสูงสุดในลิสต์**) |
 | งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **งานอื่นที่รู้อยู่** (#8, #10, #11) |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5/P4#12 |
 | คำสั่งที่ใช้จริง (หลายตัวไม่ตรงกับที่เดาจาก `package.json`) | §3 |
 | เคยพลาดอะไรมาแล้วบ้าง — **อ่านก่อนแตะ migration/deploy** | §4 |
 | จะทำ audit หาช่องโหว่รอบใหม่ | §5 |
 
-**ที่แนะนำถ้าจะทำต่อเลย** (เรียงตามความคุ้ม ทั้งหมดไม่บล็อกอะไร):
-1. **deploy P4 #12** (commit+push แล้ว รอแค่ deploy) — มี migration ใหม่ (`erp_finance`) ต้องรันบน production ด้วย
-2. ~~`npm run seed -- --fresh --yes` บน scratch DB~~ ✅ **ปิดงานแล้ว 2026-09-03** — ดู §2 หัวข้อ **seed — ตรวจซ้ำ** (ผู้ใช้ตัดสินใจข้ามส่วน `--fresh` บน scratch DB) · ⚠️ กติกาเดิมยังใช้: **ห้ามรัน `--fresh` ใส่ DB จริง** (ดู §4 #10)
-3. งานอื่นที่รู้อยู่ #8/#10/#11 — ทั้งหมด optional, ไม่ใช่บั๊ก (ดู §2 หัวข้อ **งานอื่นที่รู้อยู่**)
+**ที่แนะนำถ้าจะทำต่อเลย** (ปรับใหม่ 2026-09-08 · ไม่มีข้อไหนบล็อกอีกข้อ):
+1. **print pipeline P3** (1–2 วัน) — HTML จริงของใบกำกับเต็มรูป + ใบเสนอราคา แทน draft placeholder, ย้าย `simple` → `banded` (ตอนนี้รายการสินค้ายัดเป็นข้อความก้อนเดียวใน `items_text`), ลายน้ำ DRAFT · ปลดล็อกทั้ง §5 WHT, ฟอร์ม ภ.พ.30 และอีก 23 ใบที่รออยู่หลังมัน
+2. **ปิด 2 จุดค้างของ `gl_accounts`** — smoke §8.3 ข้อ 6 ถูกลงเยอะแล้วหลัง smoke runner รับ `needs:` (2026-09-08) · manual QA UI ทำได้เลยใน session ที่มี browser tool
+3. **ยืนยันผล cron `low_stock`/`expiry_alerts`** — ค้างมาตั้งแต่คืน 2026-09-05 ยังไม่มีใครกลับไปดู (query ตารางอ่านเอาก็พอ ไม่มี endpoint กดรัน)
+4. ถ้าจะเริ่ม **§5 หนังสือรับรองหัก ณ ที่จ่าย** — บล็อกเกอร์ยังจริง: `ap_invoices` ไม่มี `supplier_tax_id` snapshot (ยืนยันกับโค้ดแล้ว 2026-09-08) ต้องเพิ่มคอลัมน์ + migration ก่อน · ส่วน "ข้อมูลบริษัทผู้ออก" ปิดไปแล้วด้วย `company_profiles` จาก print P0
+5. ~~`npm run seed -- --fresh --yes` บน scratch DB~~ ✅ **ปิดงานแล้ว 2026-09-03** — ดู §2 หัวข้อ **seed — ตรวจซ้ำ** (ผู้ใช้ตัดสินใจข้ามส่วน `--fresh` บน scratch DB) · ⚠️ กติกาเดิมยังใช้: **ห้ามรัน `--fresh` ใส่ DB จริง** (ดู §4 #10)
+6. งานอื่นที่รู้อยู่ #8/#10/#11 — ทั้งหมด optional, ไม่ใช่บั๊ก (ดู §2 หัวข้อ **งานอื่นที่รู้อยู่**)
+
+⚠️ **นอกลิสต์นี้แต่เสี่ยงกว่าทุกข้อรวมกัน**: `HANDOFF-Postgresql.md` §2.1 — **ยังไม่มี backup เลยแม้แต่ชุดเดียว** และไม่เคยพิสูจน์ว่ากู้กลับได้ · §3.1 VM ทั้ง 7 ตัวอยู่บน hypervisor เดียว
 
 ---
 
 ## 1 · สถานะล่าสุด
 
-**ทั้งสอง repo push แล้ว ตรงกัน · working tree สะอาด · deploy ขึ้น production แล้วและ E2E ผ่าน**
+**working tree สะอาดทั้งสอง repo · deploy ขึ้น production แล้วและ E2E ผ่าน** ·
+⚠️ **การแก้ doc drift รอบ 2026-09-08 commit แล้วแต่ยังไม่ push** (4 ไฟล์ในซับโมดูล + คอมมิต bump pin
+ที่ `erp-api` — ท้ายหัวข้อนี้) · เป็นงานเอกสารล้วน ไม่ต้อง deploy
 
 | Repo | HEAD ปัจจุบัน |
 |---|---|
-| `iotechsoft-company/erp-api` | `bb81622` feat(finance-bc,iam): versioned tax rates + fiscal year closing, with admin UIs (+ commit bump submodule ที่ตามมา) |
-| `iots1/plan-erp` (submodule) | commit นี้เอง — tax_configs versioning + กับดัก #14–16 |
+| `iotechsoft-company/erp-api` | `3f796d6` test(verify): let a smoke file declare the BCs it needs; first iam smoke (+ คอมมิต bump submodule ของรอบ doc drift ที่ตามมา ยังไม่ push) |
+| `iots1/plan-erp` (submodule) | commit นี้เอง — doc drift 2026-09-08 (ก่อนหน้า `5dd3562` tax_configs versioning + กับดัก #14–16) |
+
+**`bb81622`** (versioned tax rates + fiscal year closing + admin UIs) คือคอมมิตฟีเจอร์ตัวล่าสุด —
+ที่ตามมาหลังจากนั้นเป็นงาน storage/infra ของ 2026-09-07 กับ smoke runner ของ 2026-09-08
 
 **รอบ 2026-09-08** (ดู §2 หัวข้อ **2026-09-08 · `tax_configs` เคย version อัตราภาษีไม่ได้เลย**) — ยืนยันด้วย
 การรันจริงทุกข้อ ไม่ใช่เดา:
@@ -73,6 +95,38 @@
   `page:view_tax_configs` grant ให้ 2 policy แล้ว
 - **deploy run แรกล้มเพราะ `git fetch` บน app server ต่อ `github.com:22` timeout** (ไม่เกี่ยวกับโค้ด —
   สคริปต์ตายก่อนถึงขั้น migrate/pm2 จึงไม่ค้างครึ่งทาง) re-run แล้วผ่าน — `deployed main @ bb816220`
+
+**รอบ 2026-09-08 · audit doc drift** (งานเอกสารล้วน ไม่แตะโค้ด) — ผู้ใช้ถามว่า "จาก SRS P1–5 + HANDOFF
+เหลืออะไรต้องทำอีก" แล้วการไล่เทียบกับโค้ดจริงเจอว่า **เอกสาร 3 ไฟล์เล่าสถานะผิด** จึงแก้ก่อนตอบต่อ:
+
+- `HANDOFF-Document-Print-Pipeline.md` — §7 ค้างที่ **"P2 ⬜ ถัดไป"** ทั้งที่ P2 ขึ้นโปรดักชันไปแล้ว
+  ตั้งแต่ 2026-09-06 (commit `d8b472b`, 27 ไฟล์: 2 endpoint + mapper + smoke 2 ไฟล์ + grant migration) ·
+  ต้นเหตุ: doc-bump `10ab25d` อัปเดตแต่ `api-workflow-guide.html` (รายการ endpoint) ไม่ได้แตะตารางเฟส —
+  **แก้แล้ว** + เขียน §7.2 (ผลตรวจสอบ P2 จากโค้ดจริง) + หัวไฟล์เป็น P0+P1+P2 ✅ / P3 ถัดไป
+- `srs-p3.html` §"ยังไม่ได้ทำ · รอบถัดไป" — ยังบอกว่า outbox / `stock.deducted` / `lot.created`
+  ไม่ถูก emit จริง **ขัดกับ §07 ของหน้าเดียวกัน** ที่เขียนไว้แล้วตั้งแต่ 2026-08 ว่า `outbox_events`
+  + relay job มีจริงทั้ง inventory-bc และ finance-bc · และ Purchase Return ที่บรรทัดเดียวกันเรียกว่า
+  "ช่องว่างเดียวที่เหลือของ D3" ก็ทำแล้วใน `srs-p4.html` M4 — **แก้แล้ว** เหลือ valuation strategy override
+  ระดับ item เป็นข้อเดียวที่ค้างจริง (render-check ผ่าน, mermaid 0 error)
+- `HANDOFF-Backlog-Reporting-Print-Tax.md` — §0 + พาดหัว §1 ยังเป็น "พิมพ์เอกสารจริงไม่ได้เลยสักใบ" ·
+  **แก้แล้ว** ให้ §1 เป็นบันทึก as-is ของ 2026-09-04 และชี้ว่าเจ้าของสถานะเรื่องพิมพ์คือ
+  `HANDOFF-Document-Print-Pipeline.md` §7 · §2 (report-bc ไม่มี consumer) ก็ปิดไปแล้วตอน P6 ครบ 4/4
+
+**บทเรียนที่เข้า §4 ได้เลย**: drift เกิดตรงจุดที่ **doc-bump ตามหลังโค้ดคนละคอมมิต** — เฟส/งานที่ปิด
+ให้แก้ตารางสถานะของมันในคอมมิตเดียวกับโค้ด ไม่ใช่รอ bump รอบถัดไป · และเวลาอ่านเอกสารเพื่อวางแผน
+**อย่าเชื่อตารางสถานะเปล่า ๆ** — เทียบกับ `git log`/โค้ดจริงก่อนสรุปว่าอะไรยังไม่ทำ
+
+**รอบ 2026-09-07 · storage + infra** (ไม่มีหัวข้อของตัวเองใน §2 — งานเล็กหลายชิ้น):
+
+- `de36459` — presigned URL เคยถูกเซ็นด้วย endpoint ภายใน ทำให้ลิงก์ใช้จากนอกไม่ได้ · แยกเป็นเซ็นด้วย
+  public origin แต่เรียก S3 ผ่านเน็ตเวิร์กภายใน (`.env.example` +17 บรรทัด) — คู่กับ
+  `runbook-image-confirm-storage-403.html` ที่เขียนในรอบเดียวกัน
+- `7fd2350` + `ae9abff` — error taxonomy ของ S3: แยก "ไม่พบไฟล์" ออกจาก "บริการล่ม" ใน `headObject()`
+  และจัดชั้น error ที่เหลือ (`storage-object.service.ts` ใน `libs/common` + `apps/storage`)
+- `cfa011e` — จำกัดขนาด container log ทั้ง 3 compose (infra-erp/kong/observability) + แก้ mount ของ
+  `PGDATA` สำหรับ `postgres:18` · `bada866` — Discord notification ตอน deploy สำเร็จ
+- ⚠️ **ยังไม่ได้ยืนยันในไฟล์นี้ว่ารอบ 09-07 ถูก deploy แล้วหรือยัง** — commit/push แล้วแน่นอน แต่ผล
+  deploy ไม่ได้บันทึกไว้ ใครทำต่อให้เช็ค deploy run ก่อนสรุปว่าโปรดักชันมีของพวกนี้แล้ว
 
 ไล่ commit ของรอบ 2026-09-05 (เรียงเก่า→ใหม่):
 
