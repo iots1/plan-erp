@@ -72,6 +72,7 @@
       <section id="symptom" class="section pt-16 pb-4">
         <div class="eyebrow text-[var(--accent)] mb-3">1 — อาการ (Symptom)</div>
         <h2 class="display text-3xl mb-6">ไม่มี error ฝั่ง app — เห็นได้จาก pool_nodes เท่านั้น</h2>
+        <div class="edge mb-6"><div class="tag mb-1">IP ในเอกสารนี้ถูก mask ไว้</div><p class="text-[13px]">เอกสารชุดนี้เป็น repo สาธารณะ จึงปิด octet กลางของที่อยู่ภายในไว้เป็น <span class="mono text-[12px]">172.xx.x.NNN</span> — <b>octet สุดท้ายเป็นของจริง</b> เพื่อให้ยังแยกโน้ดออกจากกันได้ (เช่น <span class="mono text-[12px]">.221</span> กับ <span class="mono text-[12px]">.222</span> คือคนละเครื่อง) · เวลารันจริงให้แทนด้วย subnet ของตัวเอง ส่วน <span class="mono text-[12px]">127.0.0.1</span> และ <span class="mono text-[12px]">0.0.0.0</span> เป็นค่าจริงตามความหมายเดิม ไม่ได้ mask</p></div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           เคสนี้ <b class="text-[var(--ink)]">เงียบสนิท</b> — ต่างจาก
           <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01 (All Nodes Down)</a>
@@ -79,13 +80,13 @@
           จะเห็นก็ต่อเมื่อไปเปิด <span class="mono text-[13px]">show pool_nodes</span> ดูเองเท่านั้น
         </p>
         <div class="code p-5">
-<pre>psql -h 172.16.0.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span>
+<pre>psql -h 172.xx.x.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span>
 
  node_id |   hostname   | port | status | pg_status |  role   | select_cnt | replication_state
 ---------+--------------+------+--------+-----------+---------+------------+-------------------
- 0       | 172.16.0.221 | 5432 | up     | up        | primary | 170591     |
- 1       | 172.16.0.222 | 5432 | <span class="s">down</span>   | <span class="s">up</span>        | standby | <span class="s">0</span>          |
- 2       | 172.16.0.223 | 5432 | up     | up        | standby | 14794      |</pre>
+ 0       | 172.xx.x.221 | 5432 | up     | up        | primary | 170591     |
+ 1       | 172.xx.x.222 | 5432 | <span class="s">down</span>   | <span class="s">up</span>        | standby | <span class="s">0</span>          |
+ 2       | 172.xx.x.223 | 5432 | up     | up        | standby | 14794      |</pre>
         </div>
         <div class="rulebox mt-6" style="border-color:var(--signal)">
           <div class="rc mb-1" style="color:var(--signal)">ลายเซ็น 3 อย่างที่ต้องเห็นพร้อมกัน</div>
@@ -104,8 +105,8 @@
         <div class="code p-5">
 <pre><span class="c">DETAIL:  postmaster on DB node 1 was shutdown by administrative command</span>
 <span class="c">LOG:  received degenerate backend request for node_id: 1 from pid [18836]</span>
-<span class="c">LOG:  starting degeneration. shutdown host 172.16.0.222(5432)</span>
-<span class="c">LOG:  failover done. shutdown host 172.16.0.222(5432)</span></pre>
+<span class="c">LOG:  starting degeneration. shutdown host 172.xx.x.222(5432)</span>
+<span class="c">LOG:  failover done. shutdown host 172.xx.x.222(5432)</span></pre>
         </div>
         <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
           คำว่า <span class="mono text-[12px]">shutdown by administrative command</span> สำคัญมาก — มันแปลว่า PostgreSQL
@@ -225,7 +226,7 @@ ssh ovh-ppr1 <span class="s">"grep -A6 '2026-08-29 06:51' /var/log/unattended-up
           </p>
           <div class="code p-5">
 <pre><span class="c"># ฝั่ง pgpool คาดหวังชื่ออะไร</span>
-psql -h 172.16.0.226 -U postgres -tAc <span class="s">"show pool_status;"</span> | grep backend_application
+psql -h 172.xx.x.226 -U postgres -tAc <span class="s">"show pool_status;"</span> | grep backend_application
 
 <span class="c"># ฝั่ง PostgreSQL ส่งชื่ออะไรมาจริง</span>
 ssh ovh-ppm <span class="s">"sudo -u postgres psql -tAc 'select application_name from pg_stat_replication;'"</span></pre>
@@ -235,9 +236,9 @@ ssh ovh-ppm <span class="s">"sudo -u postgres psql -tAc 'select application_name
               <table class="d">
                 <thead><tr><th>Backend</th><th>pgpool คาดหวัง</th><th>PostgreSQL ส่งมาจริง</th><th>ตรงกัน?</th></tr></thead>
                 <tbody>
-                  <tr><td>0 · 172.16.0.221</td><td><span class="mono text-[12px]">node0</span></td><td><span class="mono text-[12px]">ppm</span></td><td>❌</td></tr>
-                  <tr><td>1 · 172.16.0.222</td><td><span class="mono text-[12px]">node1</span></td><td><span class="mono text-[12px]">ppr1</span></td><td>❌</td></tr>
-                  <tr><td>2 · 172.16.0.223</td><td><span class="mono text-[12px]">node2</span></td><td><span class="mono text-[12px]">ppr2</span></td><td>❌</td></tr>
+                  <tr><td>0 · 172.xx.x.221</td><td><span class="mono text-[12px]">node0</span></td><td><span class="mono text-[12px]">ppm</span></td><td>❌</td></tr>
+                  <tr><td>1 · 172.xx.x.222</td><td><span class="mono text-[12px]">node1</span></td><td><span class="mono text-[12px]">ppr1</span></td><td>❌</td></tr>
+                  <tr><td>2 · 172.xx.x.223</td><td><span class="mono text-[12px]">node2</span></td><td><span class="mono text-[12px]">ppr2</span></td><td>❌</td></tr>
                 </tbody>
               </table>
             </div>
@@ -501,7 +502,7 @@ ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pg
           <span class="sn">1</span>
           <h3 class="font-semibold text-[16px] mb-2">รอ ~15 วินาที แล้วดู pool_nodes อีกครั้ง</h3>
           <div class="code p-5 mb-3">
-<pre>psql -h 172.16.0.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span></pre>
+<pre>psql -h 172.xx.x.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span></pre>
           </div>
           <div class="card overflow-hidden mb-3">
             <div class="overflow-x-auto">
@@ -536,7 +537,7 @@ ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pg
           <div class="code p-5">
 <pre>ssh ovh-ppr2 <span class="s">"sudo systemctl restart postgresql@18-main"</span>
 <span class="c"># เช็คได้เลยไม่ต้องรอนาน — ของจริงกลับมาเองใน ~2 วินาที</span>
-psql -h 172.16.0.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span>
+psql -h 172.xx.x.226 -p 5432 -U postgres -c <span class="s">"show pool_nodes;"</span>
 ssh ovh-pgpool1 <span class="s">"journalctl -u pgpool2 --since '-2min' --no-pager | grep -i failback"</span></pre>
           </div>
           <div class="rulebox ok mt-3">

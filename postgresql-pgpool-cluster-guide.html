@@ -83,6 +83,7 @@
       <section id="overview" class="section pt-16 pb-4">
         <div class="eyebrow text-[var(--accent)] mb-3">01 — ภาพรวม</div>
         <h2 class="display text-3xl mb-6">Connection Pooling คืออะไร และทำไม ERP นี้ถึงต้องมี</h2>
+        <div class="edge mb-6"><div class="tag mb-1">IP ในเอกสารนี้ถูก mask ไว้</div><p class="text-[13px]">เอกสารชุดนี้เป็น repo สาธารณะ จึงปิด octet กลางของที่อยู่ภายในไว้เป็น <span class="mono text-[12px]">172.xx.x.NNN</span> — <b>octet สุดท้ายเป็นของจริง</b> เพื่อให้ยังแยกโน้ดออกจากกันได้ (เช่น <span class="mono text-[12px]">.221</span> กับ <span class="mono text-[12px]">.222</span> คือคนละเครื่อง) · เวลารันจริงให้แทนด้วย subnet ของตัวเอง ส่วน <span class="mono text-[12px]">127.0.0.1</span> และ <span class="mono text-[12px]">0.0.0.0</span> เป็นค่าจริงตามความหมายเดิม ไม่ได้ mask</p></div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           แต่ละ Bounded Context (<span class="mono text-[13px]">apps/*</span>) เปิด connection ไปหา Postgres ของตัวเองผ่าน
           TypeORM connection pool อยู่แล้วในระดับแอป — แต่ปัญหาที่ pooling ระดับแอปคนเดียวแก้ไม่ได้คือ
@@ -191,7 +192,7 @@
 
             <!-- VIP pill -->
             <rect x="380" y="92" width="240" height="42" rx="21" fill="#fff" stroke="#0B3D91" stroke-width="1.6" stroke-dasharray="5 3"/>
-            <text x="500" y="112" fill="#0B3D91" font-size="12" text-anchor="middle" font-weight="700">Virtual IP · 172.16.0.226</text>
+            <text x="500" y="112" fill="#0B3D91" font-size="12" text-anchor="middle" font-weight="700">Virtual IP · 172.xx.x.226</text>
             <text x="500" y="126" fill="#5B6B85" font-size="9.5" text-anchor="middle">delegate_IP · port 5432 · floats between nodes</text>
 
             <!-- dashed fan-out from VIP to all 3 pgpool nodes -->
@@ -209,13 +210,13 @@
             <rect x="52" y="198" width="98" height="20" rx="10" fill="#0AA2A0"/>
             <text x="101" y="212" fill="#fff" font-size="9.5" text-anchor="middle" font-weight="700">LEADER · VIP HERE</text>
             <text x="170" y="238" fill="#0E1726" font-size="13.5" text-anchor="middle" font-weight="600">pgpool1 · node 0</text>
-            <text x="170" y="256" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.16.0.224 · wd_priority=3</text>
+            <text x="170" y="256" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.xx.x.224 · wd_priority=3</text>
             <text x="170" y="272" fill="#6B7A90" font-size="10" text-anchor="middle">ovh-pgpool1</text>
 
             <!-- pgpool2 -->
             <rect x="370" y="186" width="260" height="104" rx="10" fill="#fff" stroke="#94A3B8" stroke-width="1.5"/>
             <text x="500" y="222" fill="#0E1726" font-size="13.5" text-anchor="middle" font-weight="600">pgpool2 · node 1</text>
-            <text x="500" y="240" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.16.0.119 · wd_priority=2</text>
+            <text x="500" y="240" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.xx.x.119 · wd_priority=2</text>
             <text x="500" y="256" fill="#6B7A90" font-size="10" text-anchor="middle">ovh-pgpool2</text>
             <rect x="440" y="266" width="120" height="18" rx="9" fill="#EEF1F6"/>
             <text x="500" y="279" fill="#64748B" font-size="9" text-anchor="middle" font-weight="600">STANDBY</text>
@@ -223,7 +224,7 @@
             <!-- pgpool3 -->
             <rect x="700" y="186" width="260" height="104" rx="10" fill="#fff" stroke="#94A3B8" stroke-width="1.5"/>
             <text x="830" y="222" fill="#0E1726" font-size="13.5" text-anchor="middle" font-weight="600">pgpool3 · node 2</text>
-            <text x="830" y="240" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.16.0.120 · wd_priority=1</text>
+            <text x="830" y="240" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.xx.x.120 · wd_priority=1</text>
             <text x="830" y="256" fill="#6B7A90" font-size="10" text-anchor="middle">ovh-pgpool3</text>
             <rect x="770" y="266" width="120" height="18" rx="9" fill="#EEF1F6"/>
             <text x="830" y="279" fill="#64748B" font-size="9" text-anchor="middle" font-weight="600">STANDBY</text>
@@ -262,13 +263,13 @@
             <rect x="122" y="448" width="72" height="20" rx="10" fill="#DC5A16"/>
             <text x="158" y="462" fill="#fff" font-size="9.5" text-anchor="middle" font-weight="700">PRIMARY</text>
             <text x="220" y="490" fill="#0E1726" font-size="13.5" text-anchor="middle" font-weight="600">ppm</text>
-            <text x="220" y="507" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.16.0.221</text>
+            <text x="220" y="507" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.xx.x.221</text>
             <text x="220" y="522" fill="#6B7A90" font-size="10" text-anchor="middle">ovh-ppm · wal_level=replica</text>
 
             <!-- ppr1 -->
             <rect x="390" y="436" width="220" height="96" rx="10" fill="#fff" stroke="#0AA2A0" stroke-width="1.5"/>
             <text x="500" y="470" fill="#0E1726" font-size="13.5" text-anchor="middle" font-weight="600">ppr1 · replica</text>
-            <text x="500" y="490" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.16.0.222</text>
+            <text x="500" y="490" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.xx.x.222</text>
             <text x="500" y="507" fill="#6B7A90" font-size="10" text-anchor="middle">ovh-ppr1 · slot: ppr1_slot</text>
             <rect x="440" y="514" width="120" height="17" rx="8.5" fill="#E9F3F3"/>
             <text x="500" y="526" fill="#0E7C86" font-size="8.5" text-anchor="middle" font-weight="600">state=streaming</text>
@@ -276,7 +277,7 @@
             <!-- ppr2 -->
             <rect x="670" y="436" width="220" height="96" rx="10" fill="#fff" stroke="#0AA2A0" stroke-width="1.5"/>
             <text x="780" y="470" fill="#0E1726" font-size="13.5" text-anchor="middle" font-weight="600">ppr2 · replica</text>
-            <text x="780" y="490" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.16.0.223</text>
+            <text x="780" y="490" fill="#6B7A90" font-size="10.5" text-anchor="middle">172.xx.x.223</text>
             <text x="780" y="507" fill="#6B7A90" font-size="10" text-anchor="middle">ovh-ppr2 · slot: ppr2_slot</text>
             <rect x="720" y="514" width="120" height="17" rx="8.5" fill="#E9F3F3"/>
             <text x="780" y="526" fill="#0E7C86" font-size="8.5" text-anchor="middle" font-weight="600">state=streaming</text>
@@ -313,28 +314,28 @@
             <table class="d">
               <thead><tr><th>Host</th><th>SSH Alias</th><th>IP</th><th>บทบาท</th></tr></thead>
               <tbody>
-                <tr><td>ppm</td><td>ovh-ppm</td><td>172.16.0.221</td><td>PostgreSQL 18 Primary</td></tr>
-                <tr><td>ppr1</td><td>ovh-ppr1</td><td>172.16.0.222</td><td>PostgreSQL 18 Replica 1</td></tr>
-                <tr><td>ppr2</td><td>ovh-ppr2</td><td>172.16.0.223</td><td>PostgreSQL 18 Replica 2</td></tr>
-                <tr><td>pgpool1</td><td>ovh-pgpool1</td><td>172.16.0.224</td><td>Pgpool-II watchdog node 0 (wd_priority=3)</td></tr>
-                <tr><td>pgpool2</td><td>ovh-pgpool2</td><td>172.16.0.119</td><td>Pgpool-II watchdog node 1 (wd_priority=2)</td></tr>
-                <tr><td>pgpool3</td><td>ovh-pgpool3</td><td>172.16.0.120</td><td>Pgpool-II watchdog node 2 (wd_priority=1)</td></tr>
-                <tr><td>—</td><td>—</td><td>172.16.0.226</td><td>Virtual IP (delegate_IP) — <b>ไม่มี host ของตัวเอง</b></td></tr>
+                <tr><td>ppm</td><td>ovh-ppm</td><td>172.xx.x.221</td><td>PostgreSQL 18 Primary</td></tr>
+                <tr><td>ppr1</td><td>ovh-ppr1</td><td>172.xx.x.222</td><td>PostgreSQL 18 Replica 1</td></tr>
+                <tr><td>ppr2</td><td>ovh-ppr2</td><td>172.xx.x.223</td><td>PostgreSQL 18 Replica 2</td></tr>
+                <tr><td>pgpool1</td><td>ovh-pgpool1</td><td>172.xx.x.224</td><td>Pgpool-II watchdog node 0 (wd_priority=3)</td></tr>
+                <tr><td>pgpool2</td><td>ovh-pgpool2</td><td>172.xx.x.119</td><td>Pgpool-II watchdog node 1 (wd_priority=2)</td></tr>
+                <tr><td>pgpool3</td><td>ovh-pgpool3</td><td>172.xx.x.120</td><td>Pgpool-II watchdog node 2 (wd_priority=1)</td></tr>
+                <tr><td>—</td><td>—</td><td>172.xx.x.226</td><td>Virtual IP (delegate_IP) — <b>ไม่มี host ของตัวเอง</b></td></tr>
               </tbody>
             </table>
           </div>
         </div>
         <p class="text-[13px] mb-8" style="color:var(--ink-soft)">
-          ทุก host อยู่ Ubuntu 24.04 LTS บนซับเน็ตส่วนตัวเดียวกัน <span class="mono text-[12px]">172.16.0.0/24</span>
+          ทุก host อยู่ Ubuntu 24.04 LTS บนซับเน็ตส่วนตัวเดียวกัน <span class="mono text-[12px]">172.xx.x.0/24</span>
           (OVH vRack — L2 network จริง ซึ่งเป็นเงื่อนไขจำเป็นสำหรับ gratuitous ARP ตอน VIP failover)
-          ใช้ <span class="mono text-[12px]">--app-cidrs=172.16.0.0/24</span> ทั้งซับเน็ตแทนที่จะระบุ <span class="mono text-[12px]">/32</span>
+          ใช้ <span class="mono text-[12px]">--app-cidrs=172.xx.x.0/24</span> ทั้งซับเน็ตแทนที่จะระบุ <span class="mono text-[12px]">/32</span>
           ทีละ host เพื่อให้ host ใหม่ในอนาคต (app server เพิ่ม, pgpool node เพิ่ม) เข้าได้โดยไม่ต้องแก้ config
         </p>
 
         <div class="rulebox">
           <div class="rc mb-1">Virtual IP ไม่ใช่เครื่อง — ไม่ต้องสร้าง VM</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
-            <span class="mono text-[12px]">172.16.0.226</span> เป็นแค่หมายเลข IP ว่างในซับเน็ตที่ pgpool node ที่เป็น
+            <span class="mono text-[12px]">172.xx.x.226</span> เป็นแค่หมายเลข IP ว่างในซับเน็ตที่ pgpool node ที่เป็น
             LEADER เอาไปผูกกับ NIC ของตัวเอง (<span class="mono text-[12px]">ip addr add ... dev ens18 label ens18:0</span>)
             แล้วประกาศ gratuitous ARP ให้ทั้งวงรู้ — เห็นเป็น <span class="mono text-[12px]">secondary</span> address บน
             interface เดิม ไม่ใช่ device ใหม่ เงื่อนไขเดียวคือต้องเป็น IP ที่ไม่มีใครใช้และไม่อยู่ใน DHCP range เท่านั้น
@@ -430,8 +431,8 @@ ssh -t pg-primary <span class="s">"sudo /tmp/install-postgresql.sh --mode=primar
           <div class="edge mb-3">
             <div class="tag mb-1">ตัวเลขหน้า /24 ไม่มีผล — ไม่ต้องเสียเวลาไล่ IP ทีละตัว</div>
             <p class="text-[13px]">
-              PostgreSQL mask ทั้งสองฝั่งก่อนเทียบ ดังนั้น <span class="mono text-[12px]">172.16.0.221/24</span> กับ
-              <span class="mono text-[12px]">172.16.0.0/24</span> <b>มีความหมายเหมือนกันเป๊ะ</b> — ครอบทั้งซับเน็ตทั้งคู่
+              PostgreSQL mask ทั้งสองฝั่งก่อนเทียบ ดังนั้น <span class="mono text-[12px]">172.xx.x.221/24</span> กับ
+              <span class="mono text-[12px]">172.xx.x.0/24</span> <b>มีความหมายเหมือนกันเป๊ะ</b> — ครอบทั้งซับเน็ตทั้งคู่
               จะเขียน IP ของเครื่องไหนก็ได้ตราบใดที่ prefix เป็น <span class="mono text-[12px]">/24</span>
               (ใช้ <span class="mono text-[12px]">/32</span> ถ้าต้องการเจาะจงทีละเครื่องจริง ๆ)
             </p>
@@ -877,7 +878,7 @@ AUTH_DB_PORT=5432</pre>
             <div class="code p-5 mt-3">
 <pre>local   all     all             trust
 host    all     all             127.0.0.1/32     scram-sha-256   <span class="c"># เลิกใช้ trust</span>
-host    all     all             172.16.0.0/24    scram-sha-256</pre>
+host    all     all             172.xx.x.0/24    scram-sha-256</pre>
             </div>
             <p class="mt-3 text-[13.5px]" style="color:var(--ink-soft)">
               <b class="text-[var(--ink)]">งานที่ต้องทำก่อนไม่ว่าจะเลือกทางไหน:</b> สร้าง role สำหรับ application ที่ไม่ใช่ superuser
@@ -971,7 +972,7 @@ pcp_port = <span class="d">9898</span>
 pcp_socket_dir = <span class="s">'/var/run/postgresql'</span>
 
 <span class="c"># --- backend 1 บล็อกต่อ 1 เครื่อง (จาก --backends) ---</span>
-backend_hostname0 = <span class="s">'172.16.0.221'</span>
+backend_hostname0 = <span class="s">'172.xx.x.221'</span>
 backend_port0 = <span class="d">5432</span>
 backend_weight0 = <span class="d">1</span>          <span class="c"># น้ำหนัก load balance เท่ากันทุกตัว</span>
 backend_flag0 = <span class="s">'ALLOW_TO_FAILOVER'</span>
@@ -1015,13 +1016,13 @@ wd_ipc_socket_dir = <span class="s">'/var/run/postgresql'</span>
 enable_consensus_with_half_votes = off  <span class="c"># derived จากจำนวน node (คี่=off)</span>
 
 <span class="c"># --- รายชื่อ node ทั้งหมด เหมือนกันทุกเครื่อง รวมตัวเองด้วย ---</span>
-hostname0 = <span class="s">'172.16.0.224'</span>
+hostname0 = <span class="s">'172.xx.x.224'</span>
 wd_port0 = <span class="d">9000</span>
 pgpool_port0 = <span class="d">5432</span>
 <span class="c"># ... hostname1/2 สำหรับ node ที่เหลือ</span>
 
 <span class="c"># --- VIP ---</span>
-delegate_IP = <span class="s">'172.16.0.226'</span>       <span class="c"># capital IP! (บั๊ก #16)</span>
+delegate_IP = <span class="s">'172.xx.x.226'</span>       <span class="c"># capital IP! (บั๊ก #16)</span>
 if_cmd_path = <span class="s">'/usr/bin'</span>            <span class="c"># ที่อยู่ของ sudo ไม่ใช่ของ ip (บั๊ก #17)</span>
 arping_path = <span class="s">'/usr/bin'</span>
 if_up_cmd   = <span class="s">'sudo /usr/sbin/ip addr add $_IP_$/24 dev ens18 label ens18:0'</span>
@@ -1029,7 +1030,7 @@ if_down_cmd = <span class="s">'sudo /usr/sbin/ip addr del $_IP_$/24 dev ens18'</
 arping_cmd  = <span class="s">'sudo /usr/sbin/arping -U $_IP_$ -w 1 -I ens18'</span>
 
 <span class="c"># --- heartbeat: ต้องมีครบทุก node รวมตัวเอง ไม่งั้นถือว่าไม่มีเลย (บั๊ก #7) ---</span>
-heartbeat_hostname0 = <span class="s">'172.16.0.224'</span>
+heartbeat_hostname0 = <span class="s">'172.xx.x.224'</span>
 heartbeat_port0 = <span class="d">9694</span>
 <span class="c"># ... heartbeat_hostname1/2</span>
 
@@ -1082,21 +1083,21 @@ pid_file_name = <span class="s">'/var/run/postgresql/pgpool.pid'</span>   <span 
 
         <div class="eyebrow text-[var(--muted)] mb-3">ตรวจสอบผลลัพธ์ — show pool_nodes ผ่าน VIP</div>
         <div class="code p-5 mb-3">
-<pre>psql -h 172.16.0.226 -p 5432 -U postgres -d postgres -c <span class="s">'show pool_nodes;'</span></pre>
+<pre>psql -h 172.xx.x.226 -p 5432 -U postgres -d postgres -c <span class="s">'show pool_nodes;'</span></pre>
         </div>
         <div class="code p-5 mb-8">
 <pre> node_id |   hostname   | port | status | pg_status | role    | pg_role
 ---------+--------------+------+--------+-----------+---------+---------
- 0       | 172.16.0.221 | 5432 | up     | up        | primary | primary
- 1       | 172.16.0.222 | 5432 | up     | up        | standby | standby
- 2       | 172.16.0.223 | 5432 | up     | up        | standby | standby</pre>
+ 0       | 172.xx.x.221 | 5432 | up     | up        | primary | primary
+ 1       | 172.xx.x.222 | 5432 | up     | up        | standby | standby
+ 2       | 172.xx.x.223 | 5432 | up     | up        | standby | standby</pre>
         </div>
 
         <div class="diagram">
 <pre class="mermaid">
 sequenceDiagram
     participant App as erp-api service
-    participant VIP as VIP 172.16.0.226 (pgpool leader)
+    participant VIP as VIP 172.xx.x.226 (pgpool leader)
     participant PP as Pgpool routing logic
     participant PM as ppm (primary)
     participant PR as ppr1 / ppr2 (replicas)
@@ -1350,7 +1351,7 @@ psql -h &lt;pgpool-ip&gt; -p 5432 -U postgres -d postgres -c <span class="s">'sh
           <div class="rulebox ok">
             <div class="rc mb-1">ผลที่ต้องเห็น</div>
             <p class="text-[13.5px]" style="color:var(--ink-soft)">
-              <span class="mono text-[12px]">delegate_IP | 172.16.0.226 | ...</span> — <b>ถ้าค่าว่าง</b> แปลว่า VIP ไม่เคยถูกยกขึ้นเลย
+              <span class="mono text-[12px]">delegate_IP | 172.xx.x.226 | ...</span> — <b>ถ้าค่าว่าง</b> แปลว่า VIP ไม่เคยถูกยกขึ้นเลย
               (สะกด <span class="mono text-[12px]">delegate_ip</span> ตัวเล็ก) ไม่ต้องไปหาสาเหตุที่ ARP/firewall
             </p>
           </div>
@@ -1384,12 +1385,12 @@ psql -h &lt;pgpool-ip&gt; -p 5432 -U postgres -d postgres -c <span class="s">'sh
           <p class="text-[13px] mb-3" style="color:var(--muted)"><b>เพื่ออะไร:</b> ยืนยันว่า <span class="mono text-[12px]">if_up_cmd</span> ทำงานสำเร็จ (sudoers ถูก, if_cmd_path ถูก) — VIP ต้องอยู่บน<b>เครื่องเดียวเท่านั้น</b></p>
           <div class="code p-5 mb-3">
 <pre><span class="c"># รันบนทุก pgpool node — ต้องเจอที่เดียว</span>
-ip -4 addr show | grep 172.16.0.226</pre>
+ip -4 addr show | grep 172.xx.x.226</pre>
           </div>
           <div class="rulebox ok">
             <div class="rc mb-1">ผลที่ต้องเห็น</div>
             <p class="text-[13.5px]" style="color:var(--ink-soft)">
-              บน leader: <span class="mono text-[12px]">inet 172.16.0.226/24 scope global secondary ens18:0</span> ·
+              บน leader: <span class="mono text-[12px]">inet 172.xx.x.226/24 scope global secondary ens18:0</span> ·
               node อื่นไม่มี · <b>เจอมากกว่า 1 เครื่อง = split-brain</b> (เกิดได้เฉพาะตอน half-votes เปิดบน cluster เลขคู่)
             </p>
           </div>
@@ -1411,7 +1412,7 @@ ip -4 addr show | grep 172.16.0.226</pre>
           <p class="text-[13px] mb-3" style="color:var(--muted)"><b>เพื่ออะไร:</b> พิสูจน์ว่า gratuitous ARP ไปถึงเครื่องอื่นจริง — <b>ต้องยิงจากเครื่องที่สาม</b> ไม่ใช่จาก pgpool node เอง (จากตัวเองจะผ่านเสมอแม้ ARP ถูกบล็อก)</p>
           <div class="code p-5 mb-3">
 <pre><span class="c"># จากเครื่องอื่นที่อยู่ subnet เดียวกัน</span>
-psql -h 172.16.0.226 -p 5432 -U postgres -d postgres -c <span class="s">'select 1;'</span></pre>
+psql -h 172.xx.x.226 -p 5432 -U postgres -d postgres -c <span class="s">'select 1;'</span></pre>
           </div>
           <div class="rulebox ok">
             <div class="rc mb-1">ผลที่ต้องเห็น</div>
@@ -1432,10 +1433,10 @@ psql -h 172.16.0.226 -p 5432 -U postgres -d postgres -c <span class="s">'select 
 ssh &lt;leader&gt; <span class="s">"sudo systemctl stop pgpool2"</span>
 
 <span class="c"># 2) รอ ~25 วิ แล้วหาว่า VIP ไปโผล่ที่ไหน</span>
-ssh &lt;node-อื่น&gt; <span class="s">"ip -4 addr show | grep 172.16.0.226"</span>
+ssh &lt;node-อื่น&gt; <span class="s">"ip -4 addr show | grep 172.xx.x.226"</span>
 
 <span class="c"># 3) ยิงจากเครื่องที่สามซ้ำ — ต้องยังตอบอยู่</span>
-psql -h 172.16.0.226 -p 5432 -U postgres -d postgres -c <span class="s">'select 1;'</span>
+psql -h 172.xx.x.226 -p 5432 -U postgres -d postgres -c <span class="s">'select 1;'</span>
 
 <span class="c"># 4) เอา node กลับมา</span>
 ssh &lt;leader-เดิม&gt; <span class="s">"sudo systemctl start pgpool2"</span></pre>
@@ -1457,7 +1458,7 @@ ssh &lt;leader-เดิม&gt; <span class="s">"sudo systemctl start pgpool2"</
           <h3 class="font-semibold text-[16px] mb-1">เช็ค backend ซ้ำหลัง kill-test</h3>
           <p class="text-[13px] mb-3" style="color:var(--muted)"><b>เพื่ออะไร:</b> VIP ผ่านไม่ได้แปลว่า backend กลับเข้า rotation แล้ว — บั๊ก #20 โผล่ตรงนี้ ถ้าไม่เช็คจะเสีย read scaling ไปเงียบ ๆ</p>
           <div class="code p-5 mb-3">
-<pre>psql -h 172.16.0.226 -p 5432 -U postgres -d postgres -c <span class="s">'show pool_nodes;'</span>
+<pre>psql -h 172.xx.x.226 -p 5432 -U postgres -d postgres -c <span class="s">'show pool_nodes;'</span>
 
 <span class="c"># ถ้าเจอ status=down แต่ pg_status=up — เคลียร์บน leader ปัจจุบัน</span>
 sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
@@ -1472,7 +1473,7 @@ sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
           <p class="text-[13px] mb-3" style="color:var(--muted)"><b>เพื่ออะไร:</b> พิสูจน์ว่า <span class="mono text-[12px]">disable_load_balance_on_write='always'</span> ทำงานจริง — insert แล้ว select กลับมาทันทีต้องไม่เจอ replication lag</p>
           <div class="code p-5 mb-3">
 <pre><span class="c"># session เดียว ต่อผ่าน VIP — write แล้ว read ทันที</span>
-psql -h 172.16.0.226 -U postgres -d postgres <span class="s">&lt;&lt;'SQL'</span>
+psql -h 172.xx.x.226 -U postgres -d postgres <span class="s">&lt;&lt;'SQL'</span>
 CREATE TABLE IF NOT EXISTS raw_test(id serial primary key, note text);
 INSERT INTO raw_test(note) VALUES ('read-after-write');
 SELECT count(*) FROM raw_test WHERE note = 'read-after-write';
@@ -1495,17 +1496,17 @@ DROP TABLE raw_test;
           <p class="text-[13px] mb-3" style="color:var(--muted)"><b>เพื่ออะไร:</b> ทดสอบ end-to-end ว่า write ที่ผ่าน pgpool ไปโผล่บนทุก backend — ยิงตรงที่แต่ละเครื่อง ไม่ผ่าน pgpool เพื่อไม่ให้ load balancer มาบังผลลัพธ์</p>
           <div class="code p-5 mb-3">
 <pre><span class="c"># เขียนผ่าน VIP</span>
-psql -h 172.16.0.226 -U postgres -d postgres -c \
+psql -h 172.xx.x.226 -U postgres -d postgres -c \
   <span class="s">"CREATE TABLE IF NOT EXISTS repl_test(id int); INSERT INTO repl_test VALUES (42);"</span>
 
 <span class="c"># อ่านตรงจากทั้ง 3 เครื่อง — ต้องเจอเหมือนกันหมด</span>
-for h in 172.16.0.221 172.16.0.222 172.16.0.223; <span class="k">do</span>
+for h in 172.xx.x.221 172.xx.x.222 172.xx.x.223; <span class="k">do</span>
   <span class="k">echo</span> -n <span class="s">"$h: "</span>
   psql -h <span class="s">"$h"</span> -U postgres -d postgres -tAc <span class="s">'SELECT count(*) FROM repl_test;'</span>
 <span class="k">done</span>
 
 <span class="c"># เก็บกวาด</span>
-psql -h 172.16.0.226 -U postgres -d postgres -c <span class="s">'DROP TABLE repl_test;'</span></pre>
+psql -h 172.xx.x.226 -U postgres -d postgres -c <span class="s">'DROP TABLE repl_test;'</span></pre>
           </div>
           <div class="rulebox ok">
             <div class="rc mb-1">ผลที่ต้องเห็น</div>
@@ -1914,7 +1915,7 @@ curl -s http://&lt;pgpool-host&gt;:9719/metrics | grep -c <span class="s">'^pgpo
 <pre class="mermaid">
 sequenceDiagram
     participant API as iam app server (POST /iam/v1/users)
-    participant PP as pgpool1 (172.16.0.224)
+    participant PP as pgpool1 (172.xx.x.224)
     participant PM as ppm (primary)
     participant R1 as ppr1
     participant R2 as ppr2
@@ -1947,7 +1948,7 @@ sequenceDiagram
           <div class="p-6 border-b" style="border-color:var(--line)">
             <div class="chip mb-3"><span class="dot" style="background:var(--muted)"></span>Round 1 · 2-node cluster (half-votes = on)</div>
             <ol class="text-sm space-y-1.5 pl-5 list-decimal" style="color:var(--ink-soft)">
-              <li>Steady state: VIP อยู่บน pgpool1 (LEADER) — <span class="mono text-[12px]">psql -h 172.16.0.226</span> จาก client นอก pgpool host ตอบทุก backend ปกติ</li>
+              <li>Steady state: VIP อยู่บน pgpool1 (LEADER) — <span class="mono text-[12px]">psql -h 172.xx.x.226</span> จาก client นอก pgpool host ตอบทุก backend ปกติ</li>
               <li><span class="mono text-[12px]">systemctl stop pgpool2</span> บน pgpool1 (เจ้าของ VIP)</li>
               <li>ภายใน ~25 วิ VIP ย้ายไป pgpool2 แล้ว — client เดิมยังตอบต่อได้ (ARP takeover ไปถึง host ที่ cache MAC เก่าไว้)</li>
               <li>Restart pgpool1: rejoin เป็น STANDBY, VIP <b>ค้าง</b>ที่ pgpool2 (failback ไม่ preemptive)</li>
@@ -2089,8 +2090,8 @@ sequenceDiagram
           <div class="code p-5">
 <pre>scp scripts/install-postgresql.sh ovh-ppr1:/tmp/
 ssh -t ovh-ppr1 <span class="s">"sudo /tmp/install-postgresql.sh --mode=primary \
-  --allowed-cidrs=172.16.0.0/24 \
-  --app-cidrs=172.16.0.0/24 \
+  --allowed-cidrs=172.xx.x.0/24 \
+  --app-cidrs=172.xx.x.0/24 \
   --replication-slot=ppm_slot,ppr2_slot"</span>
 
 <span class="c"># เก็บรหัส replication ใหม่ที่ script generate ให้ ไปใช้ clone ต่อ</span>
@@ -2123,15 +2124,15 @@ REPL_PW=$(ssh -t ovh-ppr1 <span class="s">"sudo cat /root/.pg_replication/replic
           <div class="code p-5">
 <pre>scp scripts/install-postgresql.sh ovh-ppm:/tmp/
 ssh -t ovh-ppm <span class="s">"sudo /tmp/install-postgresql.sh --mode=replica \
-  --primary-host=172.16.0.222 --repl-password='$REPL_PW' \
+  --primary-host=172.xx.x.222 --repl-password='$REPL_PW' \
   --replication-slot=ppm_slot \
-  --app-cidrs=172.16.0.0/24 --force"</span>
+  --app-cidrs=172.xx.x.0/24 --force"</span>
 
 scp scripts/install-postgresql.sh ovh-ppr2:/tmp/
 ssh -t ovh-ppr2 <span class="s">"sudo /tmp/install-postgresql.sh --mode=replica \
-  --primary-host=172.16.0.222 --repl-password='$REPL_PW' \
+  --primary-host=172.xx.x.222 --repl-password='$REPL_PW' \
   --replication-slot=ppr2_slot \
-  --app-cidrs=172.16.0.0/24 --force"</span></pre>
+  --app-cidrs=172.xx.x.0/24 --force"</span></pre>
           </div>
           <div class="edge mt-3" style="border-color:var(--signal)">
             <div class="tag mb-1" style="color:var(--signal)">เจอจริง (บั๊ก #23): clone สำเร็จ 100% แต่ service start ไม่ขึ้น</div>
@@ -2162,7 +2163,7 @@ ssh ovh-ppr2 <span class="s">"sudo chmod 700 /var/lib/postgresql/18/main &amp;&a
           <div class="rulebox ok">
             <div class="rc mb-1">ผลจริงที่ได้</div>
             <p class="text-[13.5px]" style="color:var(--ink-soft)">
-              2 แถว (172.16.0.221 = ppm, 172.16.0.223 = ppr2) ทั้งคู่ <span class="mono text-[12px]">state=streaming</span>,
+              2 แถว (172.xx.x.221 = ppm, 172.xx.x.223 = ppr2) ทั้งคู่ <span class="mono text-[12px]">state=streaming</span>,
               <span class="mono text-[12px]">sync_state=async</span>
             </p>
           </div>
@@ -2175,7 +2176,7 @@ ssh ovh-ppr2 <span class="s">"sudo chmod 700 /var/lib/postgresql/18/main &amp;&a
           <p class="text-sm mb-3" style="color:var(--ink-soft)">หา node ที่ถือ VIP อยู่ก่อน แล้วยิง <span class="mono text-[12px]">pcp_attach_node</span> จากที่นั่น</p>
           <div class="code p-5 mb-3">
 <pre><span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
-  <span class="k">echo</span> -n <span class="s">"$h: "</span><span class="k">;</span> ssh <span class="s">"$h"</span> <span class="s">"ip -4 addr show | grep -c 172.16.0.226"</span>
+  <span class="k">echo</span> -n <span class="s">"$h: "</span><span class="k">;</span> ssh <span class="s">"$h"</span> <span class="s">"ip -4 addr show | grep -c 172.xx.x.226"</span>
 <span class="k">done</span>
 <span class="c"># → ovh-pgpool2: 1 (leader)</span>
 
@@ -2210,16 +2211,16 @@ ssh ovh-pgpool2 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pg
               <table class="d">
                 <thead><tr><th>Node</th><th>Host</th><th>Status</th><th>Backend Status</th><th>Role</th></tr></thead>
                 <tbody>
-                  <tr><td>0</td><td>ppm · 172.16.0.221</td><td>up</td><td>up</td><td>standby</td></tr>
-                  <tr><td>1</td><td>ppr1 · 172.16.0.222</td><td>up</td><td>up</td><td><b>primary</b></td></tr>
-                  <tr><td>2</td><td>ppr2 · 172.16.0.223</td><td>up</td><td>up</td><td>standby</td></tr>
+                  <tr><td>0</td><td>ppm · 172.xx.x.221</td><td>up</td><td>up</td><td>standby</td></tr>
+                  <tr><td>1</td><td>ppr1 · 172.xx.x.222</td><td>up</td><td>up</td><td><b>primary</b></td></tr>
+                  <tr><td>2</td><td>ppr2 · 172.xx.x.223</td><td>up</td><td>up</td><td>standby</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
           <p class="text-[13px] mb-3" style="color:var(--ink-soft)">
             หลัง re-attach ครบ VIP กลับมาตอบ query ปกติทันที (ก่อนหน้านี้ค้างเฉยๆ ตามบั๊ก #24) — ยืนยันด้วย
-            <span class="mono text-[12px]">psql -h 172.16.0.226 ...</span> จาก client ภายนอก
+            <span class="mono text-[12px]">psql -h 172.xx.x.226 ...</span> จาก client ภายนอก
           </p>
         </div>
 
@@ -2342,13 +2343,13 @@ HASH=$(echo -n <span class="s">"$PCP_PW"</span> | md5sum | cut -d<span class="s"
           <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง repmgr บน primary ก่อน</h3>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">รันบน node ที่เป็น primary จริง ณ ตอนนี้ (ไม่จำเป็นต้องเป็น node ที่เคย "แรก" ตั้งแต่ setup) — สคริปต์จะติดตั้ง <span class="mono text-[12px]">postgresql-18-repmgr</span> + <span class="mono text-[12px]">pgpool2</span> (client tools เท่านั้น) เอง, ตั้ง <span class="mono text-[12px]">shared_preload_libraries</span>/<span class="mono text-[12px]">cluster_name</span>, restart PostgreSQL หนึ่งครั้ง แล้ว enable repmgrd</p>
           <div class="code p-5">
-<pre>PGPOOL_HOSTS=172.16.0.224,172.16.0.119,172.16.0.120
+<pre>PGPOOL_HOSTS=172.xx.x.224,172.xx.x.119,172.xx.x.120
 PCP_PW=<span class="s">'&lt;pcp admin password จาก install-pgpool.sh&gt;'</span>
 
 scp scripts/install-repmgr.sh &lt;primary-host&gt;:/tmp/
 ssh -t &lt;primary-host&gt; <span class="s">"sudo /tmp/install-repmgr.sh --role=primary \
   --node-id=1 --node-name=&lt;primary-hostname&gt; \
-  --conninfo-host=&lt;primary-ip&gt; --allowed-cidrs=172.16.0.0/24 \
+  --conninfo-host=&lt;primary-ip&gt; --allowed-cidrs=172.xx.x.0/24 \
   --pgpool-hosts=$PGPOOL_HOSTS --pgpool-pcp-password='$PCP_PW'"</span></pre>
           </div>
         </div>
@@ -2364,7 +2365,7 @@ scp scripts/install-repmgr.sh &lt;standby-host&gt;:/tmp/
 ssh -t &lt;standby-host&gt; <span class="s">"sudo /tmp/install-repmgr.sh --role=standby \
   --node-id=2 --node-name=&lt;standby-hostname&gt; --upstream-node-id=1 \
   --repmgr-password='$REPMGR_PW' \
-  --conninfo-host=&lt;standby-ip&gt; --allowed-cidrs=172.16.0.0/24 \
+  --conninfo-host=&lt;standby-ip&gt; --allowed-cidrs=172.xx.x.0/24 \
   --pgpool-hosts=$PGPOOL_HOSTS --pgpool-pcp-password='$PCP_PW'"</span>
 
 <span class="c"># ทำซ้ำให้ standby ตัวที่สอง ด้วย --node-id=3 เป็นต้น</span></pre>
@@ -2498,7 +2499,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             <b>pg_hba.conf</b> บน ppm/ppr1/ppr2 มีแค่ rule สำหรับ user <span class="mono text-[12px]">postgres</span>
             (จาก <span class="mono text-[12px]">install-postgresql.sh --app-cidrs</span>) — pgpool ต่อ backend
             <i>ในนาม</i> <span class="mono text-[12px]">exporter_svc</span> ต้องมี rule ของตัวเอง:
-            <span class="mono text-[12px]">host all exporter_svc 172.16.0.0/24 scram-sha-256</span> แล้ว
+            <span class="mono text-[12px]">host all exporter_svc 172.xx.x.0/24 scram-sha-256</span> แล้ว
             <span class="mono text-[12px]">systemctl reload postgresql@18-main</span> — ยังต้อง SSH ไปแก้คนละ host
             (PostgreSQL) จาก host ที่รันสคริปต์นี้อยู่ (pgpool) จึงไม่ automate ให้
           </p>
@@ -2572,7 +2573,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
             วิธี parse แบบไร้เดียงสา (<span class="mono text-[12px]">awk -F': *'</span> ตัดทุกจุดที่เจอ colon) ผิด —
             บรรทัด <span class="mono text-[12px]">Leader Node Name</span> มี<b>ค่า</b>ที่มี colon อยู่ในตัวเองด้วย
-            (<span class="mono text-[12px]">172.16.0.119:5432 Linux pgpool2</span>) ทำให้
+            (<span class="mono text-[12px]">172.xx.x.119:5432 Linux pgpool2</span>) ทำให้
             <span class="mono text-[12px]">-F': *'</span> ตัดค่าที่จับได้เหลือแค่ IP ตัดชื่อ hostname ทิ้งไปเงียบๆ —
             ซึ่ง <span class="mono text-[12px]">grep -qw</span> ที่เช็ค leader ต้องใช้ชื่อ hostname นั้นเทียบ ทำให้
             <span class="mono text-[12px]">pgpool_watchdog_is_leader</span> จะอ่านเป็น 0 <b>ทุก node ตลอดเวลา</b>
@@ -2691,11 +2692,11 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
             operator กำลังทดสอบ manual failover จริง: promote <b>ppr1</b> เป็น primary แล้วชี้ทั้ง ppm/ppr2 กลับไป
             stream จากมันแทน ผลลัพธ์ตรวจแล้ว: <span class="mono text-[12px]">pg_is_in_recovery()</span> ให้
             ppm=t/ppr1=f/ppr2=t (primary เดียว ไม่มี split-brain) และ <b>pgpool ไม่ต้อง reconfigure อะไรเลย</b> —
-            <span class="mono text-[12px]">show pool_nodes</span> ผ่าน VIP รายงาน 172.16.0.222 (ppr1) เป็น
+            <span class="mono text-[12px]">show pool_nodes</span> ผ่าน VIP รายงาน 172.xx.x.222 (ppr1) เป็น
             <span class="mono text-[12px]">role=primary</span> เองทันทีผ่าน <span class="mono text-[12px]">sr_check</span>/<span class="mono text-[12px]">pg_is_in_recovery()</span>
             ที่มีอยู่แล้ว — คือ payoff ของสถาปัตยกรรมนี้พอดี (§01: pgpool ไม่ hardcode ว่าใครคือ primary) error ของ
             pgpool3 exporter ที่ไล่อยู่ตอนนั้น (<span class="mono text-[12px]">getsockopt() failed</span> ต่อ
-            172.16.0.221) เป็น<b>อาการ</b>จาก ppm ล่ม ไม่ใช่บั๊กจาก monitoring ที่เพิ่งเพิ่ม — ยืนยันจากการดูมันหายเองพอ
+            172.xx.x.221) เป็น<b>อาการ</b>จาก ppm ล่ม ไม่ใช่บั๊กจาก monitoring ที่เพิ่งเพิ่ม — ยืนยันจากการดูมันหายเองพอ
             ppm กลับมาเป็น replica แล้ว <b>primary ที่ live อยู่ตอนเขียนเอกสารนี้คือ ppr1 ไม่ใช่ ppm</b> — เตือนความจำว่า
             "primary" เป็น role ที่ย้ายได้ ไม่ใช่ identity คงที่ ทุก diagram/คำสั่งใน §02–§03 ที่พูดถึง "ppm (primary)"
             คือ topology ตอนเริ่ม setup ไม่ใช่การการันตีว่า live จริงตอนนี้เป็นแบบนั้น — เช็ค
@@ -2719,15 +2720,15 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
         <div class="card p-6 mb-8">
           <div class="space-y-3">
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>ppm (primary), ppr1, ppr2 (replicas) — ติดตั้ง, streaming, verified</span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>pgpool1 (node 0, 172.16.0.224) — ติดตั้ง, verify กับทั้ง 3 PostgreSQL backend แล้ว</span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>pgpool2 (node 1, 172.16.0.119) — ติดตั้งและ join เป็น MEMBER แล้ว (ต้องแก้ IP node-1 ผิดในตัว pgpool1 เองก่อน — บั๊ก #15)</span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>pgpool3 (node 2, 172.16.0.120) — ติดตั้งและ join แล้ว ทำให้ cluster เป็น <b>odd-sized</b> — <span class="mono text-[12px]">enable_consensus_with_half_votes</span> กลับเป็น off เอง ปิดความเสี่ยง split-brain</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>pgpool1 (node 0, 172.xx.x.224) — ติดตั้ง, verify กับทั้ง 3 PostgreSQL backend แล้ว</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>pgpool2 (node 1, 172.xx.x.119) — ติดตั้งและ join เป็น MEMBER แล้ว (ต้องแก้ IP node-1 ผิดในตัว pgpool1 เองก่อน — บั๊ก #15)</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>pgpool3 (node 2, 172.xx.x.120) — ติดตั้งและ join แล้ว ทำให้ cluster เป็น <b>odd-sized</b> — <span class="mono text-[12px]">enable_consensus_with_half_votes</span> กลับเป็น off เอง ปิดความเสี่ยง split-brain</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Watchdog quorum / VIP escalation — <span class="mono text-[12px]">QUORUM EXIST</span>, ทั้ง 3 node MEMBER, <span class="mono text-[12px]">Nodes required for quorum: 2</span>, VIP live</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Real failover test — ผ่านบน OVH vRack นี้จริง; gratuitous ARP ไม่ถูกบล็อก</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><span class="mono text-[12px]">arping</span> ผิด package แก้แล้ว (บั๊ก #21, เจอจากการ audit script เอง — <span class="mono text-[12px]">show pool_nodes</span> ดูปกติมาตลอด) <span class="mono text-[12px]">if_up_cmd</span> fail เงียบๆ ทุก escalation ที่ผ่านมา (7/7) เปลี่ยนไปใช้ <span class="mono text-[12px]">iputils-arping</span> ทั้ง 3 node แล้ว ยืนยันด้วย kill-test จริง — <span class="mono text-[12px]">journalctl</span> ขึ้น <span class="mono text-[12px]">'if_up_cmd' returned with success</span></span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Repo <span class="mono text-[12px]">.env</span> (local checkout) — <span class="mono text-[12px]">*_DB_HOST</span> ทั้งหมดชี้ 172.16.0.224 (pgpool1 <b>ตรง</b> ยังไม่ใช่ VIP — จุดเดียวที่ยัง SPOF)</span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>ย้าย <span class="mono text-[12px]">.env</span> ทั้ง repo และ ovh-dev ไปที่ VIP (172.16.0.226) — <b>ตอนนี้ทำได้แล้ว</b> เพราะ VIP live + ทดสอบ failover แล้ว เป็นขั้นเดียวที่เหลือกว่าจะได้ HA จริง</span></div>
-            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><span class="mono text-[12px]">ovh-dev</span> <span class="mono text-[12px]">.env</span> (server จริงที่ pm2 คุมอยู่) — ยังชี้ 172.16.0.221 (ppm ตรง) ข้าม pgpool ไปเลย ต้องเปลี่ยน host + <span class="mono text-[12px]">pm2 delete all && pm2 start ecosystem.config.js</span> — <b style="color:var(--signal)">เร่งด่วนกว่าที่เขียนไว้เดิม</b>: หลัง incident ใน §10 (2026-08-09) 172.16.0.221 ไม่ใช่ primary แล้ว เป็น <span class="mono text-[12px]">ppr1</span> (172.16.0.222) แทน — ถ้า .env นี้ยังไม่แก้ ทุก write จาก ovh-dev กำลังยิงตรงเข้า standby อยู่</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>Repo <span class="mono text-[12px]">.env</span> (local checkout) — <span class="mono text-[12px]">*_DB_HOST</span> ทั้งหมดชี้ 172.xx.x.224 (pgpool1 <b>ตรง</b> ยังไม่ใช่ VIP — จุดเดียวที่ยัง SPOF)</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span>ย้าย <span class="mono text-[12px]">.env</span> ทั้ง repo และ ovh-dev ไปที่ VIP (172.xx.x.226) — <b>ตอนนี้ทำได้แล้ว</b> เพราะ VIP live + ทดสอบ failover แล้ว เป็นขั้นเดียวที่เหลือกว่าจะได้ HA จริง</span></div>
+            <div class="flex gap-3 text-sm"><span style="color:var(--signal)">☐</span><span><span class="mono text-[12px]">ovh-dev</span> <span class="mono text-[12px]">.env</span> (server จริงที่ pm2 คุมอยู่) — ยังชี้ 172.xx.x.221 (ppm ตรง) ข้าม pgpool ไปเลย ต้องเปลี่ยน host + <span class="mono text-[12px]">pm2 delete all && pm2 start ecosystem.config.js</span> — <b style="color:var(--signal)">เร่งด่วนกว่าที่เขียนไว้เดิม</b>: หลัง incident ใน §10 (2026-08-09) 172.xx.x.221 ไม่ใช่ primary แล้ว เป็น <span class="mono text-[12px]">ppr1</span> (172.xx.x.222) แทน — ถ้า .env นี้ยังไม่แก้ ทุก write จาก ovh-dev กำลังยิงตรงเข้า standby อยู่</span></div>
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span>PostgreSQL primary failover อัตโนมัติ — <span class="mono text-[12px]">scripts/install-repmgr.sh</span> deploy ครบ 3 node จริงแล้ว (2026-08-10) ผ่าน kill-test จริง (§11 Step 4, <b>29 วินาที</b> จาก kill ถึง promote) หลัง incident จริงใน §10 (primary ตายจริง 2026-08-09) เจอบั๊กใหม่ 12 ข้อระหว่าง deploy (#25–36 ใน §08) แก้ครบและฝังอยู่ใน script แล้ว — <b>gap เดิมที่เหลืออยู่ตัวเดียวใน stack นี้ปิดแล้ว</b></span></div>
           </div>
         </div>
@@ -2735,7 +2736,7 @@ sudo ./install-monitoring-exporters.sh --role=pgpool --pg-host=127.0.0.1 --monit
         <div class="eyebrow text-[var(--muted)] mb-3">Cross-Network Restore Incident — 2026-08-25 (databasus → POC cluster)</div>
         <div class="card p-6 mb-8">
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mb-4">
-            restore <span class="mono text-[12px]">meditech_core_v1</span> (14 GB) จาก databasus (on-prem 192.168.30.35) ข้ามเน็ตเข้ามาที่ VIP <span class="mono text-[12px]">51.79.231.110:9876 → 172.16.0.226</span> ล้มซ้ำ ๆ — ไล่จนเจอทั้ง disk, tuning และ pgpool cluster ที่ค้างอยู่ก่อนแล้ว
+            restore <span class="mono text-[12px]">meditech_core_v1</span> (14 GB) จาก databasus (on-prem 192.xxx.xx.35) ข้ามเน็ตเข้ามาที่ VIP <span class="mono text-[12px]">203.0.113.110:9876 → 172.xx.x.226</span> ล้มซ้ำ ๆ — ไล่จนเจอทั้ง disk, tuning และ pgpool cluster ที่ค้างอยู่ก่อนแล้ว
           </p>
           <div class="space-y-3">
             <div class="flex gap-3 text-sm"><span style="color:var(--accent)">✓</span><span><b>Disk เต็ม</b> คือสาเหตุ restore ล้ม 2 รอบแรก (<span class="mono text-[12px]">broken pipe</span> / <span class="mono text-[12px]">could not extend file … No space left</span> → primary PANIC + reinit). ขยาย disk ทั้ง 3 node <b>40G → 60G</b> ผ่าน <span class="mono text-[12px]">qm disk resize</span> + <span class="mono text-[12px]">growpart/pvresize/lvextend/resize2fs</span> (online ไม่ reboot) → <span class="mono text-[12px]">/</span> = 58G ว่าง ~47G/node</span></div>

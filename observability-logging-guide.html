@@ -78,6 +78,7 @@
       <section id="overview" class="section pt-16 pb-4">
         <div class="eyebrow text-[var(--accent)] mb-3">01 — ภาพรวม</div>
         <h2 class="display text-3xl mb-6">ทำไม Trace ทำงานได้จาก localhost แต่ Log ไม่ได้</h2>
+        <div class="edge mb-6"><div class="tag mb-1">IP ในเอกสารนี้ถูก mask ไว้</div><p class="text-[13px]">เอกสารชุดนี้เป็น repo สาธารณะ จึงปิด octet กลางของที่อยู่ภายในไว้เป็น <span class="mono text-[12px]">172.xx.x.NNN</span> — <b>octet สุดท้ายเป็นของจริง</b> เพื่อให้ยังแยกโน้ดออกจากกันได้ (เช่น <span class="mono text-[12px]">.221</span> กับ <span class="mono text-[12px]">.222</span> คือคนละเครื่อง) · เวลารันจริงให้แทนด้วย subnet ของตัวเอง ส่วน <span class="mono text-[12px]">127.0.0.1</span> และ <span class="mono text-[12px]">0.0.0.0</span> เป็นค่าจริงตามความหมายเดิม ไม่ได้ mask</p></div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           คำถามที่พบบ่อยที่สุดตอนทดสอบ local: รัน service บนเครื่องตัวเองแล้วเห็น trace ขึ้นใน Tempo ทันที
           แต่ไม่เห็น log ใน Loki เลย ทั้งที่ deploy โค้ดตัวเดียวกัน — สาเหตุคือทั้งสองระบบใช้ transport mechanism
@@ -93,7 +94,7 @@
               </div>
               <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
                 แอป export span ผ่าน <b>OTLP gRPC</b> ตรงไปที่ <span class="mono text-[12px]">OTEL_EXPORTER_OTLP_ENDPOINT</span>
-                (server จริงที่ <span class="mono text-[12px]">172.16.0.220:4317</span>) — เป็น network call ออกไปจากเครื่องไหนก็ได้
+                (server จริงที่ <span class="mono text-[12px]">172.xx.x.220:4317</span>) — เป็น network call ออกไปจากเครื่องไหนก็ได้
                 ไม่ว่าจะ localhost หรือ production ตราบใดที่ต่อ endpoint นั้นถึง ก็เห็น trace ใน Tempo ทันที
                 <b>ไม่ต้องรัน Alloy บนเครื่องตัวเอง</b>
               </p>
@@ -135,7 +136,7 @@
           <span class="mono text-[13px]">tempo.yaml</span>, <span class="mono text-[13px]">loki-config.yaml</span>,
           <span class="mono text-[13px]">prometheus.yml</span>, <span class="mono text-[13px]">grafana-datasources.yaml</span>)
           อยู่ใน repo นี้แล้วที่ <span class="mono text-[13px]">infrastructure/observability/</span> — mirror ตรงกับที่รันจริงบน
-          server (<span class="mono text-[13px]">172.16.0.220</span>) ทุกบรรทัด ตรวจสอบ/แก้ config ได้ตรงนี้โดยไม่ต้อง ssh เข้า
+          server (<span class="mono text-[13px]">172.xx.x.220</span>) ทุกบรรทัด ตรวจสอบ/แก้ config ได้ตรงนี้โดยไม่ต้อง ssh เข้า
           server เลย (ดูวิธีรันที่ <span class="mono text-[13px]">infrastructure/README.md</span>) — สิ่งที่ต่างจาก repo
           มีแค่ไฟล์ <span class="mono text-[13px]">.env</span>/ข้อมูลจริงใน volume ซึ่ง gitignored ไว้โดยตั้งใจ
           (credentials/state ไม่ใช่ config). datastore ฝั่ง Postgres/Redis/RabbitMQ ก็ mirror ไว้แบบเดียวกันที่
@@ -290,7 +291,7 @@ otelSdk.start();</pre>
 sequenceDiagram
     participant App as erp-api service (ตัวไหนก็ได้ — localhost หรือ server)
     participant SDK as OpenTelemetry NodeSDK (tracing.ts)
-    participant Alloy as Grafana Alloy · :4317 (172.16.0.220)
+    participant Alloy as Grafana Alloy · :4317 (172.xx.x.220)
     participant Tempo as Tempo
 
     Note over App,SDK: main.ts → bootstrap.util.ts บรรทัดแรก import '../tracing'<br/>ก่อน http/pg/nestjs ถูกโหลด

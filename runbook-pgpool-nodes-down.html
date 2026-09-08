@@ -71,6 +71,7 @@
       <section id="symptom" class="section pt-16 pb-4">
         <div class="eyebrow text-[var(--accent)] mb-3">1 — อาการ (Symptom)</div>
         <h2 class="display text-3xl mb-6">Log ที่จะเห็น</h2>
+        <div class="edge mb-6"><div class="tag mb-1">IP ในเอกสารนี้ถูก mask ไว้</div><p class="text-[13px]">เอกสารชุดนี้เป็น repo สาธารณะ จึงปิด octet กลางของที่อยู่ภายในไว้เป็น <span class="mono text-[12px]">172.xx.x.NNN</span> — <b>octet สุดท้ายเป็นของจริง</b> เพื่อให้ยังแยกโน้ดออกจากกันได้ (เช่น <span class="mono text-[12px]">.221</span> กับ <span class="mono text-[12px]">.222</span> คือคนละเครื่อง) · เวลารันจริงให้แทนด้วย subnet ของตัวเอง ส่วน <span class="mono text-[12px]">127.0.0.1</span> และ <span class="mono text-[12px]">0.0.0.0</span> เป็นค่าจริงตามความหมายเดิม ไม่ได้ mask</p></div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
           ทุก microservice ที่ TypeORM ต่อผ่าน pgpool VIP จะ retry connect วนไม่หยุด โดย error ซ้ำแบบนี้ในทุก BC พร้อมกัน
           (ไม่ใช่แค่ BC เดียว — ถ้าเจอแค่ BC เดียวไม่ใช่เคสนี้ ให้เช็ค credential/DB เฉพาะ BC นั้นแทน):
@@ -150,7 +151,7 @@
           <h3 class="font-semibold text-[16px] mb-2">(ถ้าข้อ 1 ก็ผิดปกติด้วย) เช็ค TCP ไปยัง backend แต่ละตัวจาก pgpool node</h3>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">แยกให้ออกว่าเป็น network/firewall หรือ PostgreSQL ตายจริง — ถ้า TCP ต่อไม่ได้เลยคือปัญหาคนละเรื่อง ไม่ใช่ runbook นี้</p>
           <div class="code p-5">
-<pre><span class="k">for</span> ip <span class="k">in</span> 172.16.0.221 172.16.0.222 172.16.0.223<span class="k">;</span> <span class="k">do</span>
+<pre><span class="k">for</span> ip <span class="k">in</span> 172.xx.x.221 172.xx.x.222 172.xx.x.223<span class="k">;</span> <span class="k">do</span>
   ssh ovh-pgpool1 <span class="s">"nc -zv -w3 $ip 5432"</span>
 <span class="k">done</span></pre>
           </div>
@@ -285,9 +286,9 @@ sequenceDiagram
               <table class="d">
                 <thead><tr><th>Node</th><th>Host</th><th>Status Name</th><th>Backend Status</th><th>Role</th></tr></thead>
                 <tbody>
-                  <tr><td>0</td><td>ppm · 172.16.0.221</td><td><b>up</b></td><td>up</td><td>primary</td></tr>
-                  <tr><td>1</td><td>ppr1 · 172.16.0.222</td><td><b>up</b></td><td>up</td><td>standby</td></tr>
-                  <tr><td>2</td><td>ppr2 · 172.16.0.223</td><td><b>up</b></td><td>up</td><td>standby</td></tr>
+                  <tr><td>0</td><td>ppm · 172.xx.x.221</td><td><b>up</b></td><td>up</td><td>primary</td></tr>
+                  <tr><td>1</td><td>ppr1 · 172.xx.x.222</td><td><b>up</b></td><td>up</td><td>standby</td></tr>
+                  <tr><td>2</td><td>ppr2 · 172.xx.x.223</td><td><b>up</b></td><td>up</td><td>standby</td></tr>
                 </tbody>
               </table>
             </div>
