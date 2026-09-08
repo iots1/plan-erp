@@ -56,8 +56,23 @@
 
 | Repo | HEAD ปัจจุบัน |
 |---|---|
-| `iotechsoft-company/erp-api` | `99dd443` docs: bump plan-erp submodule — RabbitMQ reliability guide + tax invoice type/audit log docs |
-| `iots1/plan-erp` (submodule) | `3ed572d` docs: RabbitMQ dead-letter reliability guide + vendor tax invoice type + setting audit log |
+| `iotechsoft-company/erp-api` | `bb81622` feat(finance-bc,iam): versioned tax rates + fiscal year closing, with admin UIs (+ commit bump submodule ที่ตามมา) |
+| `iots1/plan-erp` (submodule) | commit นี้เอง — tax_configs versioning + กับดัก #14–16 |
+
+**รอบ 2026-09-08** (ดู §2 หัวข้อ **2026-09-08 · `tax_configs` เคย version อัตราภาษีไม่ได้เลย**) — ยืนยันด้วย
+การรันจริงทุกข้อ ไม่ใช่เดา:
+
+- `pnpm typecheck` ผ่าน · `nx lint finance-bc` + `nx lint iam` **0 error**
+- unit **finance-bc 420/420 (18 suites)** · **iam 186/186 (25 suites)** · finance-bc e2e 28/28
+- **`pnpm verify finance-bc --steps=smoke` ผ่านครบ 4/4 โดยไม่ต้องใส่ flag ใดๆ** หลังเพิ่ม `needs` —
+  runner สตาร์ท sales-bc/report-bc/storage ให้เองตามที่ไฟล์ smoke ประกาศ
+- **`pnpm verify iam --steps=build,smoke` ผ่าน** — smoke ตัวแรกของ iam ยิงหน้า admin ครบ 18 หน้า
+  + create form 11 หน้า + เช็คว่า sidebar render ครบ 7 กลุ่มตามลำดับ
+- migration `erp_finance` + `erp_iam` **pending 0 ทั้งคู่** · ยืนยันบน DB จริงว่า
+  `uq_tax_configs_code_open` มี predicate ถูกต้องและไม่มี code ไหนมีแถวเปิดค้างเกิน 1 แถว ·
+  `page:view_tax_configs` grant ให้ 2 policy แล้ว
+- **deploy run แรกล้มเพราะ `git fetch` บน app server ต่อ `github.com:22` timeout** (ไม่เกี่ยวกับโค้ด —
+  สคริปต์ตายก่อนถึงขั้น migrate/pm2 จึงไม่ค้างครึ่งทาง) re-run แล้วผ่าน — `deployed main @ bb816220`
 
 ไล่ commit ของรอบ 2026-09-05 (เรียงเก่า→ใหม่):
 
@@ -93,6 +108,66 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### 2026-09-08 · `tax_configs` เคย version อัตราภาษีไม่ได้เลย ✅ **แก้ constraint + supersede endpoint + Admin UI + smoke — ครบ**
+
+**ตารางถูก ship มาด้วย `UNIQUE (code)` เปล่าๆ ซึ่งขัดกับทุกอย่างที่สร้างทับบนมัน** — `effective_from`/
+`effective_upto` มีอยู่เพื่อทำ versioning, `assertNoOverlappingPeriod()` เขียนไว้รองรับหลายแถวต่อ code
+ที่ช่วงไม่ทับกัน, และ `resolveEffectiveRate()` ก็จัดการเคสเจอหลาย candidate แล้ว (ถึงขั้น 409 ปฏิเสธการเดา)
+แต่**ไปไม่ถึงโค้ดพวกนั้นเลย** เพราะ Postgres ตี `VAT7` แถวที่สองตกก่อน ผลคือทางเดียวที่จะเปลี่ยนอัตราตาม
+ประกาศรัฐคือ**เขียนทับแถวเดิม** ซึ่งทำลายช่วงเวลาที่อัตราเก่าเคยมีผล → เอกสารที่ backdate เข้าไปในช่วงนั้น
+จะ resolve ได้อัตราใหม่ (ผิด)
+
+**Constraint** — เปลี่ยนเป็น partial unique index บนแถวที่ยังมีผลอยู่:
+`(code) WHERE effective_upto IS NULL AND deleted_at IS NULL` (migration
+`1788713267769-FixTaxConfigsCodeVersioning`) ประวัติทำได้แล้ว แต่ยังกัน "สองแถวเปิดค้างพร้อมกันต่อ 1 code"
+ไว้ — เพราะสองแถวเปิดจะทำให้ `resolveEffectiveRate()` เจอ 2 candidate ทุกวันหลังแถวหลังเริ่ม แล้ว 409
+**ตอนออกใบกำกับ** ซึ่งเป็นจังหวะที่แย่ที่สุด ส่วนช่วงที่ปิดแล้วทับกันปล่อยให้
+`assertNoOverlappingPeriod()` คุม (index เขียน range check ไม่ได้) · `deleted_at IS NULL` อยู่ใน predicate
+เพราะแถวเป็น soft-delete ถ้าไม่ใส่ แถวที่ลบแล้วจะยึดช่อง "เปิด" ของ code นั้นไว้ตลอดกาล
+
+**`POST /tax-configs/:id/supersede`** — ปิดอัตราที่มีผลอยู่ + เปิดอัตราใหม่ใต้ code เดิม ใน transaction เดียว
+ใต้ row lock (`pessimistic_write`) **ที่ต้องเป็น endpoint เดียวเพราะลำดับการเขียนไม่สมมาตร**: สร้างแถวใหม่
+ก่อนจะ fail สะอาดที่ index เอง แต่ปิดแถวเก่าก่อนจะเปิดช่องที่ code นั้น**ไม่มีอัตราใดมีผลเลย** —
+`resolveEffectiveRate()` คืน `null` และ `ReceiptsService` ตีความว่า 0% แล้วออกเอกสารต่อ (จงใจ เพราะบริษัท
+ที่ไม่จด VAT ไม่มีอัตรา) → **ใบกำกับภาษีที่ออกในช่องนั้นจะไม่มี VAT และไม่มีอะไรเตือน** · อัตราเดิมถูกปิดที่
+**วันก่อนหน้า** วันเริ่มของอัตราใหม่ตามปฏิทินไทย (ทั้งสองขอบเป็น inclusive calendar day ถ้าแชร์วันเดียวกัน
+วันนั้นจะมีสองอัตรา)
+
+**Admin UI** (`apps/iam`) — `views/tax-configs` list + form ตาราง**เดียว**อ่านเป็น version history
+(คอลัมน์ช่วงที่มีผล + badge `ใช้อยู่ปัจจุบัน`/`ยังไม่เริ่ม`/`ถูกแทนที่แล้ว`/`ปิดใช้งาน` คำนวณฝั่ง client) ·
+filter 3 ตัว: ค้นหา, ประเภท VAT/WHT, ช่วงเวลา (ใช้ `effective_upto||$isnull||true|false`) · ปุ่ม
+"ปรับอัตราใหม่" เปิด dialog เรียก supersede — โผล่เฉพาะแถวที่ยังไม่ปิด **จงใจไม่ทำเป็น "แก้ไขอัตรา"
+เพราะนั่นคือสิ่งที่งานนี้ทั้งงานพยายามกันไม่ให้เกิด** · ทุก input วันที่ผ่าน
+`toDateInputValue`/`fromDateInputValue` ที่มีอยู่แล้วใน `utils.js` (`<input type="date">` ให้
+`YYYY-MM-DD` เปล่าซึ่ง `@IsISO8601()` ปฏิเสธ และ slice ISO ดิบจะเพี้ยนไปหนึ่งวันสำหรับ instant หลัง 17:00)
+
+**Refactor เมนูซ้าย** — กลุ่ม `ระบบ` เดิมโตจนกลายเป็นถังรวมของ 3 bounded context (คลังสินค้า, ผังบัญชี,
+เทมเพลตพิมพ์ อยู่ปนกัน) แยกเป็น **ตั้งค่าบัญชีและการเงิน / ตั้งค่าคลังสินค้า / ตั้งค่าเอกสาร** ตามเจ้าของข้อมูล
+URL เดิมทั้งหมด (bookmark/permission ไม่กระทบ) · เปลี่ยน `ประเภทภาษี` → **`ประเภทภาษีสินค้า`** เพื่อไม่ให้
+อ่านเป็นคำเดียวกับหน้า `อัตราภาษี` ใหม่ — inventory-bc จัดประเภทสินค้า, finance-bc บอกอัตรา, ใบกำกับต้องอ่าน
+ทั้งสองแหล่ง (srs-p5 §2)
+
+**Permission** — ไม่สร้าง permission ใหม่เลย: supersede ใช้ `tax_config:update` เดิมร่วมกับ PUT/DELETE
+(ถ้าไว้ใจให้แก้อัตราก็ไว้ใจให้ supersede ได้ — และเลี่ยงกับดัก deploy-order ไปเลย) · ui-plane
+`page:view_tax_configs` ใช้ self-upsert pattern (`SeedTaxConfigsUiPermission1788755781581`) ปลอดภัย
+ไม่ว่าจะรันก่อน/หลัง `permissions:sync`
+
+**Smoke** (`apps/finance-bc/test/smoke/tax-configs.smoke.mjs`) — จุดสำคัญคือ**เคสนี้ unit test มองไม่เห็น
+โดยหลักการ** เพราะมัน mock repository จึง "insert" แถวที่ Postgres จะตีตกได้อย่างสบายใจ ใช้ `code` สุ่มต่อรัน
++ ลงวันที่ปี 2090+ (กันไม่ให้อัตรา smoke resolve ชนเอกสารที่ smoke ไฟล์อื่นออกวันนี้) + `WHT` (ไม่มีอะไรใน
+suite ออกเอกสารที่แบก WHT) และ soft-delete คืนใน `finally` ซึ่งคืนช่อง "เปิด" ของ code ให้รันซ้ำได้
+
+**เพิ่มเติมที่ทำติดไปในรอบเดียวกัน** — `needs` ใน smoke runner: `scripts/verify.mjs` เดิมสตาร์ทแค่
+`auth`+`iam`+BC ที่เทส ทำให้ smoke ที่ข้าม BC ได้ 503 ซึ่ง**หน้าตาเหมือน regression ของ BC ที่กำลังเทส**
+(gl-accounts + receipts-print แดงอยู่วันนึงเพราะเรื่องนี้ และตอนแรกวินิจฉัยผิดว่าเป็นเพราะ `account_role`
+enum เพิ่ม role) ตอนนี้ไฟล์ smoke ประกาศ `needs: ['report-bc', 'storage']` เองแล้ว runner สตาร์ทให้ ·
+และเพิ่ม `apps/iam/test/smoke/admin-pages.smoke.mjs` ตัวแรกของ iam — iam โฮสต์หน้า admin 18 หน้าโดย
+**ไม่มี smoke แม้แต่ไฟล์เดียว** ทั้งที่ typecheck/lint ไม่เคยเปิดไฟล์ `.ejs` และ unit test ทดสอบแค่
+view controller คืนชื่อ template ไม่ใช่ template resolve ได้จริง → include พิมพ์ผิด/ลืมลงทะเบียนใน
+`build-assets.mjs` จะเขียวแล้ว 500 บน production ตอนคลิกครั้งแรก
+
+---
 
 ### 2026-09-07 · Fiscal Year Closing / ยอดยกมา (D2) ✅ **backend + Admin UI + smoke — implement ครบ**
 
@@ -1333,6 +1408,18 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     `GET /gl-accounts/tree` เป็นตัวแรก แก้แล้วใน `libs/common` (`transform-interceptor.util.ts`)
     พร้อม regression test 5 เคสครอบทั้ง 4 shape — ถ้าจะเขียน endpoint ใหม่ที่คืน array เปล่าๆ
     (ไม่ paginate) ตรวจ response จริงว่ามี `status` เสมอ อย่าเชื่อแค่ shape ถูก
+14. **(จาก 2026-09-08, tax_configs) constraint ที่ผิดทำให้ดีไซน์ทั้งชุด "ไปไม่ถึง" ได้ โดย unit test
+    เขียวหมด** — `tax_configs` มี `UNIQUE (code)` ขณะที่ service ข้างบนเขียนรองรับหลายแถวต่อ code ไว้ครบ
+    (`assertNoOverlappingPeriod()` + `resolveEffectiveRate()` ที่ handle หลาย candidate) โค้ดนั้นเป็น
+    dead code มาตลอดโดยไม่มีใครรู้ เพราะ**เทสที่ mock repository ไม่เคยเจอ constraint จริง** — mock ยอมให้
+    "insert" แถวที่ Postgres จะตีตก ทำให้เทสยืนยันตรรกะที่รันไม่ได้จริง บทเรียน: ถ้าฟีเจอร์พึ่ง invariant
+    ระดับ DB (unique/CHECK/FK/partial index) **มันต้องมี smoke ที่ยิงของจริง** ไม่ใช่แค่ unit test —
+    และเวลาอ่าน service ที่มี guard ซับซ้อน ให้ไปดู migration ด้วยว่า schema อนุญาตให้ guard นั้นทำงานจริงไหม
+15. **(จาก 2026-09-08) `verify --steps=smoke` ไม่ build ให้** — สตาร์ทจาก `dist/` ที่มีอยู่ route ใหม่จะได้
+    `404 Cannot POST /…` และ handler ที่แก้จะรันโค้ดเก่าเงียบๆ ใช้ `--steps=build,smoke` เสมอเมื่อแตะ source
+16. **(จาก 2026-09-08) smoke ที่ข้าม BC ได้ 503 ซึ่งอ่านเหมือน regression ของ BC ที่กำลังเทส** — runner
+    สตาร์ทแค่ `auth`+`iam`+BC เป้าหมาย ประกาศ `needs: ['report-bc']` ในไฟล์ smoke แล้ว runner จะสตาร์ทให้
+    (อย่าไปแก้ด้วยการจำ `--with=` เพราะช่วยได้แค่คนที่รู้อยู่แล้วว่าต้องใส่)
 
 ---
 
