@@ -45,7 +45,7 @@
 | บั๊ก auto-resolved price ไม่แปลงอัตราแลกเปลี่ยน | หัวข้อ **บั๊ก · auto-resolved price…** ต่อจาก `meta.warnings` ใน §2 (commit+deploy แล้ว) |
 | dotenv tip / P3 #9 credit_limit — ทำไปถึงไหน | commit แล้วทั้งคู่ (`18f6acf`/`21b6bd4`) — ดู §2 หัวข้อ **P3 #9** |
 | P4 #12 unrealised FX (TFRS 21) — ทำไปถึงไหน | §2 หัวข้อ **P4 #12** (เสร็จหมด + deploy + E2E บน production แล้ว 2026-09-03) |
-| **พิมพ์เอกสาร** — ทำไปถึงไหน / เฟสถัดไปคืออะไร | `HANDOFF-Document-Print-Pipeline.md` §7 (P0–P3 เสร็จ · P4 **12/25** · §7.3–§7.4 = ผลตรวจสอบ) — **13 ใบที่เหลือยังไม่มี `POST /:id/print` เลย** งานต่อใบคือ endpoint+mapper ของ BC เจ้าของ · ไฟล์นั้นเป็นเจ้าของสถานะ ไม่ใช่ที่นี่ |
+| **พิมพ์เอกสาร** — ทำไปถึงไหน / เฟสถัดไปคืออะไร | `HANDOFF-Document-Print-Pipeline.md` §7 — **P0–P4 เสร็จครบ 25/25 ใบ** (§7.3–§7.4 = ผลตรวจสอบ) · เหลือ **P5** (ต้นฉบับ/สำเนา/ใบแทน §86/12 — **รอฝ่ายบัญชี** — และฟอร์ม ภ.พ.30) · ไฟล์นั้นเป็นเจ้าของสถานะ ไม่ใช่ที่นี่ |
 | ทำไมพิมพ์ออกมาแล้วไม่มีชื่อบริษัทผู้ขาย | `company_profiles` ยังว่างทุกช่อง — กรอกผ่าน `PATCH /finance-bc/v1/company-profiles/:id` (ดู §2 หัวข้อ **2026-09-09** และ print pipeline §7.3) |
 | ผังบัญชีที่ตั้งค่าได้ (`gl_accounts`) — เหลืออะไร | §2 หัวข้อ **2026-09-06 · Configurable Chart of Accounts** (**ค้าง 2 จุด**: smoke §8.3 ข้อ 6 ที่ยังไม่ตัดสินใจ + manual QA UI ที่ยังไม่มีใคร click-through) |
 | ปิดปีบัญชี / ยอดยกมา (D2) — ทำไปถึงไหน | §2 หัวข้อ **2026-09-07 · Fiscal Year Closing / ยอดยกมา (D2)** (backend + Admin UI + smoke ครบ) · งานต่อยอดที่ยังไม่ทำอยู่ใน `HANDOFF-Fiscal-Year-Closing.md` §9 (งบการเงิน D3, manual journal entry, import/export ผังบัญชี D4) |
@@ -59,7 +59,7 @@
 | จะทำ audit หาช่องโหว่รอบใหม่ | §5 |
 
 **ที่แนะนำถ้าจะทำต่อเลย** (ปรับใหม่ 2026-09-08 · ไม่มีข้อไหนบล็อกอีกข้อ):
-1. **กรอก `company_profiles`** (5 นาที, ต้องใช้ข้อมูลจริงของบริษัท) — จนกว่าจะกรอก เอกสารทุกใบที่พิมพ์ออกมาไม่มีชื่อ/เลขผู้เสียภาษี/ที่อยู่ผู้ขาย ซึ่ง §86/4(1)–(2) บังคับ · ~~P3~~ ✅ + ~~P4 ฝั่งที่มี endpoint แล้ว~~ ✅ (12/25) → **P4 ที่เหลือ 13 ใบ** = ทำ `POST /:id/print` + mapper ของ sales-bc (SO/DN/SR), supplier-bc (PO 4 แบบ/purchase return), inventory-bc (goods receipt), finance-bc (billing note/payment entry/AP invoice 2 แบบ) ก่อน แล้ว HTML ค่อยตามมา
+1. **บันทึกข้อมูลบริษัทจริงทับข้อมูลตัวอย่างใน `company_profiles`** (ตอนนี้เป็น placeholder ที่ประกาศตัวเองบนเอกสาร) — จนกว่าจะกรอก เอกสารทุกใบที่พิมพ์ออกมาไม่มีชื่อ/เลขผู้เสียภาษี/ที่อยู่ผู้ขาย ซึ่ง §86/4(1)–(2) บังคับ · ~~P3~~ ✅ + ~~P4 ฝั่งที่มี endpoint แล้ว~~ ✅ (12/25) → **P4 ที่เหลือ 13 ใบ** = ทำ `POST /:id/print` + mapper ของ sales-bc (SO/DN/SR), supplier-bc (PO 4 แบบ/purchase return), inventory-bc (goods receipt), finance-bc (billing note/payment entry/AP invoice 2 แบบ) ก่อน แล้ว HTML ค่อยตามมา
 2. **ปิด 2 จุดค้างของ `gl_accounts`** — smoke §8.3 ข้อ 6 ถูกลงเยอะแล้วหลัง smoke runner รับ `needs:` (2026-09-08) · manual QA UI ทำได้เลยใน session ที่มี browser tool
 3. **ยืนยันผล cron `low_stock`/`expiry_alerts`** — ค้างมาตั้งแต่คืน 2026-09-05 ยังไม่มีใครกลับไปดู (query ตารางอ่านเอาก็พอ ไม่มี endpoint กดรัน)
 4. ถ้าจะเริ่ม **§5 หนังสือรับรองหัก ณ ที่จ่าย** — บล็อกเกอร์ยังจริง: `ap_invoices` ไม่มี `supplier_tax_id` snapshot (ยืนยันกับโค้ดแล้ว 2026-09-08) ต้องเพิ่มคอลัมน์ + migration ก่อน · ส่วน "ข้อมูลบริษัทผู้ออก" ปิดไปแล้วด้วย `company_profiles` จาก print P0
@@ -166,7 +166,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
-### 2026-09-09 · print pipeline P3 + P4 (17/25) ✅ **ใบหลักครบ: ใบเสนอราคา · ใบกำกับ/invoice · ใบสั่งซื้อ · ใบรับสินค้า**
+### 2026-09-09 · print pipeline P3 + P4 ✅ **พิมพ์ได้ครบ 25/25 ใบ · 11 endpoint · 5 BC**
 
 รายละเอียดเต็ม: `HANDOFF-Document-Print-Pipeline.md` §7.3 · สรุปสั้น:
 
