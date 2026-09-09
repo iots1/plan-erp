@@ -199,6 +199,21 @@
           <b class="text-[var(--ink)]">นี่คือเหตุผลที่ runbook นี้ยังต้องใช้มืออยู่ ไม่ใช่เพราะ pgpool ทำไม่ได้</b>
         </p>
         <div class="rulebox mb-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ถ้า node ทยอยตกทีละตัว (ไม่ใช่พร้อมกัน) = คนละสาเหตุ อย่าหยุดที่ attach</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            มีอีกเคสที่อาการปลายทาง<b class="text-[var(--ink)]">เหมือนหน้านี้ทุกตัวอักษร</b> แต่ต้นเหตุคนละเรื่อง:
+            <span class="mono text-[12px]">max_connections</span> เต็ม ทำให้ health check จองสล็อตไม่ได้แล้วถูกตีความว่า node ตาย
+            → degenerate ทีละ node ห่างกันเป็นสิบนาทีถึงชั่วโมง โดย PostgreSQL ปกติตลอด
+            · ลายเซ็นคือ <span class="mono text-[12px]">health check … succeeded</span> โผล่ตามหลัง
+            <span class="mono text-[12px]">starting degeneration</span> ภายใน 1 วินาที และมี
+            <span class="mono text-[12px]">too many clients already</span> ใน log ของ PostgreSQL ก่อนหน้านั้น
+            — เคสนั้น attach เฉยๆ จะตกซ้ำ ต้องปิดต้นทางก่อน ไปที่
+            <a href="runbook-pgpool-conn-exhaustion.html" class="underline" style="color:var(--accent)">Runbook 06: Pgpool Cascade จาก max_connections เต็ม</a>
+            (ยืนยันแล้ว 2026-09-09)
+          </p>
+        </div>
+
+        <div class="rulebox mb-8" style="border-color:var(--signal)">
           <div class="rc mb-1" style="color:var(--signal)">ถ้าค้าง down แค่ node เดียว ไม่ใช่ทั้งหมด = คนละเคส อย่าใช้ runbook นี้</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
             standby ตัวเดียวค้าง <span class="mono text-[12px]">down</span> ขณะที่ primary ยัง up อยู่ แปลว่า

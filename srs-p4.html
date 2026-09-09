@@ -204,6 +204,9 @@ erDiagram
         uuid po_id FK
         int received_qty "recomputed from PURCHASE_ORDER_RECEIPTS ledger, never incremented in place"
         uuid product_id "ref inventory-bc"
+        string product_sku "snapshot ณ เวลาสั่งซื้อ · null สำหรับใบก่อนมีคอลัมน์นี้"
+        string product_name_th "snapshot — ใบสั่งซื้อที่พิมพ์ต้องแสดงสิ่งที่สั่งตามที่ตกลง"
+        string product_name_en "snapshot"
         int qty
         decimal unit_cost
         string discount_type "percent_amount · per_item mode only"

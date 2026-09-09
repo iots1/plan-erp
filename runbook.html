@@ -34,6 +34,7 @@
       <a href="runbook-pm2-logs-disk-full.html" class="navlink"><span class="n" style="color:var(--signal)">02</span> Disk เต็มจาก pm2 Logs</a>
       <a href="runbook-proxmox-cpu-mce.html" class="navlink"><span class="n" style="color:var(--signal)">03</span> Proxmox Host รีบูตเอง (CPU MCE)</a>
       <a href="runbook-standby-stuck-down.html" class="navlink"><span class="n" style="color:var(--signal)">04</span> Standby ค้าง down หลัง apt Auto-Upgrade</a>
+      <a href="runbook-pgpool-conn-exhaustion.html" class="navlink"><span class="n" style="color:var(--signal)">06</span> Pgpool Cascade จาก max_connections เต็ม</a>
       <div class="rule my-4" style="background:rgba(255,255,255,.08)"></div>
       <div class="navsub">Application</div>
       <a href="runbook-image-confirm-storage-403.html" class="navlink"><span class="n" style="color:var(--signal)">05</span> อัปโหลดรูปสินค้าไม่สำเร็จ (Storage 403)</a>
@@ -190,6 +191,15 @@
               <span class="mono text-[12px]">status=down</span> แต่ <span class="mono text-[12px]">pg_status=up</span> ·
               <span class="mono text-[12px]">auto_failback</span> เปิดอยู่แต่ไม่ทำงานเพราะ
               <span class="mono text-[12px]">application_name</span> ไม่แมตช์ — เงียบสนิท ไม่มี alert
+            </p>
+          </a>
+          <a href="runbook-pgpool-conn-exhaustion.html" class="bc-card block p-6 no-underline">
+            <div class="chip mb-4"><span class="dot" style="background:var(--signal)"></span>PGPOOL · DATABASE</div>
+            <h3 class="text-lg font-semibold mb-2" style="color:var(--ink)">Pgpool Cascade จาก max_connections เต็ม</h3>
+            <p class="text-sm" style="color:var(--muted)">
+              อาการปลายทางเหมือน Runbook 01 เป๊ะ แต่ PostgreSQL ไม่เคยตาย —
+              <span class="mono text-[12px]">too many clients already</span> ทำให้ health check ตีความว่า node ตาย
+              แล้ว degenerate ทีละตัวจนหมดใน 1 ชม. 46 นาที
             </p>
           </a>
         </div>

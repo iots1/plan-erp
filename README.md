@@ -33,6 +33,7 @@
 | [Runbook · PM2 Logs Disk Full](https://iots1.github.io/plan-erp/runbook-pm2-logs-disk-full.html) | Disk เต็มจาก pm2 log ที่ไม่เคย rotate |
 | [Runbook · Proxmox CPU MCE](https://iots1.github.io/plan-erp/runbook-proxmox-cpu-mce.html) | Proxmox Host รีบูตเอง — CPU Machine Check Exception |
 | [Runbook · Standby Stuck Down](https://iots1.github.io/plan-erp/runbook-standby-stuck-down.html) | Standby ค้างสถานะ down หลัง apt Auto-Upgrade |
+| [Runbook · Pgpool Connection Exhaustion](https://iots1.github.io/plan-erp/runbook-pgpool-conn-exhaustion.html) | `max_connections` เต็ม → health check false negative → node ตกทีละตัวจนหมด |
 
 ## Local Development
 

@@ -160,6 +160,7 @@ erDiagram
         string status "DRAFT_ISSUED_VOID"
         string document_type "8 kinds — see below"
         uuid reference_receipt_id FK "self-ref · required for CREDIT_NOTE/DEBIT_NOTE only"
+        string adjustment_reason "86/10 · สาเหตุการออกใบลดหนี้/เพิ่มหนี้ — บังคับกรอกเฉพาะสองประเภทนี้, ถูกบังคับเป็น null สำหรับประเภทอื่น"
         uuid customer_id "ref sales-bc"
         string customer_name_th "snapshot 86/4(2)"
         string customer_name_en "snapshot"

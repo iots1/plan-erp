@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Runbook: Pgpool Cascade จาก max_connections เต็ม — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="R" title="Runbook" subtitle="PGPOOL · CONN EXHAUSTION" width="280">
+    <nav slot="nav">
+      <a href="#symptom"    class="navlink"><span class="n">1</span> อาการ</a>
+      <a href="#impact"     class="navlink"><span class="n">2</span> ผลกระทบ</a>
+      <a href="#diagnosis"  class="navlink"><span class="n">3</span> วินิจฉัย</a>
+      <a href="#rootcause"  class="navlink"><span class="n">4</span> สาเหตุ</a>
+      <a href="#fix"        class="navlink"><span class="n">5</span> การแก้ไข</a>
+      <a href="#verify"     class="navlink"><span class="n">6</span> ยืนยัน + ป้องกัน</a>
+    </nav>
+    <div slot="footnote">
+      <a href="runbook.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← กลับสู่ Runbook Index</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="runbook.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่ Runbook Index
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">Runbook · Database / Infra</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          Pgpool Cascade จาก<br>
+          <span class="text-[#7FE3DE]">max_connections เต็ม</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          ปลายทางเหมือน <a href="runbook-pgpool-nodes-down.html" class="underline decoration-dotted" style="color:#7FE3DE">Runbook 01</a> เป๊ะ —
+          <span class="mono text-[13px] text-white">pgpool is not accepting any new connections</span> —
+          แต่<b class="text-white">ต้นเหตุคนละเรื่องสิ้นเชิง</b>: PostgreSQL ไม่เคยตายเลยแม้วินาทีเดียว
+          connection แค่<b class="text-white">ล้นเพดาน</b> จน health check ของ pgpool จองสล็อตไม่ได้
+          แล้วมันตีความว่า node ตาย → ทยอย degenerate ทีละตัวจนหมดใน 1 ชม. 46 นาที
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9635E"></span>Severity: Critical (Total DB Outage)</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>Slow burn: ~1 ชม. 46 นาที ก่อนล่มสนิท</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>Est. fix time: 2–5 นาที</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 1 SYMPTOM ========== -->
+      <section id="symptom" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">1 — อาการ (Symptom)</div>
+        <h2 class="display text-3xl mb-6">Log ที่จะเห็น</h2>
+
+        <div class="edge mb-6"><div class="tag mb-1">IP ในเอกสารนี้ถูก mask ไว้</div><p class="text-[13px]">เอกสารชุดนี้เป็น repo สาธารณะ จึงปิด octet กลางของที่อยู่ภายในไว้เป็น <span class="mono text-[12px]">172.xx.x.NNN</span> — <b>octet สุดท้ายเป็นของจริง</b> เพื่อให้ยังแยกโน้ดออกจากกันได้ (เช่น <span class="mono text-[12px]">.221</span> กับ <span class="mono text-[12px]">.222</span> คือคนละเครื่อง) · เวลารันจริงให้แทนด้วย subnet ของตัวเอง ส่วน <span class="mono text-[12px]">127.0.0.1</span> และ <span class="mono text-[12px]">0.0.0.0</span> เป็นค่าจริงตามความหมายเดิม ไม่ได้ mask · <b>เวลาใน log ทุกบรรทัดเป็น UTC</b> (เครื่องตั้งเป็น UTC) ต้อง +7 ถ้าเทียบกับเวลาที่ user แจ้ง</p></div>
+
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          ฝั่ง client จะเห็นแค่ 500 ธรรมดา แต่ถ้า error handler ส่ง <span class="mono text-[13px]">message</span> จาก driver
+          ออกมาตรงๆ จะอ่านต้นเหตุได้ทันทีจาก response:
+        </p>
+        <div class="code p-5">
+<pre>{
+  <span class="d">"status"</span>: { <span class="d">"code"</span>: <span class="t">500</span>, <span class="d">"message"</span>: <span class="s">"pgpool is not accepting any new connections"</span> },
+  <span class="d">"errors"</span>: [{ <span class="d">"code"</span>: <span class="t">500</span>, <span class="d">"title"</span>: <span class="s">"Server Error"</span>,
+               <span class="d">"detail"</span>: <span class="s">"pgpool is not accepting any new connections"</span> }],
+  <span class="d">"meta"</span>: { <span class="d">"timestamp"</span>: <span class="s">"…T06:41:48.117Z"</span>, <span class="d">"traceId"</span>: <span class="s">"…"</span> }
+}</pre>
+        </div>
+
+        <p class="mt-6 text-[var(--ink-soft)] text-[15.5px] max-w-3xl leading-[1.85]">
+          บน pgpool node จะเห็นสามบรรทัดนี้ซ้ำนับหมื่นครั้ง — <b class="text-[var(--ink)]">เหมือน Runbook 01 ทุกตัวอักษร</b>
+          ตรงนี้ยังแยกสองเคสออกจากกันไม่ได้:
+        </p>
+        <div class="code p-5">
+<pre><span class="c">child pid xxxxx: FATAL:  pgpool is not accepting any new connections</span>
+<span class="c">child pid xxxxx: DETAIL:  all backend nodes are down, pgpool requires at least one valid node</span>
+<span class="c">child pid xxxxx: HINT:  repair the backend nodes and restart pgpool</span></pre>
+        </div>
+
+        <div class="rulebox mt-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ลายเซ็นที่แยกเคสนี้ออกจาก Runbook 01 — health check "สำเร็จ" หลัง degenerate ไป 1 วินาที</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ถ้า node ตายจริง health check จะ fail ต่อเนื่องหลายนาที แต่เคสนี้มันกลับมาเองทันที
+            <b class="text-[var(--ink)]">ช้าไปแค่ 1 วินาที</b> — นั่นคือหลักฐานว่า node ไม่เคยตาย แค่ตอบไม่ทันเพราะไม่มีสล็อตว่าง
+          </p>
+        </div>
+        <div class="code p-5 mt-4">
+<pre><span class="c">04:48:52  health_check0: LOG:  health check retrying on DB node: 0 (round:1)</span>
+<span class="c">04:48:53  health_check0: LOG:  health check retrying on DB node: 0 (round:2)</span>
+<span class="c">04:48:54  health_check0: LOG:  health check retrying on DB node: 0 (round:3)</span>
+<span class="c">04:48:55  main:          LOG:  starting degeneration. shutdown host 172.xx.x.221(5432)</span>
+<span class="c">04:48:56  health_check0: LOG:  health check retrying on DB node: 0 succeeded   &lt;-- ช้าไป 1 วินาที</span></pre>
+        </div>
+
+        <p class="mt-8 text-[var(--ink-soft)] text-[15.5px] max-w-3xl leading-[1.85]">
+          และอีกสองอาการที่ต้องเจอคู่กันเสมอในเคสนี้ — <b class="text-[var(--ink)]">ต้นเหตุจริงอยู่ใน log ของ PostgreSQL ไม่ใช่ของ pgpool</b>:
+        </p>
+        <div class="code p-5 mt-4">
+<pre><span class="c"># /var/log/postgresql/postgresql-NN-main.log บน primary — เกิดก่อน degeneration ไม่กี่วินาที</span>
+<span class="c">04:48:12  exporter_svc@postgres FATAL:  remaining connection slots are reserved for</span>
+<span class="c">                                        roles with the SUPERUSER attribute</span>
+<span class="c">04:48:50  postgres@&lt;db&gt;         FATAL:  sorry, too many clients already</span>
+<span class="c">04:48:51  repmgr@repmgr         FATAL:  sorry, too many clients already</span>
+<span class="c">04:48:52  postgres@&lt;db&gt;         FATAL:  sorry, too many clients already      &lt;-- ตรงนี้ health check ก็โดนด้วย</span></pre>
+        </div>
+        <div class="code p-5 mt-4">
+<pre><span class="c"># journalctl -u pgpool2 — fork storm หลัง node ตกครบ: ทุก connection ที่เข้ามา child รับแล้ว exit(1) ทันที</span>
+<span class="c">main: LOG:  child process with pid: 1740864 exits with status 256</span>
+<span class="c">main: LOG:  fork a new child process with pid: 1740993</span>
+<span class="c">main: LOG:  child process with pid: 1740867 exits with status 256</span>
+<span class="c">main: LOG:  fork a new child process with pid: 1740994</span>
+<span class="c"># ... วนแบบนี้ ~300 process ทุกไม่กี่ ms → load average พุ่งจาก 0 เป็น 24+</span></pre>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 2 IMPACT ========== -->
+      <section id="impact" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">2 — ผลกระทบ (Impact)</div>
+        <h2 class="display text-3xl mb-6">Total DB Outage — แต่มาแบบค่อยๆ ทรุด ไม่ใช่ดับทันที</h2>
+        <div class="grid sm:grid-cols-3 gap-5 mb-8">
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">SCOPE</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ทุก BC ที่ผ่าน VIP นี้</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">auth, iam, inventory-bc, supplier-bc, sales-bc, finance-bc, report-bc — ทุก request ที่แตะ DB ล้มเหลว 100% รวมทุก database บนคลัสเตอร์เดียวกัน ไม่ใช่แค่ของ ERP</p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">SEVERITY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">Critical — escalate ทันที</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">แต่มีหน้าต่างให้เบรกได้ ~1 ชม. 46 นาที ระหว่าง node แรกตกกับ node สุดท้ายตก — ถ้ามี alert ที่ถูกจุดจะไม่ล่มเลย (ดู §6)</p>
+          </div>
+          <div class="card p-6">
+            <div class="mono text-[11px] text-[var(--muted)] mb-2">DATA SAFETY</div>
+            <h3 class="font-semibold mb-2 text-[15px]">ข้อมูลไม่เสี่ยง</h3>
+            <p class="text-sm text-[var(--ink-soft)] leading-relaxed">PostgreSQL ปกติตลอดเหตุการณ์ · replication lag 0 · ไม่มี failover จริง ไม่ต้อง restore อะไรเลย</p>
+          </div>
+        </div>
+
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">อาการหลอกในช่วงกลาง — write ล้มแต่ read ยังได้ ทำให้ทีมไล่ผิดทาง</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            หลัง node 0 (primary) ถูก degenerate แล้ว pgpool หา primary ตัวใหม่ไม่เจอ (เหลือแต่ standby) จึงตั้ง
+            <span class="mono text-[12px]">primary node: -1</span> — ผลคือ <b class="text-[var(--ink)]">read ยังทำงานได้ปกติ แต่ write ทุกตัวเด้ง</b>
+            ด้วย error ที่ดูเหมือนบั๊กแอป ไม่เหมือนปัญหา infra:
+          </p>
+          <div class="code p-5 mt-3">
+<pre><span class="c">ERROR: cannot execute UPDATE in a read-only transaction</span>
+<span class="c">ERROR: cannot execute INSERT in a read-only transaction</span>
+<span class="c">ERROR: cannot execute CREATE EXTENSION in a read-only transaction</span></pre>
+          </div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-3">
+            <b class="text-[var(--ink)]">เจอ error สามบรรทัดนี้เมื่อไหร่ = pgpool ไม่มี primary แล้ว ให้เข้า runbook นี้ทันที</b>
+            อย่ารอให้ล่มสนิท เพราะจากจุดนี้ไปมันจะทรุดต่อเองเสมอ (ดู §4)
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 3 DIAGNOSIS ========== -->
+      <section id="diagnosis" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">3 — วินิจฉัย (Diagnosis)</div>
+        <h2 class="display text-3xl mb-6">แยกให้ออกว่าเป็นเคสนี้ ไม่ใช่ Runbook 01</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          <b class="text-[var(--ink)]">การแก้เหมือนกันทั้งสองเคส</b> (<span class="mono text-[13px]">pcp_attach_node</span>)
+          แต่ถ้าไม่แยกให้ออกว่าเป็นเคสนี้ จะ attach เสร็จแล้ว<b class="text-[var(--ink)]">ตกซ้ำอีกใน 5 นาที</b> เพราะต้นเหตุจริงยังอยู่
+          — §3 นี้จึงมีไว้เพื่อ<b class="text-[var(--ink)]">หาว่าใครกิน connection</b> ไม่ใช่แค่ยืนยันอาการ
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คว่า PostgreSQL/repmgr จริงยังปกติไหม</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">เหมือน Runbook 01 ข้อ 1 — ในเคสนี้จะปกติทุกโหนด ไม่มี failover จริง</p>
+          <div class="code p-5">
+<pre>ssh ovh-ppm <span class="s">"sudo -u postgres repmgr cluster show"</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">เทียบ timestamp: degeneration กับ "health check succeeded" ห่างกันกี่วินาที</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            นี่คือคำสั่งที่แยกสองเคสออกจากกันได้ตรงที่สุด — ถ้า <span class="mono text-[12px]">succeeded</span>
+            โผล่ตามหลัง <span class="mono text-[12px]">starting degeneration</span> ภายใน 1–2 วินาที <b>ทุกครั้ง</b> = เคสนี้
+          </p>
+          <div class="code p-5">
+<pre>ssh ovh-pgpool1 <span class="s">"sudo journalctl -u pgpool2 --since '6 hours ago' --no-pager \
+  | grep -E 'starting degeneration|health check retrying|find_primary_node_repeatedly|no valid backend'"</span></pre>
+          </div>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">รูปแบบที่ต้องเห็น — ตกทีละ node ห่างกันเป็นสิบนาทีถึงชั่วโมง ไม่ใช่พร้อมกัน</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              Runbook 01 คือ 3 node ตก<b class="text-[var(--ink)]">พร้อมกัน</b>ในไม่กี่วินาที (primary หาย/watchdog เสีย quorum) ·
+              เคสนี้คือ<b class="text-[var(--ink)]">ทยอยตก</b> โดยแต่ละครั้ง health check กลับมาเองทันที
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ยืนยันต้นเหตุใน log ของ PostgreSQL — ไม่ใช่ของ pgpool</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">ถ้าไม่เจอ <span class="mono text-[12px]">too many clients</span> ในช่วงก่อน degeneration แปลว่าไม่ใช่เคสนี้ ให้กลับไป <a href="runbook-pgpool-nodes-down.html" class="underline" style="color:var(--accent)">Runbook 01</a></p>
+          <div class="code p-5">
+<pre>ssh ovh-ppm <span class="s">"grep -aE 'too many clients|remaining connection slots' \
+  /var/log/postgresql/postgresql-*-main.log | tail -40"</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">หาว่าใครกิน connection — ต้องรู้ก่อนแก้ ไม่งั้นตกซ้ำ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ตอนที่ pgpool ปฏิเสธทุก connection แล้ว ตัวเลขนี้จะ<b>ต่ำหลอกตา</b> (ไม่มี traffic ไปถึง PG เลย —
+            ในเหตุการณ์จริงเหลือแค่ 4 connection) ให้ดู <span class="mono text-[12px]">restart count</span> ของ pm2 ควบคู่ไปด้วย
+            เพราะ service ที่ restart loop คือผู้ต้องสงสัยอันดับหนึ่ง — ทุกครั้งที่บูตใหม่มันเปิด pool ใหม่ทั้งชุด
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># ใช้ได้แม้ pgpool ตายอยู่ — ไม่ต้องผ่าน pgpool</span>
+ssh ovh-ppm <span class="s">"curl -s localhost:9187/metrics \
+  | grep -E '^pg_settings_max_connections|^pg_settings_superuser_reserved|^pg_stat_activity_count' \
+  | grep -v '} 0$'"</span>
+
+<span class="c"># ใครรีสตาร์ทวน = ใครเปิด pool ใหม่ซ้ำๆ (คอลัมน์ restart สูงผิดปกติ)</span>
+ssh app-server <span class="s">"pm2 list"</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">5</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คสถานะที่ pgpool "คิด" ว่าเป็น</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เหมือน Runbook 01 ข้อ 3 — ลายเซ็นคือ <span class="mono text-[12px]">Status Name: down</span> คู่กับ
+            <span class="mono text-[12px]">Backend Status Name: up</span> ทั้ง 3 node
+          </p>
+          <div class="code p-5">
+<pre><span class="k">for</span> n <span class="k">in</span> 0 1 2<span class="k">;</span> <span class="k">do</span>
+  ssh ovh-pgpool1 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+    pcp_node_info -h localhost -p 9898 -U pgpool_admin -w -n $n -v"</span>
+<span class="k">done</span></pre>
+          </div>
+          <div class="rulebox mt-3">
+            <div class="rc mb-1">ถ้า <span class="mono text-[12px]">pcp_node_info</span> ใช้ไม่ได้ (ไม่มี sudo / รหัส pcp หาย) มีทางสำรอง 2 ทาง</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              (1) อ่านไฟล์สถานะตรงๆ — <span class="mono text-[12px]">cat /var/log/postgresql/pgpool_status</span> คืนค่า 3 บรรทัด (node 0/1/2) ·
+              (2) นับ child process — <span class="mono text-[12px]">pgrep -c pgpool</span> อยู่ที่เพดาน
+              <span class="mono text-[12px]">num_init_children</span> คาที่เดิม พร้อม
+              <span class="mono text-[12px]">ss -Htan | grep -c TIME-WAIT</span> สูงผิดปกติ = fork storm กำลังเกิด
+              · <b class="text-[var(--ink)]">ข้อควรระวัง:</b> ไฟล์ <span class="mono text-[12px]">pgpool_status</span> คือค่าที่เขียนลงดิสก์
+              ซึ่ง<b class="text-[var(--ink)]">อาจตามหลังค่าใน memory</b> — ในเหตุการณ์จริงไฟล์ยังเป็น
+              <span class="mono text-[12px]">down/down/up</span> ขณะที่ pgpool ปฏิเสธทุก connection ไปแล้ว (คือ down จริงทั้ง 3)
+              อย่าใช้ไฟล์นี้ตัดสินว่า "ยังมี node เหลือ"
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 4 ROOT CAUSE ========== -->
+      <section id="rootcause" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">4 — สาเหตุ (Root Cause)</div>
+        <h2 class="display text-3xl mb-6">Health check แยกไม่ออกระหว่าง "node ตาย" กับ "ไม่มีสล็อตว่าง"</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          Health check ของ pgpool ตัดสินว่า node เป็นหรือตายด้วยการ<b class="text-[var(--ink)]">เปิด connection ใหม่</b>ไปที่ backend
+          — และมันเชื่อมต่อด้วย role ธรรมดาที่<b class="text-[var(--ink)]">ไม่มีสิทธิ์แตะ</b>
+          <span class="mono text-[13px]">superuser_reserved_connections</span> ดังนั้นตอน
+          <span class="mono text-[13px]">max_connections</span> เต็ม PostgreSQL จะตอบมันด้วย
+          <span class="mono text-[12px]">sorry, too many clients already</span> ซึ่งจากมุมของ health check
+          <b class="text-[var(--ink)]">หน้าตาเหมือน node ตายเป๊ะ</b> — retry ครบโควตาแล้วก็ degenerate
+        </p>
+
+        <div class="rulebox mb-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">หัวใจของเคสนี้: มันเป็น positive feedback loop ไม่ใช่เหตุการณ์เดี่ยว</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            connection ล้น → degenerate node → เหลือ node น้อยลง → connection เดิมทั้งหมดอัดเข้า node ที่เหลือ →
+            <b class="text-[var(--ink)]">ล้นเร็วกว่าเดิม</b> → degenerate ตัวถัดไป → … วนจนหมดทั้ง 3
+            · การ attach node กลับโดยไม่ปิดต้นทาง = ป้อน loop รอบใหม่
+          </p>
+        </div>
+
+        <div class="diagram mb-8">
+<pre class="mermaid">
+sequenceDiagram
+    participant App as App (TypeORM pools)
+    participant PP as Pgpool (health check)
+    participant PG as PostgreSQL (จริง — ปกติตลอด)
+
+    App->>PG: connection ทะลุ max_connections
+    PG-->>App: FATAL: sorry, too many clients already
+    PP->>PG: health check เปิด connection ใหม่
+    PG-->>PP: FATAL: too many clients (ไม่มีสล็อต · ไม่ใช่ superuser)
+    Note over PP: retry ครบโควตา → ตีความว่า node ตาย
+    PP->>PP: starting degeneration → node = down
+    PG-->>PP: 1 วินาทีถัดมา health check ผ่านแล้ว (ช้าไป)
+    Note over PP: หา primary ใหม่ → เหลือแต่ standby<br/>search_primary_node_timeout 300s หมด<br/>→ set new primary node: -1
+    App->>PP: write ทุกตัว
+    PP-->>App: cannot execute UPDATE in a read-only transaction
+    Note over App,PG: connection ทั้งหมดอัดเข้า node ที่เหลือ<br/>→ ล้นเร็วกว่าเดิม → วนซ้ำข้อ 3
+    Note over PP: node สุดท้ายตก → all backend nodes are down<br/>→ ปฏิเสธทุก connection + fork storm
+</pre>
+        </div>
+
+        <h3 class="display text-2xl mb-5 mt-12">ไทม์ไลน์จริง — 2026-09-09 (UTC)</h3>
+        <div class="card overflow-hidden mb-8">
+          <div class="overflow-x-auto">
+            <table class="d">
+              <thead><tr><th>เวลา</th><th>เหตุการณ์</th><th>สถานะ pgpool หลังจากนั้น</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">04:48:12</td><td><span class="mono text-[12px]">exporter_svc</span> โดน <span class="mono text-[12px]">remaining connection slots are reserved</span> — สัญญาณแรกสุด</td><td>ปกติทั้ง 3</td></tr>
+                <tr><td class="mono">04:48:50</td><td><span class="mono text-[12px]">too many clients already</span> กระจายทุก database + <span class="mono text-[12px]">repmgr</span></td><td>ปกติทั้ง 3</td></tr>
+                <tr><td class="mono">04:48:52–54</td><td>health check node 0 retry round 1→3 ไม่ผ่าน</td><td>ปกติทั้ง 3</td></tr>
+                <tr><td class="mono">04:48:55</td><td><b>degenerate node 0</b> (<span class="mono text-[12px]">172.xx.x.221</span> = primary จริง)</td><td>node 0 down</td></tr>
+                <tr><td class="mono">04:48:56</td><td>health check node 0 <b>succeeded</b> — ช้าไป 1 วินาที</td><td>node 0 down (ไม่มีใครดึงกลับ)</td></tr>
+                <tr><td class="mono">04:53:55</td><td><span class="mono text-[12px]">find_primary_node_repeatedly: expired after 300 seconds</span> → <span class="mono text-[12px]">primary node: -1</span></td><td><b>ไม่มี primary — write ล้มทั้งระบบ</b></td></tr>
+                <tr><td class="mono">04:56:13</td><td><b>degenerate node 1</b> (<span class="mono text-[12px]">172.xx.x.222</span>) · succeeded 1 วินาทีถัดมา</td><td>node 0,1 down</td></tr>
+                <tr><td class="mono">05:01:13</td><td>ยังหา primary ไม่ได้ → <span class="mono text-[12px]">main node: 2</span></td><td>เหลือ node 2 ตัวเดียว</td></tr>
+                <tr><td class="mono">06:34:30</td><td><b>degenerate node 2</b> ผ่าน watchdog consensus จาก pgpool1 + pgpool3 → <span class="mono text-[12px]">failover: no valid backend node found</span></td><td><b>down ทั้ง 3 — ปฏิเสธทุก connection</b></td></tr>
+                <tr><td class="mono">06:41:48</td><td>user แจ้ง login 500 (= 1 ชม. 53 นาทีหลังสัญญาณแรก)</td><td>down ทั้ง 3</td></tr>
+                <tr><td class="mono">06:50:55</td><td><span class="mono text-[12px]">pcp_attach_node</span> ด้วยมือ → <span class="mono text-[12px]">set new primary node: 0</span></td><td>up ทั้ง 3 · หาย</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rulebox mb-5">
+          <div class="rc mb-1">ทำไม auto_failback ไม่ช่วย — เหตุผลเดียวกับ Runbook 01</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <span class="mono text-[12px]">auto_failback</span> ต้องอ่าน <span class="mono text-[12px]">pg_stat_replication</span>
+            บน primary เพื่อยืนยันว่า standby streaming อยู่จริง — แต่พอ node 0 (primary ตัวจริง) ถูก degenerate เป็นตัวแรก
+            pgpool ก็ไม่มี primary ให้อ่านตั้งแต่นาทีที่ 1 <b class="text-[var(--ink)]">ขา DOWN → UP จึงตายสนิททั้งเหตุการณ์</b>
+            รายละเอียดกลไกอยู่ใน <a href="runbook-pgpool-nodes-down.html#rootcause" class="underline" style="color:var(--accent)">Runbook 01 §4</a>
+          </p>
+        </div>
+
+        <div class="rulebox">
+          <div class="rc mb-1">ตัวเร่งที่มองข้ามง่าย — <span class="mono text-[12px]">client_idle_limit</span> ทำให้ connect rate สูงกว่าที่คิด</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            คลัสเตอร์นี้ตั้ง <span class="mono text-[12px]">client_idle_limit = 60</span> — pgpool ตัด client ที่ idle เกิน 60 วินาทีทิ้ง
+            (<span class="mono text-[12px]">child connection forced to terminate due to client_idle_limit:60 is reached</span>)
+            แล้ว TypeORM ก็ต่อกลับมาใหม่ทันที ผลคือมี<b class="text-[var(--ink)]">การเปิด connection ใหม่ตลอดเวลา</b>
+            แม้ traffic จริงจะนิ่ง — เห็นเป็น <span class="mono text-[12px]">TIME-WAIT</span> ค้างหลักพันบน pgpool node
+            ยิ่งทำให้ช่วง spike ชนเพดานได้ง่าย
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 5 FIX ========== -->
+      <section id="fix" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">5 — การแก้ไข (Fix)</div>
+        <h2 class="display text-3xl mb-6">ปิดต้นทางก่อน แล้วค่อย attach — สลับลำดับแล้วตกซ้ำ</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ลด connection ต้นทางก่อน (ถ้ายังล้นอยู่)</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ถ้า §3 ข้อ 4 ชี้ว่ามี service restart loop หรือมี pool ที่เปิดไม่จำกัด ให้หยุด/จำกัดตัวนั้นก่อน
+            — <b class="text-[var(--ink)]">ถ้า attach ตอนที่ต้นทางยังล้น มันจะ degenerate ซ้ำภายในไม่กี่นาที</b>
+            · ถ้าตอนนี้ pgpool ปฏิเสธทุก connection อยู่แล้ว traffic จะไปไม่ถึง PG เลย ข้อนี้ข้ามได้
+            (แต่ยังต้องกลับมาปิดต้นทางใน §6 ไม่งั้นเกิดซ้ำวันหลัง)
+          </p>
+          <div class="code p-5">
+<pre>ssh app-server <span class="s">"pm2 stop &lt;service-ที่-restart-loop&gt;"</span></pre>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">Re-attach ทั้ง 3 node — <b>node 0 ก่อน</b> ถ้ามันคือ primary จริง</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            ต่างจาก Runbook 01 ตรงนี้: <b class="text-[var(--ink)]">ลำดับสำคัญ</b> — pgpool จะรัน
+            <span class="mono text-[12px]">find_primary_node</span> ทุกครั้งที่มี node กลับมา ถ้า attach standby ก่อน
+            มันจะหา primary ไม่เจอแล้วเข้า <span class="mono text-[12px]">search_primary_node_timeout</span> (default 300 วินาที) รอเปล่าๆ
+            · ยืนยันว่า node ไหนเป็น primary จริงจาก <span class="mono text-[12px]">repmgr cluster show</span> ใน §3 ข้อ 1
+          </p>
+          <div class="code p-5">
+<pre><span class="c"># primary ก่อน (ในคลัสเตอร์นี้คือ node 0 = ppm) แล้วค่อย standby</span>
+<span class="k">for</span> n <span class="k">in</span> 0 1 2<span class="k">;</span> <span class="k">do</span>
+  ssh ovh-pgpool1 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+    pcp_attach_node -h localhost -p 9898 -U pgpool_admin -w -n $n"</span>
+<span class="k">done</span></pre>
+          </div>
+          <p class="mt-4 text-[13.5px]" style="color:var(--ink-soft)">
+            แต่ละคำสั่งควรตอบ <span class="mono text-[12px]">pcp_attach_node -- Command Successful</span> · ถ้าเจอ
+            <span class="mono text-[12px]">FATAL: authentication failed for user "pgpool_admin"</span> แปลว่า
+            <span class="mono text-[12px]">.pcppass</span> หาย/ผิด ดู
+            <a href="postgresql-pgpool-cluster-guide.html#bugs" class="underline" style="color:var(--accent)">§08 บั๊ก #13/#19</a>
+            · จะเห็น <span class="mono text-[12px]">failback done. reconnect host …</span> ตามด้วย
+            <span class="mono text-[12px]">failover: set new primary node: 0</span> ใน journal
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">อย่า <span class="mono text-[14px]">systemctl restart pgpool2</span> เป็นทางลัด</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            HINT ใน log บอกว่า <span class="mono text-[12px]">"repair the backend nodes and restart pgpool"</span> —
+            <b class="text-[var(--ink)]">ทำตามตรงๆ แล้วไม่หาย</b> เพราะ pgpool อ่านสถานะ node กลับมาจากไฟล์
+            <span class="mono text-[12px]">pgpool_status</span> ตอนบูต ซึ่งยังเป็น <span class="mono text-[12px]">down</span> อยู่
+            → ตื่นมาก็ปฏิเสธ connection เหมือนเดิม แต่คราวนี้ตัด connection ที่ยังใช้งานได้ทิ้งไปด้วยฟรีๆ
+          </p>
+          <div class="rulebox" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ถ้าจำเป็นต้อง restart จริง (attach ไม่ได้เพราะรหัส pcp หาย)</div>
+            <div class="code p-5 mt-2">
+<pre><span class="c"># ต้องหยุดให้ครบทั้ง 3 node ก่อน ไม่งั้น watchdog เอาค่าเก่ามา sync กลับ</span>
+<span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span> ssh $h <span class="s">"sudo systemctl stop pgpool2"</span><span class="k">;</span> <span class="k">done</span>
+
+<span class="c"># ทางเลือก A: ล้างสถานะที่จำไว้ แล้วให้ pgpool ตรวจใหม่เอง (ปลอดภัยกว่า)</span>
+<span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
+  ssh $h <span class="s">"sudo mv /var/log/postgresql/pgpool_status /var/log/postgresql/pgpool_status.bak"</span>
+<span class="k">done</span>
+
+<span class="c"># ทางเลือก B: เขียนทับเป็น up ทั้ง 3 บรรทัด (ใช้เมื่อมั่นใจว่า backend ปกติจริงจาก §3 ข้อ 1)</span>
+<span class="c"># printf 'up\nup\nup\n' | sudo tee /var/log/postgresql/pgpool_status</span>
+
+<span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span> ssh $h <span class="s">"sudo systemctl start pgpool2"</span><span class="k">;</span> <span class="k">done</span></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 6 VERIFY ========== -->
+      <section id="verify" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">6 — ยืนยัน + ป้องกัน (Verify / Prevent)</div>
+        <h2 class="display text-3xl mb-6">เช็คว่าหายจริง แล้วปิดสาเหตุ</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">รอ ~10–15 วินาที แล้วเช็คว่า <b>มี primary</b> ไม่ใช่แค่ up ครบ</h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            เคสนี้ต่างจาก Runbook 01: <span class="mono text-[12px]">up</span> ครบ 3 node แล้วยังอาจไม่มี primary ได้
+            (เจอมาแล้วช่วง 04:53–06:34 ที่ <span class="mono text-[12px]">primary node: -1</span> ค้าง 1 ชม. 40 นาที)
+            ต้องเห็น <span class="mono text-[12px]">Role: primary</span> ที่ node ใดหนึ่งจริงๆ
+          </p>
+          <div class="code p-5 mb-3">
+<pre><span class="k">for</span> n <span class="k">in</span> 0 1 2<span class="k">;</span> <span class="k">do</span>
+  ssh ovh-pgpool1 <span class="s">"sudo -u postgres PGPOOLKEYFILE=/etc/pgpool2/.pgpoolkey \
+    pcp_node_info -h localhost -p 9898 -U pgpool_admin -w -n $n -v"</span>
+<span class="k">done</span></pre>
+          </div>
+          <div class="card overflow-hidden mb-4">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>Node</th><th>Host</th><th>Status Name</th><th>Backend Status</th><th>Role</th></tr></thead>
+                <tbody>
+                  <tr><td>0</td><td>ppm · 172.xx.x.221</td><td><b>up</b></td><td>up</td><td><b>primary</b></td></tr>
+                  <tr><td>1</td><td>ppr1 · 172.xx.x.222</td><td><b>up</b></td><td>up</td><td>standby</td></tr>
+                  <tr><td>2</td><td>ppr2 · 172.xx.x.223</td><td><b>up</b></td><td>up</td><td>standby</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ทางสำรองถ้าไม่มีรหัส pcp — ยืนยันจาก journal ตรงๆ</div>
+            <div class="code p-5 mt-2">
+<pre>ssh ovh-pgpool1 <span class="s">"sudo journalctl -u pgpool2 --since '20 min ago' --no-pager \
+  | grep -E 'failback done|set new primary node'"</span>
+<span class="c"># ต้องเห็น: failover: set new primary node: 0   (ไม่ใช่ -1)</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ทดสอบ write จริง ไม่ใช่แค่ <span class="mono text-[14px]">select 1</span></h3>
+          <p class="text-sm mb-3" style="color:var(--ink-soft)">
+            <span class="mono text-[12px]">select 1</span> ผ่านได้ทั้งที่ยังไม่มี primary (standby ตอบได้) —
+            <b class="text-[var(--ink)]">จึงยืนยันเคสนี้ไม่ได้</b> ต้องยิงอะไรที่ต้อง write
+          </p>
+          <div class="code p-5 mb-3">
+<pre>ssh ovh-pgpool1 <span class="s">"sudo -u postgres psql -h 127.0.0.1 -p 5432 -U postgres \
+  -c 'create temp table _probe(x int); drop table _probe;'"</span></pre>
+          </div>
+          <div class="rulebox ok">
+            <div class="rc mb-1">ผลลัพธ์ที่ต้องได้</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">CREATE TABLE</span> + <span class="mono text-[12px]">DROP TABLE</span> — ถ้าเจอ
+              <span class="mono text-[12px]">cannot execute … in a read-only transaction</span> แปลว่ายังไม่มี primary กลับไป §5 ข้อ 2
+              · ไม่ต้อง restart service ฝั่ง Node.js เลย TypeORM retry เองอยู่แล้ว
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คว่า fork storm หยุดแล้ว + exporter กลับมา scrape ได้</h3>
+          <div class="code p-5">
+<pre><span class="k">for</span> h <span class="k">in</span> ovh-pgpool1 ovh-pgpool2 ovh-pgpool3<span class="k">;</span> <span class="k">do</span>
+  ssh $h <span class="s">"uptime; curl -s localhost:9719/metrics | grep -E '^pgpool2_up'"</span>
+<span class="k">done</span>
+<span class="c"># load average ต้องไหลลง และ pgpool2_up ต้องเป็น 1 ทั้ง 3 node (0 = exporter ต่อ pgpool ไม่ได้)</span></pre>
+          </div>
+        </div>
+
+        <div class="rulebox mt-8" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ป้องกัน #1 (สำคัญสุด) — ให้ health check ทนช่วง connection spike ได้</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ต้นตอของ cascade คือ health check แยกไม่ออกระหว่าง "ตาย" กับ "ไม่มีสล็อต" ·
+            <b class="text-[var(--ink)]">ขยายโควตา retry</b> คือสิ่งที่ทำได้ทันทีและ reload ได้:
+            ค่าที่เจอในคลัสเตอร์นี้คือ <span class="mono text-[12px]">health_check_max_retries = 3</span> ·
+            <span class="mono text-[12px]">health_check_retry_delay = 1</span> = ทนได้แค่ ~3 วินาที
+            ขณะที่ node กลับมาเองหลัง degenerate เพียง <b class="text-[var(--ink)]">1 วินาที</b> ทั้ง 3 ครั้ง
+            → ตั้ง <span class="mono text-[12px]">max_retries = 10</span> /
+            <span class="mono text-[12px]">retry_delay = 2</span> (ทนได้ ~20 วินาที)
+          </p>
+          <div class="rulebox mt-3">
+            <div class="rc mb-1">กับดัก: "ให้ health check ใช้ reserved connection" อาจไม่ช่วยเลย — เช็คก่อนว่าใครเป็น superuser</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              คำแนะนำมาตรฐานคือให้ <span class="mono text-[12px]">health_check_user</span> ใช้สล็อตที่
+              <span class="mono text-[12px]">superuser_reserved_connections</span> กันไว้ —
+              <b class="text-[var(--ink)]">แต่ในคลัสเตอร์นี้ health check ก็เป็น <span class="mono text-[12px]">postgres</span> อยู่แล้ว
+              และแอปก็ต่อเป็น <span class="mono text-[12px]">postgres</span> เหมือนกัน</b> ทุกตัวเป็น superuser
+              จึงกินสล็อตสำรองได้หมด = กลไกนี้ไม่ได้ป้องกันอะไรเลย
+              · หลักฐานตรงเผง: ตัวเดียวที่ <b>ไม่ใช่</b> superuser (exporter) เป็นตัวแรกที่ถูกปฏิเสธด้วย
+              <span class="mono text-[12px]">remaining connection slots are reserved for roles with the SUPERUSER attribute</span>
+              ขณะที่แอปยังต่อได้ต่ออีก 40 วินาที
+              · <b class="text-[var(--ink)]">reserved connection จะมีความหมายก็ต่อเมื่อแยก role ของแอปออกจาก superuser ก่อน</b>
+              ตรวจด้วย: <span class="mono text-[12px]">grep health_check_user /etc/pgpool2/pgpool.conf</span>
+              เทียบกับ role ที่แอปใช้ใน PG log
+            </p>
+          </div>
+        </div>
+
+        <div class="rulebox mt-5">
+          <div class="rc mb-1">ป้องกัน #2 — ตั้งงบ connection ให้ไม่ overcommit ตั้งแต่ต้น</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            เพดานที่ pgpool เปิดได้จริงคือ
+            <span class="mono text-[12px]">num_init_children × max_pool × จำนวน pgpool node ที่รับ traffic</span>
+            ต้อง <b class="text-[var(--ink)]">≤ max_connections − superuser_reserved_connections − (repmgr + exporter + งานคน)</b>
+            · เช็คค่าจริงของตัวเองก่อนคำนวณ:
+          </p>
+          <div class="code p-5 mt-3">
+<pre>ssh ovh-pgpool1 <span class="s">"sudo grep -E '^(num_init_children|max_pool|client_idle_limit|health_check)' \
+  /etc/pgpool2/pgpool.conf"</span>
+ssh ovh-ppm <span class="s">"curl -s localhost:9187/metrics | grep -E 'max_connections|superuser_reserved'"</span>
+
+<span class="c"># อ่าน pgpool.conf ไม่ได้ (0640 root:postgres)? exporter บอก num_init_children ตรง ๆ ไม่ต้อง sudo</span>
+ssh ovh-pgpool1 <span class="s">"curl -s localhost:9719/metrics | grep -E '^pgpool2_frontend_(total|used)'"</span>
+<span class="c"># frontend_total = num_init_children · frontend_used = client ที่ต่ออยู่จริงตอนนี้</span>
+<span class="c"># ใช้ได้เฉพาะตอน pgpool ยังรับ connection ได้ — ตอนล่ม pgpool2_up=0 จะไม่มี metric นี้</span></pre>
+          </div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-3">
+            ในคลัสเตอร์นี้ <span class="mono text-[12px]">max_connections = 400</span> ·
+            <span class="mono text-[12px]">num_init_children = <b>300</b></span> ·
+            และ <span class="mono text-[12px]">max_pool</span> <b class="text-[var(--ink)]">ไม่ได้ตั้งไว้ในไฟล์เลย
+            จึงใช้ค่า default = 4</b> → เพดานจริง <span class="mono text-[12px]">300 × 4 = <b>1,200</b></span>
+            ต่อ backend node = <b class="text-[var(--ink)]">overcommit 3 เท่า</b> (รวมทุก backend node ได้ 3,600
+            เทียบกับความจุคลัสเตอร์ 1,200)
+          </p>
+          <div class="rulebox mt-3" style="border-color:var(--signal)">
+            <div class="rc mb-1" style="color:var(--signal)">ทำไมมันระเบิดหลังรันปกติมาหลายสัปดาห์ — child สะสมสล็อตไปเรื่อย ๆ</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              แต่ละ child เริ่มที่ 0 สล็อต แล้ว<b class="text-[var(--ink)]">สะสม</b>ทีละสล็อตตามคู่
+              (user, database) ที่มันเคยให้บริการ จนถึงเพดาน <span class="mono text-[12px]">max_pool</span> ·
+              ตอนตรวจใช้แค่ 1 ใน 12 สล็อต (<span class="mono text-[12px]">pgpool2_backend_by_process_used</span>
+              เทียบกับ <span class="mono text-[12px]">pgpool2_backend_by_process_total = 12</span>)
+              → ยิ่ง workload แตะ database มากขึ้น connection ยิ่งไต่ขึ้นเอง<b class="text-[var(--ink)]">แม้ traffic เท่าเดิม</b>
+              · <b class="text-[var(--ink)]">ทางแก้ที่ปลอดภัยสุด: ตั้ง <span class="mono text-[12px]">max_pool = 1</span></b>
+              (เพดานเหลือ 300 ต่อ node) — ตัด overcommit ทิ้งโดย<b class="text-[var(--ink)]">ไม่ลดความจุ client เลย</b>
+              เพราะยังมี child ครบ 300 ตัว · <span class="mono text-[12px]">max_pool</span> ต้อง
+              <b class="text-[var(--ink)]">restart</b> pgpool ไม่ใช่ reload (ต่างจาก health_check_* ที่ reload ได้)
+              — และก่อน restart <b class="text-[var(--ink)]">ต้องเช็คว่า <span class="mono text-[12px]">pgpool_status</span>
+              เป็น up ทั้ง 3 บรรทัดก่อน</b> ตามกับดักใน §5 ข้อ 3
+            </p>
+          </div>
+        </div>
+
+        <div class="rulebox mt-5" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">อย่าแก้ด้วยการเพิ่ม <span class="mono text-[12px]">max_connections</span> — มันไม่ใช่ปัญหาขนาด</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            สัญชาตญาณแรกคือ "ก็เพิ่มเพดานสิ" แต่ตัวเลขบอกว่าผิดทาง:
+            <b class="text-[var(--ink)]">งานจริงพร้อมกัน peak 30 วัน = 9 connection</b>
+            (<span class="mono text-[12px]">pg_stat_activity_count{state="active"}</span>) ส่วน 385 ตัวที่ชนเพดาน
+            คือ connection เปิดค้าง idle ที่พุ่งขึ้น <b class="text-[var(--ink)]">+341 ใน 4 นาที</b>
+            จาก baseline 45–176 — นั่นคือ runaway ไม่ใช่ demand เพิ่มเพดานก็แค่ให้มันกินได้มากขึ้นก่อนชน
+          </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-2">
+            และเพิ่มไม่ได้จริงเพราะฮาร์ดแวร์: primary มี RAM <b class="text-[var(--ink)]">6.9 GB · swap = 0</b>
+            (replica มีแค่ ~3 GB แต่ <span class="mono text-[12px]">max_connections</span> เท่ากัน)
+            วัดได้ว่า 37 backend กิน 782 MB → ที่ 400 backend ราว <b class="text-[var(--ink)]">5.5 GB จาก 6.9 GB</b>
+            เหลือให้ <span class="mono text-[12px]">work_mem</span> กับ page cache แทบไม่มี
+            · <b class="text-[var(--ink)]">OOM แย่กว่า connection refused</b> — ตอนนี้ระบบใช้ไม่ได้แต่ PostgreSQL ยังยืนอยู่
+            ถ้าชน RAM แทน OOM killer จะเก็บ postmaster แล้วต้อง crash recovery
+          </p>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-2">
+            <b class="text-[var(--ink)]">ทำแทน</b>: (1) <span class="mono text-[12px]">superuser_reserved_connections</span>
+            3 → ~10 — ต้นทุนเป็นศูนย์ เพราะกันสล็อตอยู่ใน 400 เดิม ไม่ได้เพิ่มเพดาน คู่กับ ป้องกัน #1
+            แล้ว health check + repmgr + exporter จะมีทางเข้าเสมอ · (2) แก้ leak ฝั่งแอปก่อน ·
+            (3) <b class="text-[var(--ink)]">แล้วค่อย</b>ลด <span class="mono text-[12px]">num_init_children</span>/<span class="mono text-[12px]">max_pool</span>
+            — <b class="text-[var(--ink)]">ห้ามสลับ (2) กับ (3)</b> เพราะ <span class="mono text-[12px]">num_init_children</span>
+            คือจำนวน <b>client</b> ที่รับพร้อมกันได้ ไม่ใช่จำนวน query · วัดได้ว่า
+            <span class="mono text-[12px]">pgpool2_frontend_used</span> เคย peak <b class="text-[var(--ink)]">300/300 เต็ม</b>
+            ถ้าลดก่อนแก้ leak client ตัวที่เกินจะค้างรอคิวจนแอป timeout = outage อีกแบบ
+          </p>
+        </div>
+
+        <div class="rulebox mt-5" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ป้องกัน #3 — Alert ที่ขาดไป ทั้งที่มีเวลาให้เบรก 1 ชม. 46 นาที</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            เหตุการณ์นี้<b class="text-[var(--ink)]">ไม่ควรกลายเป็น outage เลย</b> — มันส่งสัญญาณล่วงหน้า 3 ชั้นแต่ไม่มี alert ชั้นไหนดัง:
+          </p>
+          <div class="card overflow-hidden mt-3">
+            <div class="overflow-x-auto">
+              <table class="d">
+                <thead><tr><th>ชั้น</th><th>สัญญาณ</th><th>Alert ที่ควรมี</th><th>เวลาที่ได้คืน</th></tr></thead>
+                <tbody>
+                  <tr><td>1</td><td><span class="mono text-[12px]">pg_stat_activity</span> / <span class="mono text-[12px]">max_connections</span> ไต่ขึ้น</td><td>ยิงที่ &gt; 80% ก่อนถึงเพดาน</td><td>ก่อน 04:48 — ไม่ล่มเลย</td></tr>
+                  <tr><td>2</td><td><span class="mono text-[12px]">too many clients already</span> ใน PG log</td><td>ยิงทันทีที่เจอบรรทัดนี้</td><td>04:48 (7 นาทีก่อน node แรกตก)</td></tr>
+                  <tr><td>3</td><td><span class="mono text-[12px]">primary node: -1</span> / status ≠ pg_status</td><td>ยิงเมื่อค้างเกิน 1 นาที</td><td>04:53 (1 ชม. 41 นาทีก่อนล่มสนิท)</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-3">
+            และอย่าลืม alert ตัว monitoring เอง — ตอนล่มจริง <span class="mono text-[12px]">pgpool2_up == 0</span>
+            ทั้ง 3 node (exporter ต่อ pgpool ไม่ได้เพราะ pgpool ปฏิเสธมันด้วย) ซึ่งควรเป็น alert ในตัวเอง
+            เหมือนบทเรียนจาก <a href="runbook-pgpool-nodes-down.html#verify" class="underline" style="color:var(--accent)">Runbook 01 §6</a>
+          </p>
+        </div>
+
+        <div class="rulebox mt-5">
+          <div class="rc mb-1">ป้องกัน #4 — ต้นทางฝั่งแอป: อย่าให้ service เดียวเปิด pool ได้ไม่จำกัด</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            connection ที่ล้นมาจากฝั่งแอปเสมอ ไม่ใช่จาก pgpool — จุดที่ต้องตรวจ:
+            (1) <b class="text-[var(--ink)]">service ที่ restart loop</b> เปิด pool ใหม่ทั้งชุดทุกครั้งที่บูต (ดู restart count ใน <span class="mono text-[12px]">pm2 list</span>) ·
+            (2) <b class="text-[var(--ink)]">การลงทะเบียน datasource ซ้ำ</b> — NestJS ไม่ dedupe
+            <span class="mono text-[12px]">TypeOrmModule.forRootAsync()</span> ตามชื่อ ลงทะเบียนซ้ำ N ครั้งได้ N pool
+            เพดานจริงของ service จึงเป็น <span class="mono text-[12px]">จำนวน registerAsync × instance × pool max</span>
+            ไม่ใช่ <span class="mono text-[12px]">pool max</span> อย่างเดียว ·
+            (3) request ที่ list แบบไม่จำกัดจำนวนแถว ดูดสล็อตค้างนาน
+            · รายละเอียด pool sizing อยู่ใน <a href="postgresql-pgpool-cluster-guide.html" class="underline" style="color:var(--accent)">คู่มือ Pgpool ฉบับเต็ม</a>
+          </p>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · RUNBOOK · PGPOOL CONNECTION EXHAUSTION CASCADE"
+        line2="max_connections เต็ม → health check false negative → degenerate ทีละ node · incident 2026-09-09">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    themeVariables:{
+      background:'#FFFFFF',
+      primaryColor:'var(--line-soft)',
+      primaryBorderColor:'var(--accent)',
+      primaryTextColor:'var(--ink)',
+      lineColor:'var(--blueprint)',
+      tertiaryColor:'var(--line)',
+      fontFamily:'IBM Plex Sans Thai, sans-serif'
+    }
+  });
+
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
