@@ -11,7 +11,7 @@
 > **อ่านคู่กับ**: `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 (สถานะ as-is ของ print engine, ตรวจไว้
 > 2026-09-04 — ยังถูกต้องทุกข้อ) · `srs-p6.html` §06 · `backend-convention.html`
 >
-> **สถานะ 2026-09-09: P0–P3 ✅ · P4 16/25 (ดู §7)** — พิมพ์ **ใบกำกับภาษีเต็มรูป** และ
+> **สถานะ 2026-09-09: P0–P3 ✅ · P4 17/25 (ดู §7)** — พิมพ์ **ใบกำกับภาษีเต็มรูป** และ
 > **ใบเสนอราคา** ออกมาเป็นเอกสารจริงหน้าตาใช้งานได้แล้ว (banded, ตารางรายการมีเส้น + filler,
 > ยอดรวมแยก VAT, จำนวนเงินเป็นตัวอักษร, ลายน้ำ DRAFT, เลขหน้า/มีต่อหน้า) — ถัดไปคือ **P4**
 > (ขยายอีก 23 ใบ) · ⚠️ **ตัวบล็อกที่เหลือไม่ใช่โค้ด**: `company_profiles` ของ deployment นี้ยังว่าง
@@ -299,7 +299,7 @@ export class CompanyBranch extends BaseEntity {
 | **P1** | `document_prints` + `report.printDocument` RPC + resolve เทมเพลตผ่าน `document_types` (เพิ่ม `findByCode()`) + `copy_number` (0 สำหรับ DRAFT, `SELECT...FOR UPDATE` กันชนกัน) + snapshot `params` + ดึง/cache company profile ผ่าน RPC ใหม่ `finance.getCompanyProfile` + ธง `is_draft` + `idempotency_key` + `GET /document-prints` | 1.5–2 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** — ดู §7.1 |
 | **P2** | endpoint `POST /:id/print` + mapper ของ **ใบกำกับภาษีเต็มรูป** (finance-bc) และ **ใบเสนอราคา** (sales-bc) | 1–1.5 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** (commit `d8b472b`) — ดู §7.2 |
 | **P3** | HTML จริงของ 2 ใบนั้น (แทน draft placeholder) + layout ร่วมที่มีลายน้ำ DRAFT — ใช้เอนจิน `banded` สำหรับรายการยาวข้ามหน้า | 1–2 วัน | ✅ **เสร็จ 2026-09-09** (เทมเพลตอยู่ที่ v3 บนโปรดักชัน) — ดู §7.3 |
-| **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | 🟡 **16/25 แล้ว 2026-09-09** — receipt 8 + quotation 4 (ที่มี endpoint อยู่แล้ว) + **purchase order 4 (endpoint ใหม่)** · อีก 9 ใบยังไม่มี `POST /:id/print` — ดู §7.4 |
+| **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | 🟡 **17/25 แล้ว 2026-09-09** — receipt 8 + quotation 4 + **purchase order 4** + **goods receipt** (endpoint ใหม่ 2 ตัว) · ครบทุกใบหลักที่ผู้ใช้สั่งให้เน้น · อีก 8 ใบยังไม่มี `POST /:id/print` — ดู §7.4 |
 | **P5** | ใบแทน/สำเนา ตามข้อสรุป §6.2 + ฟอร์ม ภ.พ.30 (`HANDOFF-Backlog-Reporting-Print-Tax.md` §4.4 ข้อ 4) | 1–2 วัน | ⬜ รอคำตอบฝ่ายบัญชี |
 
 **ทำ P0→P3 ก่อนแล้วหยุดรีวิว** — จะได้เห็นของจริง 2 ใบพิมพ์ออกมาได้ก่อนลงทุนทำอีก 23 ใบ
@@ -468,9 +468,22 @@ relation ถูกโหลดจริง — ถ้าลืมขอ relation
 round trip · เอกสารเก่าพิมพ์ช่องรายการว่าง (nullable ไม่ backfill) และ smoke log จำนวนบรรทัดที่มี
 snapshot ให้เห็นทุกครั้ง — ตอนนี้ PO ที่มีอยู่ในคลัสเตอร์คือ `1 line(s), 0 with a product snapshot`
 
-**เหลืออีก 9 ใบ** (`sales_order`, `delivery_note`, `sales_return`, `billing_note`, `payment_entry`,
-`purchase_return`, `goods_receipt`, `ap_invoice_vendor_bill`,
-`ap_invoice_credit_note`) — **ทั้งหมดยังไม่มี `POST /:id/print` เลยสักตัว** งานต่อใบจึงไม่ใช่แค่ HTML
+**รอบสาม — ใบรับสินค้า (inventory-bc), 1 code**
+
+`POST /goods-receipts/:id/print` (`goods_receipt:print`) · `goods-receipt.html` เป็น layout เดียวที่มี
+**คอลัมน์ล็อตและวันหมดอายุ** เพราะหน้าที่ของใบรับสินค้าคือพิสูจน์ว่า *ของอะไรเข้ามาจริง* ไม่ใช่ยอดเงิน ·
+พิมพ์จำนวนสองชุด: `qty` (หน่วยนับสต็อก ซึ่งเป็นตัวที่ lot/over-receipt bound อ่าน) และ `qty_entered`
+(ที่ผู้รับกรอกก่อนแปลงหน่วย) — ใบที่โชว์แต่ตัวแปลงแล้วเอาไปทานกับใบส่งของไม่ได้ · ไม่มีมิติภาษีและ
+ส่วนลดเลย และมีข้อความกำกับว่าไม่ใช่ใบกำกับภาษี/ไม่ใช่หลักฐานการชำระเงิน
+
+**ช่องว่างที่เจอตอนทำ (แก้แล้ว)** — GRN ไม่ snapshot อะไรเลยนอกจาก id: ทั้งชื่อสินค้า, เลขที่ PO และ
+ชื่อผู้ขาย · เพิ่ม `product_sku`/`product_name_th/en` บน `goods_receipt_items` (ได้ฟรีจาก
+`resolveTransactableProduct()` ที่อ่าน product มา validate อยู่แล้ว) และ `po_number`/`supplier_name_th/en`
+บน `goods_receipts` (ได้ฟรีจาก PO lookup ที่ validate `po_id` อยู่แล้ว — RPC ตัวนั้นคืน entity เต็ม
+ชื่อผู้ขายจึงข้ามมาอยู่แล้ว แค่ interface ฝั่งผู้อ่านไม่ได้ประกาศไว้) · **ไม่ต้องยิงข้าม BC ตอนพิมพ์เลย**
+
+**เหลืออีก 8 ใบ** (`sales_order`, `delivery_note`, `sales_return`, `billing_note`, `payment_entry`,
+`purchase_return`, `ap_invoice_vendor_bill`, `ap_invoice_credit_note`) — **ทั้งหมดยังไม่มี `POST /:id/print` เลยสักตัว** งานต่อใบจึงไม่ใช่แค่ HTML
 แต่คือ endpoint + proxy + mapper + smoke ของ BC เจ้าของ (sales-bc, supplier-bc, inventory-bc,
 finance-bc) เหมือนที่ P2 ทำให้ 2 ใบแรก · แถว `invoice` → `PAYMENT_RECEIPT` ยังเป็นขยะจากระบบอื่นตาม
 §8.2 ข้อ 4 (ยังไม่ลบ)

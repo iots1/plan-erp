@@ -417,6 +417,9 @@ erDiagram
     GOODS_RECEIPTS {
         uuid id PK
         uuid po_id "ref supplier-bc"
+        string po_number "snapshot — ใบรับที่พิมพ์ต้องอ้างเลขที่ PO ได้เองโดยไม่ยิงข้าม BC"
+        string supplier_name_th "snapshot จาก purchase_orders"
+        string supplier_name_en "snapshot"
         uuid warehouse_id FK
         string status
     }
@@ -424,6 +427,9 @@ erDiagram
         uuid id PK
         uuid receipt_id FK
         uuid product_id FK
+        string product_sku "snapshot ณ เวลารับของ · null สำหรับใบก่อนมีคอลัมน์นี้"
+        string product_name_th "snapshot — ใบที่เซ็นรับแล้วต้องไม่เปลี่ยนตามชื่อที่แก้ทีหลัง"
+        string product_name_en "snapshot"
         uuid lot_id FK
         int qty
         decimal import_cost
