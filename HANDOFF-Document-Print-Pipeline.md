@@ -11,7 +11,7 @@
 > **อ่านคู่กับ**: `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 (สถานะ as-is ของ print engine, ตรวจไว้
 > 2026-09-04 — ยังถูกต้องทุกข้อ) · `srs-p6.html` §06 · `backend-convention.html`
 >
-> **สถานะ 2026-09-09: P0–P3 ✅ · P4 17/25 (ดู §7)** — พิมพ์ **ใบกำกับภาษีเต็มรูป** และ
+> **สถานะ 2026-09-09: P0–P3 ✅ · P4 20/25 (ดู §7)** — พิมพ์ **ใบกำกับภาษีเต็มรูป** และ
 > **ใบเสนอราคา** ออกมาเป็นเอกสารจริงหน้าตาใช้งานได้แล้ว (banded, ตารางรายการมีเส้น + filler,
 > ยอดรวมแยก VAT, จำนวนเงินเป็นตัวอักษร, ลายน้ำ DRAFT, เลขหน้า/มีต่อหน้า) — ถัดไปคือ **P4**
 > (ขยายอีก 23 ใบ) · ⚠️ **ตัวบล็อกที่เหลือไม่ใช่โค้ด**: `company_profiles` ของ deployment นี้ยังว่าง
@@ -299,7 +299,7 @@ export class CompanyBranch extends BaseEntity {
 | **P1** | `document_prints` + `report.printDocument` RPC + resolve เทมเพลตผ่าน `document_types` (เพิ่ม `findByCode()`) + `copy_number` (0 สำหรับ DRAFT, `SELECT...FOR UPDATE` กันชนกัน) + snapshot `params` + ดึง/cache company profile ผ่าน RPC ใหม่ `finance.getCompanyProfile` + ธง `is_draft` + `idempotency_key` + `GET /document-prints` | 1.5–2 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** — ดู §7.1 |
 | **P2** | endpoint `POST /:id/print` + mapper ของ **ใบกำกับภาษีเต็มรูป** (finance-bc) และ **ใบเสนอราคา** (sales-bc) | 1–1.5 วัน | ✅ **เสร็จ + deploy แล้ว 2026-09-06** (commit `d8b472b`) — ดู §7.2 |
 | **P3** | HTML จริงของ 2 ใบนั้น (แทน draft placeholder) + layout ร่วมที่มีลายน้ำ DRAFT — ใช้เอนจิน `banded` สำหรับรายการยาวข้ามหน้า | 1–2 วัน | ✅ **เสร็จ 2026-09-09** (เทมเพลตอยู่ที่ v3 บนโปรดักชัน) — ดู §7.3 |
-| **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | 🟡 **17/25 แล้ว 2026-09-09** — receipt 8 + quotation 4 + **purchase order 4** + **goods receipt** (endpoint ใหม่ 2 ตัว) · ครบทุกใบหลักที่ผู้ใช้สั่งให้เน้น · อีก 8 ใบยังไม่มี `POST /:id/print` — ดู §7.4 |
+| **P4** | ขยายให้ครบ 25 เอกสาร (mapper + HTML ทีละใบ) | ~0.5 วัน/ใบ | 🟡 **20/25 แล้ว 2026-09-09** — receipt 8 + quotation 4 + purchase order 4 + goods receipt + **ใบสั่งขาย/ใบส่งของ/ใบรับคืนสินค้า** · เหลือ 5 ใบ (finance-bc 4 + purchase return) — ดู §7.4 |
 | **P5** | ใบแทน/สำเนา ตามข้อสรุป §6.2 + ฟอร์ม ภ.พ.30 (`HANDOFF-Backlog-Reporting-Print-Tax.md` §4.4 ข้อ 4) | 1–2 วัน | ⬜ รอคำตอบฝ่ายบัญชี |
 
 **ทำ P0→P3 ก่อนแล้วหยุดรีวิว** — จะได้เห็นของจริง 2 ใบพิมพ์ออกมาได้ก่อนลงทุนทำอีก 23 ใบ
@@ -482,8 +482,26 @@ snapshot ให้เห็นทุกครั้ง — ตอนนี้ PO
 บน `goods_receipts` (ได้ฟรีจาก PO lookup ที่ validate `po_id` อยู่แล้ว — RPC ตัวนั้นคืน entity เต็ม
 ชื่อผู้ขายจึงข้ามมาอยู่แล้ว แค่ interface ฝั่งผู้อ่านไม่ได้ประกาศไว้) · **ไม่ต้องยิงข้าม BC ตอนพิมพ์เลย**
 
-**เหลืออีก 8 ใบ** (`sales_order`, `delivery_note`, `sales_return`, `billing_note`, `payment_entry`,
-`purchase_return`, `ap_invoice_vendor_bill`, `ap_invoice_credit_note`) — **ทั้งหมดยังไม่มี `POST /:id/print` เลยสักตัว** งานต่อใบจึงไม่ใช่แค่ HTML
+**รอบสี่ — สายขายที่เหลือ (sales-bc), 3 code** · proxy มีอยู่แล้วตั้งแต่ P2 จึงเหลือแค่ mapper +
+endpoint + เทมเพลตต่อใบ:
+
+- **ใบสั่งขาย** — layout เดียวกับใบเสนอราคา แต่ประกาศบนหน้าเอกสารว่า **ไม่ใช่ใบกำกับภาษี** เพราะใบกำกับ
+  จะออกตามจำนวนที่ส่งมอบจริงในภายหลัง (คนอ่านที่เข้าใจผิดว่าใบสั่งขายเอาไปเคลมได้คือปัญหาจริง)
+- **ใบส่งของ** — **ไม่มีตัวเลขเงินเลยทั้งใบ**: `DeliveryNoteItem.line_total` เป็น `0` โดยดีไซน์ (entity
+  เขียนไว้เองว่าสืบทอด base มาแต่ไม่ใช้คอลัมน์เงิน) และของที่คนขับรถยื่นให้ลูกค้าคือรายการสินค้า ไม่ใช่
+  ใบเรียกเก็บเงิน · คำอธิบายสินค้าดึงจาก**บรรทัดใบสั่งขาย**ที่ใบส่งของนั้นไปเติมเต็ม (join ใน database
+  ของ sales-bc เอง ไม่ใช่ข้าม BC ที่ RULE · SNAPSHOT ห้าม) — เก็บ snapshot ไว้ที่เดียวไม่ต้องคัดลอกซ้ำ
+  ลงทุกใบส่งของ
+- **ใบรับคืนสินค้า** — `return_reason` อยู่เหนือตัวเลข ไม่ใช่ซ่อนใน remark (ใบคืนที่ไม่บอกสาเหตุคือใบที่
+  ไม่มีใคร reconcile กับใบลดหนี้ที่ตามมาได้) และประกาศว่า **ไม่ใช่ใบลดหนี้** — §86/22 ต้องออกเอกสารแยก
+  พร้อมเลขที่ของตัวเอง · คำอธิบายไล่ผ่าน `delivery_note_item.sales_order_item` เพราะการคืนมีได้เฉพาะ
+  ของที่ส่งไปแล้ว ซึ่งเป็นสายที่ตัวเอกสารเองบรรยาย
+
+smoke ของ sales-bc เปลี่ยนชื่อเป็น `documents-print.smoke.mjs` แล้วยิงพิมพ์ทั้ง 4 ใบในไฟล์เดียว ·
+ใบที่ยังไม่มีข้อมูลในคลัสเตอร์ (ใบรับคืน) **skip พร้อม log** ไม่ใช่ fail — suite นี้วิ่งบนข้อมูลจริงที่มีอยู่
+
+**เหลืออีก 5 ใบ** (`billing_note`, `payment_entry`, `purchase_return`, `ap_invoice_vendor_bill`,
+`ap_invoice_credit_note`) — **ทั้งหมดยังไม่มี `POST /:id/print` เลยสักตัว** งานต่อใบจึงไม่ใช่แค่ HTML
 แต่คือ endpoint + proxy + mapper + smoke ของ BC เจ้าของ (sales-bc, supplier-bc, inventory-bc,
 finance-bc) เหมือนที่ P2 ทำให้ 2 ใบแรก · แถว `invoice` → `PAYMENT_RECEIPT` ยังเป็นขยะจากระบบอื่นตาม
 §8.2 ข้อ 4 (ยังไม่ลบ)
