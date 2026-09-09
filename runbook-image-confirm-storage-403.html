@@ -109,10 +109,19 @@
   <span class="s">"errors"</span>: [ { <span class="s">"code"</span>: <span class="s">"SERVICE_UNAVAILABLE"</span>, <span class="s">"title"</span>: <span class="s">"Service Unavailable"</span> } ]
 }</pre>
         </div>
-        <p class="text-sm mb-6" style="color:var(--ink-soft)">
+        <p class="text-sm mb-3" style="color:var(--ink-soft)">
           เห็น 503 = ดี แปลว่าเวอร์ชันที่รันอยู่มี fix เรื่องการแยกประเภท error แล้ว และมันกำลังบอกความจริงว่า
           <b>"ตรวจสอบไม่ได้"</b> ไม่ใช่ <b>"ไม่มีไฟล์"</b> — เหลือแค่ไปแก้ที่ต้นเหตุตาม §5
         </p>
+        <div class="rulebox mb-6"><div class="rc mb-1">อ่าน <span class="mono text-[12px]">detail</span> ของ 503 ให้ดี — มันมี 2 ที่มา</div><p class="text-[13.5px]">
+          ข้อความข้างบน (<b>"Failed to verify the uploaded object…"</b>) เป็นของ <b>ผู้เรียก</b> ไม่ใช่ของ storage-bc —
+          <span class="mono text-[12px]">StorageObjectService</span> พูดประโยคนี้เมื่อ RPC <b>ไม่ได้คำตอบที่ใช้ได้เลย</b>
+          ถ้า envelope ของ error เดินทางข้าม hop มาครบ คุณจะเห็นคำของ storage-bc เองแทน เช่น
+          <b>"Storage rejected the request to verify the file."</b> (403) หรือ
+          <b>"An unexpected error occurred while trying to verify the file."</b> ·
+          <b>เห็นประโยคของผู้เรียกทั้งที่ storage-bc log 403 ไว้จริง = มีบั๊กชั้นที่ 4 ซ้อนอยู่</b> (ดู §4) —
+          และเป็นเหตุผลที่เคสนี้ถูกวินิจฉัยผิดไปหนึ่งรอบว่า "RPC ไปไม่ถึง storage"
+        </p></div>
 
         <div class="eyebrow text-[var(--muted)] mb-3">บรรทัด log ที่ชี้ขาด (storage-bc)</div>
         <div class="code p-5">
@@ -303,6 +312,30 @@ flowchart TB
           </div>
         </div>
 
+        <div class="card p-6 mb-6" style="border-color:var(--accent)">
+          <div class="mono text-[11px] text-[var(--muted)] mb-2">ชั้น 4 · ตัวบัง — พบเพิ่ม 2026-09-09</div>
+          <h3 class="font-semibold mb-2 text-[15px]">exception filter ของ microservice ไม่เคยถูกผูกเลย</h3>
+          <p class="text-sm text-[var(--ink-soft)] leading-relaxed mb-3">
+            <span class="mono text-[12px]">app.connectMicroservice()</span> เรียก
+            <span class="mono text-[12px]">registerListeners()</span> + <span class="mono text-[12px]">setIsInitialized(true)</span>
+            <b>ทันทีก่อน return</b> และนั่นคือขั้นที่ผูก handler เข้ากับ enhancer ที่มีอยู่ ณ วินาทีนั้น ·
+            อะไรที่ลงทะเบียนบน instance <b>หลังจากนั้น</b> จะถูก<b>ทิ้งเงียบ ๆ</b> — Nest แค่ warn ตอน boot แล้วไปต่อ:
+          </p>
+          <div class="code p-4 mb-3">
+<pre>[Nest] WARN [NestMicroservice] Cannot apply global exception filters:
+       registration must occur before initialization.</pre>
+          </div>
+          <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
+            ผลคือ exception ทุกตัวจาก <span class="mono text-[12px]">@MessagePattern</span> — รวมทั้ง
+            <span class="mono text-[12px]">NotFoundException</span> ธรรมดา — ออกไปเป็น envelope default ของ Nest
+            (<span class="mono text-[12px]">{"status":"error","message":"Internal server error"}</span>)
+            ผู้เรียกอ่านไม่ออกจึงตกไปทาง <span class="mono text-[12px]">defaultValue</span> ·
+            <b>ชั้นนี้ทำให้ชั้น 3 มองไม่เห็นทั้งหมด</b>: storage-bc รายงาน 403 เป็น 503 พร้อมคำอธิบายที่ถูกต้อง
+            แต่ผู้ใช้กลับได้ประโยคของผู้เรียกที่บอกว่า "ติดต่อ storage ไม่ได้" ทำให้ไล่ผิดทางไปหาเรื่อง RabbitMQ
+            ทั้งที่ RPC เดินทางถึงและตอบกลับครบทุกครั้ง
+          </p>
+        </div>
+
         <div class="rulebox"><div class="rc mb-1">เส้นแบ่งที่ต้องรักษาไว้</div><p class="text-[13.5px]"><b>503 = ยังตอบไม่ได้ (retry ได้)</b> · <b>400/404 = ตอบแล้วว่าไม่มี (retry ไปก็ได้คำตอบเดิม)</b> — ถ้าสองอย่างนี้ยุบเป็นค่าเดียว ผู้เรียกจะเลือกทางผิดเสมอ และผู้ใช้จะได้คำแนะนำที่แก้ปัญหาไม่ได้ · กฎเต็มดูที่ <a href="backend-convention.html#microservice" style="color:var(--teal);text-decoration:underline">Backend Convention §08</a></p></div>
       </section>
 
@@ -342,7 +375,7 @@ pm2 list | grep storage</pre>
 
         <div class="step">
           <span class="sn">3</span>
-          <h3 class="font-semibold text-[16px] mb-2">เช็คว่าโค้ดที่รันอยู่มี fix ทั้ง 3 จุดหรือยัง</h3>
+          <h3 class="font-semibold text-[16px] mb-2">เช็คว่าโค้ดที่รันอยู่มี fix ทั้ง 5 จุดหรือยัง</h3>
           <p class="text-sm mb-3" style="color:var(--ink-soft)">
             ข้อ 1–2 ทำให้หายเดี๋ยวนั้น แต่ถ้าขาด fix เหล่านี้ ครั้งหน้าที่ storage มีปัญหาจริง ๆ อาการจะกลับไป
             "โยนความผิดให้ผู้ใช้" อีก
@@ -354,12 +387,17 @@ pm2 list | grep storage</pre>
                 <tr><td>1</td><td><span class="mono text-[12px]">libs/common/.../storage-object.service.ts</span></td><td>ใช้ sentinel ที่ callee คืนเองไม่ได้เป็น <span class="mono text-[12px]">defaultValue</span> แล้ว throw <span class="mono text-[12px]">503</span> เมื่อได้ sentinel — เหลือ <span class="mono text-[12px]">null</span> ไว้หมายถึง "ไม่มีจริง" อย่างเดียว</td></tr>
                 <tr><td>2</td><td><span class="mono text-[12px]">apps/storage/src/storage.service.ts</span></td><td>ให้ status เป็นตัวตัดสิน: <span class="mono text-[12px]">null</span> เฉพาะ 404 ที่ยืนยันได้ · 403 ที่ S3 ไม่ได้ตั้งชื่อเป็น auth error → <span class="mono text-[12px]">503</span> · log ทั้ง <span class="mono text-[12px]">status</span> + <span class="mono text-[12px]">error_name</span></td></tr>
                 <tr><td>3</td><td><span class="mono text-[12px]">apps/storage/src/storage.service.ts</span></td><td>แยก client 2 ตัว — <span class="mono text-[12px]">s3Client</span> (internal) สำหรับยิง · <span class="mono text-[12px]">presignClient</span> (public) สำหรับเซ็นเท่านั้น</td></tr>
+                <tr><td>4</td><td><span class="mono text-[12px]">libs/common/.../bootstrap.util.ts</span><br><span class="mono text-[12px]">apps/**/*-events.controller.ts</span></td><td><b>ชั้น 4</b> — <span class="mono text-[12px]">connectMicroservice(options, { deferInitialization: true })</span> แล้วค่อยผูก filter/interceptor และ <span class="mono text-[12px]">registerListeners()</span> เอง · และใส่ <span class="mono text-[12px]">@UseFilters(RpcExceptionsFilter)</span> ระดับคลาสทุก RPC controller (metadata ของคลาสไม่ขึ้นกับลำดับ init จึงพังไม่ได้)</td></tr>
+                <tr><td>5</td><td><span class="mono text-[12px]">libs/common/.../microservice-client.service.ts</span></td><td><span class="mono text-[12px]">handleRpcErrorPayload</span> ต้องคง <span class="mono text-[12px]">502/503/504</span> ไว้ ไม่ยุบเป็น 500 (และแปลง composite code <span class="mono text-[12px]">400001</span> → 400) — ไม่งั้น 503 ที่ retry ได้จะกลายเป็น 500 ที่ frontend ตั้งใจไม่ retry</td></tr>
               </tbody>
             </table>
           </div>
           <div class="code p-5">
 <pre><span class="c"># เช็คเร็ว ๆ ว่า build ที่รันอยู่มี fix #3 (ชื่อ env var ใหม่ต้องติดมาใน bundle)</span>
-grep -c STORAGE_S3_PUBLIC_ENDPOINT &lt;repo-dir&gt;/dist/apps/storage/main.js</pre>
+grep -c STORAGE_S3_PUBLIC_ENDPOINT &lt;repo-dir&gt;/dist/apps/storage/main.js
+
+<span class="c"># fix #4 เช็คจาก log ตอน boot — ถ้ายัง warn อยู่ = filter ยังไม่ถูกผูก</span>
+grep -c <span class="s">"Cannot apply global exception filters"</span> ~/.pm2/logs/storage-out-*.log</pre>
           </div>
           <div class="edge mt-3">
             <div class="tag mb-1">ทำไมเซ็น URL ด้วย client ที่เข้าถึง origin นั้นไม่ได้ก็ได้</div>
@@ -439,6 +477,33 @@ for i in $(seq 5); <span class="k">do</span>
           </div>
         </div>
 
+        <div class="rulebox ok mb-8"><div class="rc mb-1">วัดจริงหลังแก้ (2026-09-09)</div><p class="text-[13.5px]">
+          span <span class="mono text-[12px]">HEAD</span> ของ storage-bc ใน trace เป็นตัวชี้ขาดที่อ่านง่ายที่สุด —
+          <b>ก่อน</b>: มี <span class="mono text-[12px]">dns.lookup</span> + <span class="mono text-[12px]">tcp.connect</span> +
+          <span class="mono text-[12px]">tls.connect</span> แล้วได้ <b>403</b> ใน 628 ms (ทั้ง request 650 ms) ·
+          <b>หลัง</b>: ยิงตรงเข้า <span class="mono text-[12px]">http://&lt;storage-host&gt;:9000</span> ไม่มี DNS/TLS เลย
+          ได้ <b>200</b> ใน <b>1.9 ms</b> (ทั้ง request 62 ms) — เร็วขึ้น ~10 เท่าเป็นผลพลอยได้ เพราะ request
+          ไม่ต้องออกไปกลับจาก CDN อีกต่อไป · confirm ผ่าน <b>5/5</b> และ <span class="mono text-[12px]">upload_url</span>
+          ยังเป็น public domain ตามเดิม
+        </p></div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ล็อกไม่ให้ย้อนกลับมา — smoke ไม่ใช่ unit test</div>
+        <p class="text-sm mb-3" style="color:var(--ink-soft)">
+          unit test และ module e2e mock transport ทั้งคู่ จึง<b>มองไม่เห็น</b> filter ที่ไม่ถูกผูก (ชั้น 4) เลย
+          ตัวที่จับได้คือ smoke ที่ไล่ 3 ผลลัพธ์ให้แยกออกจากกันจริง ๆ ผ่าน service จริง + MinIO จริง —
+          <span class="mono text-[12px]">apps/inventory-bc/test/smoke/product-images.smoke.mjs</span>
+        </p>
+        <div class="overflow-x-auto mb-8">
+          <table class="d">
+            <thead><tr><th>เคส</th><th>ต้องได้</th><th>ถ้าได้อย่างอื่น แปลว่า</th></tr></thead>
+            <tbody>
+              <tr><td>อัปแล้ว → confirm</td><td><span class="mono text-[12px]">201</span> + <span class="mono text-[12px]">size</span>/<span class="mono text-[12px]">etag</span> ที่อ่านกลับจาก HeadObject</td><td>ค่าที่ client ส่งมาถูกเชื่อโดยไม่ตรวจ</td></tr>
+              <tr><td>ไม่เคยอัป → confirm</td><td><span class="mono text-[12px]">400 "No uploaded object found…"</span></td><td>404 จริงถูกกลบเป็น 503 (ชั้น 1/2 หลุด)</td></tr>
+              <tr><td>bucket ชื่อผิดกฎ → confirm</td><td><span class="mono text-[12px]">503</span> ที่มี<b>คำของ storage-bc เอง</b></td><td>ได้ประโยคของผู้เรียก = <b>ชั้น 4 หลุด</b> filter ไม่ถูกผูก</td></tr>
+            </tbody>
+          </table>
+        </div>
+
         <div class="eyebrow text-[var(--muted)] mb-3">ป้องกันระยะยาว</div>
         <div class="overflow-x-auto mb-6">
           <table class="d">
@@ -448,11 +513,13 @@ for i in $(seq 5); <span class="k">do</span>
               <tr><td>log <span class="mono text-[12px]">status</span> + <span class="mono text-[12px]">error_name</span> ทุกครั้งที่จัดประเภท error ของ S3</td><td>กันการวินิจฉัยไม่ได้ — เคสนี้ใช้เวลานานเพราะ log เดิมไม่มี 2 field นี้</td></tr>
               <tr><td>ห้ามใช้ <span class="mono text-[12px]">null</span> เป็น <span class="mono text-[12px]">defaultValue</span> ของ RPC ที่ callee คืน <span class="mono text-[12px]">null</span> ได้เอง</td><td>กัน "ล้มเหลว" กับ "ไม่มี" ยุบเป็นค่าเดียว → ดู <a href="backend-convention.html#microservice" style="color:var(--accent);text-decoration:underline">Backend Convention §08</a></td></tr>
               <tr><td>เก็บกวาด orphan object ใน bucket เป็นรอบ</td><td>object ที่อัปแล้ว confirm ไม่ผ่านจะค้างไว้ตลอดไปโดยไม่มีใครอ้างถึง</td></tr>
+              <tr><td>RPC controller ทุกตัวต้องมี <span class="mono text-[12px]">@UseFilters(RpcExceptionsFilter)</span> ระดับคลาส คู่กับ <span class="mono text-[12px]">@UseInterceptors(RmqAckInterceptor)</span></td><td>กันชั้น 4 กลับมา — global registration พังเงียบได้ตามลำดับ lifecycle แต่ metadata ของคลาสพังไม่ได้ · กฎอยู่ใน <span class="mono text-[12px]">.claude/rules/messaging-and-files.md</span></td></tr>
+              <tr><td>แก้ <span class="mono text-[12px]">.env</span> บนเครื่องแล้วต้องแก้ที่ secret ต้นทางด้วย (ทุก Environment)</td><td>กัน deploy ครั้งถัดไปเขียนทับค่าที่เพิ่งแก้ — ถ้าแก้แค่ Environment เดียว อาการจะกลับมาเฉพาะตอน deploy จากอีก branch หนึ่ง ซึ่งหาสาเหตุยากมาก</td></tr>
             </tbody>
           </table>
         </div>
 
-        <div class="rulebox ok"><div class="rc mb-1">อ่านเชิงลึกต่อ</div><p class="text-[13.5px]"><a href="product-image-upload-guide.html#gotchas" style="color:var(--teal);text-decoration:underline">Product Image Upload Guide §08 ข้อ 5</a> — บันทึกบั๊กนี้แบบละเอียดพร้อม fix ทั้ง 3 จุด · <a href="product-image-upload-guide.html#flow-a" style="color:var(--teal);text-decoration:underline">§04 Flow A</a> — sequence diagram ที่รวม branch 503 แล้ว · <a href="backend-convention.html#microservice" style="color:var(--teal);text-decoration:underline">Backend Convention §08</a> — กฎ <span class="mono text-[12px]">defaultValue</span> ที่ใช้กับทุก RPC ในระบบ</p></div>
+        <div class="rulebox ok"><div class="rc mb-1">อ่านเชิงลึกต่อ</div><p class="text-[13.5px]"><a href="product-image-upload-guide.html#gotchas" style="color:var(--teal);text-decoration:underline">Product Image Upload Guide §08 ข้อ 5</a> — บันทึกบั๊กนี้แบบละเอียดพร้อม fix ทั้ง 3 จุดแรก · <a href="product-image-upload-guide.html#flow-a" style="color:var(--teal);text-decoration:underline">§04 Flow A</a> — sequence diagram ที่รวม branch 503 แล้ว · <a href="backend-convention.html#microservice" style="color:var(--teal);text-decoration:underline">Backend Convention §08</a> — กฎ <span class="mono text-[12px]">defaultValue</span> ที่ใช้กับทุก RPC ในระบบ</p></div>
       </section>
 
       <!-- FOOTER -->

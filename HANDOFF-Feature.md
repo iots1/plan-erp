@@ -1,7 +1,7 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-09 (print pipeline P3 + P4 12/25 — ทุกเอกสารที่มี endpoint แล้ว (receipt 8 + quotation 4) พิมพ์ออกมาเป็นเอกสารจริงได้หมด · เจอบั๊กจริง 3 ตัว · ดู §2 หัวข้อ 2026-09-09)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-09 (อัปโหลดรูปสินค้า 503 — ปิดต้นเหตุจริงได้ทั้งสองชั้น: config ของ storage + exception filter ของ microservice ที่ไม่เคยถูกผูกเลยทั้งระบบ · ดู §2 หัวข้อ 2026-09-09 · storage 403 + RPC error taxonomy)**
 > ก่อนหน้า 2026-09-08: audit doc drift — เอกสาร 3 ไฟล์เคยขัดกับโค้ดจริง แก้ให้ตรงแล้ว (ดู §0 แถว "doc drift" + §1)
 > ก่อนหน้าในวันเดียวกัน (2026-09-08): `tax_configs` version อัตราภาษีได้แล้ว (constraint + supersede endpoint + Admin UI) · smoke runner รับ `needs:` · smoke ตัวแรกของ iam — ดู §2 หัวข้อ **2026-09-08**
 > ก่อนหน้า 2026-09-07: Fiscal Year Closing / ยอดยกมา D2 — backend + Admin UI + smoke (§2) · storage — presigned URL เซ็นด้วย public origin, error taxonomy ของ S3 · docker log retention + PGDATA ของ postgres:18 · Discord notification ตอน deploy สำเร็จ (งาน infra ไม่มีหัวข้อใน §2 — ดู §1 "รอบ 2026-09-07")
@@ -16,6 +16,7 @@
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
+> ✅ **2026-09-09 อัปโหลดรูปสินค้า 503 เป็น ๆ หาย ๆ — ปิดต้นเหตุแล้ว 2 ชั้น** · ชั้นที่ 3 (`STORAGE_S3_ENDPOINT` ชี้ public domain → CDN/WAF ตอบ 403 สุ่ม ๆ) เป็นเคสเดิมของ `runbook-image-confirm-storage-403.html` ที่ **ไม่เคยแก้ที่ต้นทางจริง** · ชั้นที่ 4 **เป็นของใหม่และกว้างกว่ามาก**: `connectMicroservice()` ผูก handler ทันทีก่อน return ทำให้ `useGlobalFilters()` ที่เรียกทีหลังถูกทิ้งเงียบ ๆ (Nest warn แล้วไปต่อ) — **ทุก BC ทั้งระบบ** ส่ง error ของ RPC ออกไปเป็น `{"status":"error","message":"Internal server error"}` ผู้เรียกจึงอ่านไม่ออกและยุบทุกอย่างเป็น "service unavailable" · แก้แล้ว: `.env` + secret ทั้ง 2 Environment, `deferInitialization` + `@UseFilters` 26 controller, คง 502/503/504 ไม่ยุบเป็น 500, smoke ตัวใหม่ที่ล็อกทั้งสามผลลัพธ์ — ดู §2 หัวข้อ **2026-09-09 · storage 403 + RPC error taxonomy**
 > ✅ **2026-09-09 print pipeline P3 — พิมพ์เอกสารจริงได้ 2 ใบแล้ว** (`receipt_full_tax_invoice`, `quotation_standard` เป็น `banded` v3 บนโปรดักชัน) · mapper เลิกส่ง `items_text` เปลี่ยนเป็น `items[]` ที่ format มาแล้วทั้งหมด + `toThaiBahtText()`/`formatAmount()`/`formatQuantity()` ใน `@lib/common` · **เจอบั๊กจริง 3 ตัวที่ unit test จับไม่ได้เลย**: paginator หา `tbody` แบบไม่ scope (แถวสินค้าไปโผล่ในหัวเอกสาร หน้าเละแต่ไม่ error), `quotations-print.smoke.mjs` ไม่ได้ประกาศ `needs` (503 อ่านเหมือน sales-bc พัง), `mergeParams()` ให้ผู้เรียก override ตัวตนผู้ออกเอกสาร/ลายน้ำ DRAFT ได้ · **ค้าง (ไม่ใช่บั๊ก)**: `company_profiles` ยังว่างทุกช่อง เอกสารจึงพิมพ์โดยไม่มีผู้ออก — §86/4(1)–(2) บังคับ ต้องกรอกก่อนใช้จริง — ดู §2 หัวข้อ **2026-09-09**
 > ✅ **2026-09-08 audit doc drift — เอกสารตรงกับโค้ดแล้ว 3 ไฟล์** · `HANDOFF-Document-Print-Pipeline.md` §7 ค้างที่ "P2 ⬜ ถัดไป" อยู่ 2 วันหลัง P2 ขึ้นโปรดักชัน (commit `d8b472b`) เพราะ doc-bump `10ab25d` แก้แต่ `api-workflow-guide.html` · `srs-p3.html` §"ยังไม่ได้ทำ · รอบถัดไป" ยังบอกว่า outbox/`stock.deducted`/`lot.created` ไม่ถูก emit จริง ทั้งที่ §07 ของหน้าเดียวกันเขียนไว้แล้วตั้งแต่ 2026-08 ว่ามีจริง และ Purchase Return ก็ทำแล้วใน P4 M4 · `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 ยังพาดหัวว่า "พิมพ์เอกสารจริงไม่ได้เลยสักใบ" — **บทเรียน: doc-bump ที่ตามหลังโค้ดคนละคอมมิตคือจุดที่ drift เกิด · เฟส/งานที่ปิด ให้แก้ตารางสถานะในคอมมิตเดียวกับโค้ด**
 > ✅ **2026-09-06 document print pipeline P0+P1+P2 — deploy แล้วทั้งสามเฟส** (`company_profiles`/`company_branches` · `document_prints` + `report.printDocument` RPC · `POST /quotations/:id/print` + `POST /receipts/:id/print`) — พิมพ์ครบวงจรจริง (RMQ → Gotenberg → storage → แถว `document_prints`) มี smoke คุมทั้งสองใบ · **ถัดไป P3** (HTML จริงแทน draft placeholder + เอนจิน `banded`) — เจ้าของสถานะคือ `HANDOFF-Document-Print-Pipeline.md` §7
@@ -165,6 +166,51 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### 2026-09-09 · storage 403 + RPC error taxonomy ✅ **ปิดต้นเหตุทั้ง 2 ชั้น — config live แล้ว, โค้ดรอ deploy**
+
+**อาการที่ผู้ใช้เจอ** — แก้ไขสินค้าใน drawer แล้วแนบรูป: `POST /products/:id/images` ตอบ `503
+"Failed to verify the uploaded object — the storage service is unavailable."` สองครั้งติด แล้วสำเร็จ
+ในครั้งที่สาม (frontend retry เอง — `confirmProductImage` retry เฉพาะ 503, backoff 400/800 ms) ·
+ไฟล์ขึ้น bucket ครบตั้งแต่ครั้งแรกเสมอ
+
+**ชั้นที่ 3 · ต้นเหตุเดิมที่ไม่เคยแก้ที่ต้นทาง** — `.env` บนเครื่องยังเป็น
+`STORAGE_S3_ENDPOINT=<public domain>` และไม่มี `STORAGE_S3_PUBLIC_ENDPOINT` เลย ⇒ `HeadObject`
+ของ storage-bc เองวิ่งออกอินเทอร์เน็ตผ่าน CDN/WAF แล้วโดน 403 เป็นบางครั้ง (repro สด: signed HEAD
+ผ่าน public **403 ปนมา 1/8** · ผ่าน internal **200 ทั้ง 8/8**) · เกิดมาแล้ว 09-06 (6 ครั้ง), 09-07
+(8 ครั้ง), 09-09 (5 ครั้ง ใน 3 ช่วง) — runbook เขียนวิธีแก้ไว้ตั้งแต่ 09-07 แต่แก้แค่โค้ด ไม่ได้แก้ค่า
+
+**ชั้นที่ 4 · ของใหม่ กระทบทั้งระบบ** — `app.connectMicroservice()` เรียก `registerListeners()` +
+`setIsInitialized(true)` **ทันทีก่อน return** และนั่นคือขั้นที่ผูก handler เข้ากับ enhancer ·
+`bootstrap.util.ts` เรียก `useGlobalInterceptors()`/`useGlobalFilters()` **หลังจากนั้น** → Nest warn
+`Cannot apply global exception filters: registration must occur before initialization.` แล้วทิ้งไป
+⇒ `RpcExceptionsFilter` **ไม่เคยทำงานเลยสักครั้งในทุก BC** ⇒ exception ทุกตัวจาก `@MessagePattern`
+กลายเป็น envelope default ของ Nest ⇒ `sendWithContext` อ่านไม่ออก ตกไปทาง `defaultValue` ·
+หลักฐาน: log ฝั่ง inventory-bc มี `error_message: {"status":"error","message":"Internal server error"}`
+22 ครั้ง และไม่มี `MICROSERVICE_RPC_ERROR_*` แม้แต่บรรทัดเดียวทั้งเครื่อง · **ชั้นนี้บังชั้น 3 มิด**
+จนวินิจฉัยผิดไปหนึ่งรอบว่า "RPC ไปไม่ถึง storage" (ทั้งที่ trace เห็น hop ครบและ storage log 403 ไว้)
+
+**ที่แก้**
+
+| จุด | ทำอะไร |
+|---|---|
+| `.env` (บนเครื่อง) + secret `ENV_FILE` **ทั้ง production และ development** | `STORAGE_S3_ENDPOINT` → internal · `STORAGE_S3_PUBLIC_ENDPOINT` → public domain · สำรองไฟล์เดิมไว้ที่ `.env.bak-2026-09-09-storage-endpoint` · **ต้องแก้ secret ทั้งสอง Environment** ไม่งั้น deploy จากอีก branch เขียนทับกลับ |
+| `libs/common/.../bootstrap.util.ts` | `connectMicroservice(options, { deferInitialization: true })` → ผูก enhancer → `registerListeners()`/`setIsInitialized()`/`setIsInitHookCalled()` เอง · **ไม่ใช้ `init()`** เพราะจะรัน `onModuleInit`/`onApplicationBootstrap` ซ้ำบน container ที่แชร์กับ HTTP app |
+| RPC controller 26 ไฟล์ | `@UseFilters(RpcExceptionsFilter)` ระดับคลาส คู่กับ `@UseInterceptors(RmqAckInterceptor)` — metadata ของคลาสไม่ขึ้นกับลำดับ lifecycle จึงพังเงียบไม่ได้อีก |
+| `libs/common/.../microservice-client.service.ts` | `resolveRpcHttpStatus()` — คง 502/503/504 ไม่ยุบเป็น 500 (500 = "อาจเขียนไปแล้ว อย่า retry" ซึ่งตรงข้ามกับความจริงของเคสนี้) + แปลง composite code `400001` → 400 |
+| `apps/inventory-bc/test/smoke/product-images.smoke.mjs` | ใหม่ — presign → PUT → confirm จริง + ล็อกทั้งสามผลลัพธ์ (201 / 400 "ไม่เคยอัป" / 503 ที่ต้องมีคำของ storage-bc เอง) |
+
+**วัดผลจริง** — span `HEAD` ของ storage: ก่อน 403 ใน 628 ms พร้อม dns+tcp+**tls** (ทั้ง request 650 ms)
+· หลัง 200 ใน **1.9 ms** ยิงตรงในวง ไม่มี DNS/TLS (ทั้ง request 62 ms) · ยิงครบ flow **5/5 ได้ 201** ·
+local curl e2e แยกครบสามเคส · และย้อนโค้ด bootstrap กลับแล้ว smoke **FAIL** พร้อม payload เดียวกับ
+ที่ผู้ใช้เจอเป๊ะ = เป็น regression lock จริง ไม่ใช่ test ที่ผ่านเพราะบังเอิญ
+
+**บทเรียนที่แพงที่สุดของรอบนี้** — runbook เขียนไว้ถูกต้องตั้งแต่ 09-07 แต่ยังเกิดซ้ำอีก 2 วัน เพราะ
+**"แก้โค้ดแล้ว" ไม่เท่ากับ "แก้ค่าที่ deploy ใช้จริงแล้ว"** · และ **ข้อความ error ที่ผู้ใช้เห็นเป็นของ
+*ผู้เรียก* ไม่ใช่ของ service ที่พัง** — ถ้าไม่ไล่ดูว่าใครเป็นเจ้าของประโยคนั้น จะไล่ผิดชั้นทั้งรอบ
+
+**ค้าง** — โค้ดยังไม่ deploy (dist บนเครื่องเป็นของ 09-08) · `nx lint` ของ finance-bc/storage แดงอยู่
+จากงานคนอื่น/หนี้เดิมใน HEAD ไม่เกี่ยวกับรอบนี้ · orphan object ใน bucket ยังไม่มีใครเก็บกวาดเป็นรอบ
 
 ### 2026-09-09 · print pipeline P3 + P4 ✅ **พิมพ์ได้ครบ 25/25 ใบ · 11 endpoint · 5 BC**
 
