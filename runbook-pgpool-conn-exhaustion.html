@@ -602,13 +602,27 @@ ssh ovh-pgpool1 <span class="s">"curl -s localhost:9719/metrics | grep -E '^pgpo
             จาก baseline 45–176 — นั่นคือ runaway ไม่ใช่ demand เพิ่มเพดานก็แค่ให้มันกินได้มากขึ้นก่อนชน
           </p>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-2">
-            และเพิ่มไม่ได้จริงเพราะฮาร์ดแวร์: primary มี RAM <b class="text-[var(--ink)]">6.9 GB · swap = 0</b>
-            (replica มีแค่ ~3 GB แต่ <span class="mono text-[12px]">max_connections</span> เท่ากัน)
-            วัดได้ว่า 37 backend กิน 782 MB → ที่ 400 backend ราว <b class="text-[var(--ink)]">5.5 GB จาก 6.9 GB</b>
-            เหลือให้ <span class="mono text-[12px]">work_mem</span> กับ page cache แทบไม่มี
-            · <b class="text-[var(--ink)]">OOM แย่กว่า connection refused</b> — ตอนนี้ระบบใช้ไม่ได้แต่ PostgreSQL ยังยืนอยู่
-            ถ้าชน RAM แทน OOM killer จะเก็บ postmaster แล้วต้อง crash recovery
+            <b class="text-[var(--ink)]">เพิ่มแล้วก็ไม่ได้ throughput เพิ่ม</b> — connection ที่ล้นคือของที่เปิดค้าง idle
+            ไม่ใช่งานที่รอทำ · และ pgpool มีไว้เพื่อ<b class="text-[var(--ink)]">จำกัด</b> connection ที่ถึง PostgreSQL
+            ถ้าเพดานของ pgpool สูงกว่า <span class="mono text-[12px]">max_connections</span> แล้วไปเพิ่มฝั่ง PostgreSQL ตาม
+            คือไล่หางตัวเอง — ที่ถูกคือลดเพดานของ pgpool ลงมาให้อยู่ในงบ
+            · <b class="text-[var(--ink)]">OOM แย่กว่า connection refused</b>: ตอนถูกปฏิเสธ ระบบใช้ไม่ได้แต่ PostgreSQL
+            ยังยืนอยู่และข้อมูลปลอดภัย ถ้าชน RAM แทน OOM killer จะเก็บ postmaster แล้วต้อง crash recovery
           </p>
+          <div class="rulebox mt-3">
+            <div class="rc mb-1">อย่าประเมิน RAM ด้วย <span class="mono text-[12px]">used ÷ จำนวน backend</span> — มันสูงเกินจริง</div>
+            <p class="text-[13.5px]" style="color:var(--ink-soft)">
+              ตัวเลขนั้นรวม fixed overhead (postmaster, shared memory, catalog cache) ที่ไม่โตตามจำนวน connection
+              · วัดจริงหลายรอบได้ <span class="mono text-[12px]">used</span> ~740–800 MB ที่ 26–37 backend
+              คือ<b class="text-[var(--ink)]">ไม่เป็นเส้นตรง</b> — ต้นทุนส่วนเพิ่มต่อ <b>idle</b> connection ต่ำกว่าที่คิดมาก
+              (หลักฐานชี้ขาด: peak 373 backend เคยรันบนเครื่องเดียวกันโดยไม่ OOM)
+              · <b class="text-[var(--ink)]">ตัวที่กิน RAM จริงคือ <span class="mono text-[12px]">work_mem</span>
+              ตอน query ทำงาน</b> ไม่ใช่จำนวน connection ที่เปิดค้าง จึงต้องดู
+              <span class="mono text-[12px]">state="active"</span> ไม่ใช่ยอดรวม
+              · และถ้าเป็น VM ให้วัด RAM สดด้วย <span class="mono text-[12px]">free -m</span> ทุกครั้ง
+              (<span class="mono text-[12px]">free -g</span> ปัดทิ้ง และ memory balloon เปลี่ยนขนาดได้โดยไม่ reboot)
+            </p>
+          </div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed mt-2">
             <b class="text-[var(--ink)]">ทำแทน</b>: (1) <span class="mono text-[12px]">superuser_reserved_connections</span>
             3 → ~10 — ต้นทุนเป็นศูนย์ เพราะกันสล็อตอยู่ใน 400 เดิม ไม่ได้เพิ่มเพดาน คู่กับ ป้องกัน #1
