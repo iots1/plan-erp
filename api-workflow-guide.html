@@ -1714,7 +1714,7 @@ sequenceDiagram
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/profit-by-lots</td><td class="mono text-[11px]">profit_by_lot:view</td><td>กำไรขั้นต้นต่อล็อตต่อใบขาย — <span class="mono text-[12px]">filter=lot_id</span>/<span class="mono text-[12px]">product_id</span>/<span class="mono text-[12px]">sold_at</span> ได้</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td><td>ล็อตในหน้าต่างเตือนหมดอายุ — สำเนาข้าม BC ของรายงานที่ inventory-bc มีอยู่แล้ว (ดู E1)</td></tr>
-              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/low-stocks</td><td class="mono text-[11px]">low_stock:view</td><td>สินค้าที่สต็อกต่ำกว่าจุดสั่งซื้อ — สำเนาข้าม BC ของสแกนกลางคืน inventory-bc, upsert ต่อ <span class="mono text-[12px]">product_id</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /report-bc/v1/low-stocks</td><td class="mono text-[11px]">low_stock:view</td><td>สินค้าที่สต็อกต่ำกว่าจุดสั่งซื้อ — สำเนาข้าม BC ของสแกนกลางคืน inventory-bc, upsert ต่อ <span class="mono text-[12px]">(product_id, warehouse_id)</span> (จุดสั่งซื้อตั้งต่อสินค้า<b>ต่อคลัง</b> สินค้าเดียวจึงมีได้หลายแถว)</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/sales-summaries</td><td class="mono text-[11px]">sales_summary:view</td><td>ยอดขาย/กำไรขั้นต้น/จำนวนบิลรายวัน — 1 แถวต่อวัน (Bangkok), เพิ่มค่าทับทุกครั้งที่มี event ใหม่</td></tr>
             </tbody>
           </table>

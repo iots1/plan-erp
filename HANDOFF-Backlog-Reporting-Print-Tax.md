@@ -328,6 +328,23 @@ Postgres จริงทำงานถูกต้อง (ก่อนหน้
 reorder 02:00 เวลาไทย, ไม่มี endpoint กดรันเอง) ตรวจได้แค่ route/permission ตอบถูกต้อง (ข้อมูลว่างเปล่า
 ถูกต้องเพราะยังไม่ถึงรอบสแกนหลัง deploy)
 
+### 3.6 ผลยืนยัน cron — 2026-09-11 ✅ **`expiry_alerts` ถูกต้อง · `low_stocks` พังมา 5 คืน แก้แล้ว**
+
+ค้างมาตั้งแต่ §3.5 ("รอ `@Cron` กลางคืน") — กลับไปดูจริงแล้วได้คำตอบคนละแบบสำหรับสองตาราง:
+
+- **`expiry_alerts` ว่างอย่างถูกต้อง** — `[Expiry Alert] Scanned 0 lot(s) expiring within 30 day(s)`
+  ทุกคืน · `erp_inventory.lots` มี 2 แถวและ**ไม่มีแถวไหนมี `expiry_date`** จึงไม่มีอะไรให้เตือน
+- **`low_stocks` ไม่เคยได้แถวเลย ทั้งที่ scan เจอ 114 คู่ทุกคืน** — cron ยิงจริง, report-bc รับจริง
+  (`[LowStock] Received stock.low chunk 1/1, 114 product(s)`) แล้วตายที่ Postgres **21000
+  `ON CONFLICT DO UPDATE command cannot affect row a second time`** เพราะตารางตั้ง unique ที่
+  `product_id` เดี่ยว ขณะที่จุดสั่งซื้อตั้งต่อสินค้า**ต่อคลัง** (114 แถว / 70 สินค้า) → Postgres ตี
+  ทิ้งทั้ง statement · แก้เป็น `(product_id, warehouse_id)` + migration + smoke ไฟล์แรกของ report-bc
+  แล้ว deploy (รายละเอียด: `HANDOFF-Feature.md` §2 หัวข้อ **2026-09-11** · RULE ใหม่ 2 ข้อใน
+  `srs-p6.html`)
+
+**บทเรียนที่ใช้ได้กับ read model ทุกตัวที่เหลือ**: endpoint ที่ตอบ 200 + array ว่าง ไม่ได้แปลว่าระบบดี —
+ต้องอ่าน log ฝั่งยิง + ฝั่งรับ + **error log ของ consumer** ก่อนจะสรุปว่า "ยังไม่มีข้อมูล"
+
 ---
 
 ## 4 · ภ.พ.30 — รายงานภาษีมูลค่าเพิ่ม (แบบแสดงรายการภาษีมูลค่าเพิ่ม)

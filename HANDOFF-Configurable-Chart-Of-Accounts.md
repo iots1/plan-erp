@@ -575,7 +575,22 @@ permissions` จะหาแถวไม่เจอ แล้ว grant ศู�
    ชี้ไปที่บัญชีที่ถูก role — **ข้อนี้คือข้อที่พิสูจน์ว่า refactor posting service ทั้ง 32 จุดไม่พัง**
    (ทำ**หลัง**ข้อ 3 เพื่อพิสูจน์ด้วยว่า posting เดินตาม role ที่ย้ายแล้ว ไม่ใช่ค้าง cache เก่า)
 
+✅ **ครบทั้ง 6 ข้อแล้ว — ยืนยันด้วยการรันจริง 2026-09-11** (`pnpm verify finance-bc --steps=smoke`
+เขียวทั้ง 4 ไฟล์) · ข้อ 6 ไม่ต้องตัดสินใจอะไรเพิ่มอย่างที่เคยกังวลไว้: หลัง smoke runner รับ `needs`
+(2026-09-08) ไฟล์นี้ประกาศ `needs: ['sales-bc']` แล้วเดินทั้งสายได้เอง — ยืม `1111-02` มาถือ role CASH →
+สร้าง+submit **ใบสำคัญรับเงินจริง** → อ่าน `ledger_entries` กลับมาว่าบรรทัด Cash ชี้ที่บัญชีที่เพิ่งย้าย
+role มาจริง → ยกเลิกใบ (posting กลับเป็นศูนย์) → คืน role กลับ `1111-01` · ไม่ต้องแตะ
+`close-period` ที่เป็น one-way ratchet เลย
+
 ### 8.4 Admin UI — manual QA (ไม่มี automated test)
+
+⏳ **ยังไม่ปิด — ต้องใช้คนคลิกจริง** (browser tool ต่อไม่ได้ทั้ง session 2026-09-06 และ 2026-09-11)
+
+**สิ่งที่ทำแทนไปแล้ว 2026-09-11** — `apps/iam/test/smoke/gl-accounts-page.smoke.mjs` เป็นพื้นอัตโนมัติ
+ใต้ checklist นี้ ไม่ใช่ตัวแทน: เช็คว่าทุก element id ที่ EJS ประกาศถูก bundle อ้างจริง, ทุก
+`onclick="fn(...)"` ในเทมเพลตแถว/dialog มีฟังก์ชันจริงลงทะเบียนเป็น global (ถ้าไม่มี = คลิกแล้ว
+`ReferenceError` เงียบ ๆ ซึ่งเป็นวิธีพังที่หน้านี้เสี่ยงที่สุด เพราะ row template ประกอบด้วย string),
+key `localStorage` ของ expand/collapse ยังอยู่, และ dialog ย้าย role ยังแสดงเจ้าของ role เดิมก่อนยืนยัน
 
 หน้า EJS + vanilla JS ของโปรเจกต์นี้ไม่มี automated test framework คลุมอยู่ (ตรวจแล้ว — `warehouses`
 เองก็ไม่มี) รอบนี้ทำ checklist manual QA แทน: เปิด `/views/gl-accounts` เห็น tree 130 บัญชีถูก indent
@@ -585,7 +600,7 @@ permissions` จะหาแถวไม่เจอ แล้ว grant ศู�
 ### 8.5 เกณฑ์ปิดงาน
 
 `pnpm verify finance-bc` เขียวครบ 6 ขั้น (ไม่ใช่ 5 ขั้น + smoke skipped แบบทุกวันนี้) + §8.4 QA
-checklist ผ่านครบ
+checklist ผ่านครบ · **สถานะ 2026-09-11**: ขั้นที่ 1–6 ✅ ครบ (§8.3) · §8.4 ยังเหลือการคลิกจริงโดยคน
 
 ---
 

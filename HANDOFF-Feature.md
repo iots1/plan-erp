@@ -1,7 +1,8 @@
 # HANDOFF — สถานะงานและแผนต่อ
 
 > **ไฟล์ชั่วคราวสำหรับส่งต่อ session** — ไม่ใช่เอกสารของ product · ลบทิ้งได้เมื่องานที่ค้างในนี้จบ
-> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-09 (อัปโหลดรูปสินค้า 503 — ปิดต้นเหตุจริงได้ทั้งสองชั้น: config ของ storage + exception filter ของ microservice ที่ไม่เคยถูกผูกเลยทั้งระบบ · ดู §2 หัวข้อ 2026-09-09 · storage 403 + RPC error taxonomy)**
+> เขียนเมื่อ 2026-09-02 · **แก้ล่าสุด 2026-09-11 (`low_stocks` ไม่เคยถูกเขียนเลยสักแถวตั้งแต่ deploy — Postgres 21000 จาก conflict target ที่แคบกว่า grain ของข้อมูล · แก้ + deploy แล้ว · gl_accounts ปิดจุดค้างที่ 1 · เพิ่ม Stop hook `docs-sync-reminder` — ดู §2 หัวข้อ **2026-09-11**)**
+> ก่อนหน้า 2026-09-09 (อัปโหลดรูปสินค้า 503 — ปิดต้นเหตุจริงได้ทั้งสองชั้น: config ของ storage + exception filter ของ microservice ที่ไม่เคยถูกผูกเลยทั้งระบบ · ดู §2 หัวข้อ 2026-09-09 · storage 403 + RPC error taxonomy)**
 > ก่อนหน้า 2026-09-08: audit doc drift — เอกสาร 3 ไฟล์เคยขัดกับโค้ดจริง แก้ให้ตรงแล้ว (ดู §0 แถว "doc drift" + §1)
 > ก่อนหน้าในวันเดียวกัน (2026-09-08): `tax_configs` version อัตราภาษีได้แล้ว (constraint + supersede endpoint + Admin UI) · smoke runner รับ `needs:` · smoke ตัวแรกของ iam — ดู §2 หัวข้อ **2026-09-08**
 > ก่อนหน้า 2026-09-07: Fiscal Year Closing / ยอดยกมา D2 — backend + Admin UI + smoke (§2) · storage — presigned URL เซ็นด้วย public origin, error taxonomy ของ S3 · docker log retention + PGDATA ของ postgres:18 · Discord notification ตอน deploy สำเร็จ (งาน infra ไม่มีหัวข้อใน §2 — ดู §1 "รอบ 2026-09-07")
@@ -36,7 +37,7 @@
 
 ## 0 · เปิด session ใหม่ — อ่านตรงไหน
 
-**ไม่มีงานที่ค้างกลางคัน** — เริ่มงานใหม่ได้เลย ไม่ต้องสะสางอะไรก่อน
+**ไม่มีงานที่ค้างกลางคัน** — เริ่มงานใหม่ได้เลย ไม่ต้องสะสางอะไรก่อน · ค้างอย่างเดียวที่ต้องใช้ **คน**: manual QA หน้า `gl-accounts` (ต้องมี browser จริง — §2 หัวข้อ 2026-09-11)
 
 | อยากรู้ว่า | ไปที่ |
 |---|---|
@@ -53,6 +54,7 @@
 | `tax_configs` version อัตราภาษี — ทำไปถึงไหน | §2 หัวข้อ **2026-09-08 · `tax_configs`** (constraint + supersede + Admin UI + smoke ครบ) |
 | **doc drift** — เอกสารไหนเคยไม่ตรงกับโค้ด และแก้อะไรไป | §1 ท้ายหัวข้อ ("รอบ 2026-09-08 · audit doc drift") — 3 ไฟล์: print pipeline §7, `srs-p3.html`, backlog §1 |
 | งานที่ยังเหลือทั้งระบบ (ไม่ใช่แค่ในไฟล์นี้) | `HANDOFF-Backlog-Reporting-Print-Tax.md` (§3 FE, §4.4, §5 WHT) · `HANDOFF-Document-Print-Pipeline.md` §7 (P3–P5) · `HANDOFF-Fiscal-Year-Closing.md` §9 · `HANDOFF-Postgresql.md` §2–§3 (**ไม่มี backup เลย = ความเสี่ยงสูงสุดในลิสต์**) |
+| `low_stocks`/`expiry_alerts` — cron ยืนยันหรือยัง | §2 หัวข้อ **2026-09-11** (ยืนยันครบ + เจอบั๊ก + แก้ + deploy แล้ว) |
 | งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **งานอื่นที่รู้อยู่** (#8, #10, #11) |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5/P4#12 |
 | คำสั่งที่ใช้จริง (หลายตัวไม่ตรงกับที่เดาจาก `package.json`) | §3 |
@@ -62,7 +64,7 @@
 **ที่แนะนำถ้าจะทำต่อเลย** (ปรับใหม่ 2026-09-08 · ไม่มีข้อไหนบล็อกอีกข้อ):
 1. **บันทึกข้อมูลบริษัทจริงทับข้อมูลตัวอย่างใน `company_profiles`** (ตอนนี้เป็น placeholder ที่ประกาศตัวเองบนเอกสาร) — จนกว่าจะกรอก เอกสารทุกใบที่พิมพ์ออกมาไม่มีชื่อ/เลขผู้เสียภาษี/ที่อยู่ผู้ขาย ซึ่ง §86/4(1)–(2) บังคับ · ~~P3~~ ✅ + ~~P4 ฝั่งที่มี endpoint แล้ว~~ ✅ (12/25) → **P4 ที่เหลือ 13 ใบ** = ทำ `POST /:id/print` + mapper ของ sales-bc (SO/DN/SR), supplier-bc (PO 4 แบบ/purchase return), inventory-bc (goods receipt), finance-bc (billing note/payment entry/AP invoice 2 แบบ) ก่อน แล้ว HTML ค่อยตามมา
 2. **ปิด 2 จุดค้างของ `gl_accounts`** — smoke §8.3 ข้อ 6 ถูกลงเยอะแล้วหลัง smoke runner รับ `needs:` (2026-09-08) · manual QA UI ทำได้เลยใน session ที่มี browser tool
-3. **ยืนยันผล cron `low_stock`/`expiry_alerts`** — ค้างมาตั้งแต่คืน 2026-09-05 ยังไม่มีใครกลับไปดู (query ตารางอ่านเอาก็พอ ไม่มี endpoint กดรัน)
+3. ~~**ยืนยันผล cron `low_stock`/`expiry_alerts`**~~ ✅ **ปิดแล้ว 2026-09-11** — `expiry_alerts` ว่างอย่างถูกต้อง แต่ `low_stocks` **พังจริงมา 5 คืน** (Postgres 21000) แก้ + deploy แล้ว · ดู §2 หัวข้อ **2026-09-11**
 4. ถ้าจะเริ่ม **§5 หนังสือรับรองหัก ณ ที่จ่าย** — บล็อกเกอร์ยังจริง: `ap_invoices` ไม่มี `supplier_tax_id` snapshot (ยืนยันกับโค้ดแล้ว 2026-09-08) ต้องเพิ่มคอลัมน์ + migration ก่อน · ส่วน "ข้อมูลบริษัทผู้ออก" ปิดไปแล้วด้วย `company_profiles` จาก print P0
 5. ~~`npm run seed -- --fresh --yes` บน scratch DB~~ ✅ **ปิดงานแล้ว 2026-09-03** — ดู §2 หัวข้อ **seed — ตรวจซ้ำ** (ผู้ใช้ตัดสินใจข้ามส่วน `--fresh` บน scratch DB) · ⚠️ กติกาเดิมยังใช้: **ห้ามรัน `--fresh` ใส่ DB จริง** (ดู §4 #10)
 6. งานอื่นที่รู้อยู่ #8/#10/#11 — ทั้งหมด optional, ไม่ใช่บั๊ก (ดู §2 หัวข้อ **งานอื่นที่รู้อยู่**)
@@ -79,8 +81,8 @@
 
 | Repo | HEAD ปัจจุบัน |
 |---|---|
-| `iotechsoft-company/erp-api` | `3f796d6` test(verify): let a smoke file declare the BCs it needs; first iam smoke (+ คอมมิต bump submodule ของรอบ doc drift ที่ตามมา ยังไม่ push) |
-| `iots1/plan-erp` (submodule) | commit นี้เอง — doc drift 2026-09-08 (ก่อนหน้า `5dd3562` tax_configs versioning + กับดัก #14–16) |
+| `iotechsoft-company/erp-api` | `e98120c` fix(report-bc): a reorder point is per product per warehouse, so is the key (push + deploy แล้ว run `34543189180`) · หลังจากนั้นมีงาน docs/hook ของรอบ 2026-09-11 ที่ยังไม่ commit |
+| `iots1/plan-erp` (submodule) | commit นี้เอง — รอบ 2026-09-11 (`srs-p6.html` 2 RULE ใหม่ + `api-workflow-guide.html` natural key + HANDOFF 3 ไฟล์) |
 
 **`bb81622`** (versioned tax rates + fiscal year closing + admin UIs) คือคอมมิตฟีเจอร์ตัวล่าสุด —
 ที่ตามมาหลังจากนั้นเป็นงาน storage/infra ของ 2026-09-07 กับ smoke runner ของ 2026-09-08
@@ -166,6 +168,46 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### 2026-09-11 · `low_stocks` ไม่เคยถูกเขียนเลยสักแถว ✅ **แก้ + deploy แล้ว** · gl_accounts ปิดจุดค้างที่ 1
+
+**ที่มา**: ตามข้อ 3 ของลิสต์ §0 (ยืนยันผล cron) — ปรากฏว่าไม่ใช่ "รอ cron" แต่เป็นบั๊กเงียบ
+
+**`expiry_alerts` — ว่างอย่างถูกต้อง** ปิดเคส: log ทุกคืนคือ `[Expiry Alert] Scanned 0 lot(s) expiring
+within 30 day(s)` และใน `erp_inventory` มี `lots` 2 แถว **ไม่มีแถวไหนมี `expiry_date`** เลย → ไม่มีอะไร
+ให้เตือน สแกนจึงไม่ยิงอีเวนต์ (chunk_count = 0)
+
+**`low_stocks` — พังทุกคืนตั้งแต่ deploy 2026-09-05** ไล่หลักฐานครบสาย: cron ยิงจริง
+(`[Reorder Alert] Scanned 114 product/warehouse pair(s) below their reorder point (113 out of stock)`)
+· report-bc รับจริง (`[LowStock] Received stock.low chunk 1/1, 114 product(s)`) · แล้วตายที่
+`ERROR [DB Error] code 21000 in low_stocks — ON CONFLICT DO UPDATE command cannot affect row a second time`
+
+ต้นเหตุ: `low_stocks` unique ที่ **`product_id` เดี่ยว** แต่ `reorder_levels` ตั้งจุดสั่งซื้อ**ต่อสินค้า
+ต่อคลัง** — ข้อมูลจริง 114 แถว / **70 สินค้า** (ซ้ำ 44 แถว เพราะสินค้าเดียวต่ำใน 2–3 คลัง) Postgres จึง
+ปฏิเสธทั้ง statement ทั้งคืนหายหมด ไม่ใช่แค่แถวซ้ำ · `expiry_alerts` รอดเพราะคีย์เป็น `lot_id`
+
+**แก้**: unique + conflict target → `(product_id, warehouse_id)` (entity + service) · migration
+`1789060158848-FixLowStockNaturalKeyToProductWarehouse` (generate จาก entity diff, รันบน DB จริงแล้ว) ·
+unit test เพิ่มเคส "สินค้าเดียวกัน 2 คลังใน chunk เดียว" · **smoke ไฟล์แรกของ report-bc**
+(`low-stocks.smoke.mjs`) เช็ค natural key บน DB จริง + เทียบจำนวนแถวกับที่ inventory-bc รายงาน ·
+พิสูจน์บน DB จริงด้วย statement รูปเดียวกับที่พัง → `INSERT 0 2` แล้ว `ROLLBACK` · commit `e98120c`
+push + deploy สำเร็จ (run `34543189180`, 4m8s)
+
+⚠️ **ลำดับที่ต้องระวังถ้าเจอแบบนี้อีก**: migration รันก่อน deploy = โค้ดเก่าบนเครื่องส่ง
+`ON CONFLICT (product_id)` ที่ไม่มี constraint รองรับแล้ว → error เปลี่ยนจาก 21000 เป็น 42P10 (ยังพัง
+เหมือนเดิม) ช่วงคาบเกี่ยวนี้ต้องปิดให้ทันก่อนรอบ cron ถัดไป
+
+**`gl_accounts` จุดค้างที่ 1 (smoke §8.3 ข้อ 6) ✅ ปิดแล้ว** — ไม่ต้องตัดสินใจอะไรเพิ่ม: smoke ที่มีอยู่
+ทำครบแล้วหลัง runner รับ `needs` · รันจริงรอบนี้: ย้าย role CASH ไป `1111-02` → สร้าง+submit ใบสำคัญ
+รับเงินจริง → ยืนยันว่า Cash line โพสต์เข้าบัญชีที่เพิ่งย้าย role → ยกเลิกใบ + คืน role กลับ `1111-01`
+(`pnpm verify finance-bc --steps=smoke` เขียวครบ 4 ไฟล์)
+
+**`gl_accounts` จุดค้างที่ 2 (manual QA UI) — ยังไม่ปิด** browser tool ใน session นี้ต่อไม่ได้อีกเหมือนเดิม
+· สิ่งที่ทำแทนได้และทำไปแล้ว: `apps/iam/test/smoke/gl-accounts-page.smoke.mjs` — เช็คว่า id ที่ EJS ประกาศ
+ถูก bundle อ้างจริง, ทุก `onclick="fn(...)"` ในเทมเพลตแถว/dialog มีตัวจริงลงทะเบียนเป็น global (ไม่งั้นคลิก
+แล้ว ReferenceError เงียบ ๆ), key `localStorage` ของ expand/collapse ยังอยู่, dialog ย้าย role ยังโชว์
+เจ้าของ role เดิมก่อนยืนยัน · **ยังต้องมีคนคลิกจริง** สำหรับ tree indent/expand/collapse/CRUD
+
 
 ### 2026-09-09 · storage 403 + RPC error taxonomy ✅ **ปิดต้นเหตุทั้ง 2 ชั้น — config live แล้ว, โค้ดรอ deploy**
 
@@ -1581,6 +1623,14 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
 16. **(จาก 2026-09-08) smoke ที่ข้าม BC ได้ 503 ซึ่งอ่านเหมือน regression ของ BC ที่กำลังเทส** — runner
     สตาร์ทแค่ `auth`+`iam`+BC เป้าหมาย ประกาศ `needs: ['report-bc']` ในไฟล์ smoke แล้ว runner จะสตาร์ทให้
     (อย่าไปแก้ด้วยการจำ `--with=` เพราะช่วยได้แค่คนที่รู้อยู่แล้วว่าต้องใส่)
+17. **(จาก 2026-09-11, low_stocks) read model ที่ป้อนด้วย cron อย่างเดียว "ว่าง" ไม่ใช่หลักฐานอะไรเลย** —
+    `GET /low-stocks` ตอบ 200 + array ว่างเหมือนกันทั้งตอนที่ไม่มีสินค้าต่ำสต็อก และตอนที่ ingest พังทุกคืน
+    (พังจริงมา 5 คืนโดยไม่มีใครเห็น) · เวลาจะสรุปว่า "ยังไม่มีข้อมูล" ต้องไล่ **3 ชั้น**: log ฝั่งยิง
+    (`[Reorder Alert] Scanned N ...`), log ฝั่งรับ (`[LowStock] Received ...`) และ **error log ของ consumer**
+    — ชั้นที่ 3 คือชั้นที่บอกความจริง · และ **conflict target ของ upsert ต้องเท่ากับ grain ของแถวที่ event
+    ส่งมา**: `low_stocks` unique ที่ `product_id` เดี่ยวขณะที่สแกนส่งมาต่อ (สินค้า, คลัง) → Postgres ตี
+    `21000 ON CONFLICT DO UPDATE command cannot affect row a second time` ทิ้ง **ทั้ง statement** ไม่ใช่แค่
+    แถวซ้ำ (114 แถว/70 สินค้า หายทั้งคืน) · unit test ที่ mock repository มองไม่เห็น (เหมือนกับดัก #14)
 
 ---
 
