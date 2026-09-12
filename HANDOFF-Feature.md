@@ -169,6 +169,24 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-12 · ฟอร์ม ภ.พ.30 พิมพ์ได้จริง ✅ **implement + verify + smoke** (ข้อ 4 ของคิว 7→6→4→8)
+
+`POST /finance-bc/v1/vat-returns/print` — เรนเดอร์ช่อง 1-16 ของแบบจริงผ่าน print engine เดิม ·
+รายละเอียดเต็ม + เหตุผลของทุกการตัดสินใจ: `HANDOFF-Backlog-Reporting-Print-Tax.md` **§4.6**
+
+สิ่งที่ต้องรู้ถ้าจะทำแบบ ภ.ง.ด. ตัวต่อไป:
+
+- **เอกสารที่ไม่มีแถวของตัวเอง ใช้ UUIDv5 ของงวดแทน `source_document_id`** — pipeline นับสำเนาต่อ id
+  นั้น การพิมพ์ซ้ำเดือนเดิมจึงต่อเลขสำเนาได้ถูกต้อง (ดู `VAT_RETURN_PERIOD_ID_NAMESPACE` — **ห้ามเปลี่ยน
+  ค่า** เพราะจะรีเซ็ตประวัติสำเนาของทุกงวดที่พิมพ์ไปแล้ว)
+- **ช่องที่ระบบไม่รู้ ให้พิมพ์ว่าง + เขียนข้อสมมติไว้บนใบ** ไม่ใช่เติม 0.00 (ช่อง 10/13/14/15/16)
+- **`company_tax_id_digits` มีให้ใช้แล้วทุกเทมเพลต** (13 ช่องต่อ 1 ตัวเลข ประกอบที่ `mergeParams()`)
+  แบบ ภ.ง.ด.3/53 ที่ตีช่องเลขผู้เสียภาษีเหมือนกันเรียกใช้ได้เลย
+- permission `vat_return:print` sync + grant migration รันบน DB จริงแล้ว (`1789227196321`) ·
+  `print_templates.code='vat_return'` + `document_types.code='vat_return'` สร้างผ่าน API แล้ว
+  (เทมเพลตต้นฉบับอยู่ที่ `apps/report-bc/src/modules/print-template/assets/templates/vat-return.html`)
+
+
 ### 2026-09-11 · `low_stocks` ไม่เคยถูกเขียนเลยสักแถว ✅ **แก้ + deploy แล้ว** · gl_accounts ปิดจุดค้างที่ 1
 
 **ที่มา**: ตามข้อ 3 ของลิสต์ §0 (ยืนยันผล cron) — ปรากฏว่าไม่ใช่ "รอ cron" แต่เป็นบั๊กเงียบ

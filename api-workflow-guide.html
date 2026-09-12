@@ -1342,6 +1342,7 @@ sequenceDiagram
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/vat-returns?year=&amp;month=</td><td class="mono text-[11px]">vat_return:view</td><td>ภาษีขาย/ภาษีซื้อ/ยอดสุทธิของเดือนนั้น</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/vat-returns/print</td><td class="mono text-[11px]">vat_return:print</td><td>พิมพ์แบบ ภ.พ.30 (ช่อง 1-16) ของเดือนนั้น → presigned URL ของ PDF · body คือ <span class="mono text-[12px]">{ year, month }</span> ไม่ใช่ id เพราะไม่มีแถวเอกสารให้อ้าง</td></tr>
             </tbody>
           </table>
         </div>
@@ -1377,8 +1378,10 @@ sequenceDiagram
             ใบลดหนี้ (<span class="mono text-[12px]">CREDIT_NOTE</span>) ถูกหักออกจากยอดของฝั่งนั้นเสมอ — ทิศทางมาจาก
             <span class="mono text-[12px]">document_type</span> ไม่ใช่เครื่องหมายตัวเลข (แถวของมันเก็บเป็นค่าบวกเหมือนเอกสารอื่น) ·
             ใบเพิ่มหนี้ (<span class="mono text-[12px]">DEBIT_NOTE</span> — มีแค่ฝั่งขาย) บวกเข้าปกติไม่ต้องพลิกเครื่องหมาย ·
-            <b>ยังไม่รองรับ</b>: ยอดภาษีซื้อยกไปเดือนถัดไป (§82/3 — เครดิตภาษีซื้อใช้ได้ภายใน 6 เดือนนับแต่เดือนที่ออกใบกำกับ),
-            ฟอร์มพิมพ์ 16 ช่องจริง (รอ print engine) — ดู <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §4
+            <b>ยังไม่รองรับ</b>: ยอดภาษีซื้อยกไปเดือนถัดไป (§82/3 — เครดิตภาษีซื้อใช้ได้ภายใน 6 เดือนนับแต่เดือนที่ออกใบกำกับ)
+            — ดู <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §4 ·
+            <b style="color:var(--ink)">ฟอร์มพิมพ์ 16 ช่องจริงทำแล้ว 2026-09-12</b>:
+            <span class="mono text-[12px]">POST /vat-returns/print</span> (<span class="mono text-[12px]">vat_return:print</span>)
           </p>
         </div>
         <div class="rulebox mb-8">
@@ -2200,6 +2203,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns</td><td class="mono text-[11px]">vat_return:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns/print</td><td class="mono text-[11px]">vat_return:print</td></tr>
             </tbody>
           </table>
         </div>
