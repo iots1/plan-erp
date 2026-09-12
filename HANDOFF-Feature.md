@@ -186,6 +186,12 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
   `print_templates.code='vat_return'` + `document_types.code='vat_return'` สร้างผ่าน API แล้ว
   (เทมเพลตต้นฉบับอยู่ที่ `apps/report-bc/src/modules/print-template/assets/templates/vat-return.html`)
 
+**deploy แล้ว** — commit `8bb83f3` · run `34707791768` ขึ้น ❌ รอบแรกเพราะ ssh หลุดตอน reload ตัวสุดท้าย
+ทั้งที่ reload ครบแล้วจริง (ดู §4 กับดัก #18) · re-run แล้วเขียว · ยืนยันบนเครื่อง: route
+`POST /finance-bc/v1/vat-returns/print` mapped ทั้งสอง worker · **ยังไม่ได้ยิง E2E ผ่านโดเมนจริง** —
+smoke วิ่งบน DB/broker/Gotenberg/storage ชุดเดียวกับโปรดักชันอยู่แล้ว ส่วนที่ยังไม่ถูกทดสอบคือชั้น Kong
+เท่านั้น (ซึ่งไม่ได้แก้อะไรในรอบนี้)
+
 
 ### 2026-09-11 · `low_stocks` ไม่เคยถูกเขียนเลยสักแถว ✅ **แก้ + deploy แล้ว** · gl_accounts ปิดจุดค้างที่ 1
 
@@ -1651,6 +1657,13 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     ส่งมา**: `low_stocks` unique ที่ `product_id` เดี่ยวขณะที่สแกนส่งมาต่อ (สินค้า, คลัง) → Postgres ตี
     `21000 ON CONFLICT DO UPDATE command cannot affect row a second time` ทิ้ง **ทั้ง statement** ไม่ใช่แค่
     แถวซ้ำ (114 แถว/70 สินค้า หายทั้งคืน) · unit test ที่ mock repository มองไม่เห็น (เหมือนกับดัก #14)
+18. **(จาก 2026-09-12) deploy ที่ขึ้น ❌ อาจ reload สำเร็จไปแล้วทั้งหมด — เช็คเครื่องก่อนสั่ง deploy ซ้ำ** —
+    workflow จบด้วย `Connection to *** closed by remote host / client_loop: send disconnect: Broken pipe`
+    → `exit 255` ตอนกำลัง reload ตัวสุดท้าย (report-bc) · แต่ `pm2 jlist` บนเครื่องแสดงว่า **ทุก process
+    reload ครบ** และ `Mapped {/finance-bc/v1/vat-returns/print, POST}` ขึ้นใน log ของทั้งสอง worker
+    เรียบร้อย — ssh หลุดตอนกำลังพิมพ์บรรทัดสุดท้ายเท่านั้น · ลำดับที่ถูก: `ssh app-server pm2 jlist` +
+    grep route ใน `~/.pm2/logs/<app>-out-*.log` ก่อน แล้วค่อยตัดสินใจ (`gh run rerun <id> --failed`
+    ปลอดภัยเพราะ deploy เป็น idempotent แต่การ "แก้" อย่างอื่นโดยเดาว่ายังไม่ได้ deploy คือทางที่พัง)
 
 ---
 
