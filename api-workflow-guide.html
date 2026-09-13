@@ -1583,6 +1583,8 @@ sequenceDiagram
             <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td><td>งบทดลอง · มีธง <span class="mono">is_balanced</span></td></tr>
+              <tr><td class="mono text-[11.5px]" style="opacity:.6">GET /finance-bc/v1/balance-sheets</td><td class="mono text-[11px]" style="opacity:.6">balance_sheet:view</td><td><span class="chip">backlog</span> งบดุล — <b>ยังไม่ implement</b> · แผนเต็ม: <span class="mono text-[12px]">HANDOFF-Financial-Statements.md</span></td></tr>
+              <tr><td class="mono text-[11.5px]" style="opacity:.6">GET /finance-bc/v1/income-statements</td><td class="mono text-[11px]" style="opacity:.6">income_statement:view</td><td><span class="chip">backlog</span> งบกำไรขาดทุน — <b>ยังไม่ implement</b> · ดูไฟล์เดียวกัน §4/§5</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td><td>บัญชีแยกประเภท · กรองด้วย <span class="mono">journal_id</span> หรือ <span class="mono">ref_doc_id</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td><td>ต้นทุนขายต่อล็อต</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td><td>กำไรขั้นต้นต่อล็อต · <b>ติดลบได้</b> เมื่อขายต่ำกว่าทุน</td></tr>
@@ -2202,6 +2204,8 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td></tr>
+              <tr style="opacity:.6"><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/balance-sheets <b>(backlog)</b></td><td class="mono text-[11px]">balance_sheet:view</td></tr>
+              <tr style="opacity:.6"><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/income-statements <b>(backlog)</b></td><td class="mono text-[11px]">income_statement:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns</td><td class="mono text-[11px]">vat_return:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns/print</td><td class="mono text-[11px]">vat_return:print</td></tr>
             </tbody>

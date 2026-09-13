@@ -53,7 +53,8 @@
 | ปิดปีบัญชี / ยอดยกมา (D2) — ทำไปถึงไหน | §2 หัวข้อ **2026-09-07 · Fiscal Year Closing / ยอดยกมา (D2)** (backend + Admin UI + smoke ครบ) · งานต่อยอดที่ยังไม่ทำอยู่ใน `HANDOFF-Fiscal-Year-Closing.md` §9 (งบการเงิน D3, manual journal entry, import/export ผังบัญชี D4) |
 | `tax_configs` version อัตราภาษี — ทำไปถึงไหน | §2 หัวข้อ **2026-09-08 · `tax_configs`** (constraint + supersede + Admin UI + smoke ครบ) |
 | **doc drift** — เอกสารไหนเคยไม่ตรงกับโค้ด และแก้อะไรไป | §1 ท้ายหัวข้อ ("รอบ 2026-09-08 · audit doc drift") — 3 ไฟล์: print pipeline §7, `srs-p3.html`, backlog §1 |
-| งานที่ยังเหลือทั้งระบบ (ไม่ใช่แค่ในไฟล์นี้) | `HANDOFF-Backlog-Reporting-Print-Tax.md` (§3 FE, §4.4, §5 WHT) · `HANDOFF-Document-Print-Pipeline.md` §7 (P3–P5) · `HANDOFF-Fiscal-Year-Closing.md` §9 · `HANDOFF-Postgresql.md` §2–§3 (**ไม่มี backup เลย = ความเสี่ยงสูงสุดในลิสต์**) |
+| งานที่ยังเหลือทั้งระบบ (ไม่ใช่แค่ในไฟล์นี้) | **`HANDOFF-Financial-Statements.md` (D3 งบการเงิน — backlog ที่ออกแบบครบแล้ว รอคำตอบ §5 สามข้อ)** · `HANDOFF-Backlog-Reporting-Print-Tax.md` (§3 FE, §4.4 ข้อ 2-3) · `HANDOFF-Document-Print-Pipeline.md` §7 (P5) · `HANDOFF-Fiscal-Year-Closing.md` §9 · `HANDOFF-Postgresql.md` §2–§3 (**ไม่มี backup เลย = ความเสี่ยงสูงสุดในลิสต์**) |
+| **งบการเงิน (D3) — จะเริ่มยังไง** | `HANDOFF-Financial-Statements.md` — ฐานข้อมูลพร้อมแล้ว เหลือ 3 คำตอบใน §5 (ระดับความละเอียด · เทียบงวดก่อน · พิมพ์เลยไหม) |
 | `low_stocks`/`expiry_alerts` — cron ยืนยันหรือยัง | §2 หัวข้อ **2026-09-11** (ยืนยันครบ + เจอบั๊ก + แก้ + deploy แล้ว) |
 | งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **งานอื่นที่รู้อยู่** (#8, #10, #11) |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5/P4#12 |
