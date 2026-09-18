@@ -170,6 +170,45 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-18 · FE แจ้ง `403 supplier_group:view` (เคสจาก 2026-09-16) ✅ **แก้ + verify + smoke ครบ 2 BC**
+
+**อาการ**: `GET /supplier-bc/v1/supplier-groups?limit=100` ตอบ
+`403 Missing required permission: supplier_group:view` **แม้แต่ superadmin**
+
+**ต้นเหตุ — ไม่ใช่กับดักลำดับ deploy (`.claude/rules/permissions.md`) รอบนี้**: `supplier_group:*` และ
+`item_supplier:*` ขึ้นมาพร้อมกันตั้งแต่ commit `13e4879` (`feat: add price list and supplier group
+management`) มี `@RequirePermission()` ครบ และ `permissions:sync` สร้างแถวใน catalog ให้แล้วด้วย —
+แต่**ไม่เคยมี grant migration ตามมาเลย** จึงไม่มี policy statement ไหนชี้มาที่ทั้ง 6 สิทธิ์ ·
+catalog row ที่ไม่มีใคร grant = default-denied ทุกคน ไม่มีข้อยกเว้นให้ superadmin (ไม่มี bypass ใน
+`PermissionGuard`) · ตรวจซ้ำทั้งระบบด้วย query "api-plane permission ที่ไม่ได้ผูกกับ
+`POL_SUPERADMIN_FULL_ACCESS`" — เจอ **6 แถวนี้เท่านั้น** ไม่มีที่อื่นค้างอีก
+
+**ต้นเหตุที่ 2 — ทำไมแก้ผ่านหน้า Policy admin ไม่ได้**: `PUT /policies/:id/statements` ตีกลับ
+`สิทธิ์ "report:print_template_restore" อยู่ในระนาบ (plane) "api" จึงใช้กับ statement ระนาบ "ui" ไม่ได้` ·
+ใน DB มี `statement_actions` เก่า 4 แถว (`report:print_template_restore`,
+`report:print_template_history_read` × 2 policy) ที่แขวน permission ระนาบ `api` ไว้บน statement ระนาบ
+`ui` — เขียนไว้ก่อนที่ `PoliciesService.assertPermissionsUsable()` จะมีอยู่ · หน้าฟอร์มโหลด statement เดิม
+มาแล้ว PUT กลับทั้งก้อน แถวพิษจึงถูกส่งซ้ำทุกครั้ง → **policy นั้นบันทึกไม่ได้อีกเลย** ไม่ว่าจะแก้อะไร
+และลบแถวพิษออกจาก UI ก็ไม่ได้เพราะ UI บันทึกไม่ผ่านตั้งแต่แรก
+
+**ที่แก้** (migration รันบน DB จริงแล้ว — dev/prod ใช้ Postgres ตัวเดียวกัน, §4 กับดัก #10):
+
+- `1789742065734-GrantSupplierGroupAndItemSupplierPermissionsToMockPolicies` — grant ทั้ง 6 สิทธิ์
+  (`supplier_group:` + `item_supplier:` × view/create/update) ให้ `POL_SUPERADMIN_FULL_ACCESS` +
+  `POL_STAFF_GENERAL_ACCESS` ตาม pattern เดิมทุกประการ
+- `1789742065735-RemovePlaneMismatchedStatementActions` — ลบแถวที่ plane ของ permission ไม่ตรงกับ
+  plane ของ statement **ทั้งหมด** (เขียนเป็นเงื่อนไขทั่วไป ไม่ hardcode 4 id) · ไม่มีใครเสียสิทธิ์:
+  `PermissionResolverService` แบนสิทธิ์รวมโดยไม่สนใจ plane อยู่แล้ว และทั้งสอง policy ถือ
+  `report:*` คู่นั้นบน statement ระนาบ `api` อยู่ก่อนแล้ว · `down()` ตั้งใจย้อนไม่ได้
+- smoke ใหม่ 2 ไฟล์ที่จะจับ 403 แบบนี้ได้ตั้งแต่ก่อนถึงมือ FE —
+  `apps/supplier-bc/test/smoke/supplier-groups.smoke.mjs` และ
+  `apps/inventory-bc/test/smoke/item-suppliers.smoke.mjs` ·
+  `pnpm verify supplier-bc` + `pnpm verify inventory-bc` เขียวทั้งคู่ (200 จริงผ่าน guard จริง)
+
+**สิ่งที่ผู้ใช้ต้องทำ**: สิทธิ์ถูก resolve ตอน login แล้วเก็บใน Redis session (ไม่ได้อยู่ใน JWT — JWT มีแค่
+identity + `jti`) · **token เดิมยังโดน 403 ต่อจนกว่าจะ login ใหม่หรือ refresh** ไม่ต้อง deploy อะไร
+เพราะเป็นข้อมูลใน `erp_iam` ล้วน
+
 ### 2026-09-12 · ฟอร์ม ภ.พ.30 พิมพ์ได้จริง ✅ **implement + verify + smoke** (ข้อ 4 ของคิว 7→6→4→8)
 
 `POST /finance-bc/v1/vat-returns/print` — เรนเดอร์ช่อง 1-16 ของแบบจริงผ่าน print engine เดิม ·
@@ -1665,6 +1704,19 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     เรียบร้อย — ssh หลุดตอนกำลังพิมพ์บรรทัดสุดท้ายเท่านั้น · ลำดับที่ถูก: `ssh app-server pm2 jlist` +
     grep route ใน `~/.pm2/logs/<app>-out-*.log` ก่อน แล้วค่อยตัดสินใจ (`gh run rerun <id> --failed`
     ปลอดภัยเพราะ deploy เป็น idempotent แต่การ "แก้" อย่างอื่นโดยเดาว่ายังไม่ได้ deploy คือทางที่พัง)
+19. **(จาก 2026-09-18) feature ที่ลืม grant migration = 403 ทุกคน รวมทั้ง superadmin — และ unit/e2e
+    มองไม่เห็นเลย** — `supplier_group:*` + `item_supplier:*` มี `@RequirePermission()` ครบและมีแถวใน
+    `permissions` (sync สร้างให้) แต่ไม่มี `statement_actions` ชี้มาเลยตั้งแต่วันแรก · **มีแถวใน catalog
+    ไม่ได้แปลว่าใช้ได้** และไม่มี bypass ให้ superadmin · query ตรวจทั้งระบบได้ในบรรทัดเดียว: api-plane
+    permission ที่ `NOT EXISTS` ใน `statement_actions` ของ `POL_SUPERADMIN_FULL_ACCESS` — รันทุกครั้งที่
+    เพิ่ม resource ใหม่ · กันซ้ำด้วย smoke ที่ยิง endpoint จริง (ดู `supplier-groups.smoke.mjs`) เพราะ
+    unit test กับ module e2e mock service layer ทั้งคู่ ไม่เคยเรียก `PermissionGuard` จริง
+20. **(จาก 2026-09-18) `statement_actions` ที่ผิด plane ทำให้ policy นั้น "บันทึกไม่ได้ตลอดกาล"** —
+    หน้า Policy admin โหลด statement เดิมมาแล้ว PUT กลับทั้งก้อน แถวที่ค้างมาก่อนยุค
+    `assertPermissionsUsable()` จึงถูกส่งซ้ำและโดน validation ตีกลับทุกครั้ง
+    (`... อยู่ในระนาบ (plane) "api" จึงใช้กับ statement ระนาบ "ui" ไม่ได้`) — operator ลบมันจาก UI ไม่ได้
+    เพราะ UI เซฟไม่ผ่านตั้งแต่แรก · บทเรียนกว้างกว่านั้น: **validation ใหม่ที่เพิ่มทีหลัง ต้องมาคู่กับ
+    migration ที่เก็บกวาดแถวเดิมที่มันจะปฏิเสธ** ไม่งั้นข้อมูลเก่ากลายเป็นกำแพงเงียบใน UI ที่อ่าน-แก้-เขียนกลับ
 
 ---
 
