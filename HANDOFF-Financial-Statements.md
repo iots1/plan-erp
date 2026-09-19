@@ -1,6 +1,6 @@
 # HANDOFF — งบการเงิน (D3 · งบดุล / งบกำไรขาดทุน)
 
-> **P1–P3 implement + verify แล้ว 2026-09-19** — JSON ครบทั้งสองงบ ยังไม่ทำฟอร์มพิมพ์ (P4)
+> **P1–P3 implement + verify + deploy แล้ว 2026-09-19** — JSON ครบทั้งสองงบ ยังไม่ทำฟอร์มพิมพ์ (P4)
 > ตามที่ผู้ใช้สั่ง · ผลตรวจสอบเต็มอยู่ที่ **§10** ท้ายไฟล์ · §5 ทั้งสามข้อได้คำตอบแล้ว (ดู §10.1)
 > ส่วน §1–§9 เก็บไว้ตามเดิมเป็นบันทึกการออกแบบ ณ 2026-09-13 — จุดที่ของจริงออกมาต่างจากที่ร่างไว้
 > ถูกกำกับไว้ใน §10.2
@@ -204,7 +204,8 @@ validate แบบมีเงื่อนไข ซึ่งเป็นที�
 `pnpm verify finance-bc` เขียวครบ 6 ขั้น · unit 14 เคสใหม่ (finance-bc รวม 434) · e2e 36/36 ·
 smoke ไฟล์ใหม่ `apps/finance-bc/test/smoke/financial-statements.smoke.mjs` ผ่านบน DB จริง ·
 migration รันบน DB จริงแล้วทั้ง 3 ตัว (2 ของ `erp_finance`, 1 grant ของ `erp_iam`) ·
-`npm_config_name=Check npm run migration:generate:finance` = **No changes** (ไม่มี drift)
+`npm_config_name=Check npm run migration:generate:finance` = **No changes** (ไม่มี drift) ·
+**deploy แล้ว** commit `80e1bd3` run `35453572794` — ยืนยันบนเครื่องจริงว่า route ทั้งสองตอบ 401 ผ่าน guard
 
 ### 10.1 · §5 ทั้งสามข้อ — ได้คำตอบจากงบจริงของฝ่ายบัญชี ไม่ใช่จากการเดา
 

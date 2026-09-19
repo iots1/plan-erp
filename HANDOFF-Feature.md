@@ -39,7 +39,7 @@
 
 **ไม่มีงานที่ค้างกลางคัน** — เริ่มงานใหม่ได้เลย ไม่ต้องสะสางอะไรก่อน · ค้างอย่างเดียวที่ต้องใช้ **คน**: manual QA หน้า `gl-accounts` (ต้องมี browser จริง — §2 หัวข้อ 2026-09-11)
 
-⚠️ **รอบ 2026-09-19 (งบการเงิน D3) ยังไม่ commit และยังไม่ deploy** — โค้ดอยู่ใน working tree, verify เขียวครบ, migration รันบน DB จริงแล้วทั้ง 3 ตัว (dev/prod ใช้ DB ตัวเดียวกัน — §4 กับดัก #10) แต่ `POST`/`GET` บนเครื่อง production ยังไม่มี endpoint ใหม่จนกว่าจะ deploy · ดู §2 หัวข้อ **2026-09-19**
+**รอบล่าสุด 2026-09-19 · งบการเงิน D3** — commit + push + **deploy สำเร็จแล้ว** (run `35453572794`) ยืนยันบนเครื่องจริงว่า route ใหม่ทั้งสองตอบ 401 ผ่าน guard (path มั่วตอบ 404) · ดู §2 หัวข้อ **2026-09-19**
 
 | อยากรู้ว่า | ไปที่ |
 |---|---|
@@ -78,13 +78,12 @@
 
 ## 1 · สถานะล่าสุด
 
-**รอบ 2026-09-19 (งบการเงิน D3) อยู่ใน working tree — ยังไม่ commit ยังไม่ deploy** · ก่อนหน้านั้น
-ทั้งสอง repo สะอาดและ push ครบ
+**working tree สะอาดทั้งสอง repo · push + deploy ขึ้น production แล้ว**
 
 | Repo | HEAD ปัจจุบัน |
 |---|---|
-| `iotechsoft-company/erp-api` | `3f5be5e` fix(iam): grant supplier_group/item_supplier, unstick the policy editor (push แล้ว) · **+ งาน D3 ที่ยังไม่ commit** |
-| `iots1/plan-erp` (submodule) | `da2e803` docs: a permission with no grant migration is a 403 for everyone (push แล้ว) · **+ งานเอกสาร D3 ที่ยังไม่ commit** |
+| `iotechsoft-company/erp-api` | `80e1bd3` feat(finance-bc): งบการเงิน D3 — income statement and balance sheet as JSON (push + deploy แล้ว run `35453572794`) |
+| `iots1/plan-erp` (submodule) | `ab3ae30` docs: the financial statements ship, and gross profit needs a column to exist (pin bump อยู่ในคอมมิตแม่ `80e1bd3`) |
 
 ⚠️ **migration ของรอบ D3 รันบน DB จริงไปแล้ว 3 ตัว ก่อน deploy** (`erp_finance` 2 + `erp_iam` 1) —
 ปลอดภัยเพราะทั้งสามเป็น additive ล้วน (คอลัมน์ nullable + DML ติดป้าย + grant permission) โค้ดเก่าที่รันอยู่
@@ -176,7 +175,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
-### 2026-09-19 · งบการเงิน D3 (งบกำไรขาดทุน + งบดุล) ✅ **implement + verify + smoke — JSON เท่านั้น ยังไม่ commit/deploy**
+### 2026-09-19 · งบการเงิน D3 (งบกำไรขาดทุน + งบดุล) ✅ **implement + verify + smoke + deploy — JSON เท่านั้น**
 
 **ที่มา**: ถามว่า handoff เหลืออะไรบ้าง → D3 เป็นก้อนเดียวที่ออกแบบครบแล้วแต่ติดคำถาม 3 ข้อใน §5 ·
 ผู้ใช้ตอบว่า "ทำ JSON ไปก่อน" แล้ว**ส่งไฟล์งบกำไรขาดทุนจริงของฝ่ายบัญชีมาให้** (Excel 4 ชั้น) ซึ่งกลายเป็น
@@ -221,6 +220,11 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ที่สร้างผังจำลองแล้วได้ผลตรงกับไฟล์งบจริงทุกบรรทัด (ตัวเลขอยู่ในเทสต์ใน repo `erp-api` ซึ่งเป็น private —
 เอกสารในซับโมดูลนี้ใช้ตัวเลขสมมติ เพราะ `plan-erp` เป็น public repo) · **ถ้าจะพิสูจน์ตัวเลขบนของจริง
 ต้องมีรายได้จริงเข้าระบบก่อน อย่าสร้างเอกสารปลอมบน DB ที่ใช้ร่วมกับ production (§4 กับดัก #10)**
+
+**deploy แล้ว** — commit `80e1bd3` (+ ซับโมดูล `ab3ae30`) · run `35453572794` ผ่านรอบเดียว ·
+ยืนยันบนเครื่องจริงแล้ว: `GET /finance-bc/v1/income-statements` และ `/balance-sheets` ตอบ **401** (ถึง guard
+แปลว่า route ถูก map จริง) ส่วน path ที่ไม่มีอยู่ตอบ 404 · **ยังไม่ได้ยิง E2E ผ่านโดเมนจริง** — smoke วิ่งบน
+DB ชุดเดียวกับโปรดักชันอยู่แล้ว ส่วนที่ยังไม่ถูกทดสอบคือชั้น Kong เท่านั้น (ซึ่งรอบนี้ไม่ได้แก้อะไร)
 
 **เหลืออะไร**: P4 ฟอร์มพิมพ์ 2 ใบ (~1.5–2 วัน, ไม่มีตัวบล็อกแล้ว) · P5 Admin UI (~1.5 วัน) ·
 ช่อง `statement_section` บนหน้า `gl-accounts` (ตอนนี้ตั้งค่าได้ผ่าน API เท่านั้น — ควรทำคู่กับ P5) ·
