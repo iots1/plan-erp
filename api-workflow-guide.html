@@ -1583,8 +1583,8 @@ sequenceDiagram
             <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td><td>งบทดลอง · มีธง <span class="mono">is_balanced</span></td></tr>
-              <tr><td class="mono text-[11.5px]" style="opacity:.6">GET /finance-bc/v1/balance-sheets</td><td class="mono text-[11px]" style="opacity:.6">balance_sheet:view</td><td><span class="chip">backlog</span> งบดุล — <b>ยังไม่ implement</b> · แผนเต็ม: <span class="mono text-[12px]">HANDOFF-Financial-Statements.md</span></td></tr>
-              <tr><td class="mono text-[11.5px]" style="opacity:.6">GET /finance-bc/v1/income-statements</td><td class="mono text-[11px]" style="opacity:.6">income_statement:view</td><td><span class="chip">backlog</span> งบกำไรขาดทุน — <b>ยังไม่ implement</b> · ดูไฟล์เดียวกัน §4/§5</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/balance-sheets?as_of=&amp;detail=&amp;is_zero_balance_included=</td><td class="mono text-[11px]">balance_sheet:view</td><td>งบแสดงฐานะการเงิน ณ วันที่ (สะสมตั้งแต่รายการแรก ไม่มี <span class="mono text-[12px]">date_from</span>) · มี <span class="mono text-[12px]">profit_for_period</span> (กำไรระหว่างงวดที่ยังไม่ปิดปี) และ <span class="mono text-[12px]">is_balanced</span>/<span class="mono text-[12px]">difference</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/income-statements?date_from=&amp;date_to=&amp;detail=&amp;is_zero_balance_included=</td><td class="mono text-[11px]">income_statement:view</td><td>งบกำไรขาดทุนของช่วงเวลา · 4 หมวด (รายได้/ต้นทุนขาย/ค่าใช้จ่าย/รายได้อื่น) + กำไรขั้นต้น/กำไรสุทธิ · <span class="mono text-[12px]">date_to</span> บังคับ, <span class="mono text-[12px]">date_from</span> ไม่ใส่ = ตั้งแต่เริ่มกิจการ</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td><td>บัญชีแยกประเภท · กรองด้วย <span class="mono">journal_id</span> หรือ <span class="mono">ref_doc_id</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td><td>ต้นทุนขายต่อล็อต</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td><td>กำไรขั้นต้นต่อล็อต · <b>ติดลบได้</b> เมื่อขายต่ำกว่าทุน</td></tr>
@@ -1599,6 +1599,64 @@ sequenceDiagram
             ถ้าตอนนั้นเรียกไม่ได้ ระบบจะ<b>ลงต้นทุนไว้ก่อนแล้วเว้นกำไรไว้</b> ·
             หน้าจอควรมีปุ่ม “เติมรายการกำไรที่ค้าง” ที่ยิงไป <span class="mono text-[12px]">POST /profit-loss-reconciliations</span>
             ซึ่งเรียกซ้ำได้ไม่จำกัด
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">E2.1 · งบการเงิน (D3) <span class="mono text-[13px] text-[var(--muted)]">— ใหม่ 2026-09-19 · JSON เท่านั้น ยังไม่มีฟอร์มพิมพ์</span></h3>
+        <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
+          งบทั้งสองใบ<b>ไม่มีตารางของตัวเอง</b> — คำนวณสดจาก <span class="mono text-[12px]">ledger_entries</span> ด้วย query เดียวกับ
+          <span class="mono text-[12px]">GET /trial-balances</span> ทุกครั้งที่เรียก · FE ไม่ต้องรวมยอดเองเลย ทั้งยอดต่อบรรทัด ยอดของบัญชีคุม
+          และ subtotal ทุกตัวมาพร้อมในคำตอบเดียว และ<b>เครื่องหมายถูกกลับมาให้อ่านเป็นบวกแล้ว</b> (บัญชีปรับมูลค่าอย่าง
+          &quot;รับคืนสินค้า&quot; จึงติดลบในหมวดรายได้ ซึ่งถูกต้อง — อย่าใส่ <span class="mono text-[12px]">Math.abs()</span> ทับ)
+        </p>
+        <div class="code p-5 mb-5"><pre><span class="c">// GET /finance-bc/v1/income-statements?date_from=2026-01-01T00:00:00%2B07:00&amp;date_to=2026-09-30T23:59:59%2B07:00</span>
+{
+  <span class="k">&quot;data&quot;</span>: {
+    <span class="k">&quot;type&quot;</span>: <span class="s">&quot;income-statements&quot;</span>,
+    <span class="k">&quot;attributes&quot;</span>: {
+      <span class="k">&quot;detail&quot;</span>: <span class="s">&quot;full&quot;</span>, <span class="k">&quot;is_zero_balance_included&quot;</span>: <span class="d">false</span>,
+      <span class="k">&quot;sections&quot;</span>: [
+        {
+          <span class="k">&quot;section&quot;</span>: <span class="s">&quot;REVENUE&quot;</span>,
+          <span class="k">&quot;label&quot;</span>: { <span class="k">&quot;th&quot;</span>: <span class="s">&quot;รายได้&quot;</span>, <span class="k">&quot;en&quot;</span>: <span class="s">&quot;Revenue&quot;</span> },
+          <span class="k">&quot;amount&quot;</span>: <span class="d">300000</span>,
+          <span class="k">&quot;lines&quot;</span>: [{
+            <span class="k">&quot;code&quot;</span>: <span class="s">&quot;4100-00&quot;</span>,
+            <span class="k">&quot;name&quot;</span>: { <span class="k">&quot;th&quot;</span>: <span class="s">&quot;รายได้จากการขาย-สุทธิ&quot;</span>, <span class="k">&quot;en&quot;</span>: <span class="s">&quot;Net Sales&quot;</span> },
+            <span class="k">&quot;level&quot;</span>: <span class="d">1</span>, <span class="k">&quot;is_group&quot;</span>: <span class="d">true</span>,
+            <span class="k">&quot;amount&quot;</span>: <span class="d">300000</span>, <span class="k">&quot;entry_count&quot;</span>: <span class="d">6</span>,
+            <span class="k">&quot;children&quot;</span>: [ <span class="c">/* 4100-02 รายได้จากการให้บริการ … */</span> ]
+          }]
+        }<span class="c">, /* COST_OF_SALES, OPERATING_EXPENSE, OTHER_INCOME — ส่งมาครบ 4 หมวดเสมอ แม้ว่าง */</span>
+      ],
+      <span class="k">&quot;summary&quot;</span>: {
+        <span class="k">&quot;revenue&quot;</span>: <span class="d">300000</span>, <span class="k">&quot;cost_of_sales&quot;</span>: <span class="d">60000</span>, <span class="k">&quot;gross_profit&quot;</span>: <span class="d">240000</span>,
+        <span class="k">&quot;other_income&quot;</span>: <span class="d">500</span>, <span class="k">&quot;total_revenue&quot;</span>: <span class="d">300500</span>,
+        <span class="k">&quot;operating_expense&quot;</span>: <span class="d">50000</span>, <span class="k">&quot;net_profit&quot;</span>: <span class="d">190500</span>
+      }
+    }
+  }
+}</pre></div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">บรรทัดบนงบมาจากผังบัญชี ไม่ได้ hard-code ไว้ที่ไหน</div>
+          <p class="text-[13.5px]">
+            ชื่อทุกบรรทัดคือ <span class="mono text-[12px]">gl_accounts.name_th/name_en</span> และการจัดกลุ่มมาจากคอลัมน์ใหม่
+            <span class="mono text-[12px]">gl_accounts.statement_section</span> (4 ค่า) ที่ใส่ไว้ที่<b>บัญชีคุมชั้นบน</b> แล้วลูกทั้ง subtree สืบทอด —
+            ลูกค้าที่ย้าย/เปลี่ยนชื่อ/เพิ่มบัญชีเอง งบเปลี่ยนตามทันทีโดยไม่ต้องแก้โค้ดหรือ deploy ·
+            บัญชีกำไรขาดทุนที่ยังไม่ติดป้ายจะ<b>ไม่หายไปจากงบ</b> แต่ตกลงหมวดสำรองใต้บรรทัดกำไรขั้นต้น
+            (รายได้อื่น / ค่าใช้จ่าย) และระบบแจ้งกลับมาใน <span class="mono text-[12px]">meta.warnings</span> รหัส
+            <span class="mono text-[12px]">UNTAGGED_STATEMENT_SECTION</span> พร้อมรายการรหัสบัญชี — ถ้าเห็น warning นี้
+            แปลว่ากำไรขั้นต้นกำลังต่ำกว่าความจริง ให้ไปติดป้ายที่บัญชีคุมของมันในหน้า
+            <span class="mono text-[12px]">gl-accounts</span>
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">งบดุลระหว่างปีต้องมี <span class="mono text-[12px]">profit_for_period</span> ถึงจะลงตัว</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">total_liability_and_equity</span> = หนี้สิน + ส่วนของผู้ถือหุ้น + <b>กำไร(ขาดทุน)ระหว่างงวด</b> ·
+            ก่อนปิดปีบัญชี กำไรของงวดยังไม่ถูกโอนเข้าบัญชีกำไรสะสม ถ้า FE เอาแค่ยอดในหมวด EQUITY ไปโชว์
+            งบจะดูไม่ลงตัวทั้งที่ระบบถูก · <span class="mono text-[12px]">is_balanced</span> กับ <span class="mono text-[12px]">difference</span>
+            รายงานตามจริงเสมอ — <b>เห็น difference ไม่เป็นศูนย์คือให้ไปไล่ที่ ledger ไม่ใช่ปัดที่หน้าจอ</b>
           </p>
         </div>
 
@@ -2133,7 +2191,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 67 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 70 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2204,8 +2262,8 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/finance-bc/v1/tax-configs/{id}</td><td class="mono text-[11px]">tax_config:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td></tr>
-              <tr style="opacity:.6"><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/balance-sheets <b>(backlog)</b></td><td class="mono text-[11px]">balance_sheet:view</td></tr>
-              <tr style="opacity:.6"><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/income-statements <b>(backlog)</b></td><td class="mono text-[11px]">income_statement:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/balance-sheets</td><td class="mono text-[11px]">balance_sheet:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/income-statements</td><td class="mono text-[11px]">income_statement:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns</td><td class="mono text-[11px]">vat_return:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns/print</td><td class="mono text-[11px]">vat_return:print</td></tr>
             </tbody>
