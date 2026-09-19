@@ -39,7 +39,7 @@
 
 **ไม่มีงานที่ค้างกลางคัน** — เริ่มงานใหม่ได้เลย ไม่ต้องสะสางอะไรก่อน · ค้างอย่างเดียวที่ต้องใช้ **คน**: manual QA หน้า `gl-accounts` (ต้องมี browser จริง — §2 หัวข้อ 2026-09-11)
 
-**รอบล่าสุด 2026-09-20 · งบการเงิน D3 พิมพ์ได้แล้ว (P4)** — `POST /income-statements/print` + `POST /balance-sheets/print` · verify เขียวครบ 6 ขั้น · **ยังไม่ commit/deploy** · รอบก่อนหน้า (JSON, 2026-09-19) deploy แล้ว run `35453572794` · ดู §2 สองหัวข้อล่าสุด
+**รอบล่าสุด 2026-09-20 · งบการเงิน D3 เสร็จครบทุกเฟส (P1–P5)** — JSON + พิมพ์ + Admin UI · P4 deploy แล้ว (run `35457819522`) · **P5 (Admin UI) ยังไม่ commit/deploy** · ดู §2 สามหัวข้อล่าสุด
 
 | อยากรู้ว่า | ไปที่ |
 |---|---|
@@ -55,8 +55,8 @@
 | ปิดปีบัญชี / ยอดยกมา (D2) — ทำไปถึงไหน | §2 หัวข้อ **2026-09-07 · Fiscal Year Closing / ยอดยกมา (D2)** (backend + Admin UI + smoke ครบ) · งานต่อยอดที่ยังไม่ทำอยู่ใน `HANDOFF-Fiscal-Year-Closing.md` §9 (งบการเงิน D3, manual journal entry, import/export ผังบัญชี D4) |
 | `tax_configs` version อัตราภาษี — ทำไปถึงไหน | §2 หัวข้อ **2026-09-08 · `tax_configs`** (constraint + supersede + Admin UI + smoke ครบ) |
 | **doc drift** — เอกสารไหนเคยไม่ตรงกับโค้ด และแก้อะไรไป | §1 ท้ายหัวข้อ ("รอบ 2026-09-08 · audit doc drift") — 3 ไฟล์: print pipeline §7, `srs-p3.html`, backlog §1 |
-| งานที่ยังเหลือทั้งระบบ (ไม่ใช่แค่ในไฟล์นี้) | `HANDOFF-Financial-Statements.md` §10.5 (D3 เหลือ P5 UI) · `HANDOFF-Backlog-Reporting-Print-Tax.md` (§3 FE, §4.4 ข้อ 2-3) · `HANDOFF-Document-Print-Pipeline.md` §7 (P5 — รอฝ่ายบัญชี) · `HANDOFF-Fiscal-Year-Closing.md` §9 · `HANDOFF-Postgresql.md` §2–§3 (**ไม่มี backup เลย = ความเสี่ยงสูงสุดในลิสต์ แต่ผู้ใช้เลื่อนไว้แล้ว ดูท้าย §0**) |
-| **งบการเงิน (D3) — ทำไปถึงไหน** | เจ้าของสถานะคือ `HANDOFF-Financial-Statements.md` **§10** (JSON) + **§11** (พิมพ์) — P1–P4 เสร็จหมด เหลือ **P5 Admin UI** อย่างเดียว · §2 หัวข้อ 2026-09-19 กับ 2026-09-20 |
+| งานที่ยังเหลือทั้งระบบ (ไม่ใช่แค่ในไฟล์นี้) | ~~`HANDOFF-Financial-Statements.md`~~ ✅ D3 ปิดครบทุกเฟสแล้ว · `HANDOFF-Backlog-Reporting-Print-Tax.md` (§3 FE, §4.4 ข้อ 2-3) · `HANDOFF-Document-Print-Pipeline.md` §7 (P5 — รอฝ่ายบัญชี) · `HANDOFF-Fiscal-Year-Closing.md` §9 · `HANDOFF-Postgresql.md` §2–§3 (**ไม่มี backup เลย = ความเสี่ยงสูงสุดในลิสต์ แต่ผู้ใช้เลื่อนไว้แล้ว ดูท้าย §0**) |
+| **งบการเงิน (D3) — ทำไปถึงไหน** | **เสร็จครบทุกเฟสแล้ว** · เจ้าของสถานะคือ `HANDOFF-Financial-Statements.md` §10 (JSON) · §11 (พิมพ์) · §12 (Admin UI) — ค้างอย่างเดียวคือ manual QA หน้าจอ |
 | `low_stocks`/`expiry_alerts` — cron ยืนยันหรือยัง | §2 หัวข้อ **2026-09-11** (ยืนยันครบ + เจอบั๊ก + แก้ + deploy แล้ว) |
 | งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **งานอื่นที่รู้อยู่** (#8, #10, #11) |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5/P4#12 |
@@ -175,7 +175,29 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
-### 2026-09-20 · งบการเงิน D3 · P4 พิมพ์งบ ✅ **implement + verify + smoke** (ยังไม่ commit/deploy)
+### 2026-09-20 · งบการเงิน D3 · P5 Admin UI ✅ **implement + verify** (ยังไม่ commit/deploy · ค้าง manual QA)
+
+หน้าใหม่ `/views/financial-statements` ใน `apps/iam` + ช่อง `statement_section` ในฟอร์ม `gl-accounts` ·
+รายละเอียดเต็ม: `HANDOFF-Financial-Statements.md` **§12**
+
+- **หน้าเดียวรับทั้งสองงบ** — อ่านเหมือนกันทุกประการ ต่างกันแค่แกนเวลา ซึ่ง dropdown ตัวแรกสลับให้
+  (ช่อง "ตั้งแต่วันที่" ซ่อนตัวเองเมื่อเลือกงบดุล) · ฝั่ง API ยังแยกเป็นสอง resource ตามเดิม — คนละเรื่องกับจำนวนเมนู
+- **หน้าเดียวในระบบที่อ่าน `meta.warnings`** จึงเรียก API ผ่าน `fetchWithAuth` ตรง ๆ ไม่ผ่าน `financeGet`
+  (client กลางแกะเอาแต่ `data`) · ถ้า warning หาย หน้าจะโชว์กำไรขั้นต้นที่ต่ำกว่าจริงอย่างหน้าตาเฉย
+  ซึ่งแย่กว่าฟีเจอร์หาย — smoke ล็อกไว้แล้ว
+- **ช่อง `statement_section`** เปลี่ยนตัวเลือกตามหมวดบัญชี และปิดตัวเอง+ล้างค่าสำหรับบัญชีงบดุล
+- CSS อยู่ใน `table.css` ที่ใช้ร่วมกัน ทุกสีเป็น token (`admin-theme-tokens.spec.ts` บังคับ)
+
+**ยืนยัน**: `pnpm verify iam` เขียวครบ 6 ขั้น · `admin-pages.smoke.mjs` นับ **19 หน้า** แล้ว ·
+`NODE_ENV=local npx jest` = **1845/1845 (139 suites)** · permission ui-plane 2 ตัว sync + grant migration
+(`ps.plane = 'ui'` — คนละ statement กับฝั่ง api) รันบน DB จริงแล้ว
+
+⬜ **ค้าง — manual QA** เหมือนรอบ `gl-accounts`: session นี้ต่อ browser tool ไม่ได้ · smoke ทดแทนได้แค่
+"ทุก id ที่ EJS ประกาศถูก bundle อ้างจริง + ทุก onclick มีตัวจริง + คลาสย่อหน้ายังมีใน CSS" ·
+ที่ยังต้องใช้ตาคน: ตัวเลขเรียงตรงหลักไหม · ย่อหน้าอ่านออกไหมตอนผังลึก 4 ชั้น · ปุ่มพิมพ์เปิดแท็บ PDF ได้จริงไหม ·
+แถบ warning อ่านออกทั้งธีมสว่างและมืด
+
+### 2026-09-20 · งบการเงิน D3 · P4 พิมพ์งบ ✅ **implement + verify + smoke + deploy**
 
 `POST /finance-bc/v1/income-statements/print` + `POST /balance-sheets/print` → presigned URL ของ PDF ·
 รายละเอียดเต็ม: `HANDOFF-Financial-Statements.md` **§11**
@@ -196,6 +218,8 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 (139 suites)** · e2e 42/42 · smoke ใหม่ยิงพิมพ์จริงผ่าน Gotenberg ได้ PDF **77,302 bytes** แล้วเช็คว่า
 จำนวนแถวบัญชีบนใบที่พิมพ์ตรงกับที่ `GET /income-statements` รายงาน · `permissions:sync` เพิ่ม 2 สิทธิ์
 (`income_statement:print`, `balance_sheet:print`) + grant migration รันบน DB จริงแล้ว
+
+**deploy แล้ว** — commit `23fc2cb` run `35457819522` · ยืนยันบนเครื่องจริง: `POST` ทั้งสอง route ตอบ 401 ผ่าน guard
 
 ### 2026-09-19 · งบการเงิน D3 (งบกำไรขาดทุน + งบดุล) ✅ **implement + verify + smoke + deploy — JSON เท่านั้น**
 
