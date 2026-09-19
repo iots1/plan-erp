@@ -39,7 +39,7 @@
 
 **ไม่มีงานที่ค้างกลางคัน** — เริ่มงานใหม่ได้เลย ไม่ต้องสะสางอะไรก่อน · ค้างอย่างเดียวที่ต้องใช้ **คน**: manual QA หน้า `gl-accounts` (ต้องมี browser จริง — §2 หัวข้อ 2026-09-11)
 
-**รอบล่าสุด 2026-09-19 · งบการเงิน D3** — commit + push + **deploy สำเร็จแล้ว** (run `35453572794`) ยืนยันบนเครื่องจริงว่า route ใหม่ทั้งสองตอบ 401 ผ่าน guard (path มั่วตอบ 404) · ดู §2 หัวข้อ **2026-09-19**
+**รอบล่าสุด 2026-09-20 · งบการเงิน D3 พิมพ์ได้แล้ว (P4)** — `POST /income-statements/print` + `POST /balance-sheets/print` · verify เขียวครบ 6 ขั้น · **ยังไม่ commit/deploy** · รอบก่อนหน้า (JSON, 2026-09-19) deploy แล้ว run `35453572794` · ดู §2 สองหัวข้อล่าสุด
 
 | อยากรู้ว่า | ไปที่ |
 |---|---|
@@ -55,8 +55,8 @@
 | ปิดปีบัญชี / ยอดยกมา (D2) — ทำไปถึงไหน | §2 หัวข้อ **2026-09-07 · Fiscal Year Closing / ยอดยกมา (D2)** (backend + Admin UI + smoke ครบ) · งานต่อยอดที่ยังไม่ทำอยู่ใน `HANDOFF-Fiscal-Year-Closing.md` §9 (งบการเงิน D3, manual journal entry, import/export ผังบัญชี D4) |
 | `tax_configs` version อัตราภาษี — ทำไปถึงไหน | §2 หัวข้อ **2026-09-08 · `tax_configs`** (constraint + supersede + Admin UI + smoke ครบ) |
 | **doc drift** — เอกสารไหนเคยไม่ตรงกับโค้ด และแก้อะไรไป | §1 ท้ายหัวข้อ ("รอบ 2026-09-08 · audit doc drift") — 3 ไฟล์: print pipeline §7, `srs-p3.html`, backlog §1 |
-| งานที่ยังเหลือทั้งระบบ (ไม่ใช่แค่ในไฟล์นี้) | `HANDOFF-Financial-Statements.md` §10.5 (D3 เหลือ P4 พิมพ์ + P5 UI) · `HANDOFF-Backlog-Reporting-Print-Tax.md` (§3 FE, §4.4 ข้อ 2-3) · `HANDOFF-Document-Print-Pipeline.md` §7 (P5 — รอฝ่ายบัญชี) · `HANDOFF-Fiscal-Year-Closing.md` §9 · `HANDOFF-Postgresql.md` §2–§3 (**ไม่มี backup เลย = ความเสี่ยงสูงสุดในลิสต์ แต่ผู้ใช้เลื่อนไว้แล้ว ดูท้าย §0**) |
-| **งบการเงิน (D3) — ทำไปถึงไหน** | §2 หัวข้อ **2026-09-19** · เจ้าของสถานะคือ `HANDOFF-Financial-Statements.md` **§10** — P1–P3 (JSON 2 endpoint) เสร็จ + verify + smoke · เหลือ P4 ฟอร์มพิมพ์ กับ P5 Admin UI ซึ่ง**ไม่มีตัวบล็อกแล้ว** |
+| งานที่ยังเหลือทั้งระบบ (ไม่ใช่แค่ในไฟล์นี้) | `HANDOFF-Financial-Statements.md` §10.5 (D3 เหลือ P5 UI) · `HANDOFF-Backlog-Reporting-Print-Tax.md` (§3 FE, §4.4 ข้อ 2-3) · `HANDOFF-Document-Print-Pipeline.md` §7 (P5 — รอฝ่ายบัญชี) · `HANDOFF-Fiscal-Year-Closing.md` §9 · `HANDOFF-Postgresql.md` §2–§3 (**ไม่มี backup เลย = ความเสี่ยงสูงสุดในลิสต์ แต่ผู้ใช้เลื่อนไว้แล้ว ดูท้าย §0**) |
+| **งบการเงิน (D3) — ทำไปถึงไหน** | เจ้าของสถานะคือ `HANDOFF-Financial-Statements.md` **§10** (JSON) + **§11** (พิมพ์) — P1–P4 เสร็จหมด เหลือ **P5 Admin UI** อย่างเดียว · §2 หัวข้อ 2026-09-19 กับ 2026-09-20 |
 | `low_stocks`/`expiry_alerts` — cron ยืนยันหรือยัง | §2 หัวข้อ **2026-09-11** (ยืนยันครบ + เจอบั๊ก + แก้ + deploy แล้ว) |
 | งานที่เหลือเลือกทำได้ (ทั้งหมดเป็น optional / ต้องถามลูกค้าก่อน) | §2 หัวข้อ **งานอื่นที่รู้อยู่** (#8, #10, #11) |
 | จะทำ currency/FX ต่อ ต้องเข้าใจอะไรก่อน | §2 หัวข้อ **C3** (สองอัตรา) แล้วค่อย P2#4/#5/P4#12 |
@@ -174,6 +174,28 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### 2026-09-20 · งบการเงิน D3 · P4 พิมพ์งบ ✅ **implement + verify + smoke** (ยังไม่ commit/deploy)
+
+`POST /finance-bc/v1/income-statements/print` + `POST /balance-sheets/print` → presigned URL ของ PDF ·
+รายละเอียดเต็ม: `HANDOFF-Financial-Statements.md` **§11**
+
+สิ่งที่ต้องรู้ถ้าจะทำรายงานอื่นที่ไม่มีแถวเอกสารต่อ (แบบ ภ.ง.ด. ฯลฯ):
+
+- **งวดแทน id** — UUIDv5 ของงวด, namespace **คนละตัวกับ ภ.พ.30** (คนละสายเอกสาร ห้ามชนกัน) ·
+  **`detail` ไม่อยู่ใน seed ของ id** โดยตั้งใจ: พิมพ์ full แล้ว summary ของงวดเดียวกัน = สำเนา 2 ใบของงบใบเดียว
+- **mapper แผ่ต้นไม้เป็นแถวแบนให้เสร็จก่อน** — print engine แทนที่ได้แค่ `{{row.field}}` ไม่มี conditional
+  ไม่ recurse เข้า `children[]` · ระดับชั้นจึงมาเป็น CSS class ใน `row_class` และยอดที่ไม่ยืนยันมาเป็นค่าว่าง
+- **บรรทัดผลต่างของงบดุลถูก "ไม่ใส่" ไม่ใช่ "ใส่แล้วซ่อน"** — engine ไม่มี conditional "แสดงเฉพาะตอนสำคัญ"
+  จึงต้องแปลว่า "ตอนที่ mapper ใส่ลง `items[]`"
+- **เทมเพลต + document_type ไม่ได้อยู่ใน migration** — `html_content` อยู่ใน object storage มีแต่ API ที่อัปโหลดได้
+  (`assets/templates/_README.md`) · สร้างบน cluster นี้ผ่าน API แล้วทั้ง 2 code · smoke ขั้นที่ 0 เช็คให้ว่ามีจริง
+  พร้อมบอกวิธีถ้าหาย — environment ใหม่ต้องทำขั้นนี้ซ้ำ
+
+**ยืนยันด้วยการรันจริง**: `pnpm verify finance-bc` เขียวครบ 6 ขั้น · `NODE_ENV=local npx jest` = **1845/1845
+(139 suites)** · e2e 42/42 · smoke ใหม่ยิงพิมพ์จริงผ่าน Gotenberg ได้ PDF **77,302 bytes** แล้วเช็คว่า
+จำนวนแถวบัญชีบนใบที่พิมพ์ตรงกับที่ `GET /income-statements` รายงาน · `permissions:sync` เพิ่ม 2 สิทธิ์
+(`income_statement:print`, `balance_sheet:print`) + grant migration รันบน DB จริงแล้ว
 
 ### 2026-09-19 · งบการเงิน D3 (งบกำไรขาดทุน + งบดุล) ✅ **implement + verify + smoke + deploy — JSON เท่านั้น**
 

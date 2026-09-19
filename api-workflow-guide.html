@@ -1585,7 +1585,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td><td>งบทดลอง · มีธง <span class="mono">is_balanced</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/balance-sheets?as_of=&amp;detail=&amp;is_zero_balance_included=</td><td class="mono text-[11px]">balance_sheet:view</td><td>งบแสดงฐานะการเงิน ณ วันที่ (สะสมตั้งแต่รายการแรก ไม่มี <span class="mono text-[12px]">date_from</span>) · มี <span class="mono text-[12px]">profit_for_period</span> (กำไรระหว่างงวดที่ยังไม่ปิดปี) และ <span class="mono text-[12px]">is_balanced</span>/<span class="mono text-[12px]">difference</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/income-statements?date_from=&amp;date_to=&amp;detail=&amp;is_zero_balance_included=</td><td class="mono text-[11px]">income_statement:view</td><td>งบกำไรขาดทุนของช่วงเวลา · 4 หมวด (รายได้/ต้นทุนขาย/ค่าใช้จ่าย/รายได้อื่น) + กำไรขั้นต้น/กำไรสุทธิ · <span class="mono text-[12px]">date_to</span> บังคับ, <span class="mono text-[12px]">date_from</span> ไม่ใส่ = ตั้งแต่เริ่มกิจการ</td></tr>
-              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td><td>บัญชีแยกประเภท · กรองด้วย <span class="mono">journal_id</span> หรือ <span class="mono">ref_doc_id</span></td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/income-statements/print</td><td class="mono text-[11px]">income_statement:print</td><td>พิมพ์งบกำไรขาดทุนของช่วงนั้น → presigned URL ของ PDF · body คือช่วงเวลา ไม่ใช่ id เพราะไม่มีแถวเอกสารให้อ้าง</td></tr><tr><td class="mono text-[11.5px]">POST /finance-bc/v1/balance-sheets/print</td><td class="mono text-[11px]">balance_sheet:print</td><td>พิมพ์งบแสดงฐานะการเงิน ณ วันที่นั้น · ถ้างบไม่ลงตัว บรรทัดผลต่างและข้อความกำกับจะอยู่บนใบที่พิมพ์ออกมาเอง</td></tr><tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td><td>บัญชีแยกประเภท · กรองด้วย <span class="mono">journal_id</span> หรือ <span class="mono">ref_doc_id</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td><td>ต้นทุนขายต่อล็อต</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td><td>กำไรขั้นต้นต่อล็อต · <b>ติดลบได้</b> เมื่อขายต่ำกว่าทุน</td></tr>
               <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/profit-loss-reconciliations</td><td class="mono text-[11px]">profit_loss_record:reconcile</td><td>เติมรายการกำไรที่ค้าง (ตอน sales-bc ไม่ตอบ)</td></tr>
@@ -1602,7 +1602,7 @@ sequenceDiagram
           </p>
         </div>
 
-        <h3 class="display text-xl mt-10 mb-4">E2.1 · งบการเงิน (D3) <span class="mono text-[13px] text-[var(--muted)]">— ใหม่ 2026-09-19 · JSON เท่านั้น ยังไม่มีฟอร์มพิมพ์</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">E2.1 · งบการเงิน (D3) <span class="mono text-[13px] text-[var(--muted)]">— ใหม่ 2026-09-19 · พิมพ์ได้ 2026-09-20</span></h3>
         <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
           งบทั้งสองใบ<b>ไม่มีตารางของตัวเอง</b> — คำนวณสดจาก <span class="mono text-[12px]">ledger_entries</span> ด้วย query เดียวกับ
           <span class="mono text-[12px]">GET /trial-balances</span> ทุกครั้งที่เรียก · FE ไม่ต้องรวมยอดเองเลย ทั้งยอดต่อบรรทัด ยอดของบัญชีคุม
@@ -1657,6 +1657,20 @@ sequenceDiagram
             ก่อนปิดปีบัญชี กำไรของงวดยังไม่ถูกโอนเข้าบัญชีกำไรสะสม ถ้า FE เอาแค่ยอดในหมวด EQUITY ไปโชว์
             งบจะดูไม่ลงตัวทั้งที่ระบบถูก · <span class="mono text-[12px]">is_balanced</span> กับ <span class="mono text-[12px]">difference</span>
             รายงานตามจริงเสมอ — <b>เห็น difference ไม่เป็นศูนย์คือให้ไปไล่ที่ ledger ไม่ใช่ปัดที่หน้าจอ</b>
+          </p>
+        </div>
+
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">พิมพ์งบ — งวดทำหน้าที่แทน id ของเอกสาร</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">POST /income-statements/print</span> (body = ช่วงเวลา) และ
+            <span class="mono text-[12px]">POST /balance-sheets/print</span> (body = <span class="mono text-[12px]">as_of</span>) —
+            ไม่มีแถวเอกสารให้อ้าง ระบบจึง hash งวดเป็น UUIDv5 ใช้แทน <span class="mono text-[12px]">source_document_id</span>
+            เหมือนที่ ภ.พ.30 ทำ · ผลคือ<b>พิมพ์งวดเดิมซ้ำ = สำเนาลำดับถัดไปของงวดนั้น</b> ไม่ใช่ต้นฉบับใบใหม่ ·
+            <span class="mono text-[12px]">detail</span> <b>ไม่</b>อยู่ในตัวตนของเอกสาร: พิมพ์ full แล้วพิมพ์ summary ของงวดเดียวกัน
+            คือสำเนา 2 ใบของงบใบเดียว · ตัวเลขที่พิมพ์ถูก snapshot ไว้ใน
+            <span class="mono text-[12px]">document_prints.params</span> ซึ่งเป็นหลักฐานเดียวว่างบที่ส่งออกไปวันนั้นมีตัวเลขอะไร
+            (งบคำนวณสด ตัวเลขขยับได้ทุกครั้งที่มีคนบันทึกเอกสารย้อนหลัง)
           </p>
         </div>
 
@@ -2191,7 +2205,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 70 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">finance-bc · ใบกำกับ · การเงิน · บัญชี <span class="mono text-[13px] text-[var(--muted)]">— 72 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2264,7 +2278,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/trial-balances</td><td class="mono text-[11px]">trial_balance:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/balance-sheets</td><td class="mono text-[11px]">balance_sheet:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/income-statements</td><td class="mono text-[11px]">income_statement:view</td></tr>
-              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns</td><td class="mono text-[11px]">vat_return:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/income-statements/print</td><td class="mono text-[11px]">income_statement:print</td></tr><tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/balance-sheets/print</td><td class="mono text-[11px]">balance_sheet:print</td></tr><tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns</td><td class="mono text-[11px]">vat_return:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/finance-bc/v1/vat-returns/print</td><td class="mono text-[11px]">vat_return:print</td></tr>
             </tbody>
           </table>
