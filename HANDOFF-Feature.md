@@ -39,7 +39,7 @@
 
 **ไม่มีงานที่ค้างกลางคัน** — เริ่มงานใหม่ได้เลย ไม่ต้องสะสางอะไรก่อน · ค้างอย่างเดียวที่ต้องใช้ **คน**: manual QA หน้า `gl-accounts` (ต้องมี browser จริง — §2 หัวข้อ 2026-09-11)
 
-**รอบล่าสุด 2026-09-20 · งบการเงิน D3 เสร็จครบทุกเฟส (P1–P5)** — JSON + พิมพ์ + Admin UI · P4 deploy แล้ว (run `35457819522`) · **P5 (Admin UI) ยังไม่ commit/deploy** · ดู §2 สามหัวข้อล่าสุด
+**รอบล่าสุด 2026-09-20 · งบการเงิน D3 เสร็จครบทุกเฟส (P1–P5) และ deploy แล้วทั้งหมด** — JSON (run `35453572794`) · พิมพ์ (run `35457819522`) · Admin UI (run `35458688736`) · ค้างอย่างเดียว: **manual QA หน้าจอ** ต้องมีคนคลิกจริง · ดู §2 สามหัวข้อล่าสุด
 
 | อยากรู้ว่า | ไปที่ |
 |---|---|
@@ -175,7 +175,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
-### 2026-09-20 · งบการเงิน D3 · P5 Admin UI ✅ **implement + verify** (ยังไม่ commit/deploy · ค้าง manual QA)
+### 2026-09-20 · งบการเงิน D3 · P5 Admin UI ✅ **implement + verify + deploy** (ค้าง manual QA)
 
 หน้าใหม่ `/views/financial-statements` ใน `apps/iam` + ช่อง `statement_section` ในฟอร์ม `gl-accounts` ·
 รายละเอียดเต็ม: `HANDOFF-Financial-Statements.md` **§12**
@@ -191,6 +191,9 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 **ยืนยัน**: `pnpm verify iam` เขียวครบ 6 ขั้น · `admin-pages.smoke.mjs` นับ **19 หน้า** แล้ว ·
 `NODE_ENV=local npx jest` = **1845/1845 (139 suites)** · permission ui-plane 2 ตัว sync + grant migration
 (`ps.plane = 'ui'` — คนละ statement กับฝั่ง api) รันบน DB จริงแล้ว
+
+**deploy แล้ว** — commit `01df0d5` run `35458688736` · ยืนยันบนเครื่องจริง: `/views/financial-statements`
+ตอบ 200 และ bundle ของหน้าเสิร์ฟได้ (`/assets/pages/financial-statements/js/bundle.js` → 200)
 
 ⬜ **ค้าง — manual QA** เหมือนรอบ `gl-accounts`: session นี้ต่อ browser tool ไม่ได้ · smoke ทดแทนได้แค่
 "ทุก id ที่ EJS ประกาศถูก bundle อ้างจริง + ทุก onclick มีตัวจริง + คลาสย่อหน้ายังมีใน CSS" ·
