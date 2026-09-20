@@ -365,6 +365,31 @@ Test Suites: <span class="t">88 failed</span>, 52 passed, 140 total
           บัญชีที่มีความเคลื่อนไหวทุกตัวมี <span class="mono text-[12px]">statement_section = NULL</span> จริง แต่ <span class="mono text-[12px]">computeProfitForPeriod()</span> วนตาม <span class="mono text-[12px]">account_type</span> (<span class="mono text-[12px]">REVENUE</span>/<span class="mono text-[12px]">EXPENSE</span>) <b>ไม่เคยแตะ <span class="mono text-[12px]">statement_section</span> เลย</b> — ฟิลด์นั้นมีผลแค่ว่าบรรทัดจะไปอยู่ใต้หัวข้อไหนตอนพิมพ์ และบัญชีที่ไม่ได้ติดป้ายจะตกไปที่ section สำรองของ <span class="mono text-[12px]">account_type</span> พร้อม warning ที่ <span class="mono text-[12px]">warnAboutUntaggedAccounts()</span> ออกให้
         </p></div>
 
+        <div class="rulebox ok mb-4"><div class="rc mb-1">การทดลองชี้ขาด · บังคับให้มีกำไรจริงแล้ววัด</div><p class="text-[13.5px]">
+          ข้อมูลที่ void หมดพิสูจน์ได้แค่ว่า "ตอนนี้แสดงอาการไม่ได้" ไม่ได้พิสูจน์ว่าไม่มี — จึง<b>สร้างการขายจริงที่ยังไม่ void</b> บนเครื่อง deploy แล้ววัดทั้งสามจุด:
+        </p>
+        <div class="code p-4 mt-3">
+<pre><span class="c">// ก่อนขาย</span>
+asset=900   liab=900        equity=0  profit=0          diff=0  balanced=true
+
+<span class="c">// ขาย 1 ชิ้น 500 บาท (ABB §86/6 ถอด VAT) — ยังไม่ void</span>
+ABB-2026-00019  total=500  net=467.2897  vat=32.7103
+asset=1400  liab=932.7103   equity=0  profit=<b>467.2897</b>  diff=0  balanced=<b>true</b>
+
+<span class="c">// void แล้วรอ eventual ลงครบ</span>
+asset=900   liab=900        equity=0  profit=0          diff=0  balanced=true
+stock=20 value=5000  <span class="c">← คืนสภาพเดิมทุกตัวเลข</span></pre>
+        </div>
+        <p class="text-[13.5px] mt-3">
+          <b><span class="mono text-[12px]">profit_for_period</span> รับรู้กำไรของงวดได้จริง และงบยังสมดุลระหว่างที่มีบิลเป็น ๆ อยู่</b> — ช่องโหว่ตามที่รายงานไม่มีอยู่ในเส้นทางนี้
+        </p></div>
+
+        <div class="rulebox mb-4" style="border-left-color:var(--signal)"><div class="rc mb-1">กับดักที่ 3 · ตัวเลขขยับได้ในช่วง eventual ของ COGS</div><p class="text-[13.5px]">
+          ทันทีหลัง void ค่าที่อ่านได้คือ <span class="mono text-[12px]">asset 650 · profit −250</span> แล้วกลับเป็น <span class="mono text-[12px]">900 / 0</span> ภายในไม่กี่วินาที — เพราะรายการกลับของ <b>COGS เดินทางผ่าน outbox</b> มาถึงหลังเอกสารถูก commit ·
+          อ่านงบในช่วงนั้นจะเห็นภาพกลางทางที่<b>ยังสมดุล</b>แต่ตัวเลขไม่ใช่ปลายทาง · ใครวัดงบทันทีหลังสร้าง/ยกเลิกเอกสารต้องเผื่อช่วงนี้ ไม่งั้นจะสรุปว่าเจอบั๊กทั้งที่เป็นแค่จังหวะ
+          <br>ส่วนสภาพ <b>ไม่สมดุล</b> อย่างที่รายงานมา (<span class="mono text-[12px]">-450</span>) <b>ยังสร้างซ้ำไม่ได้</b> และทุก invariant เชิงโครงสร้างที่ตรวจแล้วบอกว่ามันมาจากเส้นทางนี้ไม่ได้ — บันทึกไว้ตามที่เห็นจริง ไม่สรุปเกินหลักฐาน
+        </p></div>
+
         <div class="rulebox ok"><div class="rc mb-1">สิ่งที่เพิ่มจากรอบนี้ · invariant ข้ามปีบัญชี</div><p class="text-[13.5px]">
           ที่ยังไม่มีเทสต์คือ<b>รอยต่อระหว่างปี</b>: ปีที่ปิดแล้วเข้ามาทาง <b>equity</b> (การปิดปีลง closing entry จริงล้างบัญชี P&amp;L เข้า Retained Earnings) ส่วนปีที่ยังไม่ปิดเข้ามาทาง <span class="mono text-[12px]">profit_for_period</span> — สองทางนี้ต้องไม่นับซ้ำและต้องไม่เหลือช่อง เพราะ section สร้างจาก trial balance <b>ทุกช่วงเวลา</b> แต่บรรทัดกำไรสร้างจาก<b>ปีบัญชีปัจจุบัน</b>เท่านั้น · เพิ่มเคส <span class="mono text-[12px]">"counts a closed year through equity and the open year through profit"</span> ไว้แล้ว
           <br><b>ข้อควรรู้เชิงปฏิบัติการ</b>: ฐานข้อมูลนี้ <span class="mono text-[12px]">gl_account_year_end_balances</span> ยัง 0 แถว = <b>ยังไม่เคยปิดปีบัญชีเลย</b> · วันนี้ไม่มีผลเพราะข้อมูลทั้งหมดอยู่ในปี 2026 ซึ่งเป็นปีปัจจุบัน แต่พอข้ามไป 2027 งบดุลจะแสดง <span class="mono text-[12px]">difference</span> เท่ากับกำไรปี 2026 จนกว่าจะรันปิดปี — เป็นขั้นตอนตามระบบ ไม่ใช่บั๊ก แต่ต้องมีคนกดจริง
