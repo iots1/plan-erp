@@ -255,10 +255,14 @@ Test Suites: <span class="t">88 failed</span>, 52 passed, 140 total
       <section id="i18n-query" class="section py-4">
         <div class="eyebrow text-[var(--accent)] mb-3">07 — คำถามที่ตามมา</div>
         <h2 class="display text-3xl mb-6">แล้ว <span class="mono text-[24px]">name.th</span> ใน query param ล่ะ?</h2>
+        <div class="rulebox ok mb-6"><div class="rc mb-1">อัปเดต · ใช้ได้แล้วตั้งแต่ 2026-09-20 (รอบเดียวกัน)</div><p class="text-[13.5px]">
+          ตอนสำรวจครั้งแรก <b>400002 ทุกช่องทาง</b> ตามตารางข้างล่าง · ตอนนี้ <span class="mono text-[12px]">TypeOrmQueryBuilder</span> แปลง <span class="mono text-[12px]">name.th</span> → <span class="mono text-[12px]">name_th</span> ให้แล้วทั้ง <span class="mono text-[12px]">filter</span> · <span class="mono text-[12px]">or</span> · <span class="mono text-[12px]">s</span> · <span class="mono text-[12px]">sort</span> · <span class="mono text-[12px]">fields</span> — เก็บตารางเดิมไว้เพราะมันคือเหตุผลว่าทำไมต้องแปลงที่ชั้นนั้น ไม่ใช่ชั้นอื่น
+        </p></div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
           ในเมื่อ<b>ขาเข้าของ body</b> รับ nested แล้ว คำถามที่ตามมาทันทีคือ
           <span class="mono text-[13px]">?filter=name.th||$eq||xxxx</span> จะถูกแปลงเป็น <span class="mono text-[13px]">name_th</span>
-          ให้ <span class="mono text-[13px]">TypeOrmQueryBuilder</span> กรองจริงไหม — <b>คำตอบคือไม่ และได้ 400 เสมอ</b>
+          ให้ <span class="mono text-[13px]">TypeOrmQueryBuilder</span> กรองจริงไหม — <b>ตอนสำรวจคือไม่ และได้ 400 ทุกช่องทาง</b>
+          ผลการยิงข้างล่างคือสถานะ ณ ตอนนั้น ซึ่งเป็นข้อมูลที่ใช้ตัดสินว่าจะไปแปลงที่ชั้นไหน
         </p>
 
         <div class="eyebrow text-[var(--muted)] mb-3">ยิงจริงบนเครื่อง deploy · 2026-09-20</div>
@@ -285,11 +289,39 @@ Test Suites: <span class="t">88 failed</span>, 52 passed, 140 total
           ถ้า entity ไหน<b>มีคอลัมน์ <span class="mono text-[12px]">jsonb</span> ชื่อ <span class="mono text-[12px]">name</span> จริง ๆ</b> — <span class="mono text-[12px]">name.th</span> จะ<b>ไม่ 400</b> แต่จะกลายเป็น JSONB path (<span class="mono text-[12px]">"name" #&gt;&gt; ARRAY['th']</span>) แล้วกรองจาก JSON ข้างในแทน ซึ่งคนละอย่างกับที่ตั้งใจ · เครื่องหมายจุดในระบบนี้จึง<b>มีความหมายสองแบบอยู่แล้ว</b> (relation path กับ JSONB path) และ i18n ไม่ใช่ทั้งสองอย่าง
         </p></div>
 
-        <div class="rulebox ok"><div class="rc mb-1">สรุปสำหรับ client</div><p class="text-[13.5px]">
-          <b>body</b> → ส่ง <span class="mono text-[12px]">name_th</span> หรือ <span class="mono text-[12px]">name: { th, en }</span> ก็ได้ ·
-          <b>query param</b> → <span class="mono text-[12px]">name_th</span> เท่านั้นเสมอ ทั้ง <span class="mono text-[12px]">filter</span>, <span class="mono text-[12px]">or</span>, <span class="mono text-[12px]">s</span>, <span class="mono text-[12px]">sort</span>, <span class="mono text-[12px]">fields</span> ·
-          <b>response</b> → ได้ <span class="mono text-[12px]">name: { th, en }</span> เสมอ
-          <br>ถ้าอนาคตอยากให้ <span class="mono text-[12px]">name.th</span> ใช้ได้ใน query ด้วย ต้องแปลงที่ <span class="mono text-[12px]">TypeOrmQueryBuilder</span> โดยดูจาก metadata ว่าคลาสมีคู่ <span class="mono text-[12px]">_th</span>/<span class="mono text-[12px]">_en</span> ครบไหม<b>ก่อน</b>ตีความว่าเป็น relation — แต่ต้องตัดสินใจก่อนว่าจะชนกับความหมาย JSONB อย่างไร ยังไม่ได้ทำในรอบนี้
+        <div class="eyebrow text-[var(--muted)] mt-8 mb-3">ทางแก้ · ทำไมต้องเป็น TypeOrmQueryBuilder ไม่ใช่ @ValidatedQuery</div>
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">❌ @ValidatedQuery</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">
+              เป็นชั้น binding — <b>ไม่รู้ว่า endpoint นี้ query entity ไหน</b> จึงตอบไม่ได้ว่ามีคอลัมน์ <span class="mono text-[12px]">name_th</span>/<span class="mono text-[12px]">name_en</span> จริงไหม หรือ <span class="mono text-[12px]">name</span> เป็น jsonb อยู่แล้วหรือเปล่า
+              <br>ถ้าดักที่นี่ต้องเดาด้วย string ล้วน ๆ ซึ่งจะพัง <span class="mono text-[12px]">mock_data.th</span> ทันที · แถมต้องแกะไวยากรณ์ย่อยทั้ง 4 แบบ (<span class="mono text-[12px]">field||op||value</span>, <span class="mono text-[12px]">field:dir</span>, CSV, JSON) ซ้ำกับที่ query builder แกะอยู่แล้ว
+            </p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--accent)">✅ TypeOrmQueryBuilder</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">
+              ถือ <span class="mono text-[12px]">repository.metadata</span> อยู่แล้ว จึง<b>แยกความหมายทั้งสามของจุดได้จริง</b> · และแกะ path ของทั้ง 5 ช่องทางอยู่ที่เดียวอยู่แล้ว
+              <br>เป็นด่านสุดท้ายก่อนลง SQL ด้วย — อะไรที่ผ่านตรงนี้ไปคือสิ่งที่ Postgres จะเห็นจริง
+            </p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ลำดับความสำคัญ · ออกแบบให้พฤติกรรมเดิมไม่เปลี่ยนเลยสักข้อ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">resolveLocalizedFieldPath()</span> ทำงานตามลำดับนี้ แล้วคืน path เดิมถ้าไม่เข้าเงื่อนไข (ปล่อยให้ validation เดิมรายงาน error ของมันเอง):
+          <br><b>1.</b> มีคอลัมน์ชื่อ <span class="mono text-[12px]">&lt;base&gt;</span> อยู่แล้ว → ไม่แตะ · <span class="mono text-[12px]">mock_data.th</span> ยังเป็น JSONB path เหมือนเดิม
+          <br><b>2.</b> มี relation ชื่อ <span class="mono text-[12px]">&lt;base&gt;</span> → ไม่แตะ · relation path ยังชนะ
+          <br><b>3.</b> มีคอลัมน์ <span class="mono text-[12px]">&lt;base&gt;_th</span> <b>และ</b> <span class="mono text-[12px]">&lt;base&gt;_en</span> ครบคู่ → แปลงเป็น <span class="mono text-[12px]">&lt;base&gt;_&lt;leaf&gt;</span>
+          <br><b>4.</b> นอกนั้นคืนเดิม → ยังได้ <span class="mono text-[12px]">400002</span> เหมือนก่อน
+          <br>relation hop ข้างหน้าถูกเดินก่อน ดังนั้น <span class="mono text-[12px]">customer_group.name.th</span> ถูก resolve เทียบ metadata ของกลุ่มลูกค้าแล้วกลายเป็น <span class="mono text-[12px]">customer_group.name_th</span> · คอลัมน์ที่บังเอิญลงท้าย <span class="mono text-[12px]">_th</span> แต่ไม่มีคู่ (<span class="mono text-[12px]">note_th</span> เดี่ยว ๆ) <b>ไม่ถูกนับเป็นคู่ i18n</b>
+        </p></div>
+
+        <div class="rulebox ok"><div class="rc mb-1">สรุปสำหรับ client (ปัจจุบัน)</div><p class="text-[13.5px]">
+          <b>body</b> → <span class="mono text-[12px]">name_th</span> หรือ <span class="mono text-[12px]">name: { th, en }</span> ก็ได้ ·
+          <b>query param</b> → <span class="mono text-[12px]">name_th</span> หรือ <span class="mono text-[12px]">name.th</span> ก็ได้ ทั้ง <span class="mono text-[12px]">filter</span>/<span class="mono text-[12px]">or</span>/<span class="mono text-[12px]">s</span>/<span class="mono text-[12px]">sort</span>/<span class="mono text-[12px]">fields</span> ·
+          <b>response</b> → <span class="mono text-[12px]">name: { th, en }</span> เสมอ
+          <br><b>ยังไม่รองรับ</b>: <span class="mono text-[12px]">name</span> เปล่า ๆ (ไม่มี <span class="mono text-[12px]">.th</span>/<span class="mono text-[12px]">.en</span>) เพราะกำกวมว่าจะหมายถึงด้านไหน · และ entity ที่มีคอลัมน์ jsonb ชื่อชนกับ base จะยังเป็น JSONB path ตามข้อ 1
+          <br>เทสต์: <span class="mono text-[12px]">typeorm-query-builder.i18n-path.spec.ts</span> (8 เคส · ครบทั้ง 5 ช่องทาง + jsonb + relation + half-pair) และ smoke <span class="mono text-[12px]">localized-input.smoke.mjs</span> ยิงของจริงว่า <span class="mono text-[12px]">filter=name.th</span> คืนแถวชุดเดียวกับ <span class="mono text-[12px]">filter=name_th</span>
         </p></div>
       </section>
 

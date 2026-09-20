@@ -257,25 +257,26 @@
           </div>
         </div>
 
-        <div class="rulebox mb-6" style="border-left-color:var(--signal)">
-          <div class="rc mb-1">⚠ QUERY PARAM ไม่ได้ Alias นี้ — ใช้ <span class="mono text-[12px]">name_th</span> เท่านั้น</div>
+        <div class="rulebox mb-6">
+          <div class="rc mb-1">QUERY PARAM ก็ใช้ <span class="mono text-[12px]">name.th</span> ได้ แต่คนละกลไกกัน</div>
           <p class="text-[13.5px]">
-            Alias รับเฉพาะ <b>body</b> เท่านั้น (<span class="mono text-[12px]">LocalizedBodyPipe</span> ทำงานเมื่อ <span class="mono text-[12px]">metadata.type === 'body'</span>) ·
-            ใน query param จุด (<span class="mono text-[12px]">.</span>) มีความหมายอย่างอื่นอยู่แล้ว คือ <b>relation path</b> หรือ <b>JSONB path</b> —
-            <span class="mono text-[12px]">name.th</span> จึงถูกอ่านว่า “คอลัมน์ <span class="mono text-[12px]">th</span> ของ relation ชื่อ <span class="mono text-[12px]">name</span>” แล้วตอบ
-            <span class="mono text-[12px]">400002</span> <span class="mono text-[12px]">"Invalid relation: 'name' in path 'name.th'"</span>
+            <b>body</b> แปลงด้วย <span class="mono text-[12px]">LocalizedBodyPipe</span> (ดูจาก DTO) · <b>query param</b> แปลงด้วย
+            <span class="mono text-[12px]">TypeOrmQueryBuilder.resolveLocalizedFieldPath()</span> (ดูจาก entity metadata) —
+            คนละชั้นเพราะจุด (<span class="mono text-[12px]">.</span>) ใน query ถูกจองความหมายไว้แล้วสองแบบ: <b>relation path</b> กับ <b>JSONB path</b>
           </p>
           <div class="code p-4 mt-3">
-<pre><span class="c">// ยิงจริงบนเครื่อง deploy 2026-09-20 — ทุกช่องทางให้ผลเดียวกัน</span>
-?filter=name.th||$eq||test   → <span class="t">400002</span>   ?sort=name.th:asc    → <span class="t">400002</span>
-?fields=id,name.th           → <span class="t">400002</span>   ?s={"name.th":"test"} → <span class="t">400002</span>
+<pre><span class="c">// ใช้ได้ทั้งคู่ · ให้ผลเหมือนกันเป๊ะ</span>
+?filter=name.th||$eq||ไทย      ?filter=name_th||$eq||ไทย
+?sort=name.th:desc            ?fields=id,name.th
+?or=name.en||$cont||Co        ?s={"name.th":"ไทย"}
+?filter=customer_group.name.th||$eq||กลุ่ม   <span class="c">// ข้าม relation ก็ได้</span>
 
-?filter=name_th||$eq||test   → <span class="t">200000</span>   <span class="c">// ✅ รูปแบบที่ถูกต้อง</span></pre>
+<span class="c">// ยังไม่รองรับ — กำกวมว่าหมายถึงด้านไหน</span>
+?filter=name||$eq||ไทย        → <span class="t">400002</span></pre>
           </div>
           <p class="text-[13.5px] mt-3">
-            สรุปสั้น: <b>body</b> = flat หรือ nested ก็ได้ · <b>query param</b> = flat เท่านั้นเสมอ · <b>response</b> = nested เสมอ ·
-            รายละเอียดและข้อยกเว้น (entity ที่มีคอลัมน์ <span class="mono text-[12px]">jsonb</span> ชื่อ <span class="mono text-[12px]">name</span> จริง ๆ)
-            อยู่ที่ <a href="bugfix-log.html#i18n-query" style="color:var(--accent);text-decoration:underline">Bug Fix Log §07</a>
+            คอลัมน์ <span class="mono text-[12px]">jsonb</span> ที่ชื่อชนกับ base ยังถูกอ่านเป็น JSONB path เหมือนเดิม (<span class="mono text-[12px]">mock_data.th</span>) และคอลัมน์ที่ลงท้าย <span class="mono text-[12px]">_th</span> โดยไม่มีคู่ก็ไม่ถูกนับเป็น i18n ·
+            ลำดับการตัดสินทั้งหมดอยู่ที่ <a href="bugfix-log.html#i18n-query" style="color:var(--accent);text-decoration:underline">Bug Fix Log §07</a>
           </p>
         </div>
 
