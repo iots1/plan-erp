@@ -9,7 +9,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRS &middot; Phase 3 — Inventory Core &middot; ERP</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@12.0.0/dist/mermaid.min.js"></script>
+<script src="mermaid-init.js" defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1163,23 +1164,6 @@ sequenceDiagram
   </main>
 </div>
 
-<script>
-  mermaid.initialize({
-    startOnLoad:true,
-    theme:'base',
-    securityLevel:'loose',
-    er:{ useMaxWidth:true },
-    themeVariables:{
-    background:'#FFFFFF',
-      primaryColor:'var(--line-soft)',
-      primaryBorderColor:'var(--accent)',
-      primaryTextColor:'var(--ink)',
-      lineColor:'var(--blueprint)',
-      tertiaryColor:'var(--line)',
-      fontFamily:'IBM Plex Sans Thai, sans-serif'
-    }
-  });
-</script>
 
 </body>
 </html>
