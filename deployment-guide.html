@@ -471,17 +471,21 @@ pm2 save</pre>
             <tbody>
               <tr><td rowspan="3">Environment <b>secret</b><br><span class="text-[12px]">(Settings → Environments → <span class="mono text-[11px]">production</span>/<span class="mono text-[11px]">development</span>)</span></td><td><span class="mono text-[12px]">APP_SSH_HOSTNAME</span></td><td>hostname ที่ผูกกับ tunnel เช่น <span class="mono text-[12px]">app-ssh.example.com</span></td></tr>
               <tr><td><span class="mono text-[12px]">APP_SSH_USER</span></td><td>user บนเครื่อง เช่น <span class="mono text-[12px]">root</span></td></tr>
-              <tr><td><span class="mono text-[12px]">ENV_FILE</span></td><td>เนื้อหาไฟล์ <span class="mono text-[12px]">.env</span> ทั้งไฟล์ (optional — ไม่ตั้งก็ข้ามขั้นนี้เฉย ๆ)</td></tr>
+              <tr><td><span class="mono text-[12px]">ENV_FILE</span></td><td>เนื้อหาไฟล์ <span class="mono text-[12px]">.env</span> ทั้งไฟล์ — <b>ตั้งไว้แล้วทั้งสอง Environment ตั้งแต่ 2026-09-02</b> และ deploy เขียนทับไฟล์บนเครื่องจากค่านี้ทุกครั้ง</td></tr>
               <tr><td rowspan="2">Environment <b>variable</b> (ไม่ลับ)</td><td><span class="mono text-[12px]">DEPLOY_DIR</span></td><td>default <span class="mono text-[12px]">/root/erp-api</span></td></tr>
               <tr><td><span class="mono text-[12px]">APP_SSH_KEY_PATH</span></td><td>default <span class="mono text-[12px]">~/.ssh/github_iots1</span> — path <b>บน runner</b></td></tr>
               <tr><td>บนเครื่อง runner</td><td>private key</td><td><b>ไม่เคยเป็น GitHub secret</b> — ไฟล์อยู่บน runner, public half อยู่ใน <span class="mono text-[12px]">authorized_keys</span> ของ server</td></tr>
             </tbody>
           </table>
           <p class="text-sm mb-4" style="color:var(--ink-soft)">
-            <span class="mono text-[12px]">ENV_FILE</span> เป็นของ<b>เสริม</b> — deploy.yml มี step "Sync .env" เขียนทับ
+            <span class="mono text-[12px]">ENV_FILE</span> <b>ไม่ใช่ของเสริมอีกแล้ว</b> — deploy.yml มี step "Sync .env" ที่เขียนทับ
             <span class="mono text-[12px]">.env</span> บน server จาก secret นี้ก่อน <span class="mono text-[12px]">deploy-app.sh</span>
-            จะรัน แต่ถ้าไม่ตั้งไว้ก็แค่ warning แล้วข้าม (ใช้ <span class="mono text-[12px]">.env</span> เดิมที่ตั้งไว้ด้วยมือบน
-            server) ต้องเป็น <b>secret</b> ไม่ใช่ variable เพราะ <span class="mono text-[12px]">.env</span> ของ repo นี้แทบทั้งไฟล์
+            จะรัน และ secret นี้<b>ตั้งไว้ครบทั้ง production และ development แล้ว</b> แปลว่า
+            <b>แก้ <span class="mono text-[12px]">.env</span> บนเครื่องอย่างเดียวจะอยู่แค่ถึง deploy รอบหน้า</b> (กับดักข้อ 11 ใน
+            <span class="mono text-[12px]">HANDOFF-Feature.md</span>) — ลำดับที่ถูกอยู่ใน §กับดัก ด้านล่าง
+            (แก้บนเครื่องก่อน แล้ว sync ขึ้น secret ทั้งสอง Environment ห้ามทำกลับด้าน เพราะ secret อ่านกลับไม่ได้)
+            · โค้ดของ step ยัง degrade ปลอดภัย: Environment ไหนที่ยังไม่มี secret จะได้แค่ warning แล้วข้าม
+            · ต้องเป็น <b>secret</b> ไม่ใช่ variable เพราะ <span class="mono text-[12px]">.env</span> ของ repo นี้แทบทั้งไฟล์
             คือ credential จริง (DB/Redis/RabbitMQ password, <span class="mono text-[12px]">SECRET_KEY</span>, …)
           </p>
           <p class="text-sm mb-4" style="color:var(--ink-soft)">

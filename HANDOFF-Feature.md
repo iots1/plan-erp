@@ -2020,6 +2020,11 @@ ssh app-server 'export PATH="$HOME/.local/share/pnpm/bin:$HOME/.nvm/versions/nod
 ssh app-server 'cat /root/erp-api/.env' | gh secret set ENV_FILE --env production  --repo iotechsoft-company/erp-api
 ssh app-server 'cat /root/erp-api/.env' | gh secret set ENV_FILE --env development --repo iotechsoft-company/erp-api
 # pipe ตรงแบบนี้เพื่อไม่ให้ credential โผล่ใน output · แก้ไฟล์บนเครื่องก่อน แล้วค่อย sync เสมอ
+# sync ล่าสุด 2026-09-20 (181 บรรทัด / 8,038 bytes · sha256 6548c06b…) — ไม่ได้เปลี่ยนค่าไหน
+# แค่ทำให้ secret ตรงกับไฟล์บนเครื่อง · ก่อนหน้า 2026-09-09 (storage endpoint) และ 2026-09-02 (174/7,513)
+
+# ตรวจว่า secret มีอยู่จริงไหม (ได้แค่ชื่อ + updated_at — อ่านค่ากลับไม่ได้)
+gh secret list --env production --repo iotechsoft-company/erp-api
 
 # ดูว่า deploy รอบล่าสุด scope อะไร (docs-only ควรได้ deploy=false, job ถูก skip)
 gh run list --workflow=deploy.yml --limit 3
@@ -2079,6 +2084,12 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     (step "Sync .env from GitHub Environment secret" ใน `deploy.yml`) — แก้ไฟล์บนเครื่องอย่างเดียว
     **หายเงียบ**ตอน deploy รอบถัดไป แล้วบั๊กกลับมาโดยไม่มีใครแตะโค้ด · อ่านค่า secret กลับไม่ได้ด้วย
     ลำดับที่ถูกจึงเป็น **แก้ `.env` บนเครื่อง → `pm2 reload` → sync ขึ้น secret ทั้ง 2 environment**
+    · **(เพิ่ม 2026-09-20)** comment ใน `deploy.yml` เหนือ step นั้น *ยังเขียนว่า* `secrets.ENV_FILE`
+    "does not exist yet in either GitHub Environment" ซึ่ง**ผิดมาตั้งแต่ 2026-09-02** และหลอกเซสชันวันนี้
+    ให้สรุปว่าการตั้ง secret คือการพลิก step จาก dormant เป็น live (จริงๆ คือ re-sync ทับของเดิม) ·
+    แก้ comment แล้วในวันเดียวกัน — บทเรียนคือ **`gh secret list` โชว์แค่ `updated_at` ไม่บอกว่ามีมาก่อนไหม**
+    ดังนั้นห้ามอ่าน timestamp ของตัวเองแล้วสรุปว่า secret เพิ่งเกิด · และ secret อ่านกลับไม่ได้ แปลว่า
+    การ sync ทับ **พิสูจน์ไม่ได้ว่าของเดิมมีบรรทัดไหนที่ไฟล์บนเครื่องไม่มี** — ยิ่งต้องรักษาลำดับข้างบน
 12. **(จาก 2026-09-02) route ของแต่ละ resource ไม่ได้ใช้ verb เดียวกันหมด** — `customers` update เป็น
     `PUT /customers/:id` (ไม่ใช่ `PATCH`) ขณะที่ `finance-settings` เป็น `PATCH` และ
     `sales-settings`/`supplier-settings` เป็น `PUT` · ยิงผิด verb ได้ **404 `Cannot PATCH …`** ซึ่ง
