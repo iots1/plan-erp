@@ -267,7 +267,7 @@ is_public: <span class="t">boolean</span>;</pre>
   <span class="d">@Get</span>()  findAll() { <span class="k">return</span> <span class="k">this</span>.service.findAll(); }
 }</pre>
         </div>
-        <div class="rulebox"><div class="rc mb-1">STATUS CODE · 6 หลัก</div><p class="text-[13.5px]"><span class="mono text-[12px]">status.code</span> เป็นเลข 6 หลัก = HTTP status × 1000 + serial · success = <span class="mono text-[12px]">200000</span> · ต้องมี <b>อย่างใดอย่างหนึ่งระหว่าง <span class="mono text-[12px]">data</span> กับ <span class="mono text-[12px]">errors</span></b> ไม่ส่งพร้อมกัน</p></div>
+        <div class="rulebox"><div class="rc mb-1">STATUS CODE · 6 หลัก</div><p class="text-[13.5px]"><span class="mono text-[12px]">status.code</span> เป็นเลข 6 หลัก = HTTP status × 1000 + serial <b>ทุก response ทั้งสำเร็จและ error</b> · serial <span class="mono text-[12px]">000</span> = รูปธรรมดาของสถานะนั้น (<span class="mono text-[12px]">200000</span>, <span class="mono text-[12px]">201000</span>, <span class="mono text-[12px]">404000</span>, <span class="mono text-[12px]">409000</span>) · serial อื่นใช้เฉพาะเคสที่ต้องแยกให้ออก (<span class="mono text-[12px]">400001</span> validation, <span class="mono text-[12px]">400002</span> invalid parameter) · ประกอบด้วย <span class="mono text-[12px]">toEnvelopeStatusCode()</span> อย่าเขียน HTTP status เปล่า ๆ · ฟิลด์ <span class="mono text-[12px]">errors[].code</span> เป็นคนละเรื่อง — เป็น slug (<span class="mono text-[12px]">NOT_FOUND</span>, <span class="mono text-[12px]">CONFLICT</span>) ไม่ใช่ตัวเลข · ต้องมี <b>อย่างใดอย่างหนึ่งระหว่าง <span class="mono text-[12px]">data</span> กับ <span class="mono text-[12px]">errors</span></b> ไม่ส่งพร้อมกัน</p></div>
         <div class="edge mt-4" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">i18n interplay</div><p class="text-[13px]">ภายใน <span class="mono text-[12px]">attributes</span> ฟิลด์ 2 ภาษาถูกยุบเป็น nested object <span class="mono text-[12px]">{ th, en }</span> ด้วย <span class="mono text-[12px]">LocalizationInterceptor</span> เสมอ (แม้ค่าเป็น null) — ห้าม frontend ต่อ string key เอง ดู <a href="i18n-guide.html" style="color:var(--accent);text-decoration:underline">i18n Guide</a></p></div>
       </section>
 
@@ -285,16 +285,16 @@ is_public: <span class="t">boolean</span>;</pre>
           <table class="d">
             <thead><tr><th>Code</th><th>Exception</th><th>Use</th><th>Trigger</th></tr></thead>
             <tbody>
-              <tr><td>400</td><td>BadRequestException</td><td>business logic / invalid state transition</td><td>Manual</td></tr>
+              <tr><td>400000</td><td>BadRequestException</td><td>business logic / invalid state transition</td><td>Manual</td></tr>
               <tr><td>400001</td><td>ValidationException</td><td>Body validation ล้มเหลว</td><td><span class="mono text-[12px]">@Body()</span> auto</td></tr>
               <tr><td>400002</td><td>InvalidParameterException</td><td>Query parameter ไม่ผ่าน</td><td><span class="mono text-[12px]">@ValidatedQuery()</span></td></tr>
-              <tr><td>401</td><td>UnauthorizedException</td><td>token หาย/ไม่ถูกต้อง/หมดอายุ</td><td>Guards</td></tr>
-              <tr><td>403</td><td>ForbiddenException</td><td>ล็อกอินแล้วแต่สิทธิ์ไม่พอ</td><td>Guards</td></tr>
-              <tr><td>404</td><td>NotFoundException</td><td>ไม่พบ resource (เช็ค null หลัง query เสมอ)</td><td>Services</td></tr>
-              <tr><td>409</td><td>ConflictException</td><td>ซ้ำ / ชน constraint</td><td>DB auto / manual</td></tr>
-              <tr><td>422</td><td>UnprocessableEntityException</td><td>ถูก syntax แต่ผิดเชิงความหมาย</td><td>Manual</td></tr>
-              <tr><td>500</td><td>InternalServerErrorException</td><td>error ไม่คาดคิด</td><td>Auto / manual</td></tr>
-              <tr><td>503</td><td>ServiceUnavailableException</td><td>ปิดชั่วคราว / maintenance</td><td>Manual</td></tr>
+              <tr><td>401000</td><td>UnauthorizedException</td><td>token หาย/ไม่ถูกต้อง/หมดอายุ</td><td>Guards</td></tr>
+              <tr><td>403000</td><td>ForbiddenException</td><td>ล็อกอินแล้วแต่สิทธิ์ไม่พอ</td><td>Guards</td></tr>
+              <tr><td>404000</td><td>NotFoundException</td><td>ไม่พบ resource (เช็ค null หลัง query เสมอ)</td><td>Services</td></tr>
+              <tr><td>409000</td><td>ConflictException</td><td>ซ้ำ / ชน constraint</td><td>DB auto / manual</td></tr>
+              <tr><td>422000</td><td>UnprocessableEntityException</td><td>ถูก syntax แต่ผิดเชิงความหมาย</td><td>Manual</td></tr>
+              <tr><td>500000</td><td>InternalServerErrorException</td><td>error ไม่คาดคิด</td><td>Auto / manual</td></tr>
+              <tr><td>503000</td><td>ServiceUnavailableException</td><td>ปิดชั่วคราว / maintenance</td><td>Manual</td></tr>
             </tbody>
           </table>
         </div>
@@ -303,7 +303,8 @@ is_public: <span class="t">boolean</span>;</pre>
 <pre>{
   <span class="s">"status"</span>: { <span class="s">"code"</span>: 400001, <span class="s">"message"</span>: <span class="s">"Validation Failed"</span> },
   <span class="s">"errors"</span>: [
-    { <span class="s">"code"</span>: <span class="s">"400001"</span>, <span class="s">"detail"</span>: <span class="s">"received_qty must be a positive integer"</span>,
+    { <span class="s">"code"</span>: <span class="s">"VALIDATION_ERROR"</span>, <span class="s">"title"</span>: <span class="s">"Invalid Input"</span>,
+      <span class="s">"detail"</span>: <span class="s">"received_qty must be a positive integer"</span>,
       <span class="s">"source"</span>: { <span class="s">"pointer"</span>: <span class="s">"/data/attributes/received_qty"</span> } }
   ],
   <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"2026-07-14T10:30:00.000Z"</span> }

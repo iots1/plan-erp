@@ -175,6 +175,37 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-20 · `status.code` เป็น 6 หลักครบทุก response แล้ว ✅ **implement + verify 8 BC**
+
+**ที่มา**: เจอตอนยิง curl ตรวจงาน i18n รอบก่อนหน้า — `409` ตอบ `status.code` เป็นเลข 3 หลักดิบ
+ทั้งที่ `backend-convention.html` + `.claude/rules/api-contract.md` เขียนไว้ตั้งแต่แรกว่าเป็น 6 หลัก
+(HTTP × 1000 + serial) · ของเดิมมีแค่ success (`200000`/`201000`) กับ 400 สองตัว (`400001`
+validation, `400002` invalid parameter) ที่ทำตามกติกา ที่เหลือหลุดเป็น HTTP status เปล่า —
+client เลยต้องเช็คสองความกว้างแล้วแต่ว่าเจอ error ตัวไหน
+
+**กติกาที่ตกลง**: serial `000` = รูปธรรมดาของสถานะนั้น (`409000`, `404000`, `500000`) ·
+serial อื่นสงวนไว้ให้เคสที่ต้องแยกให้ออกจริง ๆ (`400001`, `400002` ของเดิม, ถัดไปคือ `409001` ฯลฯ)
+
+- `libs/common/src/utils/http-exception/status-code.util.ts` — `toEnvelopeStatusCode(status,
+  serial)` + `normalizeEnvelopeStatusCode(value, fallback)` + ค่าคงที่ `VALIDATION_FAILED_STATUS_CODE`
+  / `INVALID_PARAMETER_STATUS_CODE` แทนเลขดิบที่เคยฝังอยู่ใน filter ทั้งสองตัว
+- `AllExceptionsFilter` — ทุกกิ่ง (HttpException / QueryFailedError / catch-all) ส่ง composite ·
+  ถ้าคนโยนใส่ `status` มาเองใน body จะ normalize ให้: ใส่ `409001` มาก็เคารพตามนั้น ใส่ `409`
+  เปล่า ๆ ก็ขยายเป็น `409000`
+- `RpcExceptionsFilter` — เหมือนกัน รวมถึง payload legacy ที่ส่ง `status_code: 409` มา
+- **ฝั่งรับไม่ต้องแก้**: `resolveRpcHttpStatus()` รองรับทั้ง 3 และ 6 หลักอยู่แล้ว BC ที่ยังรันโค้ดเก่า
+  จึงคุยกับตัวใหม่ได้ไม่พัง (สำคัญมากเพราะ deploy ทีละตัวไม่ได้พร้อมกันเป๊ะ)
+- `errors[].code` **ไม่เปลี่ยน** — ยังเป็น slug (`NOT_FOUND`, `CONFLICT`, `VALIDATION_ERROR`,
+  `UNIQUE_VIOLATION`) คนละหน้าที่กับ `status.code` · ตัวอย่างใน `backend-convention.html` ที่เขียนว่า
+  `"code": "400001"` ผิดมาตั้งแต่ต้น แก้เป็น `VALIDATION_ERROR` แล้ว
+
+**ยืนยัน**: `pnpm verify` เขียวครบ 6 ขั้นทั้ง 8 BC · unit ใหม่ 6 เคสใน `status-code.util.spec.ts` ·
+e2e ใหม่ใน `customers.e2e-spec.ts` ล็อก `404000` + `409000` ผ่าน pipeline จริง
+
+⚠️ **breaking สำหรับ client ที่ match `status.code === 404` ตรง ๆ** — ถ้ามี FE ที่เช็คแบบนั้นต้องแก้เป็น
+`404000` หรือหารด้วย 1000 · ตัว HTTP status เองไม่เปลี่ยน (ยังเป็น 404/409 ตามเดิม) ฉะนั้น client
+ที่ดู `response.status` ไม่กระทบ
+
 ### 2026-09-20 · i18n · API รับ nested `{ th, en }` ตอนส่งเข้าได้แล้ว ✅ **implement + verify 8 BC + deploy + curl 22/22 บนเครื่องจริง**
 
 **ที่มา**: คำถามว่า "ถ้า request เหมือน response จะทำให้ AI frontend พลาดน้อยลงไหม" — ไล่โค้ดแล้วเจอว่า

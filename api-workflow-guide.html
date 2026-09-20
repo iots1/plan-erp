@@ -314,7 +314,8 @@ flowchart LR
 
 <span class="c">// เมื่อผิดพลาด — data หายไป มีแต่ errors</span>
 {
-  <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">400</span>, <span class="s">"message"</span>: <span class="s">"Allocations total 400 but this payment only settles 360.8"</span> },
+  <span class="c">// status.code เป็น 6 หลักเสมอ = HTTP status × 1000 + serial (000 = รูปธรรมดา)</span>
+  <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">400000</span>, <span class="s">"message"</span>: <span class="s">"Allocations total 400 but this payment only settles 360.8"</span> },
   <span class="s">"errors"</span>: [ { <span class="s">"code"</span>: <span class="s">"BAD_REQUEST"</span>, <span class="s">"title"</span>: <span class="s">"Bad Request"</span>, <span class="s">"detail"</span>: <span class="s">"…"</span> } ],
   <span class="s">"meta"</span>: { <span class="s">"timestamp"</span>: <span class="s">"…"</span> }
 }</pre>
