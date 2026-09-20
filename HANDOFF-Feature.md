@@ -78,14 +78,12 @@
 
 ## 1 · สถานะล่าสุด
 
-⚠️ **working tree ไม่สะอาด** — งาน i18n nested-input alias ของ 2026-09-20 (§2 หัวข้อแรก)
-verify เขียวครบ 8 BC แล้วแต่ **ยังไม่ commit/push/deploy** ทั้งใน `erp-api` และ submodule ·
-ของที่ push+deploy ไปแล้วคือทุกอย่างก่อนหน้านั้น
+**working tree สะอาดทั้งสอง repo · push + deploy ขึ้น production แล้ว**
 
 | Repo | HEAD ปัจจุบัน |
 |---|---|
-| `iotechsoft-company/erp-api` | `80e1bd3` feat(finance-bc): งบการเงิน D3 — income statement and balance sheet as JSON (push + deploy แล้ว run `35453572794`) |
-| `iots1/plan-erp` (submodule) | `ab3ae30` docs: the financial statements ship, and gross profit needs a column to exist (pin bump อยู่ในคอมมิตแม่ `80e1bd3`) |
+| `iotechsoft-company/erp-api` | `71c519e` feat(common): accept the nested { th, en } i18n object on request bodies (push + deploy แล้ว run `35498771120`) |
+| `iots1/plan-erp` (submodule) | `3e2fb49` docs: the API takes nested { th, en } on the way in too (pin bump อยู่ในคอมมิตแม่ `71c519e`) |
 
 ⚠️ **migration ของรอบ D3 รันบน DB จริงไปแล้ว 3 ตัว ก่อน deploy** (`erp_finance` 2 + `erp_iam` 1) —
 ปลอดภัยเพราะทั้งสามเป็น additive ล้วน (คอลัมน์ nullable + DML ติดป้าย + grant permission) โค้ดเก่าที่รันอยู่
@@ -177,7 +175,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
-### 2026-09-20 · i18n · API รับ nested `{ th, en }` ตอนส่งเข้าได้แล้ว ✅ **implement + verify 8 BC** (ยังไม่ commit/deploy)
+### 2026-09-20 · i18n · API รับ nested `{ th, en }` ตอนส่งเข้าได้แล้ว ✅ **implement + verify 8 BC + deploy + curl 22/22 บนเครื่องจริง**
 
 **ที่มา**: คำถามว่า "ถ้า request เหมือน response จะทำให้ AI frontend พลาดน้อยลงไหม" — ไล่โค้ดแล้วเจอว่า
 ของเดิมไม่ใช่แค่ "ไม่สะดวก" แต่ **พังเงียบ**: `forbidNonWhitelisted` default `false` ทั้งแพลตฟอร์ม
@@ -226,7 +224,26 @@ smoke ใหม่ `apps/sales-bc/test/smoke/localized-input.smoke.mjs` ยิ�
 เช็คคอลัมน์ `name_th/name_en` ใน `erp_sales` ตรง · `PUT` ครึ่งเดียว → อีกด้านไม่ขยับ ·
 ส่งทั้งสองแบบ → flat ชนะ + warning ขึ้นจริง · payload flat แบบเดิมยังทำงานเหมือนเดิม
 
-⬜ **ค้าง** — ยังไม่ commit/push/deploy (รอสั่ง) · ฝั่ง FE ยังไม่ต้องแก้อะไร: ของเดิมใช้ได้ต่อทั้งหมด
+**deploy แล้ว** — commit `71c519e` run `35498771120` · `/sales-bc/v1/health` บนเครื่องจริงรายงาน
+`version: 71c519ecca42` ตรงกับคอมมิต
+
+**ยิง curl ตรวจบนเครื่อง deploy จริงแล้ว 22/22 เคส** (ผ่าน ssh tunnel ไป 127.0.0.1:3001/3005/3007 —
+บริการทุกตัว bind localhost หลัง Caddy) ครอบคลุม:
+
+| กลุ่ม | เคส |
+|---|---|
+| ทางหลัก | สร้างด้วย nested → 201 + คอลัมน์ flat ใน `erp_sales.customers` ตรง · สร้างด้วย flat แบบเดิม → 201 · `PUT { name: { en } }` → `name_th` ไม่ขยับ · `GET` ยังคืน nested |
+| ทั้งสองแบบพร้อมกัน | flat ชนะเป็นราย "ด้าน" + `meta.warnings` `LOCALIZED_INPUT_IGNORED` ขึ้นจริง |
+| edge · ห้ามแปลง | `{th,en,zz}` · `{th: 42}` · `{}` → ไม่แปลง แล้วตกที่ `400001` ตามเดิม |
+| edge · error พูดภาษา flat | ส่ง `{ th }` อย่างเดียวตอน create → error ชี้ `name_en` (ไม่กุอีกด้านให้) · ส่ง `{th:null,en:null}` → ชี้ทั้ง `name_th`/`name_en` |
+| edge · ของแปลกปลอม | ฟิลด์ nested ที่ DTO ไม่รู้จัก → ถูก strip เหมือนเดิม 201 · query `filter=code||$eq||…` ไม่ถูกแตะ |
+| BC ที่สอง + โครงสร้างซ้อน | `print-templates`: `name`/`description` nested + `parameters[].label` nested (ลงไปทาง `@Type(() => DTO)`) แปลงครบ |
+| jsonb อิสระ | `mock_data: { customer_name: { th, en } }` กลับมาค่าเดิมครบ ไม่มีคีย์ `_th/_en` งอกขึ้นมา — กับดักที่ตั้งใจกันไว้ ยืนยันบนเครื่องจริงแล้ว (หมายเหตุ: jsonb ของ Postgres จัดลำดับคีย์ใหม่เอง เทียบ "ตรงทุก byte" ไม่ได้ ต้องเทียบค่า) |
+| `null` = ล้าง | `PUT { description: { th: null, en: null } }` → ล้างทั้งคู่ และ response ยังส่ง `{ th: null, en: null }` ตาม contract |
+| OpenAPI | `CreateCustomerDTO` ใน `/json-docs` มี property `name` (th/en) อยู่ข้างคู่ `name_th`/`name_en` จริง |
+
+ข้อมูลทดสอบถูกลบ (soft delete) หมดทุกแถวในรอบเดียวกัน — เหลือแถว `code LIKE 'CURL-I18N-%'`
+ที่ `is_deleted = true` ไว้ตามกลไกปกติของระบบ · ฝั่ง FE ไม่ต้องแก้อะไร ของเดิมใช้ได้ต่อทั้งหมด
 แค่เลิกต้องแบนมือเองได้เมื่อไรก็ได้
 
 ### 2026-09-20 · งบการเงิน D3 · P5 Admin UI ✅ **implement + verify + deploy** (ค้าง manual QA)
