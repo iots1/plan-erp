@@ -32,7 +32,8 @@
       <a href="#bug-5"      class="navlink"><span class="n">05</span> fields= ทำ i18n โกหก</a>
       <a href="#bug-6"      class="navlink"><span class="n">06</span> pnpm test พัง 88 suites</a>
       <a href="#i18n-query" class="navlink"><span class="n">07</span> i18n กับ query params</a>
-      <a href="#lesson"     class="navlink"><span class="n">08</span> บทเรียนร่วม</a>
+      <a href="#not-a-bug"  class="navlink"><span class="n">08</span> ตรวจแล้วไม่ใช่บั๊ก</a>
+      <a href="#lesson"     class="navlink"><span class="n">09</span> บทเรียนร่วม</a>
     </nav>
     <div slot="footnote">
       <a href="backend-convention.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Backend Conventions</a>
@@ -327,9 +328,54 @@ Test Suites: <span class="t">88 failed</span>, 52 passed, 140 total
 
       <div class="rule my-14"></div>
 
+      <!-- ========== 08 NOT A BUG ========== -->
+      <section id="not-a-bug" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — ตรวจแล้วไม่ใช่บั๊ก</div>
+        <h2 class="display text-3xl mb-6">งบดุลไม่ balance <span class="mono text-[24px]">-450</span> · <span class="text-[var(--accent)]">ข้อมูลชั่วคราว ไม่ใช่โค้ด</span></h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          รายงานเข้ามาว่า <span class="mono text-[13px]">is_balanced: false</span> · <span class="mono text-[13px]">difference: -450</span> ·
+          <span class="mono text-[13px]">profit_for_period: 0</span> ทั้งที่ Sales Revenue กับ COGS "มียอด" — อ่านแล้วเหมือน
+          <b>P&amp;L ไม่ถูกม้วนเข้า equity</b> ซึ่งจะเป็นบั๊กใหญ่ · ไล่ทั้งเส้นแล้ว<b>ไม่พบบั๊ก</b> บันทึกไว้เพราะกับดักที่หลอกเรา
+          สองคนเป็นกับดักที่จะหลอกคนถัดไปด้วย
+        </p>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th style="width:250px">ตรวจอะไร</th><th>ผล</th></tr></thead>
+            <tbody>
+              <tr><td>ทุก journal สมดุลไหม</td><td><b>สมดุลทุกอัน</b> — query หา journal ที่ <span class="mono text-[12px]">sum(debit−credit) ≠ 0</span> ได้ผลว่าง</td></tr>
+              <tr><td>มี entry นอกปีบัญชีไหม</td><td><b>ไม่มี</b> — 0 แถวก่อน <span class="mono text-[12px]">2026-01-01</span> (ปีบัญชีเริ่มเดือน 1)</td></tr>
+              <tr><td>งบดุลตอนนี้ balance ไหม</td><td><b>balance</b> — <span class="mono text-[12px]">asset 900 = liability 900</span>, <span class="mono text-[12px]">difference 0</span> ทุก <span class="mono text-[12px]">as_of</span> ที่ลอง</td></tr>
+              <tr><td><span class="mono text-[12px]">profit_for_period: 0</span> ถูกไหม</td><td><b>ถูก</b> — <span class="mono text-[12px]">4100-01</span> dr 2893.46 = cr 2893.46 → net <b>0.00</b> · <span class="mono text-[12px]">5110-00</span> dr 14000 = cr 14000 → net <b>0.00</b></td></tr>
+              <tr><td>เทสต์ครอบการม้วนเข้า equity ไหม</td><td><b>ครอบอยู่แล้ว</b> — เคส "balances once the period profit … is added to equity" (กำไร 68,953.27 → diff 0)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">กับดักที่ 1 · "มียอด" ของ dr/cr ไม่ใช่ยอดสุทธิ</div><p class="text-[13.5px]">
+          บัญชีรายได้แสดง <span class="mono text-[12px]">total_debit 2893.46</span> และ <span class="mono text-[12px]">total_credit 2893.46</span> — เห็นเลขไม่ศูนย์สองตัวแล้วสรุปว่า "มียอด" ได้ง่ายมาก แต่<b>ยอดสุทธิคือ 0</b> เพราะเอกสารทุกใบถูก void และการ void ลงรายการกลับไว้ครบ · กำไรของงวดจึงเป็นศูนย์<b>อย่างถูกต้อง</b> ไม่ใช่เพราะคำนวณไม่ถึง
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">กับดักที่ 2 · กรอง <span class="mono text-[12px]">is_cancelled</span> ออกจาก ledger = ยอดเกินจริง</div><p class="text-[13.5px]">
+          ตอนไล่ด้วย SQL เอง ผมเขียน <span class="mono text-[12px]">WHERE is_cancelled = false</span> แล้วได้ revenue <span class="mono text-[12px]">−2700</span> ซึ่งดูเหมือนยืนยันว่า "มีรายได้จริงแต่งบมองไม่เห็น" — <b>SQL ผมเองที่ผิด</b>: มันตัดรายการต้นฉบับทิ้งแต่เก็บรายการกลับไว้
+          <br><span class="mono text-[12px]">TrialBalancesService</span> เขียนกำกับเรื่องนี้ไว้ในโค้ดตั้งแต่แรกว่า <i>"Reversing entries are included, not filtered out … filtering <span class="mono text-[12px]">is_cancelled</span> would instead leave the original standing alone and overstate every account it touched"</i> — อ่านโค้ดก่อนเขียน query จะประหยัดเวลาไปทั้งรอบ
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">สมมติฐาน <span class="mono text-[12px]">statement_section = null</span> · ตรวจแล้วไม่ใช่สาเหตุ</div><p class="text-[13.5px]">
+          บัญชีที่มีความเคลื่อนไหวทุกตัวมี <span class="mono text-[12px]">statement_section = NULL</span> จริง แต่ <span class="mono text-[12px]">computeProfitForPeriod()</span> วนตาม <span class="mono text-[12px]">account_type</span> (<span class="mono text-[12px]">REVENUE</span>/<span class="mono text-[12px]">EXPENSE</span>) <b>ไม่เคยแตะ <span class="mono text-[12px]">statement_section</span> เลย</b> — ฟิลด์นั้นมีผลแค่ว่าบรรทัดจะไปอยู่ใต้หัวข้อไหนตอนพิมพ์ และบัญชีที่ไม่ได้ติดป้ายจะตกไปที่ section สำรองของ <span class="mono text-[12px]">account_type</span> พร้อม warning ที่ <span class="mono text-[12px]">warnAboutUntaggedAccounts()</span> ออกให้
+        </p></div>
+
+        <div class="rulebox ok"><div class="rc mb-1">สิ่งที่เพิ่มจากรอบนี้ · invariant ข้ามปีบัญชี</div><p class="text-[13.5px]">
+          ที่ยังไม่มีเทสต์คือ<b>รอยต่อระหว่างปี</b>: ปีที่ปิดแล้วเข้ามาทาง <b>equity</b> (การปิดปีลง closing entry จริงล้างบัญชี P&amp;L เข้า Retained Earnings) ส่วนปีที่ยังไม่ปิดเข้ามาทาง <span class="mono text-[12px]">profit_for_period</span> — สองทางนี้ต้องไม่นับซ้ำและต้องไม่เหลือช่อง เพราะ section สร้างจาก trial balance <b>ทุกช่วงเวลา</b> แต่บรรทัดกำไรสร้างจาก<b>ปีบัญชีปัจจุบัน</b>เท่านั้น · เพิ่มเคส <span class="mono text-[12px]">"counts a closed year through equity and the open year through profit"</span> ไว้แล้ว
+          <br><b>ข้อควรรู้เชิงปฏิบัติการ</b>: ฐานข้อมูลนี้ <span class="mono text-[12px]">gl_account_year_end_balances</span> ยัง 0 แถว = <b>ยังไม่เคยปิดปีบัญชีเลย</b> · วันนี้ไม่มีผลเพราะข้อมูลทั้งหมดอยู่ในปี 2026 ซึ่งเป็นปีปัจจุบัน แต่พอข้ามไป 2027 งบดุลจะแสดง <span class="mono text-[12px]">difference</span> เท่ากับกำไรปี 2026 จนกว่าจะรันปิดปี — เป็นขั้นตอนตามระบบ ไม่ใช่บั๊ก แต่ต้องมีคนกดจริง
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
       <!-- ========== 08 LESSON ========== -->
       <section id="lesson" class="section py-4 pb-20">
-        <div class="eyebrow text-[var(--accent)] mb-3">08 — บทเรียนร่วม</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — บทเรียนร่วม</div>
         <h2 class="display text-3xl mb-6">รูปแบบเดียวกันทั้ง 6 ตัว</h2>
         <div class="card overflow-hidden mb-6">
           <table class="d">
