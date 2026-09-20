@@ -175,6 +175,58 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-20 · ยิงทดสอบทุกข้อที่เอกสารอ้าง — เจอของพัง 2 จุดที่ไม่มีเทสต์ไหนเห็น ✅ **แก้ + deploy + ยืนยันสด**
+
+**ที่มา**: "เอกสารไหนที่ตรงหรือไม่ได้ทดสอบช่วยทดสอบให้หน่อย" พร้อมสิทธิ์ ssh เข้าเครื่อง dev เพื่อแก้ `.env`
+และ reload pm2 · ผลคือข้อความในเอกสารสองข้อที่เขียนไว้ตรง ๆ **ไม่เคยเป็นจริงเลย**
+
+#### 1 · rate limit ตอบ 500 ไม่ใช่ 429 (ไม่เคยทำงานเลยตั้งแต่ต้น)
+
+ลด `RATE_LIMIT_MAX=5` บนเครื่อง dev แล้วยิงรัว → ครั้งที่ 6 เป็นต้นไปได้ **`500 / 500000
+INTERNAL_SERVER_ERROR`** · ใน log เป็น `Unhandled Exception: [object Object]` ตามด้วย envelope 429
+ที่ประกอบไว้สวยงามแต่ไม่มีใครได้เห็น
+
+- **ต้นเหตุ**: `@fastify/rate-limit` **โยน**สิ่งที่ `errorResponseBuilder` คืน (`index.js:341` ·
+  default ของมันเองสร้าง `Error` พร้อม `statusCode`) — เราคืน object เปล่า มันจึงกลายเป็น exception
+  ที่ `AllExceptionsFilter` ไม่รู้จัก แล้วตกกิ่ง catch-all
+- **แก้**: คืน `HttpException` (เป็น `Error` อยู่แล้ว) ให้ filter กิ่ง `HttpException` ประกอบ envelope
+  ต่อเอง · **ยืนยันสดหลัง deploy**: 5 ครั้งแรก `200/200000` ครั้งที่ 6+ `429/429000
+  TOO_MANY_REQUESTS` พร้อม `retry-after: 58`, `x-ratelimit-limit: 5`, `x-ratelimit-remaining: 0`
+- **หมายเหตุ**: store เป็นหน่วยความจำต่อ process ไม่ได้ผูก Redis — แต่วัดผ่าน Caddy แล้ว trip ที่ค่าที่ตั้ง
+  พอดี เพราะ reverse proxy ถือ keep-alive ไป worker เดิม
+
+#### 2 · `links` ของ response ที่แบ่งหน้าใช้ไม่ได้ทุกครั้งที่มี query string
+
+`GET /customers?limit=1` คืน `links.next = ".../customers?limit=1?page=2&limit=1"` — เครื่องหมาย `?`
+ตัวที่สองทำให้ `page` กลายเป็นส่วนหนึ่งของค่า `limit` · ต้นเหตุ: `TransformInterceptor` สร้าง
+`baseUrl` จาก `request.url` ซึ่งมี query ติดมา แล้ว `createPaginatedResponse` ต่อ `?page=` เข้าไปอีก ·
+แก้ให้กิ่ง paginated ใช้ path ล้วน (ส่วน `self` ของ response ที่ไม่ได้แบ่งหน้ายังสะท้อน query เดิม) ·
+**ยืนยันสด**: `next = /sales-bc/v1/customers?page=2&limit=1`
+
+#### ข้อที่ยิงแล้ว "ตรงตามเอกสาร" (ไม่ต้องแก้อะไร)
+
+`?limit=500` → `200000` · `?limit=501` → clamp เหลือ 500 + `200002` (พิสูจน์ว่า **`QUERY_MAX_LIMIT`
+ดีฟอลต์ 500 จาก Joi** ไม่ใช่ 2000) · `?limit=2001` → `400002` · `?page=99999999` → `400002` ·
+`?filter[]=` → `400002 "property filter[] should not exist"` · query param แปลกปลอม → `400002`
+(ต่างจาก body ที่ถูก strip เงียบ ๆ) · `?relations=not_a_relation` → **`400000`** ไม่ใช่ `400002` ·
+`?get_count_only=true` → `data: []` + pagination ครบ · `?ignore_limit=true` บน route ที่ไม่ติดป้าย →
+คืนครบทุกแถว เพราะ `IGNORE_LIMIT_STRICT` ดีฟอลต์ `false` · PUT ที่มี content-type json แต่ไม่มี body →
+ถึง handler จริง ไม่ใช่ `FST_ERR_CTP_EMPTY_JSON_BODY` · `meta.pagination` มีครบ
+`page/page_size/total/total_records/total_pages`
+
+#### กับดักใหม่ที่เพิ่งรู้ · `fields=` ตัดฟิลด์ i18n ไม่ได้
+
+`?fields=id,code` บนลูกค้าที่มีชื่อจริง คืน `name: { th: null, en: null }` — คอลัมน์ไม่ได้ถูก select
+จาก DB แต่ property ของคลาส entity มีอยู่เป็น `undefined` ตัว `LocalizationInterceptor` จึงเห็นครบคู่
+แล้วยุบตามสัญญา "ส่ง `{ th, en }` เสมอ" · **client แยกไม่ออกระหว่าง "ไม่ได้ขอมา" กับ "null จริงใน DB"**
+— เขียนเตือนไว้ใน §05 แล้ว
+
+**ยืนยัน**: `pnpm verify sales-bc` เขียว + spec ใหม่ 2 ไฟล์ล็อกทั้งสองรูป (`transform-interceptor.links.spec.ts`,
+`all-exceptions-filter.rate-limit.spec.ts`) · deploy sales-bc ด้วย `scripts/deploy-app.sh
+--only=sales-bc --skip-migrations` เพราะ GitHub runner คิวค้าง (BC อื่นยังเป็น `90eb3b7` จนกว่า
+คิวนั้นจะเดิน) · `.env` บนเครื่อง dev คืนค่าเดิมครบ (`RATE_LIMIT_MAX=10000`,
+`RATE_LIMIT_WINDOW_MS=900000`) ตรวจซ้ำผ่าน header `x-ratelimit-limit: 10000` แล้ว
+
 ### 2026-09-20 · `backend-convention.html` ไล่เทียบกับโค้ดจริงทั้งไฟล์ ✅ **13 → 17 หัวข้อ + แก้ของที่เล่าผิด**
 
 **ที่มา**: คำสั่ง "เพิ่มเติมเอกสารให้ครบ ห้ามตกหล่นตามพฤติกรรมจริงของ source code" — ไล่ทุกหัวข้อของ
