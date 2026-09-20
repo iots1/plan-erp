@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>บันทึกบั๊กที่แก้ · Bug Fix Log — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <erp-sidebar badge="B" title="Bug Fix Log" subtitle="อาการ · ต้นเหตุ · การแก้ · เทสต์" width="280">
+    <nav slot="nav">
+      <a href="#how"        class="navlink"><span class="n">00</span> อ่านยังไง</a>
+      <a href="#bug-1"      class="navlink"><span class="n">01</span> i18n ขาเข้าหายเงียบ</a>
+      <a href="#bug-2"      class="navlink"><span class="n">02</span> status.code 3 หลัก</a>
+      <a href="#bug-3"      class="navlink"><span class="n">03</span> 429 ตอบ 500</a>
+      <a href="#bug-4"      class="navlink"><span class="n">04</span> links มี ? สองตัว</a>
+      <a href="#bug-5"      class="navlink"><span class="n">05</span> fields= ทำ i18n โกหก</a>
+      <a href="#bug-6"      class="navlink"><span class="n">06</span> pnpm test พัง 88 suites</a>
+      <a href="#i18n-query" class="navlink"><span class="n">07</span> i18n กับ query params</a>
+      <a href="#lesson"     class="navlink"><span class="n">08</span> บทเรียนร่วม</a>
+    </nav>
+    <div slot="footnote">
+      <a href="backend-convention.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Backend Conventions</a>
+    </div>
+  </erp-sidebar>
+
+  <main class="flex-1 min-w-0">
+
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(220,90,22,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="index.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสารบัญเอกสาร
+        </a>
+        <div class="eyebrow text-[#E9A06B] mb-5">Bug Fix Log · 2026-09-20</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          บั๊ก 6 ตัวที่เอกสารเคยบอกว่า<br>
+          <span class="text-[#E9A06B]">“ทำงานได้” แต่ไม่เคยทำงานเลย</span>
+        </h1>
+        <p class="mt-6 text-[#C6D4EA] text-[15.5px] max-w-2xl leading-relaxed">
+          ทั้งหมดถูกพบจาก<b class="text-white">การยิงของจริงบนเครื่อง dev</b> ไม่ใช่จากการอ่านโค้ด —
+          ห้าในหกตัวผ่าน typecheck, lint, unit, e2e และ build มาได้ทั้งหมด
+          หน้านี้บันทึกไว้เพื่อให้รูปแบบความผิดพลาดแบบเดิมถูกจับได้เร็วขึ้นในครั้งหน้า
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#E9A06B"></span>6 บั๊ก · แก้ครบ</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>34 unit test ใหม่</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#7FE3DE"></span>verify เขียวครบ 8 BC</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <!-- ========== 00 HOW ========== -->
+      <section id="how" class="section pt-16 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">00 — วิธีอ่านหน้านี้</div>
+        <h2 class="display text-3xl mb-6">ทุกหัวข้อเล่า 5 อย่างเท่ากัน</h2>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th style="width:150px">ช่อง</th><th>ตอบคำถามว่า</th></tr></thead>
+            <tbody>
+              <tr><td><b>อาการ</b></td><td>client เห็นอะไร (สถานะ HTTP, ตัวเลข, ข้อความจริง)</td></tr>
+              <tr><td><b>ต้นเหตุ</b></td><td>ทำไมมันเกิด — กลไกระดับโค้ด ไม่ใช่ “ลืมเช็ก”</td></tr>
+              <tr><td><b>ทำไมไม่มีใครเห็น</b></td><td>ทำไม typecheck/lint/unit/e2e/build ถึงเขียวทั้งที่ของพัง</td></tr>
+              <tr><td><b>แก้อย่างไร</b></td><td>คอมมิต + สิ่งที่เปลี่ยนจริง</td></tr>
+              <tr><td><b>เทสต์ที่คุมไว้</b></td><td>ไฟล์ไหนจะแดงถ้าบั๊กนี้กลับมา</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox"><div class="rc mb-1">ข้อสังเกตที่สำคัญที่สุดของรอบนี้</div><p class="text-[13.5px]">
+          <b>5 ใน 6 ตัวผ่านทุกด่านอัตโนมัติ</b> เพราะมันอยู่ในชั้นที่เทสต์แบบ mock มองไม่เห็น: plugin ของ Fastify ที่ทำงานก่อน filter ของ Nest, พฤติกรรมของ class field ตอน runtime, และ schema ที่ validate เฉพาะตอนบูตจริง ·
+          ตัวจับได้จริงคือ <b>smoke ที่ยิงของจริง</b> กับ <b>การนั่งยิง curl ดูด้วยตา</b> — ซึ่งเป็นเหตุผลที่ CLAUDE.md บังคับให้ทุกฟีเจอร์มีไฟล์ smoke
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 01 ========== -->
+      <section id="bug-1" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">01 — i18n</div>
+        <h2 class="display text-3xl mb-6">ส่ง <span class="mono text-[24px]">{ th, en }</span> เข้ามาแล้วหายเงียบ</h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ · POST</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ตาย <span class="mono text-[12px]">NOT NULL</span> ที่ <span class="mono text-[12px]">name_th</span> → PG <span class="mono text-[12px]">23502</span> → 400 ที่ชี้ผิดจุด</p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ · PUT (ร้ายกว่า)</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)"><b>ตอบ 200 แต่ไม่ได้บันทึกอะไรเลย</b> ไม่มี error ให้ใครเห็น</p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">forbidNonWhitelisted</span> เป็น <span class="mono text-[12px]">false</span> ทั้งแพลตฟอร์ม (<span class="mono text-[12px]">IBootstrapOptions</span> default) — คีย์ <span class="mono text-[12px]">name</span> ที่ DTO ไม่รู้จักจึงถูก <span class="mono text-[12px]">whitelist</span> <b>ตัดทิ้งเงียบ ๆ</b> ก่อนถึง service ไม่ใช่ถูกปฏิเสธ
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          ไม่มีใครเคยส่ง nested เข้ามา เพราะเอกสารบอกว่า “ห้ามส่ง” — บั๊กจะโผล่ก็ต่อเมื่อมีคนทำตามสัญชาตญาณ (GET มาแล้ว PUT กลับ) ซึ่งเป็นสิ่งที่ AI frontend ทำเป็นอย่างแรก
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">71c519e</span></div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">LocalizedBodyPipe</span> ลงทะเบียน<b>ก่อน</b> <span class="mono text-[12px]">ValidationPipe</span> แปลง nested เป็นคู่ flat ตั้งแต่ raw body — DTO ทั้ง 62 ไฟล์ไม่ต้องแก้สักบรรทัด · แปลงตาม schema ของคลาส ไม่ใช่เดาจากรูปทรง จึงไม่แตะ <span class="mono text-[12px]">jsonb</span> อิสระ · ส่งมาทั้งสองแบบ = flat ชนะ + <span class="mono text-[12px]">meta.warnings</span> · รายละเอียดเต็ม: <a href="i18n-guide.html#request" style="color:var(--accent);text-decoration:underline">i18n Guide §03.1</a>
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">localized-input.util.spec.ts</span> (11) · <span class="mono text-[12px]">customers.e2e-spec.ts</span> (service ต้องได้ flat key และต้องไม่มี <span class="mono text-[12px]">name</span> หลงเข้าไป) · <span class="mono text-[12px]">localized-input.smoke.mjs</span> ยิงของจริงแล้วอ่านคอลัมน์กลับจาก Postgres
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 ========== -->
+      <section id="bug-2" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">02 — Envelope</div>
+        <h2 class="display text-3xl mb-6"><span class="mono text-[24px]">status.code</span> เป็นเลข 3 หลักมาตลอด</h2>
+        <div class="code p-5 mb-5">
+<pre><span class="c">// เอกสารเขียนไว้ตั้งแต่ต้น: status.code = HTTP × 1000 + serial</span>
+<span class="c">// ของจริงก่อนแก้ —</span>
+409 → { <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">409</span> } }      <span class="c">// 3 หลัก</span>
+404 → { <span class="s">"status"</span>: { <span class="s">"code"</span>: <span class="t">404</span> } }      <span class="c">// 3 หลัก</span>
+400 (validation) → { <span class="s">"code"</span>: <span class="t">400001</span> }  <span class="c">// 6 หลัก — มีแค่สองตัวนี้ที่ทำตามกฎ</span></pre>
+        </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">AllExceptionsFilter</span> ใส่ <span class="mono text-[12px]">exception.getStatus()</span> ลง <span class="mono text-[12px]">status.code</span> ตรง ๆ ในสามกิ่ง (HttpException / QueryFailedError / catch-all) · มีแค่ <span class="mono text-[12px]">400001</span>/<span class="mono text-[12px]">400002</span> ที่ hardcode เลข 6 หลักไว้ · client จึงต้องเช็กสองความกว้างแล้วแต่ว่าเจอ error ตัวไหน
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">a0890be</span></div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">toEnvelopeStatusCode(status, serial)</span> + <span class="mono text-[12px]">normalizeEnvelopeStatusCode()</span> ใน <span class="mono text-[12px]">status-code.util.ts</span> · ทุกกิ่งของทั้ง HTTP และ RPC filter ประกอบผ่านตัวนี้ · serial <span class="mono text-[12px]">000</span> = รูปธรรมดา, ผู้โยนกำหนด <span class="mono text-[12px]">409001</span> เองได้ · <b>ฝั่งรับข้าม BC ไม่ต้องแก้</b> เพราะ <span class="mono text-[12px]">resolveRpcHttpStatus()</span> รับได้ทั้งสองความกว้างอยู่ก่อนแล้ว
+        </p></div>
+        <div class="rulebox mb-4" style="border-left-color:var(--signal)"><div class="rc mb-1">⚠ breaking สำหรับ client</div><p class="text-[13.5px]">
+          ใครที่เทียบ <span class="mono text-[12px]">status.code === 404</span> ต้องเปลี่ยนเป็น <span class="mono text-[12px]">404000</span> หรือ <span class="mono text-[12px]">Math.floor(code / 1000)</span> · <b>HTTP status เองไม่เปลี่ยน</b> — คนที่ดู <span class="mono text-[12px]">response.status</span> ไม่กระทบ
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">status-code.util.spec.ts</span> (6) · <span class="mono text-[12px]">all-exceptions-filter.spec.ts</span> (13 · ทุกกิ่ง) · <span class="mono text-[12px]">rpc-exceptions-filter.spec.ts</span> (9) · <span class="mono text-[12px]">customers.e2e-spec.ts</span> ล็อก <span class="mono text-[12px]">404000</span>/<span class="mono text-[12px]">409000</span> ผ่าน pipeline จริง
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 ========== -->
+      <section id="bug-3" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">03 — Rate limit</div>
+        <h2 class="display text-3xl mb-6">429 ไม่เคยถึง client เลยสักครั้ง — มันตอบ 500</h2>
+        <div class="code p-5 mb-5">
+<pre><span class="c">// ตั้ง RATE_LIMIT_MAX=5 บนเครื่อง dev แล้วยิงรัว 14 ครั้ง (ก่อนแก้)</span>
+ 1–5  http=200 code=200000
+ 6+   http=<span class="t">500</span> code=<span class="t">500000</span> INTERNAL_SERVER_ERROR   <span class="c">// ที่ควรเป็น 429</span>
+
+<span class="c">// ใน log ของ service:</span>
+ERROR [AllExceptionsFilter] Unhandled Exception: [object Object]
+{ <span class="s">"status"</span>: { <span class="s">"code"</span>: 429000, ... }   <span class="c">// envelope ที่ประกอบไว้ ไปโผล่แค่ใน log</span></pre>
+        </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">@fastify/rate-limit</span> <b>โยน</b>สิ่งที่ <span class="mono text-[12px]">errorResponseBuilder</span> คืนออกมา (<span class="mono text-[12px]">index.js:341</span> — default ของมันเองสร้าง <span class="mono text-[12px]">Error</span> พร้อม <span class="mono text-[12px]">statusCode</span>) · เราคืน envelope เป็น object เปล่า มันจึงกลายเป็น exception ที่ <span class="mono text-[12px]">AllExceptionsFilter</span> ไม่รู้จัก แล้วตกกิ่ง catch-all
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          ค่า default คือ <b>10,000 request ต่อ 15 นาที</b> — ไม่มีใครยิงทะลุโดยบังเอิญ และไม่มีเทสต์ไหนจำลองการทะลุ เพราะ plugin ทำงานที่ชั้น Fastify ซึ่ง unit/e2e ที่ mock ไว้ไม่แตะเลย
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">1c11305</span> + <span class="mono text-[12px]">ebadd51</span></div><p class="text-[13.5px]">
+          คืน <span class="mono text-[12px]">HttpException</span> (เป็น <span class="mono text-[12px]">Error</span> plugin จึงพอใจ) แล้วปล่อยให้กิ่ง <span class="mono text-[12px]">HttpException</span> ของ filter ประกอบ envelope ให้ · แยกเป็น <span class="mono text-[12px]">buildRateLimitException()</span> เพื่อให้เทสต์ยิงตรงที่ข้อ “ต้องเป็น Error” ซึ่งคือตัวบั๊กจริง
+        </p></div>
+        <div class="rulebox ok"><div class="rc mb-1">ยืนยันบนเครื่องจริงหลังแก้</div><p class="text-[13.5px]">
+          5 ครั้งแรก <span class="mono text-[12px]">200/200000</span> · ครั้งที่ 6+ <span class="mono text-[12px]">429/429000 TOO_MANY_REQUESTS</span> พร้อม header <span class="mono text-[12px]">retry-after: 58</span> · <span class="mono text-[12px]">x-ratelimit-limit: 5</span> · <span class="mono text-[12px]">x-ratelimit-remaining: 0</span> — แล้วคืนค่า <span class="mono text-[12px]">.env</span> กลับเป็น 10000 ตรวจซ้ำด้วย header
+          <br>เทสต์: <span class="mono text-[12px]">rate-limit-error.util.spec.ts</span> (4) + เคส “object เปล่าที่ถูกโยนใส่ filter ต้องตกกิ่ง catch-all” ใน <span class="mono text-[12px]">all-exceptions-filter.spec.ts</span>
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 ========== -->
+      <section id="bug-4" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">04 — Envelope</div>
+        <h2 class="display text-3xl mb-6">ลิงก์แบ่งหน้ามี <span class="mono text-[24px]">?</span> สองตัว</h2>
+        <div class="code p-5 mb-5">
+<pre><span class="c">// GET /customers?limit=1  (ก่อนแก้)</span>
+<span class="s">"links"</span>: {
+  <span class="s">"next"</span>: <span class="s">".../customers?limit=1<b>?</b>page=2&amp;limit=1"</span>   <span class="c">// page กลายเป็นส่วนหนึ่งของค่า limit</span>
+}
+<span class="c">// หลังแก้</span>
+  <span class="s">"next"</span>: <span class="s">".../customers?page=2&amp;limit=1"</span></pre>
+        </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">TransformInterceptor</span> สร้าง <span class="mono text-[12px]">baseUrl</span> จาก <span class="mono text-[12px]">request.url</span> ซึ่ง<b>มี query string ติดมาด้วย</b> แล้ว <span class="mono text-[12px]">createPaginatedResponse</span> ต่อ <span class="mono text-[12px]">?page=…&amp;limit=…</span> ของตัวเองเข้าไปอีก
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          ลิงก์จะถูกเฉพาะตอนที่คำขอ<b>ไม่มี query string เลย</b> ซึ่งเป็นกรณีที่เทสต์เขียนกันบ่อยที่สุด · และไม่มี client ตัวไหนในระบบเดินตาม <span class="mono text-[12px]">links</span> จริง ๆ จึงไม่มีใครสะดุด
+        </p></div>
+        <div class="rulebox ok"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">1c11305</span> · เทสต์ <span class="mono text-[12px]">transform-interceptor.links.spec.ts</span> (2)</div><p class="text-[13.5px]">
+          กิ่ง paginated สร้างลิงก์จาก path ล้วน (<span class="mono text-[12px]">path.split('?')[0]</span>) · <span class="mono text-[12px]">self</span> ของ response ที่ไม่ได้แบ่งหน้ายังสะท้อน query เดิมตามเจตนา · เทสต์ assert ว่าทุกลิงก์มี <span class="mono text-[12px]">?</span> ได้แค่ตัวเดียว
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 ========== -->
+      <section id="bug-5" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">05 — i18n × sparse fieldset</div>
+        <h2 class="display text-3xl mb-6"><span class="mono text-[24px]">?fields=</span> ทำให้ response โกหก</h2>
+        <div class="code p-5 mb-5">
+<pre><span class="c">// GET /customers?fields=id,code   บนลูกค้าที่ชื่อจริงไม่ได้เป็น null (ก่อนแก้)</span>
+<span class="s">"attributes"</span>: {
+  <span class="s">"code"</span>: <span class="s">"CUST-TEST-02"</span>,
+  <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="k">null</span>, <span class="s">"en"</span>: <span class="k">null</span> }   <span class="c">// ← โกหก: ไม่ได้ขอมา ไม่ใช่ null จริง</span>
+}</pre>
+        </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ · พฤติกรรมของ TypeScript ตอน runtime</div><p class="text-[13.5px]">
+          field ของคลาสใน TS เกิดเป็น <b>own property ค่า <span class="mono text-[12px]">undefined</span></b> (target ES2023 → <span class="mono text-[12px]">useDefineForClassFields</span>) · entity ที่ select แค่บางคอลัมน์จึง<b>ยังมี</b>คีย์ <span class="mono text-[12px]">name_th</span>/<span class="mono text-[12px]">name_en</span> อยู่ · <span class="mono text-[12px]">LocalizationInterceptor</span> เช็กด้วย <span class="mono text-[12px]">in</span> จึงเห็นครบคู่แล้วยุบเป็น <span class="mono text-[12px]">{ th: null, en: null }</span> ตามสัญญา “ส่ง <span class="mono text-[12px]">{ th, en }</span> เสมอ”
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          <b><span class="mono text-[12px]">LocalizationInterceptor</span> ไม่เคยมี spec เลยสักบรรทัด</b> ทั้งที่เป็นครึ่งหนึ่งของสัญญา i18n — และ <span class="mono text-[12px]">?fields=</span> แทบไม่มีใครใช้ในระบบจริง
+        </p></div>
+        <div class="rulebox ok"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">ebadd51</span> · เทสต์ <span class="mono text-[12px]">localization-interceptor.util.spec.ts</span> (8)</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">undefined</span> ทั้งสองด้าน = ไม่ได้ถูก select → <b>ไม่ส่งคีย์นั้นออกไป</b> · <span class="mono text-[12px]">null</span> = โหลดมาแล้วว่าง → ยุบเป็น <span class="mono text-[12px]">{ th: null, en: null }</span> ตามสัญญาเดิมทุกประการ · สัญญา “ส่งเสมอ” ใช้กับคอลัมน์ที่<b>ถูกขอมา</b>เท่านั้น
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 ========== -->
+      <section id="bug-6" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">06 — Tooling</div>
+        <h2 class="display text-3xl mb-6"><span class="mono text-[24px]">pnpm test</span> ที่ root พัง 88 suites มาตลอด</h2>
+        <div class="code p-5 mb-5">
+<pre>$ pnpm test
+Test Suites: <span class="t">88 failed</span>, 52 passed, 140 total
+  [Error: Config validation error: <span class="s">"NODE_ENV" must be one of [local, dev, staging, prod]</span>]</pre>
+        </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          Jest ตั้ง <span class="mono text-[12px]">NODE_ENV=test</span> ให้เองเมื่อไม่ได้ตั้งไว้ แต่ schema ของ <span class="mono text-[12px]">libs/config</span> อนุญาตแค่ <span class="mono text-[12px]">[local, dev, staging, prod]</span> — ทุก suite ที่แตะ <span class="mono text-[12px]">ConfigModule</span> จึงตายตั้งแต่ validate
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">nx test &lt;bc&gt;</span> — ทางที่ <span class="mono text-[12px]">pnpm verify</span> ใช้ — ตั้ง environment ของตัวเองและไม่เคยเจอ · <b>ทางที่พังคือทางที่ไม่มีใครเดิน</b> ระบบ CI จึงเขียวตลอดทั้งที่ entrypoint หนึ่งพังสนิท
+        </p></div>
+        <div class="rulebox ok"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">ebadd51</span></div><p class="text-[13.5px]">
+          เพิ่ม <span class="mono text-[12px]">test</span> เข้า valid list (ไม่มีอะไร branch ตามค่านี้ — มันโผล่แค่ใน <span class="mono text-[12px]">GET /health</span>) · <b>ผลหลังแก้: 144 suites / 1867 tests ผ่านหมด</b>
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 i18n × query params ========== -->
+      <section id="i18n-query" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — คำถามที่ตามมา</div>
+        <h2 class="display text-3xl mb-6">แล้ว <span class="mono text-[24px]">name.th</span> ใน query param ล่ะ?</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ในเมื่อ<b>ขาเข้าของ body</b> รับ nested แล้ว คำถามที่ตามมาทันทีคือ
+          <span class="mono text-[13px]">?filter=name.th||$eq||xxxx</span> จะถูกแปลงเป็น <span class="mono text-[13px]">name_th</span>
+          ให้ <span class="mono text-[13px]">TypeOrmQueryBuilder</span> กรองจริงไหม — <b>คำตอบคือไม่ และได้ 400 เสมอ</b>
+        </p>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ยิงจริงบนเครื่อง deploy · 2026-09-20</div>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th style="width:290px">คำขอ</th><th style="width:90px">ผล</th><th>ข้อความจริง</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">filter=name.th||$eq||test</span></td><td><b>400002</b></td><td><span class="mono text-[12px]">Invalid relation: 'name' in path 'name.th'. Allowed relations are: [customer_group]</span></td></tr>
+              <tr><td><span class="mono text-[12px]">fields=id,name.th</span></td><td><b>400002</b></td><td><span class="mono text-[12px]">Invalid relation: 'name' in path 'name.th'</span></td></tr>
+              <tr><td><span class="mono text-[12px]">sort=name.th:asc</span></td><td><b>400002</b></td><td>ข้อความเดียวกัน</td></tr>
+              <tr><td><span class="mono text-[12px]">s={"name.th":"test"}</span></td><td><b>400002</b></td><td>ข้อความเดียวกัน</td></tr>
+              <tr><td><span class="mono text-[12px]">filter=name_th||$eq||test</span></td><td class="mono">200000</td><td>กรองได้ปกติ — <b>นี่คือรูปแบบที่ถูก</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมถึงเป็น 400 ไม่ใช่การแปลงให้</div><p class="text-[13.5px]">
+          <b>1.</b> <span class="mono text-[12px]">LocalizedBodyPipe</span> ทำงานเฉพาะ <span class="mono text-[12px]">metadata.type === 'body'</span> — query param ไม่เคยผ่านมันเลย
+          <br><b>2.</b> ใน <span class="mono text-[12px]">TypeOrmQueryBuilder</span> จุดที่มีเครื่องหมาย <span class="mono text-[12px]">.</span> ถูกตีความว่าเป็น <b>relation path</b> (<span class="mono text-[12px]">validateFieldNamesRecursive</span> → <span class="mono text-[12px]">findRelationWithPropertyPath('name')</span>) · ไม่มี relation ชื่อ <span class="mono text-[12px]">name</span> จึงโยน <span class="mono text-[12px]">InvalidParameterException</span>
+          <br><b>3.</b> มันไม่ไปเข้าทาง JSONB เพราะ <span class="mono text-[12px]">isJsonbPath()</span> ต้องการให้ segment แรกเป็นคอลัมน์ <span class="mono text-[12px]">jsonb</span>/<span class="mono text-[12px]">json</span> จริง ซึ่ง <span class="mono text-[12px]">name</span> ไม่ใช่ (ฟิลด์ i18n เป็นคอลัมน์ flat สองตัว)
+        </p></div>
+
+        <div class="rulebox mb-4" style="border-left-color:var(--signal)"><div class="rc mb-1">⚠ ข้อยกเว้นเดียวที่ต้องระวัง</div><p class="text-[13.5px]">
+          ถ้า entity ไหน<b>มีคอลัมน์ <span class="mono text-[12px]">jsonb</span> ชื่อ <span class="mono text-[12px]">name</span> จริง ๆ</b> — <span class="mono text-[12px]">name.th</span> จะ<b>ไม่ 400</b> แต่จะกลายเป็น JSONB path (<span class="mono text-[12px]">"name" #&gt;&gt; ARRAY['th']</span>) แล้วกรองจาก JSON ข้างในแทน ซึ่งคนละอย่างกับที่ตั้งใจ · เครื่องหมายจุดในระบบนี้จึง<b>มีความหมายสองแบบอยู่แล้ว</b> (relation path กับ JSONB path) และ i18n ไม่ใช่ทั้งสองอย่าง
+        </p></div>
+
+        <div class="rulebox ok"><div class="rc mb-1">สรุปสำหรับ client</div><p class="text-[13.5px]">
+          <b>body</b> → ส่ง <span class="mono text-[12px]">name_th</span> หรือ <span class="mono text-[12px]">name: { th, en }</span> ก็ได้ ·
+          <b>query param</b> → <span class="mono text-[12px]">name_th</span> เท่านั้นเสมอ ทั้ง <span class="mono text-[12px]">filter</span>, <span class="mono text-[12px]">or</span>, <span class="mono text-[12px]">s</span>, <span class="mono text-[12px]">sort</span>, <span class="mono text-[12px]">fields</span> ·
+          <b>response</b> → ได้ <span class="mono text-[12px]">name: { th, en }</span> เสมอ
+          <br>ถ้าอนาคตอยากให้ <span class="mono text-[12px]">name.th</span> ใช้ได้ใน query ด้วย ต้องแปลงที่ <span class="mono text-[12px]">TypeOrmQueryBuilder</span> โดยดูจาก metadata ว่าคลาสมีคู่ <span class="mono text-[12px]">_th</span>/<span class="mono text-[12px]">_en</span> ครบไหม<b>ก่อน</b>ตีความว่าเป็น relation — แต่ต้องตัดสินใจก่อนว่าจะชนกับความหมาย JSONB อย่างไร ยังไม่ได้ทำในรอบนี้
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 LESSON ========== -->
+      <section id="lesson" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — บทเรียนร่วม</div>
+        <h2 class="display text-3xl mb-6">รูปแบบเดียวกันทั้ง 6 ตัว</h2>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th style="width:230px">รูปแบบ</th><th>ตัวอย่างในรอบนี้</th></tr></thead>
+            <tbody>
+              <tr><td><b>เอกสารเขียนไว้ก่อน โค้ดไม่เคยทำตาม</b></td><td>429, <span class="mono text-[12px]">status.code</span> 6 หลัก — ทั้งคู่เขียนไว้ตั้งแต่ต้นแต่ไม่เคยเป็นจริง</td></tr>
+              <tr><td><b>ชั้นที่ mock ไม่แตะ</b></td><td>plugin ของ Fastify ทำงานก่อน filter ของ Nest · unit/e2e ที่ mock transport มองไม่เห็น</td></tr>
+              <tr><td><b>พฤติกรรม runtime ที่ type ไม่บอก</b></td><td>class field เกิดเป็น own property ค่า <span class="mono text-[12px]">undefined</span> → interceptor เห็นคู่ที่ไม่มีอยู่จริง</td></tr>
+              <tr><td><b>ทางที่ไม่มีใครเดิน</b></td><td><span class="mono text-[12px]">pnpm test</span> ที่ root · <span class="mono text-[12px]">links</span> ที่ไม่มี client เดินตาม · <span class="mono text-[12px]">?fields=</span> ที่แทบไม่มีใครใช้</td></tr>
+              <tr><td><b>fail แบบเงียบแทนที่จะดัง</b></td><td>whitelist ตัดคีย์ทิ้งเงียบ ๆ → PUT ตอบ 200 โดยไม่บันทึกอะไร</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox ok"><div class="rc mb-1">สิ่งที่ทำให้จับได้</div><p class="text-[13.5px]">
+          <b>ยิงของจริงแล้วอ่านผลด้วยตา</b> — ห้าในหกตัวผ่าน typecheck/lint/unit/e2e/build มาได้หมด · สิ่งที่จับได้จริงคือ smoke ที่คุยกับ Postgres จริง กับการนั่ง curl ไล่ทีละเคสบนเครื่อง dev (รวมถึงการ<b>ลดค่า config ลงชั่วคราวเพื่อบังคับให้เส้นทาง error ทำงาน</b> ซึ่งเป็นวิธีเดียวที่ทำให้บั๊ก 429 โผล่)
+          <br>ทุกตัวตอนนี้มี unit test คุมไว้แล้ว — รวม <b>34 เคสใหม่ใน 4 ไฟล์</b> บวกกับที่มีอยู่เดิม ดู <a href="backend-convention.html#errors" style="color:var(--accent);text-decoration:underline">Backend Conventions §06</a> สำหรับสัญญาที่บังคับอยู่ตอนนี้
+        </p></div>
+      </section>
+
+      <erp-footer
+        line1="ERP SYSTEM · BUG FIX LOG · 2026-09-20"
+        line2="i18n · Envelope · Rate Limit · Pagination Links · Sparse Fieldset · Tooling">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>

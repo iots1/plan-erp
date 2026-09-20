@@ -257,6 +257,28 @@
           </div>
         </div>
 
+        <div class="rulebox mb-6" style="border-left-color:var(--signal)">
+          <div class="rc mb-1">⚠ QUERY PARAM ไม่ได้ Alias นี้ — ใช้ <span class="mono text-[12px]">name_th</span> เท่านั้น</div>
+          <p class="text-[13.5px]">
+            Alias รับเฉพาะ <b>body</b> เท่านั้น (<span class="mono text-[12px]">LocalizedBodyPipe</span> ทำงานเมื่อ <span class="mono text-[12px]">metadata.type === 'body'</span>) ·
+            ใน query param จุด (<span class="mono text-[12px]">.</span>) มีความหมายอย่างอื่นอยู่แล้ว คือ <b>relation path</b> หรือ <b>JSONB path</b> —
+            <span class="mono text-[12px]">name.th</span> จึงถูกอ่านว่า “คอลัมน์ <span class="mono text-[12px]">th</span> ของ relation ชื่อ <span class="mono text-[12px]">name</span>” แล้วตอบ
+            <span class="mono text-[12px]">400002</span> <span class="mono text-[12px]">"Invalid relation: 'name' in path 'name.th'"</span>
+          </p>
+          <div class="code p-4 mt-3">
+<pre><span class="c">// ยิงจริงบนเครื่อง deploy 2026-09-20 — ทุกช่องทางให้ผลเดียวกัน</span>
+?filter=name.th||$eq||test   → <span class="t">400002</span>   ?sort=name.th:asc    → <span class="t">400002</span>
+?fields=id,name.th           → <span class="t">400002</span>   ?s={"name.th":"test"} → <span class="t">400002</span>
+
+?filter=name_th||$eq||test   → <span class="t">200000</span>   <span class="c">// ✅ รูปแบบที่ถูกต้อง</span></pre>
+          </div>
+          <p class="text-[13.5px] mt-3">
+            สรุปสั้น: <b>body</b> = flat หรือ nested ก็ได้ · <b>query param</b> = flat เท่านั้นเสมอ · <b>response</b> = nested เสมอ ·
+            รายละเอียดและข้อยกเว้น (entity ที่มีคอลัมน์ <span class="mono text-[12px]">jsonb</span> ชื่อ <span class="mono text-[12px]">name</span> จริง ๆ)
+            อยู่ที่ <a href="bugfix-log.html#i18n-query" style="color:var(--accent);text-decoration:underline">Bug Fix Log §07</a>
+          </p>
+        </div>
+
         <div class="eyebrow text-[var(--muted)] mb-3">ลำดับการทำงาน · bootstrap.util.ts</div>
         <div class="code p-5">
 <pre><span class="c">// ต้องอยู่ "ก่อน" ValidationPipe เสมอ — whitelist: true จะตัดคีย์ Nested ทิ้งก่อนถึง DTO</span>

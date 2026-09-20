@@ -525,6 +525,12 @@ findAll(<span class="d">@ValidatedQuery</span>(<span class="t">QueryParamsDTO</s
           </table>
         </div>
 
+        <div class="rulebox mb-4" style="border-left-color:var(--signal)"><div class="rc mb-1">RULE · ฟิลด์ i18n ใน query param ใช้ชื่อคอลัมน์ flat เสมอ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">filter</span> · <span class="mono text-[12px]">or</span> · <span class="mono text-[12px]">s</span> · <span class="mono text-[12px]">sort</span> · <span class="mono text-[12px]">fields</span> รับ <span class="mono text-[12px]">name_th</span> เท่านั้น — <b>ไม่มีการแปลง <span class="mono text-[12px]">name.th</span> ให้</b> เพราะ <span class="mono text-[12px]">LocalizedBodyPipe</span> แตะเฉพาะ body
+          <br>จุดใน field path ถูกจองความหมายไว้แล้วสองแบบใน <span class="mono text-[12px]">TypeOrmQueryBuilder</span>: <b>relation path</b> (<span class="mono text-[12px]">customer_group.code</span>) กับ <b>JSONB path</b> (<span class="mono text-[12px]">mock_data.title</span> เมื่อคอลัมน์แรกเป็น jsonb จริง) · <span class="mono text-[12px]">name.th</span> ไม่เข้าทั้งสองทาง จึงตกที่ <span class="mono text-[12px]">validateFieldNamesRecursive</span> แล้วได้ <span class="mono text-[12px]">400002 "Invalid relation: 'name' in path 'name.th'"</span> (ยิงจริงครบทั้ง 4 ช่องทางแล้ว)
+          <br><b>ข้อยกเว้นที่ต้องระวัง</b>: entity ที่มีคอลัมน์ <span class="mono text-[12px]">jsonb</span> ชื่อ <span class="mono text-[12px]">name</span> จริง จะ<b>ไม่ 400</b> แต่กลายเป็น <span class="mono text-[12px]">"name" #&gt;&gt; ARRAY['th']</span> ซึ่งคนละความหมายกับที่ client ตั้งใจ — ดู <a href="bugfix-log.html#i18n-query" style="color:var(--accent);text-decoration:underline">Bug Fix Log §07</a>
+        </p></div>
+
         <div class="rulebox mb-4"><div class="rc mb-1">RULE · @AllowIgnoreLimit() ใช้กับตารางที่เล็กและมีขอบเขตแน่นอนเท่านั้น</div><p class="text-[13.5px]">
           <span class="mono text-[12px]">ignore_limit=true</span> ทิ้ง <span class="mono text-[12px]">take</span>/<span class="mono text-[12px]">skip</span> ทั้งหมด — request เดียวดูดทั้งตารางของ BC ออกไปได้ · ติดป้ายนี้ได้เฉพาะข้อมูลอ้างอิงที่โตไม่ได้ (brands, UOM, warehouses, tax categories, roles, policies) <b>ห้ามติดกับตารางที่โตตามปริมาณธุรกิจ</b> (products, suppliers, เอกสารทุกชนิด)
           <br>เมื่อ <span class="mono text-[12px]">IGNORE_LIMIT_STRICT=true</span> route ที่<b>ไม่มี</b>ป้ายนี้จะถูกลดระดับกลับไปแบ่งหน้าตามปกติ <b>เงียบ ๆ ไม่ใช่ 400</b> — dropdown ที่ลืมติดป้ายจึงยังทำงานได้ แค่ได้ข้อมูลทีละหน้า
