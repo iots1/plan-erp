@@ -298,6 +298,31 @@ is_public: <span class="t">boolean</span>;</pre>
             </tbody>
           </table>
         </div>
+
+        <div class="rulebox mb-5">
+          <div class="rc mb-1">ถ้าต้องแยก CASE ย่อย · ใช้ SERIAL</div>
+          <p class="text-[13.5px]">
+            โยน exception พร้อม <span class="mono text-[12px]">status</span> ใน body —
+            <span class="mono text-[12px]">new ConflictException({ status: 409001, message: '…' })</span>
+            จะได้ <span class="mono text-[12px]">status.code = 409001</span> ตามนั้น · ส่ง HTTP status เปล่า ๆ
+            (<span class="mono text-[12px]">409</span>) filter จะขยายเป็น <span class="mono text-[12px]">409000</span> ให้เอง ·
+            <b>จด serial ใหม่ลงตารางข้างบนในคอมมิตเดียวกันเสมอ</b> ไม่งั้น BC ถัดไปจะหยิบเลขเดิมไปใช้กับคนละเรื่อง
+          </p>
+        </div>
+
+        <div class="rulebox mb-5" style="border-left-color:var(--signal)">
+          <div class="rc mb-1">⚠ BREAKING · สำหรับ CLIENT ที่เขียนไว้ก่อน 2026-09-20</div>
+          <p class="text-[13.5px]">
+            ก่อนหน้านี้ error ทุกตัวยกเว้น <span class="mono text-[12px]">400001</span>/<span class="mono text-[12px]">400002</span>
+            ตอบ <span class="mono text-[12px]">status.code</span> เป็น HTTP status เปล่า (<span class="mono text-[12px]">409</span>,
+            <span class="mono text-[12px]">404</span>) — ตอนนี้เป็น 6 หลักหมดแล้ว · code ที่เทียบตรง ๆ แบบ
+            <span class="mono text-[12px]">status.code === 404</span> ต้องแก้เป็น <span class="mono text-[12px]">404000</span>
+            หรือ <span class="mono text-[12px]">Math.floor(status.code / 1000)</span> ·
+            <b>HTTP status เองไม่เปลี่ยน</b> (ยัง <span class="mono text-[12px]">404</span>/<span class="mono text-[12px]">409</span> ตามเดิม)
+            client ที่ดู <span class="mono text-[12px]">response.status</span> ไม่กระทบ ·
+            ฝั่ง BC ที่เรียกข้ามกันก็ไม่ต้องแก้ — <span class="mono text-[12px]">resolveRpcHttpStatus()</span> รับได้ทั้งสองความกว้างอยู่แล้ว
+          </p>
+        </div>
         <div class="eyebrow text-[var(--muted)] mb-3">โครง envelope · Error (data / errors ไม่ปนกัน)</div>
         <div class="code p-5 mb-5">
 <pre>{
