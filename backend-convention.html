@@ -38,6 +38,10 @@
       <a href="#boundaries"  class="navlink"><span class="n">11</span> Module Boundaries</a>
       <a href="#guards"      class="navlink"><span class="n">12</span> Params &amp; Permissions</a>
       <a href="#migrations"  class="navlink"><span class="n">13</span> Migrations &amp; Seed</a>
+      <a href="#files"       class="navlink"><span class="n">14</span> Files &amp; Storage</a>
+      <a href="#jobs"        class="navlink"><span class="n">15</span> Scheduled Jobs</a>
+      <a href="#documents"   class="navlink"><span class="n">16</span> Business Documents</a>
+      <a href="#admin-ui"    class="navlink"><span class="n">17</span> Admin UI (EJS)</a>
     </nav>
     <div slot="footnote">
       <a href="i18n-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">→ i18n Guide (TH/EN)</a><br>
@@ -144,6 +148,16 @@
 }</pre>
         </div>
         <div class="edge"><div class="tag mb-1">Class vs Property</div><p class="text-[13px]">คลาสเป็น <b>PascalCase เอกพจน์</b> (มาตรฐาน OOP/NestJS) แต่ property เป็น <b>snake_case</b> (มาตรฐาน PostgreSQL) — สองระดับนี้ต่างกันโดยตั้งใจ</p></div>
+
+        <div class="rulebox mt-6"><div class="rc mb-1">RULE · interface อยู่ไฟล์ของตัวเอง ห้ามอยู่ในไฟล์ที่มี class</div><p class="text-[13.5px]">
+          ไฟล์ไหนประกาศ <span class="mono text-[12px]">class</span> (service, controller, guard, filter, interceptor, entity, DTO, module, abstract) <b>ห้ามมี <span class="mono text-[12px]">interface</span> อยู่ในไฟล์เดียวกันเลย</b> ไม่ว่าจะ export หรือไม่, เล็กหรือใหญ่, เป็น payload หรือแค่ shape ของ raw SQL row — ย้ายไป <span class="mono text-[12px]">interfaces/&lt;kebab-name&gt;.interface.ts</span> ใน module เดียวกัน ตั้งชื่อ <span class="mono text-[12px]">I&lt;PascalName&gt;</span> พร้อม doc comment บอกว่า<b>ทำไมถึงไม่ใช่ entity ตรง ๆ</b> · shape ที่อธิบายข้อมูลของ BC อื่นไปอยู่ <span class="mono text-[12px]">integrations/&lt;other-bc&gt;/interfaces/</span> แทน
+          <br><b>ข้อยกเว้นเดียว</b> — ไฟล์ที่<b>ไม่มี class เลย</b>: <span class="mono text-[12px]">libs/contracts/src/*.contract.ts</span>, <span class="mono text-[12px]">*-message-patterns.ts</span> และ <span class="mono text-[12px]">*.util.ts</span> ที่ interface นั้นคือ parameter/return type ของฟังก์ชันในไฟล์เอง (พอมีคนอื่น import shape ไปใช้โดยไม่ได้ import ฟังก์ชันด้วย = มันเลิกเป็น signature แล้ว ต้องย้ายออก)
+          <br><b>ทุก interface ต้องมี prefix <span class="mono text-[12px]">I</span></b> ไม่ว่าจะอยู่ไฟล์ไหน · ไม่มี ESLint rule คุม (<span class="mono text-[12px]">naming-convention</span> ไม่ได้เปิดไว้) — ตัวบังคับคือ hook <span class="mono text-[12px]">scripts/hooks/convention-guard.mjs</span> กับรีวิว
+        </p></div>
+
+        <div class="rulebox"><div class="rc mb-1">RULE · ข้อความ Swagger อยู่ใน constants ไม่ inline ใน controller</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">@ApiOperation</span>/<span class="mono text-[12px]">@ApiParam</span>/<span class="mono text-[12px]">@ApiQuery</span> ต้อง import ค่ามาจาก <span class="mono text-[12px]">constants/&lt;resource&gt;.swagger.ts</span> (ตัวแปร <span class="mono text-[12px]">UPPER_SNAKE_CASE</span> ตัวละหนึ่งข้อความ) · ข้อความที่ใช้ร่วมกันหลาย controller ใน BC เดียวกันไปอยู่ <span class="mono text-[12px]">constants/swagger-common.ts</span>
+        </p></div>
       </section>
 
       <!-- ========== 03 BOOLEAN PREFIXES ========== -->
@@ -268,7 +282,34 @@ is_public: <span class="t">boolean</span>;</pre>
 }</pre>
         </div>
         <div class="rulebox"><div class="rc mb-1">STATUS CODE · 6 หลัก</div><p class="text-[13.5px]"><span class="mono text-[12px]">status.code</span> เป็นเลข 6 หลัก = HTTP status × 1000 + serial <b>ทุก response ทั้งสำเร็จและ error</b> · serial <span class="mono text-[12px]">000</span> = รูปธรรมดาของสถานะนั้น (<span class="mono text-[12px]">200000</span>, <span class="mono text-[12px]">201000</span>, <span class="mono text-[12px]">404000</span>, <span class="mono text-[12px]">409000</span>) · serial อื่นใช้เฉพาะเคสที่ต้องแยกให้ออก (<span class="mono text-[12px]">400001</span> validation, <span class="mono text-[12px]">400002</span> invalid parameter) · ประกอบด้วย <span class="mono text-[12px]">toEnvelopeStatusCode()</span> อย่าเขียน HTTP status เปล่า ๆ · ฟิลด์ <span class="mono text-[12px]">errors[].code</span> เป็นคนละเรื่อง ไม่ขยาย — บอกว่า<b>อะไร</b>ผิด: slug (<span class="mono text-[12px]">NOT_FOUND</span>, <span class="mono text-[12px]">CONFLICT</span>, <span class="mono text-[12px]">VALIDATION_ERROR</span>) หรือ SQLSTATE ของ Postgres บนเส้น <span class="mono text-[12px]">executeDbOperation()</span> (<span class="mono text-[12px]">23505</span> ซ้ำ, <span class="mono text-[12px]">23503</span> FK) ซึ่งเป็นตัวที่ทำให้แยก "ซ้ำ" ออกจาก conflict อื่นที่ก็ตอบ <span class="mono text-[12px]">409000</span> เหมือนกันได้ · ต้องมี <b>อย่างใดอย่างหนึ่งระหว่าง <span class="mono text-[12px]">data</span> กับ <span class="mono text-[12px]">errors</span></b> ไม่ส่งพร้อมกัน</p></div>
-        <div class="edge mt-4" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">i18n interplay</div><p class="text-[13px]">ภายใน <span class="mono text-[12px]">attributes</span> ฟิลด์ 2 ภาษาถูกยุบเป็น nested object <span class="mono text-[12px]">{ th, en }</span> ด้วย <span class="mono text-[12px]">LocalizationInterceptor</span> เสมอ (แม้ค่าเป็น null) — ห้าม frontend ต่อ string key เอง ดู <a href="i18n-guide.html" style="color:var(--accent);text-decoration:underline">i18n Guide</a></p></div>
+        <div class="edge mt-4" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">i18n interplay</div><p class="text-[13px]">ภายใน <span class="mono text-[12px]">attributes</span> ฟิลด์ 2 ภาษาถูกยุบเป็น nested object <span class="mono text-[12px]">{ th, en }</span> ด้วย <span class="mono text-[12px]">LocalizationInterceptor</span> เสมอ (แม้ค่าเป็น null) — ห้าม frontend ต่อ string key เอง · <b>ขาเข้าก็รับ nested เป็น alias ได้แล้ว</b> (<span class="mono text-[12px]">LocalizedBodyPipe</span>) แต่ DTO ยังประกาศ <span class="mono text-[12px]">_th</span>/<span class="mono text-[12px]">_en</span> เป็นสัญญาหลัก ดู <a href="i18n-guide.html" style="color:var(--accent);text-decoration:underline">i18n Guide §03.1</a></p></div>
+
+        <div class="eyebrow text-[var(--muted)] mt-8 mb-3">meta.pagination · ชื่อฟิลด์จริงที่ส่งออก</div>
+        <p class="text-[var(--ink-soft)] text-[14px] max-w-3xl mb-4 leading-[1.85]">
+          endpoint ที่คืน <span class="mono text-[12px]">{ data, pagination }</span> จะถูกแปลงเป็น collection + <span class="mono text-[12px]">meta.pagination</span> ให้เอง · ฟิลด์ตาม <span class="mono text-[12px]">PaginationDTO</span> — <b>มีทั้ง <span class="mono text-[12px]">total</span> และ <span class="mono text-[12px]">total_records</span> ซึ่งเป็นค่าเดียวกัน</b> (ตัวหลังเก็บไว้เพื่อความเข้ากันได้ย้อนหลัง อย่าลบ)
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ฟิลด์</th><th>ความหมาย</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">page</span></td><td>หน้าปัจจุบัน (เริ่มที่ 1)</td></tr>
+              <tr><td><span class="mono text-[12px]">page_size</span></td><td>จำนวนต่อหน้าที่ใช้จริง (หลังถูก cap ด้วย <span class="mono text-[12px]">QUERY_MAX_LIMIT</span>)</td></tr>
+              <tr><td><span class="mono text-[12px]">total</span> · <span class="mono text-[12px]">total_records</span></td><td>จำนวนแถวทั้งหมดที่ match filter (ค่าเท่ากัน)</td></tr>
+              <tr><td><span class="mono text-[12px]">total_pages</span></td><td>จำนวนหน้าทั้งหมด</td></tr>
+              <tr><td><span class="mono text-[12px]">is_large_dataset</span></td><td>true เมื่อ limit ถูก clamp หรือ <span class="mono text-[12px]">ignore_limit</span> ถูกตัดทอน — ทำให้ <span class="mono text-[12px]">status.code</span> เป็น <span class="mono text-[12px]">200002</span> แทน <span class="mono text-[12px]">200000</span> (ยัง 200 อยู่ แต่เป็นสัญญาณว่าให้ไล่หน้าต่อ ไม่ใช่ผลลัพธ์ครบชุด)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">meta.warnings · สำเร็จแต่มีเรื่องต้องบอก</div><p class="text-[13.5px]">
+          envelope มี <span class="mono text-[12px]">meta.warnings</span> เป็น array ของ <span class="mono text-[12px]">{ code, detail }</span> (รูปเดียวกับ <span class="mono text-[12px]">errors</span> เพื่อให้ client render ทางเดียวกันได้) — <b>ไม่มีคีย์นี้เลยถ้าไม่มีอะไรเตือน</b> response จึงเหมือนเดิมทุก byte สำหรับเคสปกติ
+          <br>ฝั่ง service เรียก <span class="mono text-[12px]">addRequestWarning({ code, detail })</span> จากที่ไหนก็ได้ในสายเรียก — ไม่ต้องมี <span class="mono text-[12px]">@Req()</span> ใน signature เพราะเก็บผ่าน <span class="mono text-[12px]">AsyncLocalStorage</span> ที่ <span class="mono text-[12px]">requestWarningsMiddleware</span> เปิดไว้ก่อน routing (ลงทะเบียนด้วย <span class="mono text-[12px]">app.use()</span> ไม่ใช่ guard/interceptor เพราะต้องครอบทั้งสาย async) · เรียกนอก request = no-op เงียบ ๆ ไม่ throw
+          <br>ผู้ผลิตปัจจุบัน: <span class="mono text-[12px]">PARTY_CURRENCY_MISMATCH</span> (โหมด WARN), งบการเงินที่กำไรขั้นต้นคำนวณไม่ครบ และ <span class="mono text-[12px]">LOCALIZED_INPUT_IGNORED</span> (ส่ง i18n มาทั้งสองรูปแบบในฟิลด์เดียว) · หน้า admin ที่ต้องเห็น warning ต้องเรียก API ตรง ๆ ไม่ผ่าน client กลางที่แกะเอาแต่ <span class="mono text-[12px]">data</span>
+        </p></div>
+
+        <div class="rulebox"><div class="rc mb-1">ลำดับ interceptor ที่ประกอบ envelope</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">ClassSerializerInterceptor</span> → <span class="mono text-[12px]">LocalizationInterceptor</span> → <span class="mono text-[12px]">TransformInterceptor</span> (ตามลำดับใน <span class="mono text-[12px]">registerGlobalMiddleware()</span>) · ยุบ <span class="mono text-[12px]">_th/_en</span> ให้เสร็จ<b>ก่อน</b>ห่อ envelope เสมอ ไม่งั้น <span class="mono text-[12px]">attributes</span> จะหลุดเป็นคู่คอลัมน์แบน · ทั้งสามตัวสร้างด้วย <span class="mono text-[12px]">new</span> เอง ไม่ได้ผ่าน DI จึง<b>เป็น <span class="mono text-[12px]">Scope.REQUEST</span> ไม่ได้</b> — นี่คือเหตุผลที่ warning ต้องเดินทางผ่าน <span class="mono text-[12px]">AsyncLocalStorage</span>
+        </p></div>
       </section>
 
       <!-- ========== 06 ERRORS ========== -->
@@ -293,6 +334,7 @@ is_public: <span class="t">boolean</span>;</pre>
               <tr><td>404000</td><td>NotFoundException</td><td>ไม่พบ resource (เช็ค null หลัง query เสมอ)</td><td>Services</td></tr>
               <tr><td>409000</td><td>ConflictException</td><td>ซ้ำ / ชน constraint</td><td>DB auto / manual</td></tr>
               <tr><td>422000</td><td>UnprocessableEntityException</td><td>ถูก syntax แต่ผิดเชิงความหมาย</td><td>Manual</td></tr>
+              <tr><td>429000</td><td>— (@fastify/rate-limit)</td><td>ยิงเกิน <span class="mono text-[12px]">RATE_LIMIT_MAX</span> ต่อ <span class="mono text-[12px]">RATE_LIMIT_WINDOW_MS</span></td><td>Fastify plugin (ไม่ผ่าน filter ของ Nest)</td></tr>
               <tr><td>500000</td><td>InternalServerErrorException</td><td>error ไม่คาดคิด</td><td>Auto / manual</td></tr>
               <tr><td>503000</td><td>ServiceUnavailableException</td><td>ปิดชั่วคราว / maintenance</td><td>Manual</td></tr>
             </tbody>
@@ -307,6 +349,18 @@ is_public: <span class="t">boolean</span>;</pre>
             จะได้ <span class="mono text-[12px]">status.code = 409001</span> ตามนั้น · ส่ง HTTP status เปล่า ๆ
             (<span class="mono text-[12px]">409</span>) filter จะขยายเป็น <span class="mono text-[12px]">409000</span> ให้เอง ·
             <b>จด serial ใหม่ลงตารางข้างบนในคอมมิตเดียวกันเสมอ</b> ไม่งั้น BC ถัดไปจะหยิบเลขเดิมไปใช้กับคนละเรื่อง
+          </p>
+        </div>
+
+        <div class="rulebox mb-5">
+          <div class="rc mb-1">429 ประกอบ ENVELOPE เอง · นอกสาย FILTER</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">@fastify/rate-limit</span> ตอบจากชั้น Fastify ก่อนที่ filter ของ Nest จะได้ทำงาน —
+            envelope จึงถูกประกอบมือใน <span class="mono text-[12px]">registerSecurity()</span> (<span class="mono text-[12px]">bootstrap.util.ts</span>)
+            และต้องใช้ <span class="mono text-[12px]">toEnvelopeStatusCode()</span> เหมือนกันทุกประการ ·
+            ค่าเริ่มต้น <span class="mono text-[12px]">RATE_LIMIT_MAX=10000</span> ต่อหน้าต่าง <span class="mono text-[12px]">15 นาที</span>
+            ปิดได้ด้วย <span class="mono text-[12px]">security.rateLimit: false</span> ตอน bootstrap ·
+            <b>ที่ไหนก็ตามที่ประกอบ envelope เองนอก filter ต้องมาอัปเดตตรงนี้ด้วย</b>
           </p>
         </div>
 
@@ -412,6 +466,45 @@ findAll(<span class="d">@ValidatedQuery</span>(<span class="t">QueryParamsDTO</s
             </tbody>
           </table>
         </div>
+        <div class="eyebrow text-[var(--muted)] mb-3">QueryParamsDTO · ฟิลด์ทั้งหมดที่รองรับจริง</div>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th style="width:150px">Param</th><th style="width:110px">Default</th><th>พฤติกรรม</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">page</span></td><td>1</td><td>หน้าปัจจุบัน (เริ่มที่ 1) · เพดาน <span class="mono text-[12px]">MAX_QUERY_PAGE = 10000</span> กัน deep-paging (<span class="mono text-[12px]">?page=9999999</span>) — <b>เป็นเพดานเดียวของ page และตั้งใจไม่มี env knob</b> · เกินแล้วได้ 400 / <span class="mono text-[12px]">400002</span></td></tr>
+              <tr><td><span class="mono text-[12px]">offset</span></td><td>0</td><td>ข้ามกี่แถว — ใช้แทน <span class="mono text-[12px]">page</span> ได้</td></tr>
+              <tr><td><span class="mono text-[12px]">limit</span></td><td>10</td><td><b>มีเพดานสองชั้น</b> — ชั้นที่ 1 <span class="mono text-[12px]">@Max(MAX_QUERY_LIMIT = 2000)</span> เป็นสัญญากับ client: เกินแล้ว<b>ถูกปฏิเสธด้วย 400 / <span class="mono text-[12px]">400002</span></b> (<span class="mono text-[12px]">limit must not be greater than 2000</span>) ไม่ clamp ให้ · ชั้นที่ 2 <span class="mono text-[12px]">QUERY_MAX_LIMIT</span> ใน .env (ต้อง ≤ 2000) เป็นเพดานที่ใช้จริงรายวัน — <span class="mono text-[12px]">TypeOrmQueryBuilder</span> clamp ให้เงียบ ๆ ไม่ throw พร้อมติดธง <span class="mono text-[12px]">is_large_dataset</span> (<span class="mono text-[12px]">status.code 200002</span>) เพื่อให้ผู้เรียกภายในที่รับ error ไม่ไหวยังได้หน้าที่ปลอดภัย</td></tr>
+              <tr><td><span class="mono text-[12px]">sort</span></td><td>—</td><td><span class="mono text-[12px]">field:asc|desc</span> · คั่น comma ได้หลายชั้น (<span class="mono text-[12px]">first_name:asc,created_at:desc</span>)</td></tr>
+              <tr><td><span class="mono text-[12px]">s</span></td><td>—</td><td>search แบบ JSON (<span class="mono text-[12px]">{"status":"active","age":{"&gt;":25}}</span>)</td></tr>
+              <tr><td><span class="mono text-[12px]">filter</span></td><td>[]</td><td><span class="mono text-[12px]">field||$eq||value</span> · ส่งซ้ำหลายครั้ง = <b>AND</b> · <b>ห้ามใช้ <span class="mono text-[12px]">filter[]=</span></b> จะได้ 400002 (<span class="mono text-[12px]">property filter[] should not exist</span>) เพราะไม่มี querystring parser แบบ bracket ลงทะเบียนไว้</td></tr>
+              <tr><td><span class="mono text-[12px]">or</span></td><td>[]</td><td>รูปแบบเดียวกับ <span class="mono text-[12px]">filter</span> แต่รวมแบบ <b>OR</b></td></tr>
+              <tr><td><span class="mono text-[12px]">relations</span></td><td>—</td><td>eager load คั่น comma · ใช้ <span class="mono text-[12px]">queryParamsWithRelations(ALLOWED)</span> เพื่อให้ Swagger โชว์รายการ relation ที่ resource นั้นอนุญาต</td></tr>
+              <tr><td><span class="mono text-[12px]">fields</span></td><td>—</td><td>sparse fieldset — เลือกเฉพาะคอลัมน์ที่ใช้</td></tr>
+              <tr><td><span class="mono text-[12px]">exclude_ids</span></td><td>—</td><td>uuid คั่น comma ที่ต้องตัดออกจากผลลัพธ์</td></tr>
+              <tr><td><span class="mono text-[12px]">timezone</span></td><td><b>undefined</b></td><td>โซนเวลาที่ใช้ตีความขอบเขตวันที่ <span class="mono text-[12px]">YYYY-MM-DD</span> · <b>ห้ามใส่ initializer ในคลาส</b> — ดู gotcha ถัดไป</td></tr>
+              <tr><td><span class="mono text-[12px]">ignore_limit</span></td><td>false</td><td>คืนทุกแถวไม่แบ่งหน้า — มีผลเฉพาะ route ที่ติด <span class="mono text-[12px]">@AllowIgnoreLimit()</span> เมื่อ <span class="mono text-[12px]">IGNORE_LIMIT_STRICT=true</span></td></tr>
+              <tr><td><span class="mono text-[12px]">get_count_only</span></td><td>false</td><td>คืนเฉพาะจำนวนรวม ไม่ดึง list</td></tr>
+              <tr><td><span class="mono text-[12px]">is_hard_delete</span></td><td>false</td><td>ยืนยันลบถาวร — <b>ยังไม่รองรับใน base operation</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="edge mb-5"><div class="tag mb-1">ยืนยันกับ API จริงแล้ว (2026-09-20)</div><p class="text-[13px]">
+          <span class="mono text-[12px]">?limit=5000</span> → <span class="mono text-[12px]">400</span> · <span class="mono text-[12px]">status.code 400002</span> · <span class="mono text-[12px]">"limit must not be greater than 2000"</span><br>
+          <span class="mono text-[12px]">?page=99999999</span> → <span class="mono text-[12px]">400</span> · <span class="mono text-[12px]">status.code 400002</span> · <span class="mono text-[12px]">"page must not be greater than 10000"</span><br>
+          <span class="mono text-[12px]">?limit=1999</span> → <span class="mono text-[12px]">200</span> · <span class="mono text-[12px]">status.code 200002</span> (ถูก clamp ด้วย <span class="mono text-[12px]">QUERY_MAX_LIMIT</span> แล้วติดธง large dataset)<br>
+          <b>ไม่ใช่ 422</b> — คอมเมนต์ใน <span class="mono text-[12px]">pagination.constants.ts</span>/<span class="mono text-[12px]">query-params.dto.ts</span> เคยเขียนว่า 422 ซึ่งผิด แก้ให้ตรงกับของจริงแล้ว
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · @AllowIgnoreLimit() ใช้กับตารางที่เล็กและมีขอบเขตแน่นอนเท่านั้น</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">ignore_limit=true</span> ทิ้ง <span class="mono text-[12px]">take</span>/<span class="mono text-[12px]">skip</span> ทั้งหมด — request เดียวดูดทั้งตารางของ BC ออกไปได้ · ติดป้ายนี้ได้เฉพาะข้อมูลอ้างอิงที่โตไม่ได้ (brands, UOM, warehouses, tax categories, roles, policies) <b>ห้ามติดกับตารางที่โตตามปริมาณธุรกิจ</b> (products, suppliers, เอกสารทุกชนิด)
+          <br>เมื่อ <span class="mono text-[12px]">IGNORE_LIMIT_STRICT=true</span> route ที่<b>ไม่มี</b>ป้ายนี้จะถูกลดระดับกลับไปแบ่งหน้าตามปกติ <b>เงียบ ๆ ไม่ใช่ 400</b> — dropdown ที่ลืมติดป้ายจึงยังทำงานได้ แค่ได้ข้อมูลทีละหน้า
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">GOTCHA · default ของคลาสชนะ .env เสมอ — เหตุผลที่ timezone ต้องเป็น undefined</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">@ValidatedQuery</span> ลบคีย์ที่เป็น <span class="mono text-[12px]">undefined</span> ทิ้งก่อน เพื่อให้ default ของคลาสได้ทำงาน — ดังนั้น <span class="mono text-[12px]">timezone = 'Asia/Bangkok'</span> ในคลาสจะไม่ใช่ fallback แต่เป็น<b>ค่าที่ชนะทุก request</b> ทำให้ <span class="mono text-[12px]">TIMEZONE</span> ใน .env ไม่เคยมีผลกับการ filter วันที่เลย (บั๊กจริง แก้ 2026-08-28) · ปล่อยเป็น <span class="mono text-[12px]">undefined</span> ให้ <span class="mono text-[12px]">TypeOrmQueryBuilder</span> ตกไปที่ <span class="mono text-[12px]">PROJECT_TIMEZONE</span> — client ที่ส่ง <span class="mono text-[12px]">?timezone=</span> ยัง override ได้เหมือนเดิม · <b>ฟิลด์อื่นที่ตั้งใจให้ .env เป็นคนกำหนดก็ห้ามใส่ default ในคลาสเช่นกัน</b>
+        </p></div>
+
         <div class="rulebox mb-4"><div class="rc mb-1">FEATURES · @ValidatedQuery</div><p class="text-[13.5px]">แปลง type อัตโนมัติ (<span class="mono text-[12px]">"123"→123</span>, <span class="mono text-[12px]">"true"→true</span>) · strip property แปลกปลอม (whitelist) · รองรับ nested validation และ filter syntax <span class="mono text-[12px]">filter=field||$eq||value</span> (ส่งซ้ำได้หลายค่าเพื่อ AND — <em>ไม่ใช่</em> <span class="mono text-[12px]">filter[]=...</span> ซึ่งจะโดนปฏิเสธด้วย 400002) · เงื่อนไข OR ใช้ <span class="mono text-[12px]">or=field||$eq||value</span> รูปแบบเดียวกัน</p></div>
         <div class="eyebrow text-[var(--muted)] mb-3">Manual throw · custom validation (query)</div>
         <div class="code p-5">
@@ -443,7 +536,29 @@ findAll(<span class="d">@ValidatedQuery</span>(<span class="t">QueryParamsDTO</s
           (เช่น <span class="mono text-[13px]">if (!x) throw new NotFoundException(...)</span> เฉพาะกรณี "หาไม่เจอจริง ๆ" ไม่ใช่กรณี "BC อื่นตอบ 404 มาแล้ว")
         </p>
 
+        <div class="rulebox mb-4"><div class="rc mb-1">TRANSPORT · knob เดียวทั้งแพลตฟอร์ม</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">TRANSPORT</span> ใน .env (<span class="mono text-[12px]">rmq</span> เป็นค่าเริ่มต้น · <span class="mono text-[12px]">tcp</span> เป็น fallback) ถูกอ่านทั้งฝั่ง client registration (<span class="mono text-[12px]">CommonModule</span>) และฝั่ง server listener (<span class="mono text-[12px]">bootstrapApplication</span>) จาก <span class="mono text-[12px]">microservice-transport.util.ts</span> ตัวเดียวกัน — เปลี่ยนที่เดียวพลิกทั้งระบบ ห้ามมี BC ไหนเลือกเองแยก
+        </p></div>
+
         <div class="rulebox mb-4"><div class="rc mb-1">HANDLER · @UseInterceptors(RmqAckInterceptor) บังคับ</div><p class="text-[13.5px]">ทุก controller ที่มี <span class="mono text-[12px]">@MessagePattern</span>/<span class="mono text-[12px]">@EventPattern</span> ต้องมี <span class="mono text-[12px]">RmqAckInterceptor</span> — server รัน <span class="mono text-[12px]">noAck: false</span> + <span class="mono text-[12px]">prefetchCount: 1</span> และ NestJS <b>ไม่ ack ให้เองตอนสำเร็จ</b> ถ้าลืม queue จะ head-of-line block ถาวร (อาการ: caller timeout 15s ทุกตัว โดยไม่มี error log ใด ๆ, restart service ก็ไม่ช่วย) ดู pattern ที่ <span class="mono text-[12px]">SupplierEventsController</span>/<span class="mono text-[12px]">ProductEventsController</span> · ตั้งแต่ 2026-09-05 ข้อความที่ nack เพราะไม่มี handler ตรงกันเลยไปนอนรอที่ dead-letter queue แทนที่จะหายถาวร — ดู <a href="rabbitmq-reliability-guide.html" style="color:var(--teal);text-decoration:underline">RabbitMQ Reliability Guide</a></p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">HANDLER · @UseFilters(RpcExceptionsFilter) บังคับ และต้องเป็น decorator ระดับคลาส</div><p class="text-[13.5px]">
+          วางไว้เหนือ <span class="mono text-[12px]">@UseInterceptors(RmqAckInterceptor)</span> บนคลาสเดียวกัน — ตัวหนึ่งทำให้คิวเดินต่อ อีกตัวทำให้ error ยังมีความหมายเมื่อข้ามฝั่ง
+          <br><b>ทำไมต้องเป็น class decorator ไม่ใช่ลงทะเบียน global</b>: <span class="mono text-[12px]">app.connectMicroservice()</span> เรียก <span class="mono text-[12px]">registerListeners()</span> <b>แบบ synchronous ก่อน return</b> ซึ่งเป็นขั้นที่ผูก handler เข้ากับ enhancer ที่มีอยู่ ณ วินาทีนั้น — อะไรที่ลงทะเบียนบน instance ทีหลังจะถูก<b>ทิ้งเงียบ ๆ</b> (Nest log แค่ <span class="mono text-[12px]">Cannot apply global exception filters: registration must occur before initialization.</span> แล้วไปต่อ) · <span class="mono text-[12px]">setupMicroservice()</span> จึงส่ง <span class="mono text-[12px]">{ deferInitialization: true }</span> แล้วผูกเองด้วยมือ (ห้ามถอดออก) แต่ filter ระดับคลาสผูกจาก metadata ของคลาส ลำดับ lifecycle ทำอะไรมันไม่ได้เลย
+          <br><b>ราคาที่จ่ายเมื่อลืม</b>: exception ทุกตัวที่ออกจาก RPC handler — รวมถึง <span class="mono text-[12px]">NotFoundException</span> ธรรมดา — กลายเป็น <span class="mono text-[12px]">{ status: 'error', message: 'Internal server error' }</span> ของ Nest ซึ่ง <span class="mono text-[12px]">sendWithContext</span> อ่านไม่ออก จึงตกไปที่ <span class="mono text-[12px]">defaultValue</span> แล้วผู้เรียกไปรายงานว่า "service ไม่พร้อมใช้งาน" ทั้งที่ปลายทางตอบชัดเจนแล้ว (เคสจริง: storage 403 กลายเป็น 503 ในเบราว์เซอร์อยู่สองวัน)
+          <br><b>ห้ามใช้ try/catch ครอบตัว handler เพื่อเลี่ยงเรื่องนี้</b> — filter แปลง <span class="mono text-[12px]">HttpException</span> ที่โยนจากชั้นไหนก็ได้ใต้ handler ให้เป็น <span class="mono text-[12px]">IRpcErrorPayload</span> อยู่แล้ว · catch ที่คืน <span class="mono text-[12px]">null</span> แทนการ rethrow เปลี่ยน "ฉันล้มเหลว" ให้กลายเป็น "ไม่มีข้อมูล" ซึ่งผู้เรียกแยกไม่ออกจากผลลัพธ์ว่างจริง ๆ · การแปลง error ของ SDK ภายนอก (S3, HTTP client) เป็นคนละเรื่องและอยู่ที่ service ตรงขอบนั้น (<span class="mono text-[12px]">translateS3Error</span>) · catch ที่ยอมรับได้มีแบบเดียวคือใน <span class="mono text-[12px]">@EventPattern</span> ที่ไม่มีใครรอคำตอบ และต้อง log เสมอ
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RETRY · ทั้ง sendWithContext และ emitWithContext retry ให้อัตโนมัติ — handler จึงต้องทนถูกเรียกซ้ำ</div><p class="text-[13.5px]">
+          retry เฉพาะความล้มเหลวชั่วคราว: <span class="mono text-[12px]">TimeoutError</span> (ปลายทางไม่ตอบ) หรือ error ระดับ connection (<span class="mono text-[12px]">ECONNREFUSED</span>/<span class="mono text-[12px]">ECONNRESET</span>/<span class="mono text-[12px]">EPIPE</span>/<span class="mono text-[12px]">ETIMEDOUT</span>/socket hang up) — <span class="mono text-[12px]">DEFAULT_RETRY_ATTEMPTS</span> = 2 (ครั้งแรก + retry อีกหนึ่ง) backoff <span class="mono text-[12px]">DEFAULT_RETRY_BACKOFF_MS</span> คูณตามรอบ แล้วค่อยตกไปที่ <span class="mono text-[12px]">defaultValue</span>
+          <br><b>business error ไม่ retry</b> — อะไรที่ unwrap ออกมาเป็น <span class="mono text-[12px]">IRpcErrorPayload</span>/<span class="mono text-[12px]">IRpcErrorResponse</span> หรือ <span class="mono text-[12px]">HttpException</span> อยู่แล้ว (404, validation 400) คือคำตอบที่ตัดสินแล้ว ยิงซ้ำได้แค่ latency และเสี่ยงรัน handler ที่ไม่ idempotent สองรอบ
+          <br><b>ผลที่ตามมาเป็นข้อผูกมัด</b>: handler ฝั่งรับอาจถูกเรียกสองครั้งสำหรับสิ่งที่ผู้เรียกมองว่าเป็นครั้งเดียว (ที่หายไปอาจเป็นแค่ <i>คำตอบ</i> ไม่ใช่ <i>งาน</i>) — ทุก <span class="mono text-[12px]">@MessagePattern</span>/<span class="mono text-[12px]">@EventPattern</span> ต้อง idempotent เหมือนที่ event consumer ต้องเป็นอยู่แล้ว
+          <br><span class="mono text-[12px]">DEFAULT_RETRY_ATTEMPTS × DEFAULT_RPC_TIMEOUT_MS</span> (≈30 วิ) ตั้งไว้ต่ำกว่า read timeout 60 วิของ Kong โดยตั้งใจ — จะขยับต้องกลับไปคิดงบตรงนี้ใหม่ · ส่ง <span class="mono text-[12px]">retryAttempts</span> เป็นพารามิเตอร์ตัวท้ายเพื่อ override รายครั้ง (ใส่ <span class="mono text-[12px]">1</span> = ปิด retry สำหรับ handler ที่รันซ้ำไม่ได้)
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">พิสูจน์ว่าใช้ได้จริงต้องใช้ smoke — เทสต์แบบ static มองไม่เห็น</div><p class="text-[13.5px]">
+          unit และ module-e2e mock transport ทั้งคู่ จึงไม่มีทางเห็น filter ที่ไม่ได้ผูก · ตัวล็อกคือ smoke ที่ยิง RPC จริงให้ล้มเหลวแบบ<b>ไม่ใช่ 404</b> แล้ว assert ว่าข้อความของปลายทางรอดข้ามฝั่งมาถึง — ดูเคสที่สามใน <span class="mono text-[12px]">apps/inventory-bc/test/smoke/product-images.smoke.mjs</span> (confirm รูปด้วยชื่อ bucket ที่ผิดกฎ → <span class="mono text-[12px]">503</span> พร้อมข้อความจริงของ storage ไม่ใช่ sentinel ของผู้เรียก) · call ข้าม BC ใหม่ที่ taxonomy ของ error สำคัญ ให้ลอกรูปแบบนี้
+        </p></div>
 
         <div class="rulebox mb-4"><div class="rc mb-1">⚠️ <span class="mono text-[12px]">defaultValue</span> ต้องเป็นค่าที่ callee คืนเองไม่ได้ — สำคัญเมื่อ <span class="mono text-[12px]">null</span> คือคำตอบที่ถูกต้อง</div><p class="text-[13.5px]">สัญญา "ไม่ throw เอง" ข้างบนหมายความว่า <b>ความล้มเหลวของ transport ถูกแทนด้วย <span class="mono text-[12px]">defaultValue</span></b> — ดังนั้นถ้าส่ง <span class="mono text-[12px]">null</span> เป็น <span class="mono text-[12px]">defaultValue</span> ให้ handler ที่ <b>คืน <span class="mono text-[12px]">null</span> เป็นคำตอบปกติได้อยู่แล้ว</b> ผู้เรียกจะแยกไม่ออกระหว่าง "callee ตอบมาว่าไม่มี" กับ "ไม่เคยได้คำตอบเลย" เพราะทั้งสองกรณีมาถึงเป็น <span class="mono text-[12px]">null</span> เหมือนกันเป๊ะ</p>
         <p class="text-[13.5px] mt-3">เจอจริง 2026-09-07 · <span class="mono text-[12px]">Storage.cmd.HeadObject</span> คืน <span class="mono text-[12px]">null</span> เมื่อ object ไม่มีอยู่จริง (เป็น outcome ปกติที่ผู้เรียกต้องตัดสินใจเอง) แต่ <span class="mono text-[12px]">StorageObjectService.headObject()</span> ก็ส่ง <span class="mono text-[12px]">null</span> เป็น <span class="mono text-[12px]">defaultValue</span> ด้วย → RMQ timeout หรือ storage ล่มชั่วคราวครั้งใด ก็ถูกรายงานเป็น <span class="mono text-[12px]">400</span> "ยังไม่ได้อัปโหลดไฟล์" ทั้งที่ไฟล์อยู่ใน bucket แล้วจริง ผู้ใช้จึงเห็นข้อความที่บอกให้อัปโหลดใหม่ ซึ่งเป็นสิ่งที่แก้ปัญหาไม่ได้เลย · กระทบทุก resource ที่สืบทอด <span class="mono text-[12px]">BaseAttachmentService</span> เท่ากันหมด (product images, receipt/quotation/purchase-order attachments) ไม่ใช่แค่ endpoint เดียว</p>
@@ -563,6 +678,25 @@ microserviceInstance.useGlobalInterceptors(
         <div class="eyebrow text-[var(--accent)] mb-3">10 — Entity &amp; Column Rules</div>
         <h2 class="display text-3xl mb-6">Entity · คอลัมน์ · คลาสฐานร่วม</h2>
 
+        <div class="eyebrow text-[var(--muted)] mb-3">BaseEntity · ทุก entity ที่ persist ต้อง extend</div>
+        <div class="code p-5 mb-4">
+<pre><span class="k">export abstract class</span> <span class="t">BaseEntity</span> {
+  id: <span class="t">string</span>;               <span class="c">// @PrimaryGeneratedColumn('uuid')</span>
+  created_at: <span class="t">Date</span>;         <span class="c">// @CreateDateColumn timestamptz</span>
+  created_by: <span class="t">string</span> | <span class="k">null</span>;
+  updated_at: <span class="t">Date</span>;         <span class="c">// @UpdateDateColumn timestamptz</span>
+  updated_by: <span class="t">string</span> | <span class="k">null</span>;
+  is_deleted: <span class="t">boolean</span>;      <span class="c">// default false</span>
+  deleted_reason: <span class="t">string</span> | <span class="k">null</span>;
+  deleted_at: <span class="t">Date</span> | <span class="k">null</span>;  <span class="c">// @DeleteDateColumn → TypeORM กรองให้เองทุก query</span>
+  deleted_by: <span class="t">string</span> | <span class="k">null</span>;
+}</pre>
+        </div>
+        <div class="rulebox mb-4" style="border-left-color:var(--signal)"><div class="rc mb-1">GOTCHA · soft-delete filter ลงไปที่ "ตารางที่ join มา" ด้วย</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">@DeleteDateColumn</span> ทำให้ TypeORM เติม <span class="mono text-[12px]">deleted_at IS NULL</span> ให้อัตโนมัติ — <b>และมันเติมให้ตารางที่ join เข้ามาด้วย ไม่ใช่แค่ตารางหลัก</b> · รายงานที่ join ข้ามตารางจึงหล่นแถวที่ตัวมันเองยังอยู่ แต่ของที่อ้างถึงถูก soft-delete ไปแล้ว (lot ที่สินค้าถูกลบ หายจากรายงานยอดคงเหลือ ทั้งที่ของยังอยู่บนชั้นจริง ๆ)
+          <br>ทางที่ถูกคือ <span class="mono text-[12px]">.withDeleted()</span> เพื่อปิดการเติมอัตโนมัติ <b>แล้วใส่เงื่อนไขของตารางหลักกลับเข้าไปเอง</b> (<span class="mono text-[12px]">.andWhere('lot.deleted_at IS NULL')</span>) — ดู <span class="mono text-[12px]">StockBalancesService.buildQuery()</span> และ <span class="mono text-[12px]">LotsService.findExpiring()</span> เป็นตัวอย่าง · query ปกติที่ไม่ join ไม่ต้องทำอะไร
+        </p></div>
+
         <div class="rulebox mb-4"><div class="rc mb-1">RULE · comment ของคอลัมน์ต้องบอกชื่อตารางต้นทางเสมอ</div><p class="text-[13.5px]">FK ใน BC เดียวกัน: <span class="mono text-[12px]">อ้างอิง &lt;table&gt;.id (ตารางเดียวกัน มี FK constraint) / References &lt;table&gt;.id</span> · uuid ข้าม BC (ไม่มี FK จริง): <span class="mono text-[12px]">อ้างอิง &lt;table&gt;.id ใน &lt;bc&gt; (คนละ database ไม่มี FK constraint จริง)</span> · ค่าที่ copy/denormalize มา: <span class="mono text-[12px]">คัดลอกจาก &lt;table&gt;.&lt;column&gt; ณ เวลา…</span> — <b>ชื่อ property ไม่ต้องมี <span class="mono text-[12px]">_snapshot</span> ต่อท้าย</b> comment คือสิ่งที่บันทึกความหมายนี้</p></div>
 
         <div class="rulebox mb-4"><div class="rc mb-1">RULE · วัน/เวลาเป็น timestamptz เท่านั้น ห้าม date/time</div><p class="text-[13.5px]">แม้ค่าที่ "รู้สึกเหมือน" วันที่ล้วน (<span class="mono text-[12px]">document_date</span>, <span class="mono text-[12px]">valid_until</span>, <span class="mono text-[12px]">effective_from</span>, <span class="mono text-[12px]">expiry_date</span>) ก็เป็น <span class="mono text-[12px]">timestamptz</span> / <span class="mono text-[12px]">Date | null</span> — เพราะ <span class="mono text-[12px]">date</span> ทิ้ง offset ของ client ทำให้ backend ต้อง<b>เดา</b>ว่าหมายถึงโซนเวลาไหน · DTO ใช้ <span class="mono text-[12px]">@IsISO8601()</span> ของโปรเจกต์เอง (<b>ไม่ใช่</b> <span class="mono text-[12px]">@IsDateString()</span> ซึ่งรับ <span class="mono text-[12px]">YYYY-MM-DD</span> เปล่า ๆ ผ่าน) · service แปลงด้วย <span class="mono text-[12px]">parseInstant()</span> · การอ่านเป็น "วันตามปฏิทิน" ต้องผ่าน <span class="mono text-[12px]">toBusinessDate()</span>/<span class="mono text-[12px]">businessYearOf()</span>/<span class="mono text-[12px]">todayBusinessDate()</span> ที่ปักหมุด <span class="mono text-[12px]">Asia/Bangkok</span> เสมอ — <span class="mono text-[12px]">.toISOString()</span>/<span class="mono text-[12px]">getFullYear()</span>/<span class="mono text-[12px]">::date</span> ดิบ ๆ ให้วันผิดทุกครั้งที่เหตุการณ์เกิดหลัง 17:00 น. ไทย</p></div>
@@ -598,13 +732,15 @@ microserviceInstance.useGlobalInterceptors(
             <tbody>
               <tr><td><span class="mono text-[12px]">SubmittableDocumentEntity</span></td><td><span class="mono text-[12px]">remark_th/en</span> · <span class="mono text-[12px]">sent_by/at</span> · <span class="mono text-[12px]">approved_by/at</span> · <span class="mono text-[12px]">cancelled_by/at</span> · <span class="mono text-[12px]">cancel_reason</span> · <span class="mono text-[12px]">is_vat_included</span></td></tr>
               <tr><td><span class="mono text-[12px]">DocumentLineItemEntity</span></td><td><span class="mono text-[12px]">product_id</span> (ข้าม BC → inventory) · <span class="mono text-[12px]">qty</span> · <span class="mono text-[12px]">line_total</span></td></tr>
+              <tr><td><span class="mono text-[12px]">OutboxEventEntity</span></td><td>แถวเหตุการณ์ที่รอส่ง — เขียนใน transaction เดียวกับงานจริง แล้ว relay ค่อยส่งออกหลัง commit</td></tr>
+              <tr><td><span class="mono text-[12px]">ProcessedEventEntity</span></td><td>กันทำซ้ำฝั่ง consumer — บันทึก event id ที่ประมวลผลแล้ว เพื่อให้ delivery ซ้ำไม่สร้างผลซ้ำ</td></tr>
               <tr><td><span class="mono text-[12px]">DocumentNumberCounterEntity</span></td><td><span class="mono text-[12px]">year</span> · <span class="mono text-[12px]">last_number</span> + สัญญาการ lock ด้วย <span class="mono text-[12px]">SELECT … FOR UPDATE</span> · subclass ใส่แค่ <span class="mono text-[12px]">@Entity()</span> + <span class="mono text-[12px]">@Unique('uq_&lt;table&gt;_year', ['year'])</span> ของตัวเอง — <b>หนึ่งตารางต่อ BC เสมอ ห้ามมีตารางตัวนับกลาง</b></td></tr>
             </tbody>
           </table>
         </div>
         <p class="text-[12.5px] mb-6" style="color:var(--muted)"><b>ตั้งใจไม่แชร์:</b> <span class="mono text-[12px]">status</span> (แต่ละโดเมนมี enum ของตัวเอง) · เลขที่เอกสาร · reference ของคู่ค้า (<span class="mono text-[12px]">supplier_id</span>/<span class="mono text-[12px]">customer_id</span>) · ฟิลด์เงินเฉพาะโดเมน (<span class="mono text-[12px]">unit_cost</span> vs <span class="mono text-[12px]">unit_price</span>, <span class="mono text-[12px]">received_qty</span>)</p>
 
-        <div class="rulebox"><div class="rc mb-1">RULE · interface ภายในต้องมีไฟล์ของตัวเอง</div><p class="text-[13.5px]">ห้ามประกาศ <span class="mono text-[12px]">interface</span> ไว้ในไฟล์เดียวกับ service/controller ที่ใช้ แม้จะใช้ที่เดียว — วางที่ <span class="mono text-[12px]">&lt;module&gt;/interfaces/&lt;kebab-name&gt;.interface.ts</span> และ export ชื่อขึ้นต้นด้วย <span class="mono text-[12px]">I</span> (<span class="mono text-[12px]">IUserSession</span>, <span class="mono text-[12px]">IResponsePaginatedService</span>) · ใช้กับทั้ง interface ที่ export ออกไปและที่ใช้ภายใน module เท่านั้น</p></div>
+        <div class="rulebox"><div class="rc mb-1">RULE · interface ภายในต้องมีไฟล์ของตัวเอง</div><p class="text-[13.5px]">ใช้กับ entity เหมือนทุกไฟล์ที่มี <span class="mono text-[12px]">class</span> — กติกาเต็มพร้อมข้อยกเว้นอยู่ที่ <a href="#naming" style="color:var(--accent);text-decoration:underline">§02 Naming</a></p></div>
       </section>
 
       <!-- ========== 11 MODULE BOUNDARIES ========== -->
@@ -621,7 +757,39 @@ microserviceInstance.useGlobalInterceptors(
         <div class="eyebrow text-[var(--accent)] mb-3">12 — Params · Permissions · Body</div>
         <h2 class="display text-3xl mb-6">Path param · สิทธิ์ · body ว่าง</h2>
         <div class="rulebox mb-4"><div class="rc mb-1">RULE · path param ที่เป็น UUID ต้องผ่าน ParseUuidParamPipe</div><p class="text-[13.5px]"><span class="mono text-[12px]">@Param('id', ParseUuidParamPipe)</span> ทุกตัว (<span class="mono text-[12px]">:id</span>, <span class="mono text-[12px]">:role_id</span>, param ที่เป็น FK ทุกอัน) — ปฏิเสธ UUID ผิดรูปด้วย <span class="mono text-[12px]">400002</span> ก่อนถึง service/DB · <span class="mono text-[12px]">@Param('id')</span> เปล่า ๆ ถือว่าผิด convention</p></div>
+        <div class="eyebrow text-[var(--muted)] mb-3">สายของ guard · ลำดับที่ลงทะเบียนใน CommonModule</div>
+        <p class="text-[var(--ink-soft)] text-[14px] max-w-3xl mb-4 leading-[1.85]">
+          ทั้งสี่ตัวเป็น <span class="mono text-[12px]">APP_GUARD</span> ใน <span class="mono text-[12px]">CommonModule</span> ซึ่งเป็น <span class="mono text-[12px]">@Global()</span> — <b>ทุก BC ได้เหมือนกันหมดโดยไม่ต้องต่อสายเอง</b> และทำงานตามลำดับนี้
+        </p>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th style="width:170px">Guard</th><th>ตรวจอะไร</th><th style="width:230px">ทางออก</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">AuthGuard</span></td><td>verify JWT + เช็ค session ใน Redis · บล็อกทุก endpoint ด้วย 403 เมื่อ session มี <span class="mono text-[12px]">must_change_password</span></td><td><span class="mono text-[12px]">@Public()</span> · <span class="mono text-[12px]">@SkipPasswordChangeCheck()</span></td></tr>
+              <tr><td><span class="mono text-[12px]">AccessKeyGuard</span></td><td>ตรวจลายเซ็น HMAC ของ access key/secret key (system-to-system) แล้วเติม <span class="mono text-[12px]">request.user</span> ในรูปเดียวกับที่ AuthGuard ทำ</td><td>ทำงานเมื่อ route ติด <span class="mono text-[12px]">@UseAccessKey()</span> (AuthGuard จะข้าม JWT ให้)</td></tr>
+              <tr><td><span class="mono text-[12px]">CsrfGuard</span></td><td>double-submit: request ที่<b>ไม่ใช่</b> GET/HEAD/OPTIONS และ<b>มีคุกกี้</b> <span class="mono text-[12px]">csrf_token</span> ต้องส่งค่าเดิมกลับมาใน header <span class="mono text-[12px]">x-csrf-token</span></td><td><span class="mono text-[12px]">@SkipCsrfCheck()</span> (มีที่เดียวคือ <span class="mono text-[12px]">POST /auth/login</span>) · route ที่เป็น <span class="mono text-[12px]">@UseAccessKey()</span></td></tr>
+              <tr><td><span class="mono text-[12px]">PermissionGuard</span></td><td>เทียบ <span class="mono text-[12px]">@RequirePermission()</span> กับรายการ permission แบนใน JWT ก่อน · ถ้าเป็น permission ที่ติดธง conditional จะไปถาม iam-bc เพื่อประเมิน ABAC สด ๆ</td><td><span class="mono text-[12px]">@SkipPermissionCheck()</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">CSRF ผูกกับ "มีคุกกี้ไหม" ไม่ใช่ "public ไหม"</div><p class="text-[13.5px]">
+          ตัวตัดสินคือ<b>การมีอยู่ของคุกกี้</b> <span class="mono text-[12px]">csrf_token</span> ซึ่งแปลว่าเบราว์เซอร์นี้ถือ credential ที่ถูกส่งอัตโนมัติ — ไม่ได้ดูว่า endpoint เป็น <span class="mono text-[12px]">@Public()</span> หรือไม่ เพราะ <span class="mono text-[12px]">POST /auth/refresh</span> เป็น <span class="mono text-[12px]">@Public()</span> (ไม่ต้องมี JWT) แต่กลายเป็น cookie-ambient ทันทีที่ <span class="mono text-[12px]">refresh_token</span> เป็นคุกกี้ จึงยังต้องป้องกัน · client ที่ใช้ bearer อย่างเดียวไม่เคยได้รับคุกกี้นี้ จึงไม่ถูกบังคับโดยปริยาย
+        </p></div>
+
         <div class="rulebox mb-4"><div class="rc mb-1">RULE · endpoint ที่ไม่ @Public() ต้องมี @RequirePermission พร้อมชื่อ { th, en }</div><p class="text-[13.5px]"><span class="mono text-[12px]">@RequirePermission('resource:action', { th, en })</span> — <b>ต้องส่งชื่อสองภาษาเสมอ</b> ไม่ใช่แค่สตริง permission · <span class="mono text-[12px]">AuthGuard</span> + <span class="mono text-[12px]">PermissionGuard</span> ลงทะเบียนเป็น <span class="mono text-[12px]">APP_GUARD</span> ใน <span class="mono text-[12px]">CommonModule</span> ทุก BC — endpoint ที่ไม่ public และ<b>ไม่มี</b> <span class="mono text-[12px]">@RequirePermission()</span> จะถูก <b>default-deny</b> · แคตตาล็อก <span class="mono text-[12px]">permissions</span> ไม่ hand-maintain: รัน <span class="mono text-[12px]">npm run permissions:sync</span> หรือกดปุ่ม Sync Permissions ในหน้า admin (<span class="mono text-[12px]">POST /permission-syncs</span>) · sync แตะเฉพาะแคตตาล็อก <b>ไม่ผูก permission เข้า policy ให้</b> — ต้องมี grant migration แยกอีกที</p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">permissions:sync · สอง plane คนละแหล่งที่มา</div><p class="text-[13.5px]">
+          <b>plane <span class="mono text-[12px]">api</span></b> — สแกนจาก decorator <span class="mono text-[12px]">@RequirePermission('resource:action', { th, en })</span> ใน <span class="mono text-[12px]">apps/&lt;service&gt;/src/**/*.ts</span>
+          <br><b>plane <span class="mono text-[12px]">ui</span></b> (<span class="mono text-[12px]">page:*</span>, <span class="mono text-[12px]">component:*</span>) — สแกนจาก attribute <span class="mono text-[12px]">data-permission="..."</span> ใน <span class="mono text-[12px]">views/**</span> + <span class="mono text-[12px]">public/**</span> และจากไฟล์ประกาศ <span class="mono text-[12px]">apps/&lt;service&gt;/ui-permissions.manifest.json</span> ถ้ามี · <b>manifest เป็นแหล่งที่ควรใช้</b> เพราะ attribute ใส่ชื่อ <span class="mono text-[12px]">{ th, en }</span> ไม่ได้ (ได้ placeholder ที่ humanize เอา) และบอกไม่ได้ว่า component อยู่หน้าไหน · manifest ประกาศได้เฉพาะ ui plane — endpoint จริงยังต้องมี decorator ของตัวเอง · ชนกันเมื่อไร manifest ชนะ
+          <br><b><span class="mono text-[12px]">resource</span> เป็นค่าที่ derive มา ไม่ใช่แค่ข้างหน้า colon</b> — <span class="mono text-[12px]">derivePermissionParts()</span> คือแหล่งความจริงเดียว: <span class="mono text-[12px]">page:view_dashboard</span> → resource <span class="mono text-[12px]">page_dashboard</span> (ตัด <span class="mono text-[12px]">view_</span> ทิ้ง), component ที่อยู่ใต้ page ใน manifest <b>สืบ resource ของ page นั้น</b>, ส่วน api plane เก็บ prefix ไว้ (<span class="mono text-[12px]">role:create</span> → <span class="mono text-[12px]">role</span>) · seed migration ที่เขียนมือต้อง derive ให้ตรงกัน เพราะ sync ทั้งสองทาง <span class="mono text-[12px]">UPDATE … SET resource = EXCLUDED.resource</span> — derive ผิดจะทับแถวที่ seed ถูกไว้ทั้งหมดเงียบ ๆ
+          <br>upsert ด้วยคู่ <span class="mono text-[12px]">(service, permission)</span> เพราะ <span class="mono text-[12px]">resource:action</span> เดียวกันมีความหมายต่างกันได้ในคนละ BC · ของที่หายไปจากทั้งสองแหล่งถูก soft-delete ไม่เคย hard-delete · ทุกรอบบันทึกเป็นแถวใน <span class="mono text-[12px]">permission_sync_logs</span>
+        </p></div>
+
+        <div class="rulebox mb-4" style="border-left-color:var(--signal)"><div class="rc mb-1">⚠ กับดักลำดับ deploy · permission ใหม่กับ grant migration ขึ้นพร้อมกันไม่ได้</div><p class="text-[13.5px]">
+          pipeline รัน <span class="mono text-[12px]">migration:run</span> <b>ก่อน</b> <span class="mono text-[12px]">permissions:sync</span> (ยืนยันจาก log ของ deploy จริง 2026-09-04) ซึ่งตรงข้ามกับสิ่งที่ grant migration ต้องการ — migration ที่ <span class="mono text-[12px]">INSERT … JOIN permissions</span> จะรันตอนที่ยังไม่มีแถวใน <span class="mono text-[12px]">permissions</span> เลย จึง grant <b>ศูนย์ statement</b> แต่บันทึกตัวเองว่า executed แล้ว — ไม่มี error ไม่มี log มีแต่ <span class="mono text-[12px]">403 Missing required permission</span> ตอนยิงจริง
+          <br><b>ลำดับที่ปลอดภัย</b>: deploy <span class="mono text-[12px]">@RequirePermission()</span> ไปก่อนตัวเดียว ปล่อยให้ <span class="mono text-[12px]">permissions:sync</span> ของรอบนั้นสร้างแถวในแคตตาล็อก <b>แล้วค่อย</b> deploy grant migration ในคอมมิตถัดไป
+          <br><b>ถ้าพลาดไปแล้ว</b>: เขียน migration ตัวใหม่ที่ re-apply INSERT เดิม (มี <span class="mono text-[12px]">NOT EXISTS</span> กัน) — <b>ห้ามแก้หรือรันตัวเดิมซ้ำ</b> เพราะ migration ที่บันทึกไว้ในตาราง <span class="mono text-[12px]">migrations</span> แล้วจะไม่มีวันรันอีก (ดูรูปแบบที่ <span class="mono text-[12px]">ReapplyVatReturnPermissionsToMockPolicies</span>)
+        </p></div>
         <div class="rulebox"><div class="rc mb-1">RULE · body ว่างของ action route ถือเป็น {} ไม่ใช่ 400</div><p class="text-[13.5px]"><span class="mono text-[12px]">bootstrap.util.ts</span> แทน content-type parser ของ <span class="mono text-[12px]">application/json</span> ด้วยตัวที่คืน <span class="mono text-[12px]">{}</span> เมื่อ body ยาว 0 ไบต์ (นอกนั้นส่งต่อ parser เดิมของ Fastify ทุกประการ รวมถึง JSON เสีย → 400 เหมือนเดิม) — action route อย่าง <span class="mono text-[12px]">POST /{doc}/{id}/approve</span> จึงเรียกได้โดยไม่ต้องส่ง <span class="mono text-[12px]">{}</span> มาเอง · <b>ลำดับการติดตั้งสำคัญ</b>: ต้องเรียก <span class="mono text-[12px]">await app.init()</span> ก่อน แล้วค่อย <span class="mono text-[12px]">removeContentTypeParser</span> + ลงทะเบียนตัวใหม่ — ติดตั้งก่อนหน้านั้นทุก BC จะ crash-loop ตอน boot ด้วย <span class="mono text-[12px]">FastifyError: Content type parser 'application/json' already present</span></p></div>
       </section>
 
@@ -637,10 +805,173 @@ microserviceInstance.useGlobalInterceptors(
         <div class="rulebox mb-4"><div class="rc mb-1">RULE · migration ที่แปลง date → timestamptz ต้องปักที่เที่ยงคืนกรุงเทพฯ</div><p class="text-[13.5px]"><span class="mono text-[12px]">USING (col::timestamp AT TIME ZONE 'Asia/Bangkok')</span> — cast เปล่า ๆ จะเลื่อนวันตามปฏิทินของแถวเดิมทันทีถ้า session ไม่ได้ตั้ง timezone เป็น UTC+7 อยู่แล้ว</p></div>
         <div class="rulebox"><div class="rc mb-1">RULE · เปลี่ยน schema แล้วต้องไปแก้ seeder ด้วยเสมอ</div><p class="text-[13.5px]">seeder ใน <span class="mono text-[12px]">libs/database/src/scripts/seed/</span> เป็น <span class="mono text-[12px]">pg</span> client เขียน SQL ดิบ <b>ไม่ผ่าน entity/service/DTO</b> จึงไม่มีอะไร type-check ให้ — มันพังตอน runtime บนเครื่องที่ติดตั้งใหม่ นานหลังจากคุณแก้ · ต้องตามแก้เมื่อ: เพิ่ม/เปลี่ยนชื่อคอลัมน์หรือทำให้ <span class="mono text-[12px]">NOT NULL</span> · เปลี่ยน natural key (seeder re-resolve reference จาก DB ด้วย natural key ไม่ได้ถือ id ไว้ในหน่วยความจำ) · เปลี่ยนชื่อ/ลบตาราง หรือมี entity ใหม่เข้ามาใน aggregate ที่ seed อยู่ (แก้ <span class="mono text-[12px]">truncates</span> + <span class="mono text-[12px]">SEEDERS[]</span> พร้อม <span class="mono text-[12px]">depends_on</span>) · BC ใหม่เริ่ม seed ได้ (เพิ่มใน <span class="mono text-[12px]">ISeedDatabase</span> + <span class="mono text-[12px]">SEED_DATABASE_ENV</span>) · tree entity มีแถวเพิ่ม (ต้อง rebuild <span class="mono text-[12px]">lft</span>/<span class="mono text-[12px]">rgt</span>) · seeder ต้อง idempotent + deterministic — สุ่มค่าจาก <span class="mono text-[12px]">stable-index.util.ts</span> (hash ของ SKU) ห้ามใช้ <span class="mono text-[12px]">faker</span>/<span class="mono text-[12px]">Math.random</span> · ตรวจด้วย <span class="mono text-[12px]">npm run seed -- --dry-run</span> และ <span class="mono text-[12px]">--fresh --yes</span> บน DB ทดสอบเมื่อเป็นการเปลี่ยนโครงสร้าง</p></div>
       </section>
+      <!-- ========== 14 FILES & STORAGE ========== -->
+      <section id="files" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">14 — Files &amp; Storage</div>
+        <h2 class="display text-3xl mb-6">ไฟล์แนบ · presigned เทียบกับ multipart</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          <span class="mono text-[13px]">apps/storage</span> เป็น wrapper ของ S3/MinIO ที่<b>ไม่มี Postgres ของตัวเอง</b> และเปิดให้ใช้ผ่าน RPC
+          (<span class="mono text-[13px]">AppMicroservice.Storage.cmd</span>) เท่านั้น — <span class="mono text-[13px]">Upload</span>/<span class="mono text-[13px]">UploadWithMeta</span>,
+          <span class="mono text-[13px]">GeneratePresignedUpload</span>/<span class="mono text-[13px]">HeadObject</span>, <span class="mono text-[13px]">Remove</span>/<span class="mono text-[13px]">GetPath</span>/<span class="mono text-[13px]">GenerateSignedUrls</span>
+        </p>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · BC เก็บแค่ bucket/object_key ห้ามเก็บ signed URL</div><p class="text-[13.5px]">
+          signed URL หมดอายุ (1 ชม.) — เก็บลงคอลัมน์เมื่อไรก็กลายเป็นลิงก์ตายในฐานข้อมูล · ขอใหม่ตอนที่ต้องใช้จริงผ่าน <span class="mono text-[12px]">GenerateSignedUrls</span> และ<b>อย่าขอแบบ eager ในทุก list/get response</b> · ตัวอย่างอ้างอิงที่ทำครบทั้งสองโฟลว์: <span class="mono text-[12px]">ProductImagesService.getDownloadUrl</span>
+        </p></div>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(14,124,134,.06);border:1px solid rgba(14,124,134,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--accent)">✅ PRESIGNED — ค่าเริ่มต้น</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">
+              "เพิ่มไฟล์ให้ resource ที่มีอยู่แล้ว" · <span class="mono text-[12px]">GeneratePresignedUpload</span> → client PUT ตรงไป MinIO → ยืนยันด้วย <span class="mono text-[12px]">HeadObject</span>
+              <br><b>bytes ไม่เคยผ่าน backend หรือ broker</b> — <span class="mono text-[12px]">TRANSPORT</span> เป็น rmq หรือ tcp จึงไม่เกี่ยวเลย
+              <br><span class="mono text-[12px]">HeadObject</span> คืน <span class="mono text-[12px]">null</span> = "ยังไม่เคยอัปโหลดจริง" ไม่ใช่ error
+              <br><b>endpoint ยืนยันต้องตรวจว่า <span class="mono text-[12px]">object_key</span> อยู่ใต้ prefix ของ resource นั้นจริง</b> (<span class="mono text-[12px]">assertObjectKeyOwnedByProduct</span>) ไม่งั้น client ลงทะเบียน object ที่ตัวเองไม่ได้อัปโหลด — รวมถึงของคนอื่น — ได้
+            </p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-3" style="color:var(--signal)">MULTIPART — เฉพาะ "สร้าง resource พร้อมไฟล์ในครั้งเดียว"</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">
+              <span class="mono text-[12px]">UploadWithMeta</span> · bytes วิ่งผ่าน backend · ใช้เมื่อ route เดียวกันต้องรับ <span class="mono text-[12px]">application/json</span> ธรรมดาได้ด้วย
+              <br>Fastify <b>ไม่เติม <span class="mono text-[12px]">request.body</span></b> ให้ multipart — <span class="mono text-[12px]">@Body()</span> จึงใช้ไม่ได้ ต้องรับ <span class="mono text-[12px]">@Req()</span> แล้ว validate เองด้วย <span class="mono text-[12px]">parseMultipartJsonBody</span>/<span class="mono text-[12px]">validateDto</span> ซึ่งโยน <span class="mono text-[12px]">ValidationException</span> รูปเดียวกับ global pipe
+              <br>ฟิลด์ที่ถือ JSON payload ชื่อ <span class="mono text-[12px]">data</span> ตามธรรมเนียม · <span class="mono text-[12px]">@fastify/multipart</span> ลงทะเบียนไว้ทั้งแพลตฟอร์ม (<span class="mono text-[12px]">MULTIPART_MAX_FILE_SIZE_BYTES</span>/<span class="mono text-[12px]">MULTIPART_MAX_FILES</span> · ค่าเริ่มต้น 5MB/5 ไฟล์) แต่ opt-in รายคำขอ
+            </p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · error ระหว่างวน multipart part = 400 เสมอ ไม่ใช่ 500</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">@fastify/multipart</span> ไม่ได้โยน <span class="mono text-[12px]">FST_*</span> <span class="mono text-[12px]">FastifyError</span> ตามที่เอกสารบอกเสมอไป — เกินจำนวนไฟล์กลางสตรีมโผล่มาเป็น <span class="mono text-[12px]">ERR_STREAM_PREMATURE_CLOSE</span> ของ Node ธรรมดา (ยืนยันกับ instance จริงแล้ว) · <span class="mono text-[12px]">parseMultipartJsonBody</span> ครอบให้แล้ว — อย่าไปเขียนโค้ดอ่าน part เองที่อื่นโดยไม่มี catch-all แบบเดียวกัน
+        </p></div>
+
+        <div class="rulebox"><div class="rc mb-1">อย่าเพิ่มการถอดรหัสชื่อไฟล์กลับเข้ามาอีก</div><p class="text-[13.5px]">
+          resource ที่ชื่อไฟล์เดินทางมาถึง backend ผ่าน <span class="mono text-[12px]">@fastify/multipart</span> เท่านั้น <b>ไม่ต้อง</b> decode ซ้ำ — มันเป็น UTF-8 ที่ถูกต้องอยู่แล้ว · <span class="mono text-[12px]">storage.service.ts</span> เคยตีความ <span class="mono text-[12px]">originalname</span> เป็น latin1→UTF-8 ทุกตัวโดยเดาว่าเจอบั๊ก mojibake ของ Busboy/Multer ซึ่งไม่จริงกับ transport ของแอปนี้ และมันทำให้ชื่อไฟล์ภาษาไทยที่ถูกอยู่แล้วเพี้ยน — ถอดออกไปแล้ว อย่าเอากลับมาโดยไม่มีผู้เรียกที่ต้องการจริง ๆ
+        </p></div>
+      </section>
+
+      <!-- ========== 15 SCHEDULED JOBS ========== -->
+      <section id="jobs" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">15 — Scheduled Jobs</div>
+        <h2 class="display text-3xl mb-6">งานตามเวลา · <span class="mono text-[20px]">*JobsController</span></h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          งานตามเวลาอยู่ในคลาส <span class="mono text-[13px]">&lt;Resource&gt;JobsController</span> ที่ประกาศ <span class="mono text-[13px]">@Controller()</span> <b>ไม่มี path</b>
+          — ที่ต้องเป็น controller เพราะ explorer ของ <span class="mono text-[13px]">@nestjs/schedule</span> สแกนทั้ง provider และ controller ·
+          controller เป็นแค่ตัวสั่งงาน: มันรู้ว่า<b>เมื่อไร</b>ต้องรันและจะทำอย่างไรถ้าพัง ส่วนเนื้องานอยู่ใน service ที่ endpoint ปกติก็เรียกได้
+        </p>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · dependency tree ของ host ต้อง static — ของที่เป็น Scope.REQUEST ต้อง resolve ผ่าน ModuleRef</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">@nestjs/schedule</span> ลงทะเบียน <span class="mono text-[12px]">@Cron</span> ให้เฉพาะ host ที่ dependency tree เป็น <b>static</b> · service ที่พึ่ง <span class="mono text-[12px]">MicroserviceClientService</span> (ซึ่งเป็น <span class="mono text-[12px]">Scope.REQUEST</span>) ถ้า inject ตรง ๆ จะลาก controller ให้กลายเป็น request-scoped ตามไปด้วย แล้ว scheduler จะ<b>ข้ามงานนั้นเงียบ ๆ</b> เหลือแค่ warning ตอน boot — งานไม่เคยรันเลยโดยไม่มีใครรู้
+          <br>ทางที่ถูก: <span class="mono text-[12px]">moduleRef.resolve(Service, ContextIdFactory.create(), { strict: false })</span> ทุกรอบ tick (ไม่มี inbound request ให้สืบ context อยู่แล้ว ซึ่งถูกต้องสำหรับ cron) · ดู <span class="mono text-[12px]">ExpiryAlertJobsController</span> เทียบกับ <span class="mono text-[12px]">OutboxJobsController</span> ที่ inject ได้ตามปกติเพราะ <span class="mono text-[12px]">OutboxService</span> ใช้ <span class="mono text-[12px]">ClientProxy</span> ดิบ
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · ล็อกต่อ tick เมื่อ worker ทั้งสองตัวจะทำงานซ้ำกัน</div><p class="text-[13.5px]">
+          ทุก BC ถูกสตาร์ทด้วย PM2 <span class="mono text-[12px]">exec_mode: 'cluster'</span> <span class="mono text-[12px]">instances: 2</span> และ <span class="mono text-[12px]">@nestjs/schedule</span> ทำงานแยกต่อ process — ไม่มีล็อก = tick เดียวยิงสองครั้ง งานที่ emit event ก็ emit สองรอบ งานที่เขียนแถวก็เขียนซ้ำ (เพิ่ม <span class="mono text-[12px]">instances</span> ยิ่งแย่ขึ้นเงียบ ๆ)
+          <br><span class="mono text-[12px]">ScheduledJobLockService.acquire(key, ttl)</span> เป็น <span class="mono text-[12px]">SET NX EX</span> บน Redis — ใครจองได้ก่อนเป็นคนทำ อีกตัวข้าม · <b>ตั้งใจไม่ปล่อยล็อกเมื่อทำงานเสร็จ</b>: TTL คือสิ่งที่นิยามว่า "tick นี้จัดการแล้ว" worker ที่ตายกลางทางจึงส่งงานซ้ำให้เพื่อนไม่ได้ · key ต้องไม่ซ้ำ<b>ทั้งต่อ job และต่อ tick</b> (<span class="mono text-[12px]">job:expiry-alert:2026-08-28</span>) ไม่งั้นรอบแรกจะบล็อกทุกรอบถัดไป
+          <br><b>ข้อยกเว้นที่ถูกต้อง</b>: outbox relay <b>ไม่มี</b>ล็อก เพราะ <span class="mono text-[12px]">claimBatch()</span> จองแถวด้วย <span class="mono text-[12px]">FOR UPDATE SKIP LOCKED</span> — worker สองตัวหยิบคนละ batch และทำงานที่มีประโยชน์ทั้งคู่ การเอาล็อกมาคั่นมีแต่ลด throughput ลงครึ่งหนึ่งโดยไม่ได้อะไร · ฐานข้อมูลแยกงานให้แล้ว
+        </p></div>
+
+        <div class="rulebox"><div class="rc mb-1">RULE · @Cron handler ต้องไม่ปล่อยให้ reject หลุดออกไป</div><p class="text-[13.5px]">
+          rejection ของ <span class="mono text-[12px]">@Cron</span> คือ unhandled promise rejection ซึ่งภายใต้ <span class="mono text-[12px]">--unhandled-rejections=throw</span> (ค่าเริ่มต้นของ Node) จะลากทั้ง worker ลง — "สแกนของหมดอายุคืนนี้ล้มเหลว" กลายเป็น "inventory-bc รีสตาร์ตตอนตีหนึ่ง" · catch + log แล้วปล่อยให้ tick ถัดไปทำต่อ (สแกนที่ derive ทุกอย่างจากข้อมูลปัจจุบันรันซ้ำได้อยู่แล้ว) · ใช้ <span class="mono text-[12px]">timeZone: BUSINESS_TIMEZONE</span> กับทุก <span class="mono text-[12px]">@Cron</span> ที่ผูกกับเวลาทำการ
+        </p></div>
+      </section>
+
+      <!-- ========== 16 BUSINESS DOCUMENTS ========== -->
+      <section id="documents" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">16 — Business Documents</div>
+        <h2 class="display text-3xl mb-6">เอกสารธุรกิจ · เงิน ภาษี และเลขที่ตามกฎหมาย</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          หัวข้อนี้เป็น<b>กฎของโดเมน ไม่ใช่ convention ทางวิศวกรรม</b> — มันมาจากวิธีที่บัญชีไทยกับสถาปัตยกรรมของระบบทำงานจริง
+          (<a href="srs-p5.html" style="color:var(--accent);text-decoration:underline">srs-p5</a>, <a href="core-feature.html" style="color:var(--accent);text-decoration:underline">core-feature</a>)
+          การ implement ที่ "สะอาดกว่า" แต่ผิดข้อใดข้อหนึ่งคือ<b>ผิด</b> ไม่ใช่ trade-off · เลขคณิตทั้งหมดอยู่ใน <span class="mono text-[13px]">@lib/common/utils/</span> ที่เดียว
+          service เป็นแค่ adapter บาง ๆ — สำเนาที่สองของเลขคณิตนี้คือวิธีที่เอกสารสองชนิดเริ่มเข้าใจคำว่า "ส่วนลด" ไม่ตรงกันเงียบ ๆ
+        </p>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th style="width:230px">Util</th><th>รับผิดชอบ</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">document-totals.util.ts</span></td><td><span class="mono text-[12px]">assertNoDuplicateProductLines()</span> · <span class="mono text-[12px]">resolveDocumentLineAmounts()</span> (gross/discount/net ต่อบรรทัด ตาม <span class="mono text-[12px]">discount_mode</span>) · <span class="mono text-[12px]">sumDocumentLines()</span> · <span class="mono text-[12px]">computeDocumentTotals()</span></td></tr>
+              <tr><td><span class="mono text-[12px]">discount.util.ts</span></td><td><span class="mono text-[12px]">roundMoney()</span> (4 ตำแหน่ง ตรงกับ <span class="mono text-[12px]">numeric(18,4)</span>) · <span class="mono text-[12px]">resolveDiscountAmount()</span></td></tr>
+              <tr><td><span class="mono text-[12px]">vat.util.ts</span></td><td><span class="mono text-[12px]">resolveLineVat()</span> (<span class="mono text-[12px]">exclude_vat</span>/<span class="mono text-[12px]">include_vat</span>) · <span class="mono text-[12px]">summarizeVat()</span> · <span class="mono text-[12px]">resolveWithholdingTax()</span> · <span class="mono text-[12px]">allocateProRata()</span></td></tr>
+              <tr><td><span class="mono text-[12px]">document-date.util.ts</span></td><td><span class="mono text-[12px]">normalizeDateOnly()</span> · <span class="mono text-[12px]">resolveDocumentDate()</span> (ดีฟอลต์เป็นวันนี้ตามกรุงเทพฯ ไม่ใช่ UTC) · <span class="mono text-[12px]">assertDateNotAfter()</span></td></tr>
+              <tr><td><span class="mono text-[12px]">price-reference.util.ts</span></td><td><span class="mono text-[12px]">assertPriceWithinReferenceBound()</span> — กรอบ ±20% เทียบ <span class="mono text-[12px]">item_prices</span> ของ inventory-bc</td></tr>
+              <tr><td><span class="mono text-[12px]">document-line-sync.util.ts</span></td><td><span class="mono text-[12px]">planDocumentLineSync()</span> — diff insert/update/delete ที่ <span class="mono text-[12px]">update()</span> เอาไปใช้กับบรรทัดเอกสาร</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · update() ที่ส่ง items มาใหม่คือการ SYNC ไม่ใช่ลบทิ้งแล้วใส่ใหม่</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">planDocumentLineSync()</span> diff ของที่เก็บไว้กับที่ส่งมาด้วย <span class="mono text-[12px]">product_id</span> (เป็น key ที่ใช้ได้เพราะ <span class="mono text-[12px]">assertNoDuplicateProductLines</span> ปฏิเสธเอกสารที่มีสินค้าเดียวกันซ้ำ) — บรรทัดที่ match ถูก <span class="mono text-[12px]">UPDATE</span> อยู่กับที่ เก็บ <span class="mono text-[12px]">id</span>, <span class="mono text-[12px]">created_at</span>/<span class="mono text-[12px]">created_by</span> และทุกคอลัมน์ที่ client ไม่เคยส่งมาไว้ครบ — ที่สำคัญที่สุดคือ <span class="mono text-[12px]">purchase_order_items.received_qty</span> ซึ่งการ re-insert จะรีเซ็ตเป็นศูนย์ ลบประวัติของที่รับมาแล้วทิ้ง
+          <br>อ่านแถวที่เก็บไว้ <b>ภายใน transaction เดียวกัน</b> ใต้ row lock ของ header และเขียนบรรทัด<b>หลัง</b>ผ่าน validation ครบแล้วเท่านั้น — request ที่ถูกปฏิเสธต้องไม่ทิ้งบรรทัดที่ sync ไปครึ่งทางไว้
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · DiscountMode สามแบบแยกขาดจากกัน ห้ามซ้อน</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">none</span> ข้ามการคำนวณทั้งหมด · <span class="mono text-[12px]">header</span> ต้องมี <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span> แล้วคิดกับ <span class="mono text-[12px]">sub_total</span> · <span class="mono text-[12px]">per_item</span> ใช้ส่วนลดของแต่ละบรรทัดแล้วรวมขึ้นมาเป็น <span class="mono text-[12px]">total_discount</span> ของ header
+          <br>นอกโหมด <span class="mono text-[12px]">per_item</span> ส่วนลดรายบรรทัดที่ client ส่งมาถูก<b>ทิ้ง</b> · นอกโหมด <span class="mono text-[12px]">header</span> <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span> ถูกบังคับเป็น <span class="mono text-[12px]">null</span>
+          <br><span class="mono text-[12px]">sub_total</span> คือผลรวม<b>ก่อน</b>หักส่วนลดเสมอ ดังนั้น <span class="mono text-[12px]">total = sub_total − total_discount</span> เป็นจริงทุกโหมด และทั้งสองค่าไม่เคยติดลบ
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · "ของชนิดไหน" เป็นของ inventory-bc · "อัตราเท่าไร" เป็นของ finance-bc</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">inventory-bc.tax_categories</span> ตอบว่า<b>สินค้านี้เป็นของประเภทไหน</b> (<span class="mono text-[12px]">VatTreatment</span> = <span class="mono text-[12px]">standard</span>/<span class="mono text-[12px]">zero_rated</span>/<span class="mono text-[12px]">exempt</span>) — enum อยู่ใน <span class="mono text-[12px]">@lib/common</span> เพราะ finance-bc ต้อง snapshot ลงทุกบรรทัดใบกำกับ
+          <br><span class="mono text-[12px]">finance-bc.tax_configs</span> ตอบว่า<b>อัตราเท่าไร และมีผลช่วงไหน</b> — version ด้วย <span class="mono text-[12px]">effective_from</span>/<span class="mono text-[12px]">effective_upto</span> เพื่อให้การเปลี่ยนอัตราตามกฎหมายไม่ย้อนไปแก้เอกสารที่ออกไปแล้ว · สองแถวที่ <span class="mono text-[12px]">code</span> เดียวกันห้ามมีช่วงเวลาซ้อนกัน
+          <br>ข้าม BC ผ่าน RPC เสมอ และ<b>ห้ามให้ client เป็นคนบอก</b> — ผู้เรียกที่ประกาศเองว่าบรรทัดนี้ <span class="mono text-[12px]">exempt</span> ได้ ก็ล้าง VAT ของการขายที่ต้องเสียภาษีได้ · สินค้าที่ไม่มี tax category ตกไปที่ <span class="mono text-[12px]">STANDARD</span> (เก็บเกินดีกว่าเก็บขาด)
+          <br><span class="mono text-[12px]">zero_rated</span> กับ <span class="mono text-[12px]">exempt</span> คำนวณได้ 0 เท่ากันแต่<b>ต้องแยกกันจนถึง header</b> (<span class="mono text-[12px]">total_zero_vat_price</span> เทียบ <span class="mono text-[12px]">total_exempt_vat_price</span>) — คนละช่องใน ภ.พ.30 และมีแต่ zero-rated ที่ยังเครดิตภาษีซื้อได้
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · ส่วนลด header ต้องปันลงบรรทัดก่อนคิด VAT · WHT ไม่เคยลด total</div><p class="text-[13.5px]">
+          ยอดแยกตาม treatment เป็นตัวเลขระดับบรรทัด — ปล่อยส่วนลดไว้ที่ header จะทำให้ยอดเหล่านั้นสูงเกินจริงและ VAT ที่ต้องชำระผิดตาม · <span class="mono text-[12px]">allocateProRata()</span> โยนเศษจากการปัดให้ตัวที่น้ำหนักมากที่สุด ผลรวมจึงกลับมาเท่าเดิมพอดี
+          <br><b>ภาษีหัก ณ ที่จ่ายไม่ลดยอดหนี้</b> มันลดเงินสดที่ได้รับ — เงินสดที่คาดว่าจะได้คือ <span class="mono text-[12px]">total − total_wht</span> ซึ่ง<b>คำนวณเอา ไม่เก็บเป็นคอลัมน์</b>
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · เลขที่เอกสารตามกฎหมายต้องไม่มีช่อง (gapless)</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">Receipt</span> ของ finance-bc (ใบเสร็จเงินสด / ใบกำกับภาษีเต็มรูป / อย่างย่อ แยกด้วย <span class="mono text-[12px]">document_type</span>) ไม่ใช่เอกสาร workflow จึงไม่มีชุดสถานะแบบ PO/Quotation — <span class="mono text-[12px]">ReceiptStatus</span> คือ <span class="mono text-[12px]">DRAFT → ISSUED → VOID</span>
+          <br><b>เลขถูกดึงตอน <span class="mono text-[12px]">issue()</span> ไม่ใช่ตอน create</b> — §86/4 บังคับว่าลำดับต้องไม่มีช่อง เลขจึงต้องไม่ถูกใช้ไปกับเอกสารที่ยังทิ้งได้ · ดึงอยู่<b>ใน transaction เดียวกับที่พลิกสถานะ</b> พังกลางคันจึงไม่เผาเลข · ปีมาจาก <span class="mono text-[12px]">document_date</span> ของเอกสารเอง ไม่ใช่วันนี้ เอกสารของเดือนธันวาคมจึงไม่ถูกออกเลขเข้าลำดับของปีหน้า
+          <br><b><span class="mono text-[12px]">ISSUED</span> แก้ไม่ได้</b> — <span class="mono text-[12px]">update()</span> รับเฉพาะ <span class="mono text-[12px]">DRAFT</span> การแก้ไขทำด้วยใบลด/ใบเพิ่มหนี้ที่อ้างถึงเอกสารเดิม ไม่ใช่การแก้ทับ · <b><span class="mono text-[12px]">VOID</span> เก็บทั้งแถวและเลขไว้</b> เลขที่ถูกใช้แล้วต้องมีที่อยู่เสมอ ไม่งั้นลำดับตรวจสอบไม่ได้ และไม่มีการนำกลับมาใช้ซ้ำ · <span class="mono text-[12px]">DRAFT</span> ไม่มีเลขและไม่มีตัวตนทางกฎหมาย จึง<b>ลบ</b>ได้ ไม่ต้อง void
+        </p></div>
+
+        <div class="rulebox"><div class="rc mb-1">RULE · เอกสารธุรกรรมเป็น submittable · เหตุการณ์ออกหลัง commit</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">DRAFT → SUBMITTED → CANCELLED</span> — สต็อก/บัญชีลงตอน submit และกลับรายการตอน cancel · domain event ออก<b>หลัง commit</b> ผ่าน outbox และ consumer ต้อง idempotent · <span class="mono text-[12px]">available_qty</span> มี <span class="mono text-[12px]">CHECK (… &gt;= 0)</span> ที่ระดับฐานข้อมูล · อ้างข้าม BC ด้วย uuid เท่านั้น ไม่มี FK ข้ามฐานข้อมูล
+        </p></div>
+      </section>
+
+      <!-- ========== 17 ADMIN UI (EJS) ========== -->
+      <section id="admin-ui" class="section py-4 pb-20">
+        <div class="eyebrow text-[var(--accent)] mb-3">17 — Admin UI (EJS)</div>
+        <h2 class="display text-3xl mb-6">หน้าแอดมินที่ render จากฝั่ง server</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-7 leading-[1.85]">
+          หน้าแอดมินเป็น EJS ที่ backend render เอง + vanilla JS ไม่มี framework — <span class="mono text-[13px]">apps/iam/views</span> คือ reference implementation
+          และ skill <span class="mono text-[13px]">init-view</span> scaffold หน้าใหม่ที่ทำตามกติกาทั้งหมดนี้ให้แล้ว · กติกาฉบับเต็มอยู่ที่
+          <span class="mono text-[13px]">.claude/rules/admin-ui-ejs.md</span> — ข้างล่างคือข้อที่พลาดแล้วเจ็บที่สุด
+        </p>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">โครงหน้า · list กับ form แยกไฟล์เป็นค่าเริ่มต้น</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">views/pages/{resource}/index.ejs</span> (list อย่างเดียว) + <span class="mono text-[12px]">form.ejs</span> (สร้างและแก้ไขรวมไฟล์เดียว) · view controller มีสามเส้นทาง: <span class="mono text-[12px]">@Get()</span> → index, <span class="mono text-[12px]">@Get('new')</span> → form (<span class="mono text-[12px]">resourceId: null</span>), <span class="mono text-[12px]">@Get(':id/edit')</span> → form (<span class="mono text-[12px]">@Param('id', ParseUuidParamPipe)</span>)
+          <br>ใช้ <span class="mono text-[12px]">&lt;dialog&gt;</span> แทนได้เฉพาะฟอร์มที่เล็กจนหน้าเต็มเป็นภาระเปล่า หรือสิ่งที่<b>ไม่ใช่มุมมองของ resource</b> เลย (เช่น dialog เผยความลับของ access key ครั้งเดียว)
+          <br><b>อย่าเขียนชื่อหน้าซ้ำ breadcrumb</b> — <span class="mono text-[12px]">topbar.ejs</span> render ให้จาก <span class="mono text-[12px]">pageTitle</span> อยู่แล้ว · ปุ่มระดับหน้าอยู่ใน <span class="mono text-[12px]">.um-toolbar</span> ผ่าน <span class="mono text-[12px]">toolbar-action-button.ejs</span> · <b>ช่องค้นหา/ตัวกรองอยู่ใน <span class="mono text-[12px]">.um-table-toolbar</span> ในการ์ดตาราง</b> ไม่ใช่ toolbar บนสุด
+        </p></div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ตาราง · pager และคอลัมน์ audit ไม่ใช่ของเลือกใส่</div><p class="text-[13.5px]">
+          แถวอยู่ใน <span class="mono text-[12px]">&lt;table class="p-table"&gt;&lt;tbody&gt;</span> ใน <span class="mono text-[12px]">.um-table-scroll-area</span> เสมอ ห้ามทำเป็น grid ของ <span class="mono text-[12px]">&lt;article&gt;</span> เอง · ทุก list ที่ยิง endpoint แบบแบ่งหน้าจริงต้องมี <span class="mono text-[12px]">pager.ejs</span> พร้อม <span class="mono text-[12px]">pageSizeId</span>/<span class="mono text-[12px]">pageSizeOptions</span>
+          <br>ตาราง CRUD ทุกตัวต้องมี<b>คอลัมน์ audit สองช่อง</b> (<span class="mono text-[12px]">audit-columns-head</span> + <span class="mono text-[12px]">renderAuditCells(row)</span>) — อย่าลืมบวก <span class="mono text-[12px]">columnCount</span> และ <span class="mono text-[12px]">colspan</span> ของ empty state อีก 2 · <span class="mono text-[12px]">created_by</span>/<span class="mono text-[12px]">updated_by</span> เป็น uuid เปล่าบน <span class="mono text-[12px]">BaseEntity</span> และคนที่มันชี้ถึงอยู่ใน <span class="mono text-[12px]">erp_iam</span> คนละฐานกับ resource ส่วนใหญ่ — API จึง join ชื่อมาให้ไม่ได้ ต้องให้ <span class="mono text-[12px]">user-directory.js</span> resolve ฝั่ง client จาก <span class="mono text-[12px]">GET /users?ignore_limit&amp;fields=id,username</span> ที่ cache ไว้ · list แบบ log (audit-logs, sessions, ฯลฯ) ได้รับยกเว้น
+          <br>บัญชีหน้า/ขนาดหน้าไม่เขียนเองรายหน้า — ใช้ <span class="mono text-[12px]">createPaginatedList({ fetchPage, infoId, prevId, nextId, defaultPageSize })</span> แล้ว resource จัดหาแค่ <span class="mono text-[12px]">fetchPage</span>
+        </p></div>
+
+        <div class="rulebox mb-4" style="border-left-color:var(--signal)"><div class="rc mb-1">⚠ กับดัก · แก้ไฟล์ใน public/** แล้ว Nest ไม่ restart</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">nest start --watch</span> รีโหลดเฉพาะการเปลี่ยนใน <span class="mono text-[12px]">src/**</span> — <span class="mono text-[12px]">public/**</span> เปลี่ยนแค่ bundle · <span class="mono text-[12px]">?v=</span> ของทุก <span class="mono text-[12px]">&lt;script&gt;</span>/<span class="mono text-[12px]">&lt;link&gt;</span> มาจาก <span class="mono text-[12px]">getAssetVersion()</span> ที่อ่าน <b>mtime</b> ของ <span class="mono text-[12px]">build-manifest.json</span> ทุกครั้ง ห้าม memoize ไม่งั้น browser ได้ <span class="mono text-[12px]">?v=</span> เดิมที่ cache ไว้แล้ว bundle ใหม่จึงไม่เคยถูกโหลด
+          <br><b>อาการหลอก</b>: EJS ที่ render จาก server อัปเดตทันทีที่รีเฟรช แต่ JS ไม่อัปเดต — หน้า list ที่เพิ่งเพิ่มคอลัมน์จะโชว์ <span class="mono text-[12px]">&lt;th&gt;</span> ใหม่โดยไม่มี <span class="mono text-[12px]">&lt;td&gt;</span> ตรงกัน (ช่องว่าง + เส้นแถวสั้นกว่าตาราง) · เห็นรูปนี้เมื่อไรให้สงสัย bundle ค้างก่อนสงสัยข้อมูล
+        </p></div>
+
+        <div class="rulebox"><div class="rc mb-1">CSS · theme.css ตัดสินธีม ไม่ใช่ไฟล์ component</div><p class="text-[13.5px]">
+          อะไรที่ขึ้นกับธีมต้องประกาศเป็น token ใน<b>ทั้งสามบล็อก</b>ของ <span class="mono text-[12px]">theme.css</span> (<span class="mono text-[12px]">:root:not([data-theme="dark"])</span>, <span class="mono text-[12px]">@media (prefers-color-scheme: dark)</span>, <span class="mono text-[12px]">:root[data-theme="dark"]</span>) แล้ว component อ่าน token นั้นแบบไม่มีเงื่อนไข — <span class="mono text-[12px]">admin-theme-tokens.spec.ts</span> บังคับไว้ทั้งสองครึ่ง
+          <br><b>ทำไมห้ามเขียน <span class="mono text-[12px]">:root:not([data-theme="dark"])</span> ในไฟล์ component</b>: มันอ่านเหมือน "เฉพาะธีมสว่าง" แต่ไม่ใช่ — มันแมตช์ทุกครั้งที่ attribute ไม่ใช่คำว่า <span class="mono text-[12px]">dark</span> เป๊ะ ๆ <b>รวมถึงสถานะที่ผู้ใช้ทุกคนเริ่มต้น</b> (ไม่มี attribute เลย + OS ตั้งเป็นมืด ซึ่ง media block เปลี่ยน palette เป็นมืดไปแล้ว) · เคยหลุดขึ้นเป็นแถวตารางสีขาวใต้ตัวอักษรของธีมมืด อ่านไม่ออก และหายเองทันทีที่กดสลับธีม (เพราะการกดเขียน attribute จริงลงไป) จึงเกิดซ้ำได้เฉพาะตอนโหลดครั้งแรก · <span class="mono text-[12px]">:root</span> กับ <span class="mono text-[12px]">:not()</span> นับเป็น class อย่างละตัว override แบบนี้จึงชนะ <span class="mono text-[12px]">.foo:hover</span> และฆ่า hover ของธีมเดียวเงียบ ๆ ด้วย — token ไม่มี specificity จึงทำแบบนั้นไม่ได้
+          <br>กฎพื้นฐานของ Pico คือ <span class="mono text-[12px]">td,th{background-color:var(--pico-background-color)}</span> — ทุกเซลล์ทาพื้นทึบทับสิ่งที่ตั้งไว้บน <span class="mono text-[12px]">&lt;tr&gt;</span> จนมิด · กฎพื้นหลัง/hover ของแถวต้องเล็งที่ <span class="mono text-[12px]">.p-table tbody td</span> ไม่ใช่ <span class="mono text-[12px]">tr</span>
+          <br>ปุ่มทำลายข้อมูลเรียก <span class="mono text-[12px]">showConfirmDialog({ title, message, confirmText, danger })</span> เสมอ ห้ามใช้ <span class="mono text-[12px]">window.confirm()</span>
+        </p></div>
+      </section>
+
       <!-- FOOTER -->
       <erp-footer
         line1="ERP SYSTEM · BACKEND CONVENTIONS · NESTJS 11 · POSTGRESQL"
-        line2="Naming · JSON:API · Errors · Query Params · Microservice · Controllers · Entities · Boundaries · Migrations">
+        line2="Naming · JSON:API · Errors · Query Params · Microservice · Controllers · Entities · Boundaries · Migrations · Files · Jobs · Documents · Admin UI">
       </erp-footer>
 
     </div>

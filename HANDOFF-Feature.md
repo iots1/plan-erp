@@ -175,6 +175,47 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-20 · `backend-convention.html` ไล่เทียบกับโค้ดจริงทั้งไฟล์ ✅ **13 → 17 หัวข้อ + แก้ของที่เล่าผิด**
+
+**ที่มา**: คำสั่ง "เพิ่มเติมเอกสารให้ครบ ห้ามตกหล่นตามพฤติกรรมจริงของ source code" — ไล่ทุกหัวข้อของ
+`.claude/rules/*.md` เทียบกับไฟล์นี้ แล้วเทียบต่อกับโค้ดจริงอีกชั้น
+
+**หัวข้อใหม่ 4 ตัว** (ของเดิมไม่มีเลย ทั้งที่มี rule file กำกับอยู่แล้ว)
+
+| § | ครอบคลุม |
+|---|---|
+| 14 · Files &amp; Storage | presigned (ค่าเริ่มต้น) เทียบ multipart · ห้ามเก็บ signed URL · ตรวจ prefix ความเป็นเจ้าของ object · error ตอนวน multipart part = 400 เสมอ · ห้ามเอา latin1→UTF-8 กลับมา |
+| 15 · Scheduled Jobs | `*JobsController` · dependency tree ต้อง static (ModuleRef ต่อ tick) · ล็อกต่อ tick ด้วย `ScheduledJobLockService` และข้อยกเว้นของ outbox relay (`SKIP LOCKED`) · `@Cron` ห้ามปล่อย rejection หลุด |
+| 16 · Business Documents | ตาราง util ทั้ง 6 ตัว · `update()` = sync ไม่ใช่ลบ-ใส่ใหม่ · `DiscountMode` สามแบบแยกขาด · classification (inventory) เทียบ rate (finance) · ส่วนลด header ต้องปันก่อนคิด VAT · WHT ไม่ลด total · เลขที่ gapless ดึงตอน issue() |
+| 17 · Admin UI (EJS) | list/form แยกไฟล์ · pager + audit columns บังคับ · กับดัก bundle ค้างเมื่อแก้ `public/**` · `:root:not([data-theme="dark"])` ในไฟล์ component คือกับดักธีม |
+
+**ที่เติมในหัวข้อเดิม**: §02 interface ต้องอยู่ไฟล์ของตัวเอง + Swagger constants · §05 ชื่อฟิลด์
+`meta.pagination` จริง, `meta.warnings`, `200002`, ลำดับ interceptor · §06 แถว `429000` + ทำไม
+rate-limit ประกอบ envelope เอง · §07 ตาราง `QueryParamsDTO` ครบทุกฟิลด์ + `@AllowIgnoreLimit` +
+กับดัก class default ชนะ .env · §08 `TRANSPORT`, retry/idempotency, `@UseFilters` ต้องเป็น class
+decorator, ต้องพิสูจน์ด้วย smoke · §10 `BaseEntity` + กับดัก soft-delete filter ลงไปที่ตาราง join ·
+§12 สายของ guard ทั้ง 4 ตัว, decorator ยกเว้นทั้งชุด, CSRF ผูกกับคุกกี้ไม่ใช่ `@Public()`,
+permission sync สอง plane + กับดักลำดับ deploy
+
+**ของที่เล่าผิดและแก้แล้ว (เจอเพราะไล่เทียบโค้ด ไม่ใช่เดา)**
+
+1. **`?limit=` เกิน 2000 ไม่ใช่ 422** — คอมเมนต์ใน `pagination.constants.ts` กับ `query-params.dto.ts`
+   เขียนว่า "rejected with a 422" มาตลอด · ยิงจริงบนเครื่อง deploy: `?limit=5000` → **400 /
+   `400002`** `"limit must not be greater than 2000"` และ `?page=99999999` → `400002` เช่นกัน
+   (`InvalidParameterException` เป็น `HttpStatus.BAD_REQUEST` ตรง ๆ) · แก้คอมเมนต์ทั้งสองจุด +
+   เขียนผลการยิงไว้ในเอกสาร
+2. **`@fastify/rate-limit` ตอบ `status.code: 429` เลข 3 หลัก** — มันประกอบ envelope เองใน
+   `registerSecurity()` ก่อนที่ filter ของ Nest จะได้ทำงาน จึงรอดจากการแก้รอบ 6 หลักไปเงียบ ๆ ·
+   แก้เป็น `toEnvelopeStatusCode(429)` แล้ว และเขียนกำกับไว้ว่า "ที่ไหนก็ตามที่ประกอบ envelope เอง
+   นอก filter ต้องมาอัปเดตด้วย"
+3. **ตัวอย่าง envelope ที่เขียน `errors[].code: "400001"`** — ของจริงเป็น slug (`VALIDATION_ERROR`)
+   หรือ SQLSTATE (`23505`) แก้ตัวอย่างแล้ว (ดูรอบ `status.code` 6 หลักด้านล่าง)
+4. **กฎ interface ซ้ำสองที่** (§02 กับ §10) — ยุบให้ §10 ชี้มา §02 เพื่อไม่ให้ทั้งสองฉบับ drift กันเอง
+
+**ยืนยัน**: `pnpm verify` เขียวครบทั้ง 8 BC (โค้ดที่แตะคือ `bootstrap.util.ts` + คอมเมนต์สองไฟล์) ·
+render-check ด้วย headless Chrome ทั้งหน้า · well-formedness ผ่าน · `.claude/rules/api-contract.md`
+อัปเดตตามข้อ 1 ด้วยเพื่อให้ quick-reference กับฉบับ render ตรงกัน
+
 ### 2026-09-20 · `status.code` เป็น 6 หลักครบทุก response แล้ว ✅ **implement + verify 8 BC**
 
 **ที่มา**: เจอตอนยิง curl ตรวจงาน i18n รอบก่อนหน้า — `409` ตอบ `status.code` เป็นเลข 3 หลักดิบ
