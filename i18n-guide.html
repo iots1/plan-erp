@@ -181,12 +181,96 @@
           <div class="card p-6">
             <div class="flex items-center gap-2 mb-3"><span class="dot" style="background:var(--signal)"></span><h3 class="font-semibold text-[15px]">Free Text</h3></div>
             <p class="text-sm text-[var(--ink-soft)] leading-relaxed">
-              เช่น หมายเหตุ, รายละเอียด — Frontend ต้องส่งมาเป็น Flat Key ตาม Database คือ
-              <span class="mono text-[12px]">description_th</span> และ
+              เช่น หมายเหตุ, รายละเอียด — ส่งเป็น Flat Key ตาม Database คือ
+              <span class="mono text-[12px]">description_th</span> /
               <span class="mono text-[12px]">description_en</span>
+              หรือส่งเป็น Nested Object ก็ได้ (ดูหัวข้อถัดไป)
             </p>
           </div>
         </div>
+
+        <div class="eyebrow text-[var(--accent)] mt-12 mb-3">03.1 — Nested Alias (รับเพิ่ม ไม่ใช่แทนที่)</div>
+        <h3 class="display text-2xl mb-5">Request รับได้ทั้งสองรูปแบบ</h3>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
+          Flow ที่เป็นธรรมชาติที่สุดของ Client คือ <span class="mono text-[13px]">GET</span> มาแก้ในออบเจกต์เดิม
+          แล้วส่งกลับ — แต่เดิมต้องแบนมือเองทุกฟิลด์ก่อนส่ง ซึ่งพลาดแล้ว<b>เงียบ</b>:
+          <span class="mono text-[12px]">whitelist</span> ตัดคีย์ Nested ทิ้งก่อนถึง DTO ทำให้
+          <span class="mono text-[13px]">POST</span> ตายที่ <span class="mono text-[12px]">NOT NULL</span>
+          และ <span class="mono text-[13px]">PUT</span> ตอบ <span class="mono text-[12px]">200</span> โดยไม่บันทึกอะไรเลย
+          — ปัจจุบัน <span class="mono text-[13px]">LocalizedBodyPipe</span> รับรูปแบบ Nested เป็น
+          <b>Alias</b> ของคู่ <span class="mono text-[12px]">_th/_en</span> แล้ว
+        </p>
+
+        <div class="grid lg:grid-cols-2 gap-6 items-start mb-8">
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">ทั้งสอง Payload นี้ให้ผลเหมือนกันทุกประการ</div>
+            <div class="code p-5">
+<pre><span class="c">// แบบเดิม — Flat Keys (ยังเป็นรูปแบบหลักของ DTO/Swagger)</span>
+{
+  <span class="s">"code"</span>: <span class="s">"CUS-0001"</span>,
+  <span class="s">"name_th"</span>: <span class="s">"บริษัท ตัวอย่าง จำกัด"</span>,
+  <span class="s">"name_en"</span>: <span class="s">"Example Co., Ltd."</span>
+}
+
+<span class="c">// แบบใหม่ — Nested Alias (หน้าตาเดียวกับที่ Response ส่งกลับ)</span>
+{
+  <span class="s">"code"</span>: <span class="s">"CUS-0001"</span>,
+  <span class="s">"name"</span>: { <span class="s">"th"</span>: <span class="s">"บริษัท ตัวอย่าง จำกัด"</span>, <span class="s">"en"</span>: <span class="s">"Example Co., Ltd."</span> }
+}</pre>
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow text-[var(--muted)] mb-3">กติกา 4 ข้อ</div>
+            <div class="rulebox mb-3">
+              <div class="rc mb-1">RULE · FLAT ยังเป็นสัญญาหลัก</div>
+              <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+                DTO, Entity, คอลัมน์ DB และ Error ทุกตัวยังเป็น <span class="mono text-[12px]">_th/_en</span> เหมือนเดิม —
+                ส่ง <span class="mono text-[12px]">name.th</span> ผิด Error จะชี้ที่ <span class="mono text-[12px]">name_th</span>
+              </p>
+            </div>
+            <div class="rulebox mb-3">
+              <div class="rc mb-1">RULE · ส่งครึ่งเดียว = แตะแค่ด้านนั้น</div>
+              <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+                <span class="mono text-[12px]">{ name: { th: "x" } }</span> เขียนแค่
+                <span class="mono text-[12px]">name_th</span> · <span class="mono text-[12px]">name_en</span> คงค่าเดิมใน DB ·
+                ถ้าจะล้างต้องส่ง <span class="mono text-[12px]">"en": null</span> ให้ชัด
+              </p>
+            </div>
+            <div class="rulebox mb-3">
+              <div class="rc mb-1">RULE · ส่งมาทั้งสองแบบ = FLAT ชนะ</div>
+              <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+                ไม่ 400 (จะทำให้ Client เดิมพัง) แต่ตอบกลับพร้อม
+                <span class="mono text-[12px]">meta.warnings</span> code
+                <span class="mono text-[12px]">LOCALIZED_INPUT_IGNORED</span> · ชนะเป็นราย “ด้าน”
+                ไม่ใช่รายฟิลด์
+              </p>
+            </div>
+            <div class="rulebox">
+              <div class="rc mb-1">RULE · แปลงตาม SCHEMA ไม่ใช่เดาจากรูปทรง</div>
+              <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+                แปลงเฉพาะฟิลด์ที่ DTO ประกาศครบคู่ และไล่ลงไปเฉพาะ Nested DTO ที่มี
+                <span class="mono text-[12px]">@Type(() =&gt; X)</span> — ฟิลด์ <span class="mono text-[12px]">jsonb</span>
+                อิสระอย่าง <span class="mono text-[12px]">mock_data</span> จึงไม่ถูกแตะ แม้ข้างในจะมีออบเจกต์
+                <span class="mono text-[12px]">{ th, en }</span> ของมันเอง
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="eyebrow text-[var(--muted)] mb-3">ลำดับการทำงาน · bootstrap.util.ts</div>
+        <div class="code p-5">
+<pre><span class="c">// ต้องอยู่ "ก่อน" ValidationPipe เสมอ — whitelist: true จะตัดคีย์ Nested ทิ้งก่อนถึง DTO</span>
+app.useGlobalPipes(
+  <span class="k">new</span> <span class="t">LocalizedBodyPipe</span>(),   <span class="c">// nested { th, en } → flat _th/_en</span>
+  <span class="k">new</span> <span class="t">ValidationPipe</span>({ transform: <span class="k">true</span>, whitelist: <span class="k">true</span>, … }),
+);</pre>
+        </div>
+        <p class="text-[var(--ink-soft)] text-[14px] max-w-3xl mt-5 leading-[1.85]">
+          Route ที่รับ <span class="mono text-[12px]">multipart/form-data</span> ได้ Alias เดียวกันผ่าน
+          <span class="mono text-[12px]">validateDto()</span> ใน <span class="mono text-[12px]">multipart-json-body.util.ts</span> ·
+          ส่วน Query Param (<span class="mono text-[12px]">@ValidatedQuery</span>) และ Route Param ไม่เกี่ยวและไม่ถูกแตะ ·
+          OpenAPI ประกาศ Alias นี้ไว้ข้างคู่ <span class="mono text-[12px]">_th/_en</span> ให้ SDK generator เห็นด้วย
+        </p>
       </section>
 
       <div class="rule my-14"></div>
@@ -349,9 +433,21 @@
         <div class="p-5 rounded-xl" style="background:var(--signal-soft);border:1px solid #F3D9C6;">
           <div class="mono text-[11px] text-[var(--signal)] mb-2">ข้อควรจำ</div>
           <p class="text-[13.5px] text-[#7A4526] leading-relaxed">
-            ตอน Submit API ให้ส่งข้อมูลกลับไปให้ Backend ในรูปแบบ <b>Flat Keys</b>
-            (<span class="mono text-[12px]">description_th</span>, <span class="mono text-[12px]">description_en</span>)
-            ตามที่กำหนดใน DTO เสมอ — Object รูปแบบ Nested ใช้เฉพาะฝั่ง Response เท่านั้น
+            ตอน Submit จะส่ง <b>Flat Keys</b> (<span class="mono text-[12px]">description_th</span>,
+            <span class="mono text-[12px]">description_en</span>) ตามที่ DTO ประกาศ หรือส่ง
+            <b>Nested Object</b> (<span class="mono text-[12px]">description: { th, en }</span>) แบบเดียวกับที่ได้รับมาจาก
+            Response ก็ได้ — Backend รับทั้งสองแบบ (ดู <a href="#request" class="underline">03.1</a>)
+            <b>แต่อย่าส่งทั้งสองแบบพร้อมกันในฟิลด์เดียว</b>: Flat จะชนะ และจะได้
+            <span class="mono text-[12px]">meta.warnings</span> กลับมา
+          </p>
+        </div>
+
+        <div class="rulebox ok mt-5">
+          <div class="rc mb-1">ฟอร์มแก้ไข · ทางที่สั้นที่สุด</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ไม่ต้องแบนกลับเป็น <span class="mono text-[12px]">_th/_en</span> ก่อนส่งอีกแล้ว — ผูก Input สองช่องเข้ากับ
+            <span class="mono text-[12px]">form.description.th</span> / <span class="mono text-[12px]">.en</span>
+            แล้ว <span class="mono text-[12px]">PUT</span> ออบเจกต์นั้นกลับไปตรง ๆ ได้เลย
           </p>
         </div>
       </section>

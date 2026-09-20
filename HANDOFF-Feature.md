@@ -78,7 +78,9 @@
 
 ## 1 · สถานะล่าสุด
 
-**working tree สะอาดทั้งสอง repo · push + deploy ขึ้น production แล้ว**
+⚠️ **working tree ไม่สะอาด** — งาน i18n nested-input alias ของ 2026-09-20 (§2 หัวข้อแรก)
+verify เขียวครบ 8 BC แล้วแต่ **ยังไม่ commit/push/deploy** ทั้งใน `erp-api` และ submodule ·
+ของที่ push+deploy ไปแล้วคือทุกอย่างก่อนหน้านั้น
 
 | Repo | HEAD ปัจจุบัน |
 |---|---|
@@ -174,6 +176,58 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
+
+### 2026-09-20 · i18n · API รับ nested `{ th, en }` ตอนส่งเข้าได้แล้ว ✅ **implement + verify 8 BC** (ยังไม่ commit/deploy)
+
+**ที่มา**: คำถามว่า "ถ้า request เหมือน response จะทำให้ AI frontend พลาดน้อยลงไหม" — ไล่โค้ดแล้วเจอว่า
+ของเดิมไม่ใช่แค่ "ไม่สะดวก" แต่ **พังเงียบ**: `forbidNonWhitelisted` default `false` ทั้งแพลตฟอร์ม
+(`bootstrap.util.ts`) ดังนั้นคีย์ nested ที่ client ส่งมาโดน `whitelist` ตัดทิ้งก่อนถึง DTO →
+`POST` ไปตายที่ `NOT NULL` (PG 23502 → 400 ที่ชี้ผิดจุด) ส่วน **`PUT` ตอบ 200 โดยไม่ได้บันทึกอะไรเลย**
+ซึ่งเป็นเคสที่เจ็บที่สุดเพราะไม่มี error ให้ใครเห็น
+
+**สิ่งที่ทำ — รับเพิ่ม ไม่ได้เปลี่ยนสัญญาเดิม**
+
+- `libs/common/src/pipes/localized-body.pipe.ts` + `utils/localized-input.util.ts` — ลงทะเบียน
+  **ก่อน** `ValidationPipe` ใน `registerGlobalMiddleware()` แปลง `name: { th, en }` ใน body กลับเป็น
+  `name_th`/`name_en` ก่อน validation · DTO ทั้ง **62 ไฟล์ไม่ต้องแก้แม้แต่บรรทัดเดียว**
+- **แปลงตาม schema ไม่ใช่เดาจากรูปทรง** — แปลงเฉพาะฟิลด์ที่คลาสประกาศครบคู่ (อ่านจาก
+  `getMetadataStorage()` ของ class-validator จึงเห็นของที่ `PartialType(Create…DTO)` สืบมาด้วย)
+  และไล่ลงไปเฉพาะ property ที่มี `@Type(() => X)` (อ่านจาก `defaultMetadataStorage` ของ
+  class-transformer) · นี่คือสิ่งที่กัน `print_templates.mock_data` / render `params` ซึ่งเป็น
+  jsonb อิสระที่ผู้ใช้ใส่ `{ "customer_name": { "th": …, "en": … }}` ได้จริง ไม่ให้โดนเขียนทับ
+- **semantics ของ PATCH/PUT**: ใช้ `!== undefined` ไม่ใช่ `in` — `{ name: { th: 'x' } }` เขียนแค่
+  `name_th`, `name_en` คงค่าเดิม · ส่ง `null` = ล้างด้านนั้นชัดเจน
+- **ส่งมาทั้งสองแบบ = flat ชนะ + `meta.warnings` `LOCALIZED_INPUT_IGNORED`** (ไม่ 400 เพราะจะทำให้
+  client ที่เผลอส่งทั้งคู่พังทันที) · ชนะเป็นราย "ด้าน" ไม่ใช่รายฟิลด์
+- `validateDto()` ใน `multipart-json-body.util.ts` ได้ alias เดียวกัน — route ที่รับ
+  `multipart/form-data` ต้องไม่มีสัญญาแคบกว่า JSON บน route เดียวกัน
+- `applyLocalizedRequestSchemas()` เติม property nested (optional) ข้างคู่ `_th/_en` ใน OpenAPI
+  document — **ข้อนี้คือหัวใจของคำถามตั้งต้น** เพราะ AI/SDK generator อ่าน spec ไม่ได้อ่านเอกสาร
+
+**กับดักที่จ่ายไปแล้ว (อย่าไปเหยียบซ้ำ)**
+
+- `class-transformer@0.5.1` export `defaultMetadataStorage` ที่ `class-transformer/cjs/storage`
+  แต่วาง type ไว้ที่ `types/storage.d.ts` ซึ่ง `moduleResolution: nodenext` ไม่มองหา → import แล้วได้
+  `any` เงียบ ๆ (repo ตั้ง `noImplicitAny: false`) แล้ว `no-unsafe-*` ยิงรัว · แก้ด้วย ambient
+  declaration ของเราเอง `libs/common/src/types/class-transformer-storage.d.ts` ประกาศ
+  `findTypeMetadata` เป็น **optional** เพื่อให้เวอร์ชันหน้าที่ย้าย/ถอด export นี้ degrade เป็น
+  "ไม่ไล่ลง nested DTO" แทนที่จะพังตอน boot · ยืนยันว่าไฟล์นี้ load-bearing จริงโดยลองย้ายออกแล้ว lint
+  ฟ้อง 6 error ทันที
+- `SchemaObject` ไม่ได้ re-export จาก `@nestjs/swagger` และ `exports` map ปิด deep path ไว้ →
+  ต้อง derive type จากรูปของ `OpenAPIObject` เอง
+- `pnpm test` (jest ที่ root) **พังอยู่ก่อนแล้ว** 88 suites — `NODE_ENV=test` ไม่ผ่าน config
+  validation (`must be one of [local, dev, staging, prod]`) · ยืนยันด้วยการ stash แล้วรันซ้ำ:
+  88 failed เท่าเดิม · ทางที่ใช้ได้คือ `nx test <bc>` ที่ `pnpm verify` เรียก
+
+**ยืนยัน**: `pnpm verify` เขียวครบ 6 ขั้น **ทั้ง 8 BC** (sales-bc, finance-bc, report-bc, supplier-bc,
+inventory-bc, iam, auth, storage) · unit ใหม่ 11 เคสใน `localized-input.util.spec.ts` ·
+e2e ใหม่ 1 เคสใน `customers.e2e-spec.ts` (พิสูจน์ว่า service ได้ flat key และไม่มี `name` หลงเข้าไป) ·
+smoke ใหม่ `apps/sales-bc/test/smoke/localized-input.smoke.mjs` ยิงของจริง: สร้างด้วย nested →
+เช็คคอลัมน์ `name_th/name_en` ใน `erp_sales` ตรง · `PUT` ครึ่งเดียว → อีกด้านไม่ขยับ ·
+ส่งทั้งสองแบบ → flat ชนะ + warning ขึ้นจริง · payload flat แบบเดิมยังทำงานเหมือนเดิม
+
+⬜ **ค้าง** — ยังไม่ commit/push/deploy (รอสั่ง) · ฝั่ง FE ยังไม่ต้องแก้อะไร: ของเดิมใช้ได้ต่อทั้งหมด
+แค่เลิกต้องแบนมือเองได้เมื่อไรก็ได้
 
 ### 2026-09-20 · งบการเงิน D3 · P5 Admin UI ✅ **implement + verify + deploy** (ค้าง manual QA)
 

@@ -42,9 +42,14 @@ govern **every code example written into these docs** and the future backend imp
 
 DB stores **flat parallel columns** `*_th` / `*_en` (never JSONB for normal fields). A NestJS
 `LocalizationInterceptor` collapses each `_th/_en` pair into a nested object on **response**
-(`name → { th, en }`), always emitting `{ th, en }` even when null (stable contract). **Input
-(DTO) and submit payloads use flat keys** (`remark_th`, `remark_en`). Nested objects are
-**response-only**. See `i18n-guide.html`.
+(`name → { th, en }`), always emitting `{ th, en }` even when null (stable contract). **DTOs
+declare flat keys** (`remark_th`, `remark_en`) — that is still the canonical form, and what
+errors and Swagger speak. A request body may *also* send the nested `{ th, en }` object as an
+alias: `LocalizedBodyPipe` (global, registered before `ValidationPipe`) expands it back to the
+flat pair, so a client can PUT back the shape it just GET'd. A half object touches only that
+side; sending both forms for one field keeps the flat key and raises a `meta.warnings`
+`LOCALIZED_INPUT_IGNORED`. Never hand-build a `{ th, en }` on a response. See
+`i18n-guide.html`.
 
 ---
 

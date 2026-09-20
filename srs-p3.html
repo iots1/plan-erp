@@ -767,8 +767,8 @@ sequenceDiagram
           </div>
           <p class="text-[13px] mb-7" style="color:var(--ink-soft)">ทุก request แนบ <span class="mono text-[12px]">Accept-Language: th|en</span> → <span class="mono text-[12px]">nestjs-i18n</span> AcceptLanguageResolver เลือกไฟล์แปล error/validation · <span class="mono text-[12px]">LocalizationInterceptor</span> ผูกระดับ controller ให้ทุก response ยุบ <span class="mono text-[12px]">_th/_en</span> เป็น nested object อัตโนมัติ</p>
 
-          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.2 · DTO — ขาเข้าเป็น flat keys ตาม i18n Guide</h5>
-          <pre class="code p-4 mb-3"><span class="c">// create-goods-receipt.dto.ts — INPUT ใช้ flat keys ตามคอลัมน์ DB เสมอ</span>
+          <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.2 · DTO — ประกาศเป็น flat keys ตาม i18n Guide (nested เป็น alias ที่รับเพิ่มได้)</h5>
+          <pre class="code p-4 mb-3"><span class="c">// create-goods-receipt.dto.ts — DTO ประกาศ flat keys ตามคอลัมน์ DB เสมอ</span>
 <span class="k">export class</span> <span class="t">CreateGoodsReceiptItemDTO</span> {
   <span class="d">@IsUUID()</span>  product_id: <span class="t">string</span>;      <span class="c">// ห้ามเป็น has_variants=true (template)</span>
   <span class="d">@IsUUID()</span>  warehouse_id: <span class="t">string</span>;    <span class="c">// คลังปลายทาง — leaf เท่านั้น</span>

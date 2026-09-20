@@ -321,12 +321,14 @@ flowchart LR
         </div>
 
         <div class="rulebox mb-6">
-          <div class="rc mb-1">i18n · สิ่งที่ FE มักพลาด</div>
+          <div class="rc mb-1">i18n · ส่งเข้าได้ทั้งสองแบบ</div>
           <p class="text-[13.5px]">
-            <b>ตอนส่งเข้า (request body) ใช้คีย์แยก</b> — <span class="mono text-[12px]">name_th</span>,
-            <span class="mono text-[12px]">name_en</span>, <span class="mono text-[12px]">remark_th</span> ·
-            <b>ตอนรับกลับ (response) จะกลายเป็น object</b> — <span class="mono text-[12px]">name: { th, en }</span> ·
-            อย่าส่ง <span class="mono text-[12px]">{ th, en }</span> กลับเข้ามาเด็ดขาด backend จะไม่รับ ·
+            <b>ตอนรับกลับ (response) เป็น object เสมอ</b> — <span class="mono text-[12px]">name: { th, en }</span> ·
+            <b>ตอนส่งเข้า (request body) เลือกได้</b> — คีย์แยก <span class="mono text-[12px]">name_th</span>/<span class="mono text-[12px]">name_en</span>
+            (รูปแบบหลักที่ DTO และ Swagger ประกาศ) หรือส่ง object <span class="mono text-[12px]">name: { th, en }</span>
+            ชุดเดิมที่เพิ่งรับมาก็ได้ — backend แปลงให้เองก่อนเข้า validation ·
+            ส่งด้านเดียว (<span class="mono text-[12px]">{ th: "…" }</span>) = แก้แค่ด้านนั้น อีกด้านคงค่าเดิม ·
+            <b>อย่าส่งทั้งสองแบบในฟิลด์เดียวกัน</b> — คีย์แยกจะชนะ และจะได้ <span class="mono text-[12px]">meta.warnings</span> กลับมา ·
             รายละเอียดเต็ม: <a href="i18n-guide.html" class="underline">i18n Guide</a>
           </p>
         </div>
@@ -2324,7 +2326,7 @@ sequenceDiagram
           <p class="text-[13.5px] leading-[1.9]">
             <b>1.</b> ทุกเอกสารเริ่มที่ <span class="mono text-[12px]">DRAFT</span> · แก้/ลบได้เฉพาะตอนนั้น — ซ่อนปุ่มแก้ไขทันทีที่สถานะเปลี่ยน<br>
             <b>2.</b> วันที่ส่งเป็น ISO 8601 <b>เต็มรูปแบบพร้อม offset</b> เสมอ (<span class="mono text-[12px]">2026-08-29T00:00:00+07:00</span>) — ส่ง <span class="mono text-[12px]">2026-08-29</span> เปล่า ๆ จะไม่ผ่าน<br>
-            <b>3.</b> i18n ส่งเข้าใช้ <span class="mono text-[12px]">name_th</span>/<span class="mono text-[12px]">name_en</span> · รับกลับเป็น <span class="mono text-[12px]">name: {'{'} th, en {'}'}</span><br>
+            <b>3.</b> i18n รับกลับเป็น <span class="mono text-[12px]">name: { th, en }</span> เสมอ · ส่งเข้าใช้ <span class="mono text-[12px]">name_th</span>/<span class="mono text-[12px]">name_en</span> หรือส่ง object ชุดเดิมกลับไปก็ได้ (อย่าส่งทั้งคู่)<br>
             <b>4.</b> อย่าให้ผู้ใช้กรอก VAT · ต้นทุน · ราคาอ้างอิงเอง — backend คำนวณและตรวจให้หมดแล้ว<br>
             <b>5.</b> งานข้ามระบบ (ตัดยอด PO · COGS · กำไร) เป็น <b>eventual</b> ใช้เวลาไม่กี่วินาที — ตอบ 200 แล้วให้รีเฟรชทีหลัง อย่า block ผู้ใช้
           </p>
