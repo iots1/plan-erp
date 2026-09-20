@@ -1031,14 +1031,8 @@ sequenceDiagram
             <span class="mono text-[12px]">change_amount</span> = <span class="mono text-[12px]">paid_amount − total</span> —
             ทั้งคู่เก็บไว้บนแถว <span class="mono text-[12px]">pos_sales</span> เพื่อกระทบยอดลิ้นชักตอนปิดกะ ·
             <b>ใบรับชำระที่ finance-bc บันทึกเท่ากับ <span class="mono text-[12px]">total</span> เสมอ</b> ไม่ใช่ยอดที่ยื่นมา
-            (เงินทอนไม่ใช่รายได้ และไม่ได้ตัดหนี้อะไร) · ไม่ส่ง <span class="mono text-[12px]">paid_amount</span> มาเลย = ถือว่าจ่ายพอดี (ใช้กับบัตร/QR)<br>
-            <b>เงินไม่พอถูกปฏิเสธ <span class="mono text-[12px]">400</span> ตั้งแต่ก่อนตัดสต็อก</b> — ต้องเช็คก่อน ไม่ใช่หลัง เพราะถ้าเช็คทีหลัง
-            แคชเชียร์ที่พิมพ์ <span class="mono text-[12px]">1</span> แทน <span class="mono text-[12px]">1000</span> จะโดนตัดสต็อกและ<b>ออกเลขใบกำกับไปแล้ว</b>
-            ก่อนที่ระบบจะปฏิเสธ เหลือใบกำกับลอยที่ถอนเลขคืนไม่ได้<br>
-            ยอดที่เอามาเทียบคือ<b>ผลรวมราคาหลังหักส่วนลด</b> ซึ่งคิดที่ sales-bc เองได้ · สำหรับ <b>ABB</b> นี่คือยอดจริงเป๊ะ (VAT อยู่ในราคาแล้ว) ·
-            สำหรับ <b>FULL</b> เป็นเพียง<b>ขั้นต่ำ</b> เพราะ VAT ยังไม่ถูกบวก และ sales-bc ไม่รู้อัตรา/ประเภทภาษีของแต่ละบรรทัด —
-            ถ้าจ่ายผ่านขั้นต่ำแต่ไม่ถึงยอดจริง ระบบจะบันทึก <span class="mono text-[12px]">paid_amount</span> เท่ากับ
-            <span class="mono text-[12px]">total</span> (ใบรับชำระตัดเต็มจำนวนไปแล้ว จะบันทึกว่ารับเงินน้อยกว่านั้นไม่ได้)
+            (เงินทอนไม่ใช่รายได้ และไม่ได้ตัดหนี้อะไร) · จ่ายมาน้อยกว่า <span class="mono text-[12px]">total</span> = <span class="mono text-[12px]">400</span>
+            ตั้งแต่ก่อนตัดสต็อก · ไม่ส่ง <span class="mono text-[12px]">paid_amount</span> มาเลย = ถือว่าจ่ายพอดี (ใช้กับบัตร/QR)
           </p>
         </div>
         <div class="rulebox ok mb-8">

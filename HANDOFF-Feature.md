@@ -17,7 +17,6 @@
 > `meta.warnings` + บั๊ก auto-resolved price currency — **commit + push + deploy แล้ว** ·
 > P2#5 + #6 + #7 — ปิด P2 audit ครบ · commit + push + deploy แล้ว · 2026-09-01 (C3 + currency enum + FX audit + P2#4 + column contracts + credit column precision)
 >
-> ✅ **2026-09-20 B5 ขายหน้าร้าน (POS) — endpoint เส้นเดียวที่ตัดสต็อก + ออกใบกำกับภาษี + รับชำระ ครบในคำขอเดียว** · `POST /sales-bc/v1/pos-sales` (+ `GET` list/detail + `POST /:id/void`) · ตาราง `pos_sales`/`pos_sale_items`/`pos_sale_number_counters` ใน `erp_sales` · default เป็น **ใบกำกับภาษีอย่างย่อ §86/6** (ราคาที่คีย์รวม VAT แล้ว ระบบถอดออก) สลับเป็น **ใบกำกับภาษีเต็มรูป §86/4** ได้ด้วย `document_type` ฟิลด์เดียว · finance-bc ได้ facade module ใหม่ (`PosSaleOperationsService` + RPC `financeBc.posSale.recordSale`/`voidSale`) ที่ทำ create→issue→payment ในคำสั่งเดียว เพราะ `ReceiptModule` กับ `PaymentModule` import กันไม่ได้ · `pnpm verify sales-bc` **และ** `finance-bc` เขียวครบทั้ง 6 ขั้น · **ยังไม่ commit / ยังไม่ deploy — รอ user สั่ง** · ดู §2 หัวข้อ **2026-09-20 · B5 POS**
 > ✅ **2026-09-09 อัปโหลดรูปสินค้า 503 เป็น ๆ หาย ๆ — ปิดต้นเหตุแล้ว 2 ชั้น** · ชั้นที่ 3 (`STORAGE_S3_ENDPOINT` ชี้ public domain → CDN/WAF ตอบ 403 สุ่ม ๆ) เป็นเคสเดิมของ `runbook-image-confirm-storage-403.html` ที่ **ไม่เคยแก้ที่ต้นทางจริง** · ชั้นที่ 4 **เป็นของใหม่และกว้างกว่ามาก**: `connectMicroservice()` ผูก handler ทันทีก่อน return ทำให้ `useGlobalFilters()` ที่เรียกทีหลังถูกทิ้งเงียบ ๆ (Nest warn แล้วไปต่อ) — **ทุก BC ทั้งระบบ** ส่ง error ของ RPC ออกไปเป็น `{"status":"error","message":"Internal server error"}` ผู้เรียกจึงอ่านไม่ออกและยุบทุกอย่างเป็น "service unavailable" · แก้แล้ว: `.env` + secret ทั้ง 2 Environment, `deferInitialization` + `@UseFilters` 26 controller, คง 502/503/504 ไม่ยุบเป็น 500, smoke ตัวใหม่ที่ล็อกทั้งสามผลลัพธ์ — ดู §2 หัวข้อ **2026-09-09 · storage 403 + RPC error taxonomy**
 > ✅ **2026-09-09 print pipeline P3 — พิมพ์เอกสารจริงได้ 2 ใบแล้ว** (`receipt_full_tax_invoice`, `quotation_standard` เป็น `banded` v3 บนโปรดักชัน) · mapper เลิกส่ง `items_text` เปลี่ยนเป็น `items[]` ที่ format มาแล้วทั้งหมด + `toThaiBahtText()`/`formatAmount()`/`formatQuantity()` ใน `@lib/common` · **เจอบั๊กจริง 3 ตัวที่ unit test จับไม่ได้เลย**: paginator หา `tbody` แบบไม่ scope (แถวสินค้าไปโผล่ในหัวเอกสาร หน้าเละแต่ไม่ error), `quotations-print.smoke.mjs` ไม่ได้ประกาศ `needs` (503 อ่านเหมือน sales-bc พัง), `mergeParams()` ให้ผู้เรียก override ตัวตนผู้ออกเอกสาร/ลายน้ำ DRAFT ได้ · **ค้าง (ไม่ใช่บั๊ก)**: `company_profiles` ยังว่างทุกช่อง เอกสารจึงพิมพ์โดยไม่มีผู้ออก — §86/4(1)–(2) บังคับ ต้องกรอกก่อนใช้จริง — ดู §2 หัวข้อ **2026-09-09**
 > ✅ **2026-09-08 audit doc drift — เอกสารตรงกับโค้ดแล้ว 3 ไฟล์** · `HANDOFF-Document-Print-Pipeline.md` §7 ค้างที่ "P2 ⬜ ถัดไป" อยู่ 2 วันหลัง P2 ขึ้นโปรดักชัน (commit `d8b472b`) เพราะ doc-bump `10ab25d` แก้แต่ `api-workflow-guide.html` · `srs-p3.html` §"ยังไม่ได้ทำ · รอบถัดไป" ยังบอกว่า outbox/`stock.deducted`/`lot.created` ไม่ถูก emit จริง ทั้งที่ §07 ของหน้าเดียวกันเขียนไว้แล้วตั้งแต่ 2026-08 ว่ามีจริง และ Purchase Return ก็ทำแล้วใน P4 M4 · `HANDOFF-Backlog-Reporting-Print-Tax.md` §1 ยังพาดหัวว่า "พิมพ์เอกสารจริงไม่ได้เลยสักใบ" — **บทเรียน: doc-bump ที่ตามหลังโค้ดคนละคอมมิตคือจุดที่ drift เกิด · เฟส/งานที่ปิด ให้แก้ตารางสถานะในคอมมิตเดียวกับโค้ด**
@@ -175,68 +174,6 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 ---
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
-
-### 2026-09-20 · B5 ขายหน้าร้าน (POS) — เส้นเดียวจบ ✅ *(ยังไม่ commit)*
-
-**ของใหม่ทั้งหมด** — เดิมระบบไม่มีทางขายหน้าร้านเลย มีแต่วงจร B2B (ใบเสนอราคา → SO → ใบส่งของ)
-ซึ่งกิน 5 request และบังคับให้ทุก SO สืบย้อนไปหาใบเสนอราคา (`sales_orders.quotation_id` เป็น
-`NOT NULL` + FK จริง) จึงลัดไม่ได้ · ดู `api-workflow-guide.html` §B5 สำหรับสัญญา API เต็ม
-
-| ที่ | ของใหม่ |
-|---|---|
-| sales-bc | โมดูล `pos-sale` — `pos_sales` + `pos_sale_items` + `pos_sale_number_counters` (`POS-{YYYY}-{00001}`), `PosSalesService`, `PosSalesController` (4 route), proxy ใหม่ไป finance-bc |
-| finance-bc | โมดูล `pos-sale` — **facade ล้วน ไม่มี entity/ตาราง** · `PosSaleOperationsService` + `PosSaleEventsController` |
-| `@lib/common` | `IRecordPosSale*` / `IVoidPosSale*` contract + `PosSaleResources` ใน `AppMicroservice.Finance.cmd` |
-| migration | `erp_sales` `AddPosSales` (รันแล้ว) · `erp_iam` `GrantPosSalePermissionsToMockPolicies` (รันแล้ว) |
-
-**สามอย่างที่ตัดสินใจไว้และเหตุผล**
-
-1. **ทำไมต้องมีตาราง `pos_sales` ไม่ใช่แค่ยิงตรงไป finance-bc** — สามข้อ: (ก) การตัดสต็อกต้องมี
-   `source_doc_id` ที่อยู่ถาวรไว้กลับรายการ (`pos_sale_items.id` ทำหน้าที่เดียวกับ
-   `delivery_note_items.id`), (ข) **COGS ต้องมีคู่รายได้** — `stock.deducted` พกแต่ต้นทุน
-   finance-bc ต้องถาม sales-bc กลับ ถ้าไม่มีแถวนี้ บิล POS ทุกใบจะลงต้นทุนโดยไม่มีรายได้
-   รายงานกำไรต่อล็อตจะอ่านเป็นขาดทุนล้วน, (ค) การขายเป็นข้อเท็จจริงของ sales-bc
-2. **ทำไม finance-bc ต้องมีโมดูล facade** — งานอยู่คนละโมดูล (`ReceiptModule` ออกใบกำกับ,
-   `PaymentModule` รับเงิน) และสองตัวนี้ import กันไม่ได้ (`PaymentModule` อ่าน `receipts`
-   ตรง ๆ อยู่แล้วเพื่อเลี่ยง cycle) · โมดูลที่สาม import ทั้งคู่คือรูปที่
-   `.claude/rules/module-boundaries.md` กำหนดไว้ · **และต้องเป็น RPC เดียวไม่ใช่สาม** เพราะ
-   ระหว่างสอง RPC ลูกค้าเดินออกจากร้านไปแล้ว เหลือใบกำกับ §86/4 ที่ออกเลขแล้วแต่ไม่มีเงินคู่
-3. **`create`/`issue`/`payment` ไม่ได้อยู่ transaction เดียวกัน และจงใจ** — สี่เมธอดนั้นเปิด
-   transaction ของตัวเองและไม่รับ `EntityManager` จากข้างนอก · การร้อย manager ทะลุทั้งสี่คือ
-   การ refactor service ที่กฎหนาแน่นที่สุดในระบบ ใหญ่และเสี่ยงกว่าฟีเจอร์ที่ขอเอง ·
-   จึงเดินหน้าอย่างเดียวและ**เขียนทางกู้ไว้ชัด ๆ แทนที่จะซ่อน** (ดู docblock ของ
-   `PosSaleOperationsService`): issue ล้ม = ไม่มีอะไรเกิด ไม่เปลืองเลข · payment ล้มหลัง issue =
-   ใบกำกับยืนอยู่ถูกต้องแล้วแค่ยังไม่ได้ตัดชำระ ให้ไปลงรับชำระตามปกติกับเลขใบที่ error บอก
-
-**ลำดับ "ของจริงก่อน แล้วค่อยลงบัญชีตัวเอง"** — เหมือน `DeliveryNotesService.submit()` ทุกประการ:
-ตัดสต็อก → บันทึกที่ finance-bc → ค่อย commit แถว `pos_sales` โดย**ไม่มี transaction ของ sales-bc
-เปิดค้างคร่อม RPC เลย** · `source_doc_id` pre-generate ด้วย `randomUUID()` ก่อน insert เพราะ
-inventory-bc ต้องรู้ค่านั้นก่อนที่แถวจะมีจริง
-
-**บั๊กของตัวเองที่เจอระหว่างเขียน smoke แล้วแก้ไปแล้ว 2 ตัว**
-
-- **เช็คเงินที่ลูกค้ายื่นหลังตัดสต็อก** — เดิมเทียบ `paid_amount` กับ `finance.total` ซึ่งรู้ค่าได้
-  ก็ต่อเมื่อ finance-bc ตอบกลับมาแล้ว แปลว่าแคชเชียร์ที่พิมพ์ `1` แทน `1000` จะโดนตัดสต็อกและ
-  **ออกเลขใบกำกับไปแล้ว** ก่อนระบบจะปฏิเสธ เหลือใบกำกับลอยที่ถอนเลขคืนไม่ได้ · ย้ายไปเช็คก่อน
-  ทุกอย่างโดยคิดยอดเองด้วย `computeDocumentTotals` (เป๊ะสำหรับ ABB, เป็นขั้นต่ำสำหรับ FULL)
-- **ปฏิเสธสินค้าชุด (bundle) เข้มกว่าใบกำกับที่ตัวเองไปสร้าง** — finance-bc
-  (`resolveInvoiceableProduct`) ปฏิเสธเฉพาะ variant template · ถ้า POS ปฏิเสธ bundle ด้วย
-  จะเป็นการปฏิเสธบิลที่ใบกำกับรับได้อยู่แล้ว แก้ให้ตรงกัน (inventory-bc แตก bundle ตอนตัดจริงอยู่แล้ว)
-
-**ข้อจำกัดของ smoke ที่ต้องรู้** — `apps/sales-bc/test/smoke/pos-sales.smoke.mjs` ขายของจริง
-ออกใบกำกับจริง แล้ว void คืน (เลขใบกำกับยังถูกใช้ไปแล้วถาวร คืนไม่ได้ตามกฎ §86/4 — นั่นคือ
-ราคาที่ต้องจ่ายเพื่อพิสูจน์เส้นนี้) · **ตอนนี้ dataset มีสินค้าที่มีสต็อกอยู่ตัวเดียวและเป็น
-`exempt` (ปุ๋ย ยกเว้น VAT จริงตามกฎหมาย)** ดังนั้น assertion ที่พิสูจน์การ**ถอด VAT ออกจากราคาป้าย
-§86/6 ยังไม่เคยรันเลย** — suite log WARNING ไว้ตรง ๆ · ยืนยันทางอ้อมแล้วว่าสิ่งที่ POS ต้องส่งให้ถูก
-ส่งถูก (`receipts.is_vat_included = true`, `vat_rate = 7`, `receipt_items.vat_treatment = 'exempt'`
-ตรงกับ `products.tax_category`) · **ถ้าอยากได้ coverage เต็ม ต้องรับสินค้าที่ standard-rated
-เข้าสต็อกก่อน (A2→A3)**
-
-**ค้าง** — ยังไม่ commit, ยังไม่ push, ยังไม่ deploy · ตอน deploy ต้องระวัง**กับดักลำดับ
-permission** (`.claude/rules/permissions.md`): grant migration ถูกเขียนหลังรัน
-`permissions:sync` บน `erp_iam` จริงแล้ว (แถว catalog มีอยู่ก่อน migration จึง JOIN เจอ) —
-ถ้า environment ไหนรัน migration บน DB ที่ยังไม่ sync ต้องออก migration ใบใหม่ re-apply
-ห้ามแก้ไฟล์เดิม
 
 ### 2026-09-20 · เก็บบั๊กที่เหลือจากรอบทดสอบ + เขียนเทสต์คุมให้ครบ ✅
 
