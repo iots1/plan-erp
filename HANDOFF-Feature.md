@@ -175,6 +175,41 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-20 · เก็บบั๊กที่เหลือจากรอบทดสอบ + เขียนเทสต์คุมให้ครบ ✅
+
+รอบก่อนหน้าเจอบั๊กระหว่างยิงจริงแล้วแก้ไป 2 ตัว (rate limit 500, links สอง `?`) · รอบนี้เก็บที่เหลือ
+และเติมเทสต์ในจุดที่ "ของพังได้โดยไม่มีอะไรเห็น"
+
+**บั๊กที่แก้เพิ่ม**
+
+1. **`fields=` ทำให้ i18n โกหก** — `?fields=id,code` คืน `name: { th: null, en: null }` ทั้งที่ชื่อจริง
+   ไม่ได้เป็น null · ต้นเหตุ: property ของคลาสใน TS เกิดเป็น own property ค่า `undefined`
+   (target ES2023 → `useDefineForClassFields`) แถวที่ select แค่บางคอลัมน์จึง **มี** คีย์
+   `name_th`/`name_en` อยู่ interceptor เลยยุบให้เป็นคู่ null · แก้: ถ้าทั้งสองด้านเป็น `undefined`
+   = ไม่ได้ถูก select → ไม่ส่งคีย์นั้นออก · `null` (โหลดมาแล้วว่าง) ยังยุบเป็น `{ th: null, en: null }`
+   ตามสัญญาเดิมทุกประการ
+2. **`pnpm test` ที่ root พังมาตลอด 88 suites** — Jest ตั้ง `NODE_ENV=test` เองเมื่อไม่ได้ตั้งไว้
+   แต่ schema ของ `libs/config` อนุญาตแค่ `[local, dev, staging, prod]` · ทุก suite ที่แตะ
+   `ConfigModule` จึงตายตั้งแต่ validate · `nx test <bc>` (ที่ verify loop ใช้) ไม่เจอเพราะคนละ path
+   — บั๊กเลยมองไม่เห็นจากทางที่ทุกคนใช้ · เพิ่ม `test` เข้า valid list (ไม่มีอะไร branch ตามค่านี้
+   มันโผล่แค่ใน `GET /health`) · **ผลหลังแก้: 144 suites / 1867 tests ผ่านหมด**
+3. **`errorResponseBuilder` ของ rate limit ไม่มีเทสต์คุมต้นเหตุ** — รอบก่อนแก้ให้คืน `HttpException`
+   แล้วแต่เทสต์คุมแค่ฝั่ง filter ที่ render ออกมา ไม่ได้คุมว่า "สิ่งที่คืนต้องเป็น `Error`" ซึ่ง
+   **คือตัวบั๊กจริง** · แยกออกมาเป็น `buildRateLimitException()` ใน
+   `libs/common/src/utils/http-exception/rate-limit-error.util.ts` แล้วเขียนเทสต์ยิงตรงที่ข้อนั้น
+
+**เทสต์ที่เพิ่ม (ทั้งหมดเป็น unit ไม่ต้องพึ่งของจริง)**
+
+| ไฟล์ | คุมอะไร |
+|---|---|
+| `localization-interceptor.util.spec.ts` (ใหม่ · 8 เคส) | interceptor ตัวนี้**ไม่เคยมี spec เลย** ทั้งที่เป็นครึ่งหนึ่งของสัญญา i18n · คุม: ยุบคู่ปกติ · null ยังส่ง `{th,en}` · `undefined` ทั้งคู่ไม่ส่ง · ด้านเดียวที่ select มายังยุบ · half pair ไม่แตะ · ไล่ array/nested · Date/string/null/number ผ่านตรง · ยุบข้างใน jsonb ด้วย (ฝั่ง response ตั้งใจให้ดูจากรูปทรง ต่างจากฝั่ง request ที่ดูจาก schema) |
+| `all-exceptions-filter.spec.ts` (ใหม่ · 13 เคส) | ทุกกิ่งของ filter: `400002`/`400001` พร้อม `source` · `404000`/`409000`/`400000`/`503000` · composite ที่ผู้โยนกำหนดเอง (`409001`) · bare status ที่ถูกขยาย · SQLSTATE บน `errors[].code` · `QueryFailedError` → `422000` · catch-all → `500000` ไม่ leak อะไร · **object เปล่าที่ถูกโยนใส่ → ตกกิ่ง catch-all จริง** (ตัวบั๊ก rate limit) · exception ของ rate limit → `429/429000` |
+| `rpc-exceptions-filter.spec.ts` (ใหม่ · 9 เคส) | ฝั่ง RPC: rethrow เมื่อไม่ใช่ context rpc · HttpException → composite ทั้ง `status` และ `errors[]` · 409/404 ไม่ยุบเป็น 500 · sub-code เดิมของ validation · legacy `{status_code: 409}` ถูกขยาย · legacy ที่เป็น composite อยู่แล้วไม่ถูกแตะ · string → `500000` · unknown → `500000` · payload ที่รูปถูกอยู่แล้วผ่านตรง |
+| `rate-limit-error.util.spec.ts` (ใหม่ · 4 เคส) | **ต้องเป็น `Error`** (ข้อที่บั๊กจริงพลาด) · 429 + `429000` · message ที่ตั้งเอง/ดีฟอลต์ |
+
+**ยืนยัน**: `pnpm verify` ครบ 8 BC · `nx test common` 37 suites / 363 tests · `pnpm test` ที่ root
+กลับมาใช้งานได้ 144/144 suites
+
 ### 2026-09-20 · ยิงทดสอบทุกข้อที่เอกสารอ้าง — เจอของพัง 2 จุดที่ไม่มีเทสต์ไหนเห็น ✅ **แก้ + deploy + ยืนยันสด**
 
 **ที่มา**: "เอกสารไหนที่ตรงหรือไม่ได้ทดสอบช่วยทดสอบให้หน่อย" พร้อมสิทธิ์ ssh เข้าเครื่อง dev เพื่อแก้ `.env`

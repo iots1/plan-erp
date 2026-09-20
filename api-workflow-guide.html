@@ -80,9 +80,10 @@
         <div class="eyebrow text-[var(--accent)] mb-3">01 — Overview</div>
         <h2 class="display text-3xl mb-6">ภาพรวม · ทั้งระบบมีกี่ Flow</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          ระบบแบ่งเป็น <b>5 กลุ่มงาน</b> รวม <b>18 flow</b> ที่ผู้ใช้จับต้องได้จริง ทุก flow เป็นเอกสารที่มีสถานะ
+          ระบบแบ่งเป็น <b>5 กลุ่มงาน</b> รวม <b>23 flow</b> ที่ผู้ใช้จับต้องได้จริง เกือบทุก flow เป็นเอกสารที่มีสถานะ
           (<span class="mono text-[12px]">DRAFT → …</span>) และ <b>สต็อก/บัญชีจะเคลื่อนก็ต่อเมื่อกดยืนยันเท่านั้น</b> —
-          ตอนสร้างร่างยังไม่มีอะไรเกิดขึ้นในระบบหลังบ้าน
+          ตอนสร้างร่างยังไม่มีอะไรเกิดขึ้นในระบบหลังบ้าน · <b>ข้อยกเว้นเดียวคือ B5 ขายหน้าร้าน (POS)</b> ที่ไม่มีขั้น DRAFT เลย
+          เพราะบิลหน้าร้านเกิดขึ้นครั้งเดียวจบในคำขอเดียว
         </p>
 
         <div class="diagram mb-8">
@@ -98,6 +99,7 @@ flowchart LR
   end
   subgraph B["กลุ่ม B · ขาย"]
     B1["Quotation<br/>ใบเสนอราคา"] --> B2["Sales Order<br/>ใบสั่งขาย"] --> B3["Delivery Note<br/>ใบส่งของ"]
+    B5["POS Sale<br/>ขายหน้าร้าน"]
   end
   subgraph C["กลุ่ม C · การเงิน"]
     C1["Receipt / Tax Invoice<br/>ใบกำกับภาษี"] --> C3["Billing Note<br/>ใบวางบิล"] --> C4["Payment Entry<br/>รับชำระ"]
@@ -108,7 +110,10 @@ flowchart LR
   D1 --> STOCK
   D2 --> STOCK
   STOCK -->|"สต็อกออก"| B3
+  STOCK -->|"สต็อกออก (หน้าร้าน)"| B5
   B3 -->|"stock.deducted"| GL[(บัญชีแยกประเภท<br/>COGS · P&amp;L)]
+  B5 -->|"stock.deducted"| GL
+  B5 -->|"ออก+ตัดชำระให้เอง"| C1
   B3 --> C1
   C1 --> GL
   C4 --> GL
@@ -143,6 +148,7 @@ flowchart LR
               <tr><td>A5 AP Invoice</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL (ล้างหนี้ + ภาษีซื้อที่ตั้งไว้)</td><td>มีใบจ่ายเงินตัดใบนี้อยู่ (409) — ยกเลิกใบจ่ายก่อน · งวดบัญชีปิดแล้ว</td></tr>
               <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td>ไม่มี guard พิเศษ — คืนได้เสมอ</td></tr>
               <tr><td>B4 Sales Return</td><td class="mono text-[12px]">cancel</td><td>ดึงของออกจากล็อตเดิม (ต้นทุนเดิม) + คืน COGS ที่กลับไปแล้วขึ้นบัญชีอีกครั้ง</td><td><b>ของที่รับคืนถูกขายออกไปอีกแล้ว (503)</b> — ต่างจากใบส่งของที่คืนได้เสมอ ต้องกลับรายการที่ขายออกไปก่อน</td></tr>
+              <tr><td>B5 POS Sale</td><td class="mono text-[12px]">void</td><td>คืนสต็อกกลับล็อตเดิม + ยกเลิกใบรับชำระ + void ใบกำกับภาษี (ทั้งสามอย่างในคำสั่งเดียว)</td><td><b>ของถูกขายออกไปอีกแล้ว</b> หรือ finance-bc ตอบไม่ได้ (503) · งวดบัญชี/สต็อกปิดแล้ว (409)</td></tr>
               <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ</td></tr>
               <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td>ไม่มี guard พิเศษ</td></tr>
               <tr><td>D1 Stock Entry</td><td class="mono text-[12px]">cancel</td><td>คืนล็อต/ย้ายกลับตาม entry_type</td><td>ล็อตปลายทางถูกเบิกไปแล้ว (409)</td></tr>
@@ -165,6 +171,7 @@ flowchart LR
               <tr><td class="mono">B2</td><td>แปลงเป็นใบสั่งขาย</td><td>Sales Rep · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>SO · <b>PENDING_APPROVAL</b>→CONFIRMED→PARTIAL→CLOSED</td></tr>
               <tr><td class="mono">B3</td><td>ส่งของ</td><td>Warehouse Staff · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>DN · DRAFT→<b>PENDING_APPROVAL</b>→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">B4</td><td>รับคืนสินค้าจากลูกค้า</td><td>Warehouse Staff</td><td>SRN · DRAFT→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">B5</td><td><b>ขายหน้าร้าน (POS)</b></td><td>Cashier / พนักงานหน้าร้าน</td><td>POS Sale · <b>COMPLETED</b>→VOIDED (ไม่มี DRAFT)</td></tr>
               <tr><td class="mono">C1</td><td>ออกใบกำกับภาษี/ใบเสร็จ</td><td>Accountant</td><td>Receipt · DRAFT→ISSUED→VOID</td></tr>
               <tr><td class="mono">C2</td><td>ใบลดหนี้ / ใบเพิ่มหนี้</td><td>Accountant</td><td>Receipt (CN/DN) · DRAFT→ISSUED</td></tr>
               <tr><td class="mono">C3</td><td>วางบิล</td><td>AR Clerk</td><td>Billing Note · DRAFT→ISSUED→CANCELLED</td></tr>
@@ -204,6 +211,7 @@ flowchart LR
               <tr><td><b>Warehouse Manager</b><br><span class="mono text-[11px]">ผู้จัดการคลัง</span></td><td class="mono text-[12px]">D2 · E1</td><td class="mono text-[11.5px]">stock_adjustment:* · stock_balance:view · stock_ledger:view · expiry_alert:view · stock_setting:*</td></tr>
               <tr><td><b>Sales Rep</b><br><span class="mono text-[11px]">พนักงานขาย</span></td><td class="mono text-[12px]">B1</td><td class="mono text-[11.5px]">customer:* · quotation:create/view/update/send/cancel</td></tr>
               <tr><td><b>Sales Manager</b><br><span class="mono text-[11px]">ผู้จัดการขาย</span></td><td class="mono text-[12px]">B2</td><td class="mono text-[11.5px]">quotation:approve · sales_order:create/view/cancel/<b>approve</b></td></tr>
+              <tr><td><b>Cashier</b><br><span class="mono text-[11px]">พนักงานขายหน้าร้าน</span></td><td class="mono text-[12px]">B5</td><td class="mono text-[11.5px]">pos_sale:create/view/void · customer:view · product:view · barcode:lookup</td></tr>
               <tr><td><b>Accountant</b><br><span class="mono text-[11px]">นักบัญชี</span></td><td class="mono text-[12px]">C1 · C2 · C8 · E2</td><td class="mono text-[11.5px]">receipt:* · tax_config:* · ledger_entry:view · trial_balance:view · cogs_entry:view · period:view · vat_return:view</td></tr>
               <tr><td><b>AR / AP Clerk</b><br><span class="mono text-[11px]">เจ้าหน้าที่การเงิน</span></td><td class="mono text-[12px]">A5 · C3 · C4 · C5 · C7</td><td class="mono text-[11.5px]">billing_note:* · payment_entry:* · payment_schedule:* · ap_invoice:*</td></tr>
               <tr><td><b>Finance Manager</b><br><span class="mono text-[11px]">ผู้จัดการการเงิน</span></td><td class="mono text-[12px]">C6 · C8 · E2</td><td class="mono text-[11.5px]">period:view/close · report:view · vat_return:view</td></tr>
@@ -881,6 +889,162 @@ sequenceDiagram
             บนบรรทัดเป็นแค่ snapshot ให้คนออกใบลดหนี้ใช้ ไม่มีผลต่อมูลค่าสต็อก<br>
             <b>แต่ครึ่ง COGS ระบบทำให้อัตโนมัติ</b> — submit ยิง event <span class="mono text-[12px]">sales_return.received</span> พร้อมต้นทุนรายล็อต
             แล้ว finance-bc กลับ COGS <b>เฉพาะส่วนที่คืน</b> (คนละ event กับ <span class="mono text-[12px]">stock.deduction_reversed</span> ที่ล้างทั้งการขาย ดู C7 ท้ายหัวข้อ E2)
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4">B5 · ขายหน้าร้าน POS <span class="mono text-[13px] text-[var(--muted)]">— Cashier</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          เพิ่มเข้ามา 2026-09-20 — <b>ทางลัดเส้นเดียวสำหรับเครื่อง POS</b> · B1→B2→B3 เป็นวงจรขายแบบ B2B
+          (เสนอราคา → ลูกค้าตกลง → ส่งของทีหลัง) ซึ่งกินอย่างน้อย <b>5 request</b> และบังคับให้ทุก SO
+          สืบย้อนไปหาใบเสนอราคา · หน้าร้านไม่มีอะไรให้สืบย้อน — ลูกค้ายืนอยู่ตรงหน้า หยิบของ จ่ายเงิน รับใบกำกับ แล้วเดินออก
+          ทั้งหมดใน <b>คำขอเดียว</b> ที่ต้องตอบกลับภายในเวลาที่คนยืนรอไหว
+        </p>
+
+        <div class="diagram mb-6">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor C as แคชเชียร์
+  participant SAL as sales-bc
+  participant INV as inventory-bc
+  participant FIN as finance-bc
+  C->>SAL: POST /pos-sales (items[], payment_method, paid_amount)
+  SAL->>INV: ตัดสต็อก FIFO/FEFO (ConfirmDelivery)
+  Note over SAL,INV: ผลทางกายภาพเกิดก่อนเสมอ
+  SAL->>FIN: posSale.recordSale
+  FIN->>FIN: สร้าง + issue ใบกำกับภาษี (ABB/FULL)
+  FIN->>FIN: สร้าง + submit ใบรับชำระ ตัดยอดใบกำกับเต็มจำนวน
+  FIN-->>SAL: receipt_number + ยอดภาษีที่คำนวณแล้ว
+  SAL->>SAL: commit แถว pos_sales = COMPLETED
+  SAL-->>C: 201 + เลขใบกำกับ + เงินทอน
+  INV-->>FIN: stock.deducted → COGS + กำไรต่อล็อต
+</pre>
+        </div>
+
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/barcodes/lookup?barcode=…</td><td class="mono text-[11px]">barcode:lookup</td><td>ยิงบาร์โค้ด → ได้ <span class="mono text-[11px]">product_id</span> (มีอยู่แล้ว ไม่ใช่ของใหม่)</td></tr>
+              <tr><td class="mono">1</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:create</td><td><b>ตัดสต็อก + ออกใบกำกับภาษี + รับชำระ</b> ครบในคำขอเดียว · ได้เลข <span class="mono text-[11px]">POS-{ปี}-{ลำดับ}</span> และเลขใบกำกับกลับมาพร้อมกัน</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{receipt_id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์สลิป — ใช้ <span class="mono text-[11px]">receipt_id</span> ที่ขั้น 1 ตอบกลับมา (ไม่มี <span class="mono text-[11px]">/pos-sales/{id}/print</span> แยก)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /sales-bc/v1/pos-sales?relations=items</td><td class="mono text-[11px]">pos_sale:view</td><td>ดูรายการขายของกะ/สาขา</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/void</td><td class="mono text-[11px]">pos_sale:void</td><td>ยกเลิกบิล — คืนสต็อก + ยกเลิกใบรับชำระ + void ใบกำกับ</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /sales-bc/v1/pos-sales</span>
+{
+  <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,         <span class="c">// บังคับ — ลูกค้าทั่วไปหน้าร้านก็ต้องเป็น customer หนึ่งแถว (ดู rulebox)</span>
+  <span class="s">"warehouse_id"</span>: <span class="s">"9f04…"</span>,        <span class="c">// บังคับ — คลัง/สาขาที่ตัดของออก</span>
+  <span class="s">"document_type"</span>: <span class="s">"ABB_TAX_INVOICE"</span>,  <span class="c">// ไม่ส่ง = ABB_TAX_INVOICE · ส่ง FULL_TAX_INVOICE เมื่อลูกค้าขอใบเต็มรูป</span>
+  <span class="s">"document_date"</span>: <span class="s">"2026-09-20T10:32:00+07:00"</span>,  <span class="c">// ไม่ส่ง = เวลาปัจจุบัน</span>
+  <span class="s">"payment_method"</span>: <span class="s">"CASH"</span>,     <span class="c">// CASH | BANK_TRANSFER | CREDIT_CARD | QR_PROMPTPAY | OTHER</span>
+  <span class="s">"paid_amount"</span>: <span class="t">1000</span>,             <span class="c">// เงินที่ลูกค้ายื่นให้ — ไม่ส่ง = พอดี total (บัตร/QR) · ต้อง &gt;= total</span>
+  <span class="s">"reference"</span>: <span class="s">"APPROVAL-8842"</span>,   <span class="c">// เลข slip / approval code — ไม่บังคับ</span>
+  <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,
+  <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount_value"</span>: <span class="t">0</span>,
+  <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
+  <span class="s">"items"</span>: [
+    { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">2</span>, <span class="s">"unit_price"</span>: <span class="t">428</span>,
+      <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> }
+  ]
+}
+
+<span class="c">// 201 — ตอบกลับพร้อมทุกอย่างที่สลิปต้องใช้ ไม่ต้องยิงถามต่อ</span>
+{
+  <span class="s">"pos_number"</span>: <span class="s">"POS-2026-00031"</span>,
+  <span class="s">"status"</span>: <span class="s">"COMPLETED"</span>,
+  <span class="s">"receipt_id"</span>: <span class="s">"c4a1…"</span>,
+  <span class="s">"receipt_number"</span>: <span class="s">"ABB-2026-00108"</span>,   <span class="c">// FULL_TAX_INVOICE จะได้ INV-2026-…</span>
+  <span class="s">"payment_entry_id"</span>: <span class="s">"77be…"</span>,
+  <span class="s">"sub_total"</span>: <span class="t">856</span>, <span class="s">"total_discount"</span>: <span class="t">0</span>,
+  <span class="s">"net_amount"</span>: <span class="t">800</span>,               <span class="c">// ถอด VAT ออกจากราคาป้ายแล้ว (ABB = ราคารวมภาษี)</span>
+  <span class="s">"vat_amount"</span>: <span class="t">56</span>, <span class="s">"total"</span>: <span class="t">856</span>,
+  <span class="s">"paid_amount"</span>: <span class="t">1000</span>, <span class="s">"change_amount"</span>: <span class="t">144</span>
+}</pre>
+        </div>
+
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ใบกำกับภาษีอย่างย่อเป็นค่าเริ่มต้น — สลับเป็นเต็มรูปได้ด้วยฟิลด์เดียว</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">document_type</span> ไม่ส่งมา = <span class="mono text-[12px]">ABB_TAX_INVOICE</span>
+            (ใบกำกับภาษีอย่างย่อ §86/6) เพราะนั่นคือเอกสารที่หน้าร้านออกให้ผู้บริโภค 99% ของบิล ·
+            ลูกค้าขอใบเต็มรูป (นิติบุคคลเอาไปเคลม) → ส่ง <span class="mono text-[12px]">"document_type": "FULL_TAX_INVOICE"</span> ในคำขอเดียวกันนั้น
+            <b>ไม่มี endpoint แปลงย้อนหลัง</b><br>
+            สองแบบนี้<b>คิดภาษีคนละทิศ</b> และ FE ต้องรู้เพราะราคาที่คีย์เข้ามาคนละความหมาย:<br>
+            · <b>ABB</b> — <span class="mono text-[12px]">unit_price</span> คือ<b>ราคาป้าย รวม VAT แล้ว</b> ระบบ<b>ถอด</b> VAT ออกมา
+            (<span class="mono text-[12px]">is_vat_included = true</span>) · <span class="mono text-[12px]">total</span> = ผลรวมราคาป้ายพอดี ไม่มีอะไรบวกเพิ่ม ·
+            ไม่ต้องมี <span class="mono text-[12px]">tax_id</span> ผู้ซื้อ และออกให้ลูกค้าที่ไม่ได้จด VAT ได้<br>
+            · <b>FULL</b> — <span class="mono text-[12px]">unit_price</span> คือ<b>ราคาก่อน VAT</b> ระบบ<b>บวก</b> VAT ทับ ·
+            <span class="mono text-[12px]">total</span> จึง<b>สูงกว่า</b>ผลรวมที่คีย์ · §86/4(2) บังคับให้ลูกค้าต้องมี
+            <span class="mono text-[12px]">tax_id</span> + ที่อยู่ และต้องเป็นลูกค้าที่
+            <span class="mono text-[12px]">is_vat_registered = true</span> — ไม่ครบ ระบบปฏิเสธ <span class="mono text-[12px]">400</span> ตั้งแต่ก่อนตัดสต็อก<br>
+            หน้าจอ POS จึงควรถาม “ต้องการใบกำกับเต็มรูปไหม” <b>ก่อน</b>กดจบบิล แล้วบังคับเลือกลูกค้าจริงแทนลูกค้าทั่วไป ไม่ใช่ถามหลังจ่ายเงินแล้ว
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">คำขอเดียว = 3 ผลลัพธ์ · ลำดับคือ “ของจริงก่อน แล้วค่อยลงบัญชีตัวเอง”</div>
+          <p class="text-[13.5px]">
+            ระบบทำตามลำดับนี้เสมอ และ <b>ไม่มีสถานะ DRAFT ให้แก้</b> — บิลหน้าร้านเกิดขึ้นครั้งเดียวจบ:<br>
+            <b>1) ตัดสต็อก</b> ที่ inventory-bc (FIFO/FEFO, all-or-nothing, ข้ามล็อตหมดอายุ, แตก bundle — กฎเดียวกับ B3 ทุกข้อ)<br>
+            <b>2) ออก + ตัดชำระ</b> ที่ finance-bc ในคำสั่ง RPC เดียว: สร้างใบกำกับ → <span class="mono text-[12px]">issue</span> (ได้เลขจริง)
+            → สร้างใบรับชำระ → <span class="mono text-[12px]">submit</span> ตัดยอดใบกำกับ<b>เต็มจำนวน</b><br>
+            <b>3) commit แถว <span class="mono text-[12px]">pos_sales</span></b> ที่ sales-bc พร้อม <span class="mono text-[12px]">receipt_id</span>/<span class="mono text-[12px]">payment_entry_id</span> ที่ได้มา<br>
+            <b>ทำไมต้องเรียงแบบนี้</b> — เหตุผลเดียวกับ B3 (ดู docblock ของ <span class="mono text-[12px]">DeliveryNotesService</span>):
+            ผลทางกายภาพอยู่<b>นอก</b> BC นี้ จึงต้องสำเร็จก่อน โดยไม่มี transaction ของ sales-bc เปิดค้างไว้ ·
+            ขั้นไหนพัง = <b>ขั้นถัดไปไม่เกิด</b> และ client ได้ error กลับ (ไม่ใช่บิลครึ่งใบ) ·
+            ตัดสต็อกสำเร็จแล้วขั้น 2 ล้ม → ยิงซ้ำได้เลย การตัดสต็อกซ้ำเป็น no-op ตาม
+            <span class="mono text-[12px]">source_doc_id</span> เดิม
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ไม่มี “ลูกค้าทั่วไป” ฝังในระบบ — ต้องมี customer จริงหนึ่งแถว</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">customer_id</span> <b>บังคับ</b> ส่ง <span class="mono text-[12px]">null</span> ไม่ได้ —
+            ใบกำกับภาษีทุกใบผูกกับลูกค้า และรายงานลูกหนี้/ยอดขายทั้งระบบนับจากคอลัมน์นั้น ถ้าปล่อยว่างได้
+            จะมีบิลกลุ่มหนึ่งที่หายไปจากทุกรายงานเงียบๆ<br>
+            วิธีที่ตั้งใจให้ทำคือ <b>สร้าง customer หนึ่งแถวชื่อ “ลูกค้าทั่วไป / General Customer”</b> ต่อสาขา แล้วให้เครื่อง POS
+            ยิง id นั้นเป็นค่าเริ่มต้น — ยอดขายหน้าร้านจึงรวมกันอยู่ที่ลูกค้ารายนั้นและยัง drill-down ถึงบิลได้ ·
+            แถวนั้นควรตั้ง <span class="mono text-[12px]">credit_limit = 0</span> ไว้ด้วย
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ต่างจาก B1–B3 ตรงไหนบ้าง — 4 ข้อ</div>
+          <p class="text-[13.5px]">
+            · <b>ไม่เช็ควงเงินเครดิต</b> — หน้าร้านเก็บเงินสดก่อนส่งของ ไม่มีหนี้ให้เกินวงเงิน (B2/B3 เช็คเพราะส่งของก่อนเก็บเงินทีหลัง)<br>
+            · <b>ไม่มีเพดานราคา ±20%</b> — กฎนั้นคุม<b>ราคาที่ต่อรอง</b>กับราคาอ้างอิงใน <span class="mono text-[12px]">item_prices</span>
+            หน้าร้านไม่มีการต่อรอง ราคามาจากป้าย/price list ที่ FE resolve มาก่อนยิงแล้ว และส่วนลดถูกคุมด้วย
+            <span class="mono text-[12px]">discount_mode</span> อยู่แล้ว (percent 0–100, amount ไม่เกินยอดบรรทัด) ·
+            การใส่ RPC ต่อบรรทัดเพิ่มในเส้นที่ร้อนที่สุดของระบบเพื่อคุมสิ่งที่ส่วนลดคุมอยู่แล้วไม่คุ้ม<br>
+            · <b>ไม่มี Sales Order / Delivery Note</b> — บิลหน้าร้านไม่เข้า <span class="mono text-[12px]">delivered_qty</span> ของ SO ใดๆ
+            และไม่โผล่ในรายการใบส่งของ · ใบรับคืน B4 จึงอ้างบิล POS <b>ไม่ได้</b> คืนของหน้าร้าน = <span class="mono text-[12px]">void</span> ทั้งบิล
+            (ถ้าคืนบางส่วน ให้ void แล้วขายใหม่เฉพาะที่เหลือ)<br>
+            · <b>ไม่มีปุ่มแก้ไข</b> — ไม่มี <span class="mono text-[12px]">PUT</span> และไม่มี <span class="mono text-[12px]">DELETE</span>
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">เงินทอนเป็นเรื่องของลิ้นชัก ไม่ใช่เรื่องของบัญชี</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">paid_amount</span> คือเงินที่ลูกค้า<b>ยื่นให้</b> และ
+            <span class="mono text-[12px]">change_amount</span> = <span class="mono text-[12px]">paid_amount − total</span> —
+            ทั้งคู่เก็บไว้บนแถว <span class="mono text-[12px]">pos_sales</span> เพื่อกระทบยอดลิ้นชักตอนปิดกะ ·
+            <b>ใบรับชำระที่ finance-bc บันทึกเท่ากับ <span class="mono text-[12px]">total</span> เสมอ</b> ไม่ใช่ยอดที่ยื่นมา
+            (เงินทอนไม่ใช่รายได้ และไม่ได้ตัดหนี้อะไร) · จ่ายมาน้อยกว่า <span class="mono text-[12px]">total</span> = <span class="mono text-[12px]">400</span>
+            ตั้งแต่ก่อนตัดสต็อก · ไม่ส่ง <span class="mono text-[12px]">paid_amount</span> มาเลย = ถือว่าจ่ายพอดี (ใช้กับบัตร/QR)
+          </p>
+        </div>
+        <div class="rulebox ok mb-8">
+          <div class="rc ok mb-1">COGS และกำไรต่อล็อตทำงานเหมือน B3 ทุกประการ</div>
+          <p class="text-[13.5px]">
+            บิล POS ยิง <span class="mono text-[12px]">stock.deducted</span> เหมือนใบส่งของ และ finance-bc ถามราคาขายกลับมาที่
+            sales-bc ด้วย RPC <span class="mono text-[12px]">salesBc.deliveryNote.getSaleRevenue</span> ตัวเดิม —
+            ฝั่ง sales-bc จะหาใน <span class="mono text-[12px]">delivery_note_items</span> ก่อน ไม่เจอค่อยหาใน
+            <span class="mono text-[12px]">pos_sale_items</span> · ยอดขายหน้าร้านจึงเข้ารายงานกำไรต่อล็อต (E2) เท่าเทียมกับการขายแบบ B2B
+            ไม่ใช่กลายเป็นต้นทุนที่ไม่มีรายได้คู่กัน<br>
+            <b>FE อย่ารอ</b> — เหมือน B3 ตัวเลขกำไรมาช้ากว่า 1–5 วินาที ส่วนสลิปพิมพ์ได้ทันทีจาก
+            <span class="mono text-[12px]">receipt_id</span> ที่ตอบกลับมาแล้ว
           </p>
         </div>
       </section>
@@ -2152,7 +2316,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ <span class="mono text-[13px] text-[var(--muted)]">— 48 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ · ขายหน้าร้าน <span class="mono text-[13px] text-[var(--muted)]">— 52 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2175,6 +2339,10 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}/approve</td><td class="mono text-[11px]">delivery_note:approve</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}/cancel</td><td class="mono text-[11px]">delivery_note:cancel</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes/{id}/submit</td><td class="mono text-[11px]">delivery_note:submit</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales/{id}</td><td class="mono text-[11px]">pos_sale:view</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales/{id}/void</td><td class="mono text-[11px]">pos_sale:void</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations</td><td class="mono text-[11px]">quotation:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations</td><td class="mono text-[11px]">quotation:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations/{id}</td><td class="mono text-[11px]">quotation:update</td></tr>
