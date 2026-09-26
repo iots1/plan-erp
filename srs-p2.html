@@ -625,6 +625,316 @@ item_prices: [
               </tbody>
             </table>
           </div>
+
+          <!-- PRODUCT SHAPES · DEEP DIVE -->
+          <div id="product-shapes" class="scroll-mt-6"></div>
+          <h4 class="font-semibold mt-12 mb-2 text-[16px]">ความสัมพันธ์ข้อมูลสินค้าแบบละเอียด · เดี่ยว / ต้นแบบ + variant / ชุด (ทุกเคส)</h4>
+          <p class="text-[13.5px] mb-5" style="color:var(--ink-soft)">ส่วนนี้ขยายจากตารางสรุปด้านบน โดยแสดง<b>แถวข้อมูลจริงในแต่ละตาราง</b>ของทุกรูปแบบสินค้า พร้อม API ที่ต้องเรียกตามลำดับ และสิ่งที่ระบบจะปฏิเสธ &middot; ทุกกติกาในส่วนนี้ตรวจกับโค้ดจริงใน <span class="mono text-[12px]">apps/inventory-bc</span> (2026-09-26)</p>
+
+          <div class="rulebox ok mb-6"><div class="rc mb-1">หลักข้อเดียวที่ต้องจำ &middot; 1 แถวใน <span class="mono">products</span> = 1 SKU เสมอ</div><p class="text-[13.5px]">ระบบไม่มี flag ที่บอกว่า &ldquo;นี่คือ SKU&rdquo; &mdash; ทุกแถวมี <span class="mono text-[12px]">sku</span> (บังคับกรอก &middot; unique ด้วย <span class="mono text-[12px]">uq_products_sku</span>) สินค้าเดี่ยว ต้นแบบ variant และชุด <b>อยู่ในตาราง <span class="mono text-[12px]">products</span> ตารางเดียวกันทั้งหมด</b> ต่างกันแค่ 3 คอลัมน์: <span class="mono text-[12px]">type</span>, <span class="mono text-[12px]">has_variants</span>, <span class="mono text-[12px]">template_product_id</span> &middot; ความสัมพันธ์ที่เหลือเก็บในตารางเสริม 3 ตาราง: <span class="mono text-[12px]">item_variant_attributes</span> (variant ประกอบด้วยค่าอะไร), <span class="mono text-[12px]">bundle_items</span> (ชุดประกอบด้วยอะไร) และ <span class="mono text-[12px]">uom_conversion_factors</span> (หน่วยบรรจุ)</p></div>
+
+          <!-- Shape decision table -->
+          <div class="card overflow-hidden mb-6">
+            <div class="p-5 pb-3"><div class="mono text-[12px]" style="color:#7C3AED">อ่านรูปแบบสินค้าจาก 3 คอลัมน์</div></div>
+            <table class="d">
+              <thead><tr><th>รูปแบบ</th><th>type</th><th>has_variants</th><th>template_product_id</th><th>ถือสต็อก / Lot</th><th>ขายได้</th></tr></thead>
+              <tbody>
+                <tr><td><b>สินค้าเดี่ยว</b> (item)</td><td>single</td><td>false</td><td>null</td><td><span style="color:#15803D">✓</span></td><td><span style="color:#15803D">✓</span></td></tr>
+                <tr><td><b>ต้นแบบ</b> (template)</td><td>single</td><td><b>true</b></td><td>null</td><td><span style="color:#B91C1C">✗</span></td><td><span style="color:#B91C1C">✗</span></td></tr>
+                <tr><td><b>Variant</b></td><td>single</td><td>false</td><td><b>id ของต้นแบบ</b></td><td><span style="color:#15803D">✓</span></td><td><span style="color:#15803D">✓</span></td></tr>
+                <tr><td><b>ชุด</b> (bundle / kit)</td><td><b>bundle</b></td><td>false</td><td>null</td><td><span style="color:#B91C1C">✗</span> (สต็อกอยู่ที่สินค้าย่อย)</td><td><span style="color:#15803D">✓</span> (แตกชุดตอนตัดสต็อก)</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="rulebox mb-6"><div class="rc mb-1">RULE &middot; ชุดค่าที่ห้ามใช้ &rarr; 400 (บังคับตั้งแต่ 2026-09-26)</div><p class="text-[13.5px]"><span class="mono text-[12px]">ProductsService.assertValidShape()</span> ตรวจ 3 คอลัมน์รวมกันทั้งตอน <span class="mono text-[12px]">POST /products</span> (JSON และ multipart) และ <span class="mono text-[12px]">PUT /products/{id}</span> &middot; ตอน PUT ตรวจกับ<b>แถวหลังแก้</b> (ค่าที่ส่งมา + ค่าเดิมของคอลัมน์ที่ไม่ได้ส่ง) จึงกันการพลิกทีละคอลัมน์ได้ด้วย &middot; ชุดที่ถูกปฏิเสธ: (1) <span class="mono text-[12px]">type=bundle</span> + <span class="mono text-[12px]">has_variants=true</span>: ถ้าปล่อยผ่าน variant ที่ generate ออกมาจะได้ <span class="mono text-[12px]">type=bundle</span> ตามแม่ทุกตัว &middot; (2) <span class="mono text-[12px]">type=bundle</span> + <span class="mono text-[12px]">template_product_id</span> มีค่า &middot; (3) <span class="mono text-[12px]">has_variants=true</span> + <span class="mono text-[12px]">template_product_id</span> มีค่า: ต้นแบบซ้อนต้นแบบ &middot; แนะนำให้สร้าง variant ผ่าน <span class="mono text-[12px]">generate-variants</span> แทนการส่ง <span class="mono text-[12px]">template_product_id</span> เองใน <span class="mono text-[12px]">POST /products</span></p></div>
+
+          <!-- ER -->
+          <div class="card p-6 mb-6">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">ER &middot; ตารางที่เกี่ยวกับรูปแบบสินค้า (erp_inventory)</div>
+            <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    PRODUCTS ||--o{ PRODUCTS : "template_product_id (variant ของ)"
+    PRODUCTS ||--o{ ITEM_VARIANT_ATTRIBUTES : "variant_product_id"
+    ITEM_ATTRIBUTES ||--o{ ITEM_ATTRIBUTE_VALUES : "attribute_id"
+    ITEM_ATTRIBUTES ||--o{ ITEM_VARIANT_ATTRIBUTES : "attribute_id"
+    ITEM_ATTRIBUTE_VALUES ||--o{ ITEM_VARIANT_ATTRIBUTES : "attribute_value_id"
+    PRODUCTS ||--o{ BUNDLE_ITEMS : "bundle_product_id (ตัวชุด)"
+    PRODUCTS ||--o{ BUNDLE_ITEMS : "component_product_id (สินค้าย่อย)"
+    PRODUCTS ||--o{ UOM_CONVERSION_FACTORS : "product_id"
+    PRODUCTS {
+        uuid id PK
+        string sku UK "unique ทุกแถว"
+        enum type "single or bundle"
+        boolean has_variants "true = ต้นแบบ"
+        uuid template_product_id FK "null ถ้าไม่ใช่ variant"
+        uuid stock_uom_id FK
+    }
+    ITEM_ATTRIBUTES {
+        uuid id PK
+        string name "สี, ขนาด"
+    }
+    ITEM_ATTRIBUTE_VALUES {
+        uuid id PK
+        uuid attribute_id FK
+        string value "แดง, M"
+        string abbr "RD, M (ต่อท้าย SKU)"
+    }
+    ITEM_VARIANT_ATTRIBUTES {
+        uuid id PK
+        uuid variant_product_id FK "CASCADE"
+        uuid attribute_id FK
+        uuid attribute_value_id FK
+    }
+    BUNDLE_ITEMS {
+        uuid id PK
+        uuid bundle_product_id FK "CASCADE"
+        uuid component_product_id FK "RESTRICT"
+        int quantity "ต่อ 1 ชุด (หน่วยสต็อกของสินค้าย่อย)"
+    }
+    UOM_CONVERSION_FACTORS {
+        uuid id PK
+        uuid product_id FK
+        uuid uom_id FK
+        numeric conversion_factor
+        enum uom_type "purchase or sales"
+    }
+</pre>
+            </div>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)"><b>อ่าน FK ให้ถูก:</b> <span class="mono text-[12px]">products.template_product_id</span> และ <span class="mono text-[12px]">bundle_items</span> ทั้งสองคอลัมน์ชี้กลับมาที่ <span class="mono text-[12px]">products</span> ตารางเดิม (self-reference) &middot; <b>CASCADE / RESTRICT มีผลเฉพาะ hard delete ใน Postgres</b> &mdash; <span class="mono text-[12px]">DELETE /products/{id}</span> เป็น soft delete (<span class="mono text-[12px]">is_deleted=true</span>) จึงไม่ติด FK ทั้งสองทาง: ลบต้นแบบแล้ว variant ยังอยู่ ส่วนสินค้าย่อยของชุด API กันแทน FK: <span class="mono text-[12px]">DELETE</span> สินค้าที่ชุดที่ยังไม่ถูกลบมี BOM อ้างอยู่ &rarr; <b>409</b> พร้อม SKU ของชุด (<span class="mono text-[12px]">ProductOperationsService</span> · 2026-09-26)</p>
+          </div>
+
+          <p class="text-[13px] mb-5" style="color:var(--ink-soft)">ตัวอย่างทุกเคสด้านล่างใช้ id แบบอ่านง่าย (<span class="mono text-[12px]">P1</span>, <span class="mono text-[12px]">T1</span>, <span class="mono text-[12px]">V1</span>…) แทน UUID จริง และละคอลัมน์ที่ไม่เกี่ยว (<span class="mono text-[12px]">name_en</span>, <span class="mono text-[12px]">item_group_id</span>, audit columns)</p>
+
+          <!-- ===== CASE A · SINGLE ===== -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(22,163,74,.12);color:#15803D;border:1px solid rgba(22,163,74,.3)">A &middot; has_variants=false</span>
+              <span class="text-[14px] font-semibold">สินค้าเดี่ยว (ไม่มีตัวเลือกย่อย)</span>
+            </div>
+
+            <div class="mono text-[12px] mb-2" style="color:#15803D">A1 &middot; สินค้าเดี่ยวพื้นฐาน: ปากกาเจล</div>
+            <p class="text-[13px] mb-2">เรียก <span class="mono text-[12px]">POST /products</span> ครั้งเดียว ได้ 1 แถว ใช้งานได้ทันที ไม่ต้องใช้ตารางเสริม</p>
+            <table class="d mb-3">
+              <thead><tr><th colspan="5">products</th></tr><tr><th>id</th><th>sku</th><th>name_th</th><th>type</th><th>has_variants</th></tr></thead>
+              <tbody><tr><td>P1</td><td class="mono">PEN-UNI-BL-05</td><td>ปากกาเจล UNI น้ำเงิน 0.5</td><td>single</td><td>false</td></tr></tbody>
+            </table>
+            <p class="text-[12.5px] mb-5" style="color:var(--ink-soft)">รับเข้าคลัง (GR), ตั้งราคา (<span class="mono text-[12px]">item_prices</span>), ผูกซัพพลายเออร์ (<span class="mono text-[12px]">item_suppliers</span>), ติดบาร์โค้ด <span class="mono text-[12px]">target_type=item</span> และขาย ทั้งหมดอ้าง <span class="mono text-[12px]">product_id = P1</span> ตรง ๆ</p>
+
+            <div class="mono text-[12px] mb-2" style="color:#15803D">A2 &middot; สินค้าเดี่ยวที่ซื้อ/ขายเป็นหน่วยบรรจุ: ปากกาเจล ซื้อยกกล่อง 12 ด้าม</div>
+            <p class="text-[13px] mb-2">ยังเป็น <b>SKU เดียว</b> ไม่ต้องสร้างสินค้าใหม่ชื่อ &ldquo;ปากกา (กล่อง)&rdquo; &mdash; เพิ่มอัตราแปลงหน่วยให้ P1 แทน (<span class="mono text-[12px]">POST /products/P1/uom-conversions</span>)</p>
+            <table class="d mb-3">
+              <thead><tr><th colspan="4">uom_conversion_factors</th></tr><tr><th>product_id</th><th>uom_id</th><th>conversion_factor</th><th>uom_type</th></tr></thead>
+              <tbody>
+                <tr><td>P1</td><td>กล่อง</td><td>12</td><td>purchase</td></tr>
+                <tr><td>P1</td><td>แพ็ก</td><td>3</td><td>sales</td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] mb-5" style="color:var(--ink-soft)">รับเข้า 5 กล่อง &rarr; Lot ของ P1 = <b>60 ด้าม</b> (แปลงเป็น <span class="mono text-[12px]">stock_uom</span> เสมอ) &middot; บาร์โค้ดข้างกล่องใช้ <span class="mono text-[12px]">target_type=pack</span> + <span class="mono text-[12px]">uom_id=กล่อง</span> ยิง 1 ครั้งรับเข้า 12 ด้าม</p>
+
+            <div class="mono text-[12px] mb-2" style="color:#15803D">A3 &middot; สินค้าเดี่ยวที่เป็นส่วนประกอบของชุด</div>
+            <p class="text-[13px]">P1 ไม่ต้องเปลี่ยนอะไรเลย ตัวชุดเป็นฝ่ายอ้างมาหามันผ่าน <span class="mono text-[12px]">bundle_items.component_product_id = P1</span> (ดูเคส C) &middot; สต็อกของ P1 จึงถูกตัดทั้งจากการขายปากกาเดี่ยว ๆ และจากการขายชุด</p>
+          </div>
+
+          <!-- ===== CASE B · TEMPLATE + VARIANTS ===== -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(124,58,237,.12);color:#7C3AED;border:1px solid rgba(124,58,237,.3)">B &middot; has_variants=true</span>
+              <span class="text-[14px] font-semibold">สินค้าต้นแบบ + variant (สินค้ามีตัวเลือก)</span>
+            </div>
+            <p class="text-[13px] mb-4">ใช้เมื่อสินค้าตัวเดียวกันมีหลายตัวเลือก และ<b>แต่ละตัวเลือกต้องนับสต็อกแยกกัน</b> (สี, ไซซ์, ขนาดบรรจุ) &middot; ต้นแบบเป็นแค่ตัวจัดกลุ่ม ของจริงที่อยู่บนชั้นคือ variant</p>
+
+            <div class="mono text-[12px] mb-2" style="color:#7C3AED">B1 &middot; ตัวเลือกมิติเดียว: น้ำยาสมุนไพร 3 ขนาด</div>
+            <div class="step"><span class="sn">1</span><p class="text-[13.5px]">เตรียมคุณลักษณะ (ทำครั้งเดียว ใช้ร่วมกับสินค้าตัวอื่นได้)</p></div>
+            <table class="d mb-3">
+              <thead><tr><th colspan="2">item_attributes</th><th colspan="4">item_attribute_values</th></tr><tr><th>id</th><th>name</th><th>id</th><th>attribute_id</th><th>value</th><th>abbr</th></tr></thead>
+              <tbody>
+                <tr><td rowspan="3">A3</td><td rowspan="3">ขนาดบรรจุ</td><td>V11</td><td>A3</td><td>1 ลิตร</td><td class="mono">1L</td></tr>
+                <tr><td>V12</td><td>A3</td><td>4 ลิตร</td><td class="mono">4L</td></tr>
+                <tr><td>V13</td><td>A3</td><td>20 ลิตร</td><td class="mono">20L</td></tr>
+              </tbody>
+            </table>
+            <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><span class="mono text-[12px]">POST /products</span> ด้วย <span class="mono text-[12px]">has_variants: true</span> ได้ต้นแบบ T2</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><span class="mono text-[12px]">POST /products/T2/generate-variants</span> เลือกทั้ง 3 ค่า</p></div>
+            <table class="d mb-3">
+              <thead><tr><th colspan="5">products</th></tr><tr><th>id</th><th>sku</th><th>name_th</th><th>has_variants</th><th>template_product_id</th></tr></thead>
+              <tbody>
+                <tr><td>T2</td><td class="mono">HRB-T01</td><td>น้ำยาสมุนไพร</td><td><b>true</b></td><td>null</td></tr>
+                <tr><td>X11</td><td class="mono">HRB-T01-1L</td><td>น้ำยาสมุนไพร 1 ลิตร</td><td>false</td><td>T2</td></tr>
+                <tr><td>X12</td><td class="mono">HRB-T01-4L</td><td>น้ำยาสมุนไพร 4 ลิตร</td><td>false</td><td>T2</td></tr>
+                <tr><td>X13</td><td class="mono">HRB-T01-20L</td><td>น้ำยาสมุนไพร 20 ลิตร</td><td>false</td><td>T2</td></tr>
+              </tbody>
+            </table>
+            <table class="d mb-5">
+              <thead><tr><th colspan="3">item_variant_attributes (1 แถวต่อ variant ต่อมิติ)</th></tr><tr><th>variant_product_id</th><th>attribute_id</th><th>attribute_value_id</th></tr></thead>
+              <tbody>
+                <tr><td>X11</td><td>A3 (ขนาดบรรจุ)</td><td>V11 (1 ลิตร)</td></tr>
+                <tr><td>X12</td><td>A3</td><td>V12 (4 ลิตร)</td></tr>
+                <tr><td>X13</td><td>A3</td><td>V13 (20 ลิตร)</td></tr>
+              </tbody>
+            </table>
+
+            <div class="mono text-[12px] mb-2" style="color:#7C3AED">B2 &middot; ตัวเลือกสองมิติ: เสื้อยืด สี &times; ไซซ์ (2 &times; 2 = 4 variant)</div>
+            <table class="d mb-3">
+              <thead><tr><th colspan="2">item_attributes</th><th colspan="4">item_attribute_values</th></tr><tr><th>id</th><th>name</th><th>id</th><th>attribute_id</th><th>value</th><th>abbr</th></tr></thead>
+              <tbody>
+                <tr><td rowspan="2">A1</td><td rowspan="2">สี</td><td>V1</td><td>A1</td><td>แดง</td><td class="mono">RD</td></tr>
+                <tr><td>V2</td><td>A1</td><td>น้ำเงิน</td><td class="mono">BL</td></tr>
+                <tr><td rowspan="2">A2</td><td rowspan="2">ขนาด</td><td>V3</td><td>A2</td><td>M</td><td class="mono">M</td></tr>
+                <tr><td>V4</td><td>A2</td><td>L</td><td class="mono">L</td></tr>
+              </tbody>
+            </table>
+            <div class="code p-5 mb-3"><pre><span class="c">// 1) สร้างต้นแบบ</span>
+POST /products
+{ <span class="s">"sku"</span>: <span class="s">"TSHIRT"</span>, <span class="s">"name_th"</span>: <span class="s">"เสื้อยืด"</span>, <span class="s">"name_en"</span>: <span class="s">"T-Shirt"</span>, <span class="s">"type"</span>: <span class="s">"single"</span>,
+  <span class="s">"has_variants"</span>: <span class="k">true</span>, <span class="s">"item_group_id"</span>: <span class="s">"…"</span>, <span class="s">"stock_uom_id"</span>: <span class="s">"…ชิ้น"</span> }   <span class="c">// → T1</span>
+
+<span class="c">// 2) generate: ระบบจับคู่ทุกค่าของทุกมิติให้เอง (cartesian product)</span>
+POST /products/T1/generate-variants
+{ <span class="s">"attributes"</span>: [
+    { <span class="s">"attribute_id"</span>: <span class="s">"A1"</span>, <span class="s">"value_ids"</span>: [<span class="s">"V1"</span>, <span class="s">"V2"</span>] },
+    { <span class="s">"attribute_id"</span>: <span class="s">"A2"</span>, <span class="s">"value_ids"</span>: [<span class="s">"V3"</span>, <span class="s">"V4"</span>] } ] }
+<span class="c">// 201 → 4 variant ในทรานแซกชันเดียว (สำเร็จทั้งหมดหรือไม่สร้างเลย)</span></pre></div>
+            <table class="d mb-3">
+              <thead><tr><th colspan="5">products</th></tr><tr><th>id</th><th>sku</th><th>name_th</th><th>has_variants</th><th>template_product_id</th></tr></thead>
+              <tbody>
+                <tr><td>T1</td><td class="mono">TSHIRT</td><td>เสื้อยืด</td><td><b>true</b></td><td>null</td></tr>
+                <tr><td>X1</td><td class="mono">TSHIRT-RD-M</td><td>เสื้อยืด แดง M</td><td>false</td><td>T1</td></tr>
+                <tr><td>X2</td><td class="mono">TSHIRT-RD-L</td><td>เสื้อยืด แดง L</td><td>false</td><td>T1</td></tr>
+                <tr><td>X3</td><td class="mono">TSHIRT-BL-M</td><td>เสื้อยืด น้ำเงิน M</td><td>false</td><td>T1</td></tr>
+                <tr><td>X4</td><td class="mono">TSHIRT-BL-L</td><td>เสื้อยืด น้ำเงิน L</td><td>false</td><td>T1</td></tr>
+              </tbody>
+            </table>
+            <table class="d mb-3">
+              <thead><tr><th colspan="3">item_variant_attributes (4 variant &times; 2 มิติ = 8 แถว)</th></tr><tr><th>variant_product_id</th><th>attribute_id</th><th>attribute_value_id</th></tr></thead>
+              <tbody>
+                <tr><td>X1</td><td>A1 (สี)</td><td>V1 (แดง)</td></tr>
+                <tr><td>X1</td><td>A2 (ขนาด)</td><td>V3 (M)</td></tr>
+                <tr><td>X2</td><td>A1</td><td>V1 (แดง)</td></tr>
+                <tr><td>X2</td><td>A2</td><td>V4 (L)</td></tr>
+                <tr><td>X3</td><td>A1</td><td>V2 (น้ำเงิน)</td></tr>
+                <tr><td>X3</td><td>A2</td><td>V3 (M)</td></tr>
+                <tr><td>X4</td><td>A1</td><td>V2 (น้ำเงิน)</td></tr>
+                <tr><td>X4</td><td>A2</td><td>V4 (L)</td></tr>
+              </tbody>
+            </table>
+            <div class="edge mb-5"><div class="tag mb-1">variant ได้อะไรมาจากต้นแบบ</div><p class="text-[13px]"><span class="mono text-[12px]">sku</span> = sku แม่ + <span class="mono text-[12px]">abbr</span> ของแต่ละค่าต่อด้วย <span class="mono text-[12px]">-</span> ตามลำดับมิติที่ส่ง (ไม่มี abbr ใช้ <span class="mono text-[12px]">value</span> แทน) &middot; <span class="mono text-[12px]">name_th/en</span> = ชื่อแม่ + value &middot; <b>คัดลอกค่า ณ ตอน generate</b>: <span class="mono text-[12px]">type</span>, <span class="mono text-[12px]">item_group_id</span>, <span class="mono text-[12px]">brand_id</span>, <span class="mono text-[12px]">stock_uom_id</span>, <span class="mono text-[12px]">supplier_id</span>, <span class="mono text-[12px]">tax_category_id</span> &middot; หลังจากนั้นแต่ละ variant เป็นแถวอิสระ แก้แม่ทีหลัง<b>ไม่ไหลลงไป</b>ที่ variant ที่สร้างไปแล้ว &middot; ราคา อัตราแปลงหน่วย บาร์โค้ด และซัพพลายเออร์ <b>ไม่คัดลอก</b> ต้องตั้งให้ variant แต่ละตัว (บาร์โค้ดใช้ <span class="mono text-[12px]">POST /products/T1/variant-barcodes</span> ออกให้ทุกตัวในคำขอเดียว)</p></div>
+
+            <div class="mono text-[12px] mb-2" style="color:#7C3AED">B3 &middot; เพิ่มตัวเลือกทีหลัง: เพิ่มสีดำ ให้เสื้อยืดที่มีอยู่แล้ว</div>
+            <p class="text-[13px] mb-2">เพิ่มค่า <span class="mono text-[12px]">V5 = ดำ (BK)</span> ใต้ A1 แล้ว generate <b>เฉพาะค่าใหม่</b> คูณกับไซซ์เดิม</p>
+            <div class="code p-5 mb-3"><pre>POST /products/T1/generate-variants
+{ <span class="s">"attributes"</span>: [
+    { <span class="s">"attribute_id"</span>: <span class="s">"A1"</span>, <span class="s">"value_ids"</span>: [<span class="s">"V5"</span>] },
+    { <span class="s">"attribute_id"</span>: <span class="s">"A2"</span>, <span class="s">"value_ids"</span>: [<span class="s">"V3"</span>, <span class="s">"V4"</span>] } ] }
+<span class="c">// 201 → TSHIRT-BK-M, TSHIRT-BK-L</span></pre></div>
+            <p class="text-[12.5px] mb-5" style="color:var(--ink-soft)"><b>อย่าส่งชุดเต็มซ้ำ</b> (V1, V2, V5 &times; V3, V4) &mdash; ชุดที่มีอยู่แล้วจะได้ SKU ซ้ำ ชน <span class="mono text-[12px]">uq_products_sku</span> &rarr; <b>409</b> และเพราะทั้งคำขออยู่ในทรานแซกชันเดียว variant สีดำก็จะไม่ถูกสร้างด้วย</p>
+
+            <div class="mono text-[12px] mb-2" style="color:#7C3AED">B4 &middot; ต้นแบบถูกกันที่ไหนบ้าง</div>
+            <table class="d">
+              <thead><tr><th>ทำกับต้นแบบ T1 ตรง ๆ</th><th>ผล</th><th>ต้องทำแทน</th></tr></thead>
+              <tbody>
+                <tr><td>รับเข้าคลัง (GR) / stock entry</td><td>400</td><td>รับเข้า variant (<span class="mono text-[12px]">TSHIRT-RD-M</span>)</td></tr>
+                <tr><td>ตั้งราคา <span class="mono text-[12px]">item_prices</span> / ผูก <span class="mono text-[12px]">item_suppliers</span></td><td>400</td><td>ตั้งให้ variant แต่ละตัว</td></tr>
+                <tr><td>ใส่ในใบเสนอราคา / POS</td><td>400</td><td>เลือก variant</td></tr>
+                <tr><td>ใส่เป็นสินค้าย่อยของชุด</td><td>400</td><td>ใส่ variant ลงในชุด (เคส C2)</td></tr>
+                <tr><td>บาร์โค้ด <span class="mono text-[12px]">target_type=template</span></td><td><span style="color:#15803D">201</span></td><td>สร้างได้ แต่ใช้ค้นหา/ป้ายชั้นวางเท่านั้น ยิงแล้วทำธุรกรรมไม่ได้</td></tr>
+                <tr><td><span class="mono text-[12px]">generate-variants</span> บนสินค้าที่ <span class="mono text-[12px]">has_variants=false</span></td><td>400</td><td>&mdash;</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ===== CASE C · BUNDLE ===== -->
+          <div class="card p-6 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="pchip" style="background:rgba(220,90,22,.12);color:var(--signal);border:1px solid rgba(220,90,22,.3)">C &middot; type=bundle</span>
+              <span class="text-[14px] font-semibold">สินค้าชุด (bundle / kit)</span>
+            </div>
+            <p class="text-[13px] mb-4">ใช้เมื่อขาย<b>หลาย SKU รวมเป็นชุดเดียว</b>ในบรรทัดเดียวบนบิล &middot; ตัวชุดไม่มีสต็อก ไม่มี Lot ไม่มีต้นทุนของตัวเอง ระบบแตกชุดเป็นสินค้าย่อยตาม BOM (<span class="mono text-[12px]">bundle_items</span>) ตอนเช็กสต็อก (SO confirm) และตอนตัดสต็อก (ส่งของ / POS / รับคืน) &middot; sales-bc ไม่เคยเห็น BOM เลย แค่ส่ง product ของชุดไปให้ inventory-bc</p>
+
+            <div class="mono text-[12px] mb-2" style="color:var(--signal)">C1 &middot; ชุดจากสินค้าเดี่ยว: ชุดของขวัญ A = ปากกา 2 ด้าม + แก้ว 1 ใบ</div>
+            <div class="code p-5 mb-3"><pre><span class="c">// 1) สร้างตัวชุด: เป็นแถวใน products เหมือนสินค้าอื่น</span>
+POST /products
+{ <span class="s">"sku"</span>: <span class="s">"GIFTSET-A"</span>, <span class="s">"name_th"</span>: <span class="s">"ชุดของขวัญ A"</span>, <span class="s">"name_en"</span>: <span class="s">"Gift Set A"</span>,
+  <span class="s">"type"</span>: <span class="s">"bundle"</span>, <span class="s">"has_variants"</span>: <span class="k">false</span>, <span class="s">"item_group_id"</span>: <span class="s">"…"</span>, <span class="s">"stock_uom_id"</span>: <span class="s">"…ชุด"</span> }   <span class="c">// → B1</span>
+
+<span class="c">// 2) ใส่ BOM ทีละบรรทัด</span>
+POST /products/B1/bundle-items  { <span class="s">"component_product_id"</span>: <span class="s">"P1"</span>, <span class="s">"quantity"</span>: <span class="d">2</span> }
+POST /products/B1/bundle-items  { <span class="s">"component_product_id"</span>: <span class="s">"P2"</span>, <span class="s">"quantity"</span>: <span class="d">1</span> }</pre></div>
+            <table class="d mb-3">
+              <thead><tr><th colspan="4">products</th></tr><tr><th>id</th><th>sku</th><th>name_th</th><th>type</th></tr></thead>
+              <tbody>
+                <tr><td>P1</td><td class="mono">PEN-UNI-BL-05</td><td>ปากกาเจล UNI น้ำเงิน 0.5</td><td>single</td></tr>
+                <tr><td>P2</td><td class="mono">MUG-001</td><td>แก้วมัค</td><td>single</td></tr>
+                <tr><td>B1</td><td class="mono">GIFTSET-A</td><td>ชุดของขวัญ A</td><td><b>bundle</b></td></tr>
+              </tbody>
+            </table>
+            <table class="d mb-3">
+              <thead><tr><th colspan="3">bundle_items</th></tr><tr><th>bundle_product_id</th><th>component_product_id</th><th>quantity</th></tr></thead>
+              <tbody>
+                <tr><td>B1</td><td>P1 (ปากกา)</td><td>2</td></tr>
+                <tr><td>B1</td><td>P2 (แก้ว)</td><td>1</td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] mb-5" style="color:var(--ink-soft)">ขาย <b>GIFTSET-A &times; 3 ชุด</b> &rarr; บิลแสดง 1 บรรทัด (ราคาชุด) &middot; inventory-bc แตกเป็น <b>P1 &times; 6</b> และ <b>P2 &times; 3</b> แล้วตัด FIFO/FEFO ของแต่ละตัวในทรานแซกชันเดียว &middot; COGS ของบรรทัด = ต้นทุนรวมทุกล็อตของทุกสินค้าย่อย &middot; รายงานกำไรต่อล็อตแบ่งรายได้ของชุดให้สินค้าย่อย<b>ตามสัดส่วนต้นทุน</b> (เพราะสินค้าย่อยไม่มีราคาขายของตัวเองในชุด)</p>
+
+            <div class="mono text-[12px] mb-2" style="color:var(--signal)">C2 &middot; ชุดที่มี variant: ชุดยูนิฟอร์ม = เสื้อยืดแดง M 2 ตัว + ปากกา 1 ด้าม</div>
+            <table class="d mb-3">
+              <thead><tr><th colspan="3">bundle_items</th></tr><tr><th>bundle_product_id</th><th>component_product_id</th><th>quantity</th></tr></thead>
+              <tbody>
+                <tr><td>B2 (<span class="mono">UNIFORM-SET-M</span>)</td><td>X1 (<span class="mono">TSHIRT-RD-M</span> &middot; variant)</td><td>2</td></tr>
+                <tr><td>B2</td><td>P1 (ปากกา &middot; สินค้าเดี่ยว)</td><td>1</td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] mb-5" style="color:var(--ink-soft)">สินค้าย่อยเป็น <b>variant ที่ระบุตัวเลือกครบแล้ว</b> เท่านั้น ใส่ต้นแบบ T1 ไม่ได้ เพราะระบบต้องรู้ว่าจะตัดสต็อกสีไหนไซซ์ไหน &middot; ถ้าต้องขายชุดยูนิฟอร์มหลายไซซ์ ให้สร้าง<b>ชุดแยกต่อไซซ์</b> (<span class="mono text-[12px]">UNIFORM-SET-M</span>, <span class="mono text-[12px]">UNIFORM-SET-L</span>) &mdash; ชุดทำเป็นต้นแบบ + variant ไม่ได้ (ดูกล่อง &ldquo;ชุดค่าที่ห้ามใช้&rdquo; ด้านบน)</p>
+
+            <div class="mono text-[12px] mb-2" style="color:var(--signal)">C3 &middot; หลายชุดแชร์สินค้าย่อยเดียวกัน: demand ถูกรวมก่อนเช็กสต็อก</div>
+            <p class="text-[13px] mb-2">ใบสั่งขายเดียวมี 3 บรรทัด: GIFTSET-A &times; 3, UNIFORM-SET-M &times; 2, และปากกา P1 ขายเดี่ยว &times; 4</p>
+            <table class="d mb-3">
+              <thead><tr><th>สินค้าย่อย</th><th>มาจาก GIFTSET-A &times; 3</th><th>มาจาก UNIFORM-SET-M &times; 2</th><th>ขายตรง</th><th>demand รวมที่เช็กกับสต็อก</th></tr></thead>
+              <tbody>
+                <tr><td>P1 ปากกา</td><td>2 &times; 3 = 6</td><td>1 &times; 2 = 2</td><td>4</td><td><b>12</b></td></tr>
+                <tr><td>P2 แก้ว</td><td>1 &times; 3 = 3</td><td>&mdash;</td><td>&mdash;</td><td><b>3</b></td></tr>
+                <tr><td>X1 เสื้อยืดแดง M</td><td>&mdash;</td><td>2 &times; 2 = 4</td><td>&mdash;</td><td><b>4</b></td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] mb-5" style="color:var(--ink-soft)">ถ้าปากกาเหลือ 10 ด้าม ใบนี้<b>ไม่ผ่าน</b> ถึงแต่ละบรรทัดแยกกันจะดูเหมือนพอก็ตาม &mdash; <span class="mono text-[12px]">BundleItemsService.explodeDemands()</span> รวม demand ต่อสินค้าย่อยก่อน เพื่อไม่ให้สองบรรทัดแย่งล็อตเดียวกันแล้วผ่านทั้งคู่</p>
+
+            <div class="mono text-[12px] mb-2" style="color:var(--signal)">C4 &middot; สิ่งที่ระบบปฏิเสธเกี่ยวกับชุด</div>
+            <table class="d mb-3">
+              <thead><tr><th>คำขอ</th><th>ผล</th><th>เหตุผล</th></tr></thead>
+              <tbody>
+                <tr><td>ใส่ชุดเป็นสินค้าย่อยของอีกชุด (bundle ซ้อน bundle)</td><td>400</td><td>กันวงวน A&rarr;B&rarr;A ตั้งแต่โครงสร้าง แตกชุดจึงทำรอบเดียวจบ &middot; ให้ใส่สินค้าย่อยของชุดนั้นแทน</td></tr>
+                <tr><td>ใส่ชุดเป็นสินค้าย่อยของตัวเอง</td><td>400</td><td>&mdash;</td></tr>
+                <tr><td>ใส่ต้นแบบ (<span class="mono text-[12px]">has_variants=true</span>) เป็นสินค้าย่อย</td><td>400</td><td>ใส่ variant แทน</td></tr>
+                <tr><td>ใส่สินค้าย่อยตัวเดิมซ้ำในชุดเดียวกัน</td><td>409</td><td><span class="mono text-[12px]">uq_bundle_items_bundle_component</span> &middot; ให้แก้ <span class="mono text-[12px]">quantity</span> ของบรรทัดเดิม</td></tr>
+                <tr><td><span class="mono text-[12px]">POST /products/{id}/bundle-items</span> บนสินค้าที่ไม่ใช่ <span class="mono text-[12px]">type=bundle</span></td><td>400</td><td>มีแต่ชุดที่มี BOM ได้</td></tr>
+                <tr><td>ขาย/ส่งของชุดที่ยังไม่มี BOM เลย</td><td>400</td><td>ชุดเปล่าจะ &ldquo;ตัดสต็อกสำเร็จ&rdquo; เป็นศูนย์ ซึ่งไม่ใช่สิ่งที่ผู้ขายตั้งใจ</td></tr>
+                <tr><td>รับเข้าคลัง / stock entry ให้ตัวชุด</td><td>400</td><td>รับเข้าสินค้าย่อยแทน</td></tr>
+                <tr><td>ตั้งราคาใน <span class="mono text-[12px]">item_prices</span> / ผูก <span class="mono text-[12px]">item_suppliers</span> ให้ตัวชุด</td><td>400</td><td>ดูกล่องราคาด้านล่าง</td></tr>
+                <tr><td>ลบสินค้าย่อยที่ยังอยู่ในชุดที่ยังไม่ถูกลบ</td><td>409</td><td>ข้อความบอก SKU ของทุกชุดที่ยังอ้างอยู่ &middot; เอาออกจาก BOM (<span class="mono text-[12px]">DELETE /products/{bundle}/bundle-items/{id}</span>) ก่อน แล้วลบได้ตามปกติ &middot; soft delete ไม่ติด FK RESTRICT จึงต้องกันที่ <span class="mono text-[12px]">ProductOperationsService</span></td></tr>
+              </tbody>
+            </table>
+            <div class="edge"><div class="tag mb-1">ราคาของชุดมาจากไหน</div><p class="text-[13px]"><span class="mono text-[12px]">item_prices</span> ไม่รับตัวชุด (ข้อความ error บอกให้ตั้งราคาที่สินค้าย่อยแทน) &middot; ตอนขาย ใบเสนอราคา/SO/POS <b>รับชุดเป็น 1 บรรทัด</b> ให้ส่ง <span class="mono text-[12px]">unit_price</span> ของชุดมาในบรรทัดเอง หรือตั้ง pricing rule ให้ product ของชุด (ถ้าไม่ส่งราคาและไม่มีกฎที่ตรงเลย ใบเสนอราคาจะตอบ 400 เพราะไม่มีราคาให้เสนอ) &middot; บาร์โค้ด <span class="mono text-[12px]">target_type=bundle</span> สร้างได้สำหรับติดป้ายราคา/โปรโมชัน แต่ยิงเพื่อรับเข้าคลังไม่ได้</p></div>
+          </div>
+
+          <!-- ===== CAPABILITY MATRIX ===== -->
+          <div class="card overflow-hidden mb-6">
+            <div class="p-5 pb-3"><div class="mono text-[12px]" style="color:#7C3AED">สรุป &middot; แต่ละรูปแบบใช้กับอะไรได้บ้าง</div></div>
+            <table class="d">
+              <thead><tr><th>ใช้กับ</th><th>เดี่ยว</th><th>ต้นแบบ</th><th>Variant</th><th>ชุด</th></tr></thead>
+              <tbody>
+                <tr><td>Lot / สต็อกของตัวเอง</td><td>✓</td><td>✗</td><td>✓</td><td>✗ (อยู่ที่สินค้าย่อย)</td></tr>
+                <tr><td>Goods Receipt / stock entry</td><td>✓</td><td>✗</td><td>✓</td><td>✗</td></tr>
+                <tr><td><span class="mono text-[12px]">item_prices</span> / <span class="mono text-[12px]">item_suppliers</span></td><td>✓</td><td>✗</td><td>✓</td><td>✗</td></tr>
+                <tr><td><span class="mono text-[12px]">uom_conversion_factors</span> (หน่วยบรรจุ)</td><td>✓</td><td>&mdash;</td><td>✓ (ตั้งต่อ variant)</td><td>&mdash;</td></tr>
+                <tr><td>ใบเสนอราคา / SO / POS</td><td>✓</td><td>✗</td><td>✓</td><td>✓ (1 บรรทัด, แตกชุดตอนตัดสต็อก)</td></tr>
+                <tr><td>เป็นสินค้าย่อยในชุด</td><td>✓</td><td>✗</td><td>✓</td><td>✗</td></tr>
+                <tr><td>บาร์โค้ด (target_type)</td><td><span class="mono text-[12px]">item</span>, <span class="mono text-[12px]">pack</span></td><td><span class="mono text-[12px]">template</span> (ค้นหาเท่านั้น)</td><td><span class="mono text-[12px]">variant</span>, <span class="mono text-[12px]">pack</span></td><td><span class="mono text-[12px]">bundle</span> (ป้ายเท่านั้น)</td></tr>
+                <tr><td>ตัวที่ตรวจ</td><td colspan="4"><span class="mono text-[12px]">ProductsService.assertValidShape</span> (รูปแบบสินค้า), <span class="mono text-[12px]">ProductOperationsService</span> (ลบสินค้าย่อยของชุด), <span class="mono text-[12px]">assertProductTransactable</span> (item-price / item-supplier / barcode), <span class="mono text-[12px]">GoodsReceiptsService</span> / <span class="mono text-[12px]">StockEntriesService</span>, <span class="mono text-[12px]">BundleItemsService</span>, sales-bc <span class="mono text-[12px]">QuotationsService</span> / <span class="mono text-[12px]">PosSalesService</span></td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- 2.3 Barcode -->
@@ -686,7 +996,7 @@ item_prices: [
                 <tr><td><span class="mono text-[12px]">item</span></td><td><span class="mono text-[12px]">products</span> สินค้าเดี่ยว (<span class="mono text-[12px]">type=single</span> &middot; <span class="mono text-[12px]">has_variants=false</span> &middot; ไม่มี template)</td><td><span style="color:#15803D">✓</span></td><td>1 <span class="mono text-[12px]">stock_uom</span></td></tr>
                 <tr><td><span class="mono text-[12px]">variant</span></td><td><span class="mono text-[12px]">products</span> ที่ generate จาก template (<span class="mono text-[12px]">template_product_id</span> ไม่เป็น null) เช่น เสื้อยืด-ดำ-M</td><td><span style="color:#15803D">✓</span></td><td>1 <span class="mono text-[12px]">stock_uom</span></td></tr>
                 <tr><td><span class="mono text-[12px]">pack</span></td><td>สินค้าเดียวกับ <span class="mono text-[12px]">item</span>/<span class="mono text-[12px]">variant</span> แต่ระบุ <span class="mono text-[12px]">uom_id</span> เป็นหน่วยบรรจุ (โหล/ลัง)</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">conversion_factor</span> <span class="mono text-[12px]">stock_uom</span></td></tr>
-                <tr><td><span class="mono text-[12px]">bundle</span></td><td><span class="mono text-[12px]">products</span> ที่ <span class="mono text-[12px]">type=bundle</span> (ชุด/kit)</td><td><span style="color:var(--muted)">P4</span></td><td>ระเบิดเป็นส่วนประกอบตาม <span class="mono text-[12px]">bundle_items</span> (<b>ยังไม่มีตาราง</b> — รอ Phase 4)</td></tr>
+                <tr><td><span class="mono text-[12px]">bundle</span></td><td><span class="mono text-[12px]">products</span> ที่ <span class="mono text-[12px]">type=bundle</span> (ชุด/kit)</td><td><span style="color:var(--muted)">P4</span></td><td>ป้ายราคา/โปรโมชันเท่านั้น — ยิงแล้วไม่รับเข้าคลัง (รับเข้าสินค้าย่อยแทน) · ตัวชุดแตกเป็นส่วนประกอบตาม <span class="mono text-[12px]">bundle_items</span> ตอนขาย/ส่งของ (ดู <a href="#product-shapes" style="color:var(--signal);text-decoration:underline">เคส C</a>)</td></tr>
                 <tr><td><span class="mono text-[12px]">template</span></td><td><span class="mono text-[12px]">products</span> ที่ <span class="mono text-[12px]">has_variants=true</span> (สินค้าต้นแบบ)</td><td><span style="color:#B91C1C">✗</span></td><td>ค้นหา / ป้ายชั้นวางเท่านั้น — ยิงแล้วระบบตอบว่าเป็นต้นแบบ พร้อมรายการ variant ให้ไปยิงป้ายที่ถูกต้อง <b>ไม่ใช่ dialog ให้เลือกแล้วรับเข้าคลัง</b></td></tr>
                 <tr><td><span class="mono text-[12px]">item_group</span></td><td><span class="mono text-[12px]">item_groups</span> (node หรือ leaf ก็ได้)</td><td><span style="color:#B91C1C">✗</span></td><td>ค้นหา / ป้ายหมวดหมู่เท่านั้น</td></tr>
               </tbody>
@@ -701,7 +1011,7 @@ item_prices: [
               <div class="edge"><div class="tag mb-1">pack</div><p class="text-[13px]">สินค้าเดียวกับ <span class="mono text-[12px]">AGCH-FUN-01</span> แต่มีป้าย &ldquo;ลัง&rdquo; แยกอีกใบ ชี้ <span class="mono text-[12px]">uom_id</span> = ลัง (มี <span class="mono text-[12px]">uom_conversion_factors</span> บอกว่า 1 ลัง = 24 ถุง) — ยิงป้ายลังแล้วรับเข้าคลัง <b>24</b> หน่วยในคราวเดียว ไม่ใช่ 1</p></div>
               <div class="edge"><div class="tag mb-1">template</div><p class="text-[13px]">ยิงป้ายที่ติดอยู่บนกล่องโชว์สินค้าของ <span class="mono text-[12px]">AGCH-HRB-T01</span> (ต้นแบบ ไม่ใช่ของจริงที่ขาย) — ระบบตอบกลับว่า &ldquo;นี่คือสินค้าต้นแบบ มี 3 variant: 1L, 4L, 20L&rdquo; ให้พนักงานไปหยิบของแล้วยิงป้ายที่ตัวสินค้าจริงแทน</p></div>
               <div class="edge"><div class="tag mb-1">item_group</div><p class="text-[13px]">ป้ายติดชั้นวางหมวด &ldquo;ปุ๋ยเคมี&rdquo; — ยิงแล้วเปิดหน้าจอ &ldquo;สินค้าในหมวดนี้&rdquo; ใช้เดินสต็อก/ตรวจนับ ไม่ใช่รับเข้าคลัง</p></div>
-              <div class="edge"><div class="tag mb-1">bundle</div><p class="text-[13px]">ชุด &ldquo;สตาร์ทเตอร์ปลูกผัก&rdquo; (เมล็ด + ปุ๋ย + กระถาง) — สร้างป้ายได้ตั้งแต่วันนี้ (สำหรับติดป้ายราคา/โปรโมชัน) แต่ยิงเพื่อ &ldquo;รับเข้าคลัง/ระเบิดเป็นส่วนประกอบ&rdquo; ยังทำไม่ได้จนกว่า Phase 4 จะมีตาราง <span class="mono text-[12px]">bundle_items</span></p></div>
+              <div class="edge"><div class="tag mb-1">bundle</div><p class="text-[13px]">ชุด &ldquo;สตาร์ทเตอร์ปลูกผัก&rdquo; (เมล็ด + ปุ๋ย + กระถาง) — สร้างป้ายได้ตั้งแต่วันนี้ (สำหรับติดป้ายราคา/โปรโมชัน) แต่ยิงเพื่อ &ldquo;รับเข้าคลัง&rdquo; ไม่ได้ เพราะตัวชุดไม่ถือสต็อก ต้องรับเข้าเมล็ด/ปุ๋ย/กระถางทีละตัว · BOM ของชุดอยู่ใน <span class="mono text-[12px]">bundle_items</span> ซึ่งถูกแตกตอนขาย/ส่งของ</p></div>
             </div>
           </div>
 

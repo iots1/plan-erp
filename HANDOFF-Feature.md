@@ -176,6 +176,27 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-26 · รูปแบบสินค้าผิดชุด + ลบสินค้าย่อยของชุด บันทึกผ่านเงียบ ✅ **แก้ + verify + smoke** *(ยังไม่ commit · ยังไม่ deploy)*
+
+**ต้นเหตุ** — (1) `POST/PUT /products` ตรวจทีละคอลัมน์ ไม่ตรวจ `type` × `has_variants` × `template_product_id`
+รวมกัน ชุดที่ไม่มีส่วนไหนรองรับ (ชุดที่เป็นต้นแบบ, ชุดที่เป็น variant, ต้นแบบซ้อนต้นแบบ) จึงบันทึกได้ ·
+(2) `DELETE /products/:id` เป็น soft delete จึงไม่ติด RESTRICT ของ `bundle_items.component_product_id`
+ลบสินค้าย่อยแล้ว BOM ยังชี้หามัน ไปพังตอนขายชุด
+
+| ที่ | ของใหม่ |
+|---|---|
+| inventory-bc | `ProductsService.assertValidShape()` → **400** ทั้ง create (JSON + multipart) และ update · update ตรวจกับแถวหลังแก้ (ส่งมา + ค่าเดิม) |
+| inventory-bc | โมดูล `product-operations` — facade `ProductOperationsService` + ย้าย `ProductsController` มาอยู่ที่นี่ (route เดิมทุกเส้น) · DELETE สินค้าที่ชุดที่ยังไม่ถูกลบมี BOM อ้างอยู่ → **409** พร้อม SKU ของชุด · `BundleItemsService.findBundleSkusContainingComponent()` |
+| เทสต์ | unit `products.service.spec.ts` (shape ทั้ง create/update) · `bundle-items.service.spec.ts` · `product-operations.service.spec.ts` · smoke `product-shape-guards.smoke.mjs` |
+| docs | `srs-p2.html` §2 "ความสัมพันธ์ข้อมูลสินค้าแบบละเอียด" (เคส A/B/C ทุกแบบ) + ข้อความบาร์โค้ดของชุดที่ยังบอกว่า "ยังไม่มี `bundle_items`" |
+
+**ทำไมเป็น facade** — `BundleModule` import `ProductModule` อยู่แล้ว (เช็ก component ผ่าน `ProductsService`)
+ถ้า `ProductsService` เรียก `BundleItemsService` กลับจะเป็น cycle — แพทเทิร์นเดียวกับ `uom-conversion-operations`
+**ยังค้าง** — (a) ข้อมูลเก่าที่ผิดรูปแบบไปแล้วไม่ได้ถูกแก้ ตรวจด้วย
+`SELECT sku FROM products WHERE is_deleted=false AND ((type='bundle' AND (has_variants OR template_product_id IS NOT NULL)) OR (has_variants AND template_product_id IS NOT NULL));`
+และ BOM ที่ชี้สินค้าที่ลบไปแล้ว (`bundle_items` join `products.is_deleted=true`) · (b) ยังไม่กัน: เปลี่ยนสินค้าที่อยู่ใน BOM
+ให้เป็นต้นแบบ/ชุดผ่าน PUT, ปิด `has_variants` ของต้นแบบที่มี variant แล้ว, ลบต้นแบบที่ยังมี variant
+
 ### 2026-09-26 · บาร์โค้ด pack ยิงได้ `qty_per_scan: null` ถาวร ✅ **แก้ + verify + smoke** *(ยังไม่ commit · ยังไม่ deploy)*
 
 **ต้นเหตุ** — สร้างบาร์โค้ด `target_type=pack` ระบบตรวจว่ามี `uom_conversion_factors` ของ product + uom
