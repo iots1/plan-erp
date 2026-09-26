@@ -2090,7 +2090,7 @@ sequenceDiagram
               <tr><td>inventory</td><td class="mono text-[11.5px]">/uoms · /products/{id}/uom-conversions</td><td>หน่วยนับ + อัตราแปลงต่อสินค้า</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/warehouses</td><td>คลัง (โครงสร้างต้นไม้ · รับของได้เฉพาะคลังใบ)</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/price-lists · /item-prices · /pricing-rules</td><td>รายการราคา · ราคาต่อสินค้า (มีช่วงวันมีผล) · กฎส่วนลด</td></tr>
-              <tr><td>inventory</td><td class="mono text-[11.5px]">/item-suppliers · /tax-categories · /bundles</td><td>ผู้ขายต่อสินค้า · ประเภทภาษีต่อสินค้า · สินค้าชุด</td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/item-suppliers · /tax-categories · /products/{id}/bundle-items</td><td>ผู้ขายต่อสินค้า · ประเภทภาษีต่อสินค้า · สินค้าชุด (BOM ของชุด)</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/products/{id}/reorder-levels · /products/{id}/variant-barcodes</td><td>จุดสั่งซื้อซ้ำ · บาร์โค้ด</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/purchase-returns</td><td>ส่งคืนสินค้าให้ผู้ขาย (ดู A4 ด้านบน) — submittable, ไม่ใช่ CRUD ตรง</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/stock-settings</td><td><b>GET/PUT เท่านั้น</b> · FIFO/FEFO · วันแจ้งเตือนหมดอายุ · % รับเกิน · <b>เพดานอนุมัติใบปรับยอด</b></td></tr>
@@ -2133,6 +2133,25 @@ sequenceDiagram
             <b>2) <span class="mono text-[12px]">stock_uom_id</span> ล็อกเมื่อมีสต็อกแล้ว</b> — <span class="mono text-[12px]">PUT /products/{id}</span>
             ที่พยายามเปลี่ยน <span class="mono text-[12px]">stock_uom_id</span> ของสินค้าที่มี lot อยู่แล้ว (เคยรับ/ตัด/ปรับสต็อกมาก่อน) จะได้ <span class="mono text-[12px]">400</span>
             "already has stock movements" — ฟอร์มแก้ไขสินค้าควรปิด (disable) ช่องหน่วยเก็บสต็อกเมื่อสินค้ามีสต็อกอยู่แล้ว แทนที่จะให้กดแล้วเจอ error
+          </p>
+        </div>
+        <div class="rulebox mb-4" id="products-2026-09-27">
+          <div class="rc mb-1">/products · SKU อัตโนมัติ + กันรูปแบบสินค้าผิด + กันแก้/ลบของที่มีประวัติ (2026-09-26 – 27)</div>
+          <p class="text-[13.5px]">
+            <b>1) <span class="mono text-[12px]">sku</span> ไม่บังคับ</b> — <span class="mono text-[12px]">POST /products</span> (JSON หรือ multipart: ฟิลด์ <span class="mono text-[12px]">data</span> = JSON ของสินค้า + <span class="mono text-[12px]">images</span> ≤ 5 ไฟล์)
+            ไม่ส่งหรือส่ง <span class="mono text-[12px]">""</span> → ระบบรันให้ <span class="mono text-[12px]">ITM-000001</span> (สินค้าเดี่ยว) / <span class="mono text-[12px]">VAR-000001</span> (ต้นแบบ หรือ variant ที่ส่ง <span class="mono text-[12px]">template_product_id</span> เอง) / <span class="mono text-[12px]">SET-000001</span> (ชุด) ·
+            ส่งมาเองก็ใช้ตามนั้น (ซ้ำ → <span class="mono text-[12px]">409</span>) · <span class="mono text-[12px]">PUT</span> ส่ง <span class="mono text-[12px]">sku: ""</span> → <span class="mono text-[12px]">400</span> —
+            <b>FE:</b> ช่อง SKU ในฟอร์มสร้างปล่อยว่างได้ แล้วแสดงค่าที่ได้จาก response<br>
+            <b>2) รูปแบบสินค้าต้องถูก</b> — <span class="mono text-[12px]">type</span> × <span class="mono text-[12px]">has_variants</span> × <span class="mono text-[12px]">template_product_id</span>:
+            ชุดที่เป็นต้นแบบ, ชุดที่ผูกต้นแบบ, ต้นแบบซ้อนต้นแบบ → <span class="mono text-[12px]">400</span> ทั้ง POST และ PUT (PUT ตรวจกับค่าหลังแก้ รวมค่าเดิมของช่องที่ไม่ได้ส่ง)<br>
+            <b>3) เปลี่ยน <span class="mono text-[12px]">type</span> / <span class="mono text-[12px]">has_variants</span> ไม่ได้เมื่อมีประวัติ</b> → <span class="mono text-[12px]">409</span>: สินค้าเคยมี lot แล้ว ·
+            ต้นแบบที่ยังมี variant (ปิด <span class="mono text-[12px]">has_variants</span>) · สินค้าที่อยู่ใน BOM ของชุด (ต้องเป็นสินค้าเดี่ยวธรรมดาเท่านั้น) · ชุดที่ยังมี BOM (เปลี่ยนเป็นสินค้าเดี่ยว) —
+            <b>FE:</b> ปิดช่องประเภทสินค้า/มีตัวเลือกในฟอร์มแก้ไขเมื่อสินค้ามีประวัติแล้ว<br>
+            <b>4) <span class="mono text-[12px]">DELETE /products/{id}</span> → <span class="mono text-[12px]">409</span></b> เมื่อยังอยู่ใน BOM ของชุด (ข้อความบอก SKU ชุด) · เป็นต้นแบบที่ยังมี variant · ยังมีสต็อกคงเหลือใน lot ใดก็ตาม (รวมล็อตหมดอายุ) —
+            <b>FE:</b> แสดงข้อความจาก <span class="mono text-[12px]">errors[0].detail</span> ตรง ๆ เพราะบอกแล้วว่าต้องแก้อะไรก่อน<br>
+            <b>5) <span class="mono text-[12px]">POST /products/{id}/generate-variants</span> → <span class="mono text-[12px]">400</span></b> เมื่อส่ง value ที่ไม่ใช่ของ <span class="mono text-[12px]">attribute_id</span> นั้น · ส่ง <span class="mono text-[12px]">attribute_id</span> เดียวกันซ้ำ · ส่ง value ซ้ำใน attribute เดียว ·
+            ส่งชุดค่าที่เคย generate แล้ว → <span class="mono text-[12px]">409</span> (SKU ซ้ำ) และไม่สร้างตัวไหนเลย — ให้ส่งเฉพาะค่าใหม่ ·
+            รายละเอียดความสัมพันธ์ข้อมูลทุกรูปแบบ: <a href="srs-p2.html#product-shapes" style="color:var(--signal);text-decoration:underline">srs-p2 · ความสัมพันธ์ข้อมูลสินค้า</a>
           </p>
         </div>
         <div class="rulebox mb-6">
@@ -2284,7 +2303,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules/{id}</td><td class="mono text-[11px]">pricing_rule:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/pricing-rules/{id}</td><td class="mono text-[11px]">pricing_rule:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products</td><td class="mono text-[11px]">product:view</td></tr>
-              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products</td><td class="mono text-[11px]">product:create</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/inventory-bc/v1/products <a href="#products-2026-09-27" style="color:var(--signal)">(JSON/multipart · sku ไม่บังคับ)</a></td><td class="mono text-[11px]">product:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/inventory-bc/v1/products/{id}</td><td class="mono text-[11px]">product:update</td></tr>

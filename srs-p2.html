@@ -854,6 +854,8 @@ POST /products/T1/generate-variants
                 <tr><td>ใส่เป็นสินค้าย่อยของชุด</td><td>400</td><td>ใส่ variant ลงในชุด (เคส C2)</td></tr>
                 <tr><td>บาร์โค้ด <span class="mono text-[12px]">target_type=template</span></td><td><span style="color:#15803D">201</span></td><td>สร้างได้ แต่ใช้ค้นหา/ป้ายชั้นวางเท่านั้น ยิงแล้วทำธุรกรรมไม่ได้</td></tr>
                 <tr><td><span class="mono text-[12px]">generate-variants</span> บนสินค้าที่ <span class="mono text-[12px]">has_variants=false</span></td><td>400</td><td>&mdash;</td></tr>
+                <tr><td><span class="mono text-[12px]">generate-variants</span> ส่ง value ที่ไม่ใช่ของ <span class="mono text-[12px]">attribute_id</span> นั้น / ส่ง attribute ซ้ำ / value ซ้ำ</td><td>400</td><td>หนึ่ง attribute ต่อหนึ่งรายการ ค่าต้องเป็นของ attribute นั้น (2026-09-27)</td></tr>
+                <tr><td>ลบต้นแบบที่ยังมี variant / ปิด <span class="mono text-[12px]">has_variants</span></td><td>409</td><td>ลบ variant ก่อน (ข้อความบอก SKU ของ variant) (2026-09-27)</td></tr>
               </tbody>
             </table>
           </div>
@@ -927,6 +929,8 @@ POST /products/B1/bundle-items  { <span class="s">"component_product_id"</span>:
                 <tr><td>รับเข้าคลัง / stock entry ให้ตัวชุด</td><td>400</td><td>รับเข้าสินค้าย่อยแทน</td></tr>
                 <tr><td>ตั้งราคาใน <span class="mono text-[12px]">item_prices</span> / ผูก <span class="mono text-[12px]">item_suppliers</span> ให้ตัวชุด</td><td>400</td><td>ดูกล่องราคาด้านล่าง</td></tr>
                 <tr><td>ลบสินค้าย่อยที่ยังอยู่ในชุดที่ยังไม่ถูกลบ</td><td>409</td><td>ข้อความบอก SKU ของทุกชุดที่ยังอ้างอยู่ &middot; เอาออกจาก BOM (<span class="mono text-[12px]">DELETE /products/{bundle}/bundle-items/{id}</span>) ก่อน แล้วลบได้ตามปกติ &middot; soft delete ไม่ติด FK RESTRICT จึงต้องกันที่ <span class="mono text-[12px]">ProductOperationsService</span></td></tr>
+                <tr><td>เปลี่ยนสินค้าที่อยู่ใน BOM เป็นต้นแบบหรือชุด (<span class="mono text-[12px]">PUT</span>)</td><td>409</td><td>สินค้าย่อยต้องเป็นสินค้าเดี่ยวธรรมดาเสมอ เพราะตอนแตกชุดจะตัดสต็อกของมัน (2026-09-27)</td></tr>
+                <tr><td>เปลี่ยนชุดที่ยังมี BOM เป็นสินค้าเดี่ยว (<span class="mono text-[12px]">PUT</span>)</td><td>409</td><td>ลบ BOM ก่อน (2026-09-27)</td></tr>
               </tbody>
             </table>
             <div class="edge"><div class="tag mb-1">ราคาของชุดมาจากไหน</div><p class="text-[13px]"><span class="mono text-[12px]">item_prices</span> ไม่รับตัวชุด (ข้อความ error บอกให้ตั้งราคาที่สินค้าย่อยแทน) &middot; ตอนขาย ใบเสนอราคา/SO/POS <b>รับชุดเป็น 1 บรรทัด</b> ให้ส่ง <span class="mono text-[12px]">unit_price</span> ของชุดมาในบรรทัดเอง หรือตั้ง pricing rule ให้ product ของชุด (ถ้าไม่ส่งราคาและไม่มีกฎที่ตรงเลย ใบเสนอราคาจะตอบ 400 เพราะไม่มีราคาให้เสนอ) &middot; บาร์โค้ด <span class="mono text-[12px]">target_type=bundle</span> สร้างได้สำหรับติดป้ายราคา/โปรโมชัน แต่ยิงเพื่อรับเข้าคลังไม่ได้</p></div>
@@ -945,7 +949,8 @@ POST /products/B1/bundle-items  { <span class="s">"component_product_id"</span>:
                 <tr><td>ใบเสนอราคา / SO / POS</td><td>✓</td><td>✗</td><td>✓</td><td>✓ (1 บรรทัด, แตกชุดตอนตัดสต็อก)</td></tr>
                 <tr><td>เป็นสินค้าย่อยในชุด</td><td>✓</td><td>✗</td><td>✓</td><td>✗</td></tr>
                 <tr><td>บาร์โค้ด (target_type)</td><td><span class="mono text-[12px]">item</span>, <span class="mono text-[12px]">pack</span></td><td><span class="mono text-[12px]">template</span> (ค้นหาเท่านั้น)</td><td><span class="mono text-[12px]">variant</span>, <span class="mono text-[12px]">pack</span></td><td><span class="mono text-[12px]">bundle</span> (ป้ายเท่านั้น)</td></tr>
-                <tr><td>ตัวที่ตรวจ</td><td colspan="4"><span class="mono text-[12px]">ProductsService.assertValidShape</span> (รูปแบบสินค้า), <span class="mono text-[12px]">ProductOperationsService</span> (ลบสินค้าย่อยของชุด), <span class="mono text-[12px]">assertProductTransactable</span> (item-price / item-supplier / barcode), <span class="mono text-[12px]">GoodsReceiptsService</span> / <span class="mono text-[12px]">StockEntriesService</span>, <span class="mono text-[12px]">BundleItemsService</span>, sales-bc <span class="mono text-[12px]">QuotationsService</span> / <span class="mono text-[12px]">PosSalesService</span></td></tr>
+                <tr><td>เปลี่ยน <span class="mono text-[12px]">type</span>/<span class="mono text-[12px]">has_variants</span> หลังมี lot</td><td colspan="4">409 ทุกรูปแบบ (ตรวจ lot ทุกตัวรวมที่ลบแล้ว เหมือนกติกา <span class="mono text-[12px]">stock_uom_id</span>) &middot; ลบสินค้าที่ยังมีสต็อกคงเหลือ (รวมล็อตหมดอายุ) &rarr; 409 (2026-09-27)</td></tr>
+                <tr><td>ตัวที่ตรวจ</td><td colspan="4"><span class="mono text-[12px]">ProductsService.assertValidShape</span> (รูปแบบสินค้า), <span class="mono text-[12px]">ProductOperationsService</span> (แก้/ลบที่ต้องถาม BOM หรือสต็อก), <span class="mono text-[12px]">assertProductTransactable</span> (item-price / item-supplier / barcode), <span class="mono text-[12px]">GoodsReceiptsService</span> / <span class="mono text-[12px]">StockEntriesService</span>, <span class="mono text-[12px]">BundleItemsService</span>, sales-bc <span class="mono text-[12px]">QuotationsService</span> / <span class="mono text-[12px]">PosSalesService</span></td></tr>
               </tbody>
             </table>
           </div>

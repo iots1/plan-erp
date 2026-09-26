@@ -176,6 +176,24 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-27 · สินค้า: กันแก้/ลบของที่มีประวัติ + generate-variants ตรวจ input ✅ **implement + verify + smoke**
+
+**ต้นเหตุ** — audit logic สินค้าหลังงาน SKU เจอ 3 จุดที่บันทึกผ่านเงียบ: (1) PUT เปลี่ยน `type`/`has_variants`
+ของสินค้าที่มีประวัติได้ (มี lot, เป็นสินค้าย่อยใน BOM, เป็นชุดที่มี BOM, เป็นต้นแบบที่มี variant) ·
+(2) ลบต้นแบบที่ยังมี variant และลบสินค้าที่ยังมีสต็อกได้ · (3) `generate-variants` ไม่ตรวจว่า value เป็นของ attribute ที่ส่ง และรับ attribute ซ้ำ
+
+| ที่ | ของใหม่ |
+|---|---|
+| inventory-bc `ProductsService` | `assertShapeChangeAllowed` → **409** เมื่อเปลี่ยน type/has_variants แล้วมี lot (รวม lot ที่ลบแล้ว) หรือปิด has_variants ขณะยังมี variant · `generate-variants` → **400** เมื่อ value ไม่ใช่ของ attribute, attribute ซ้ำ, value ซ้ำ · `findLiveVariantSkus()` |
+| inventory-bc `ProductOperationsService` | PUT ผ่าน facade แล้ว: สินค้าย่อยใน BOM ต้องเป็นสินค้าเดี่ยวธรรมดา, ชุดที่มี BOM ต้องเป็นชุด → **409** · DELETE เพิ่ม: ต้นแบบที่มี variant, สต็อกคงเหลือ (รวมล็อตหมดอายุ) → **409** · โมดูล import `StockModule` เพิ่ม |
+| inventory-bc อื่น ๆ | `LotsService.hasStockOnHand()` · `BundleItemsService.findComponentSkus()` · แก้คอมเมนต์ `barcode-target-type.enum.ts` ที่ยังบอกว่าไม่มี `bundle_items` |
+| เทสต์ | unit `product-operations.service.spec.ts` (เขียนใหม่ 9 เคส), `products.service.spec.ts` (+8) · smoke `product-shape-guards.smoke.mjs` เพิ่ม 6 เคส รวม type change บนสินค้าที่มี lot จริง (request ย้อนตัวเองถ้า guard พัง) |
+| docs | `api-workflow-guide.html` rulebox ใหม่ `#products-2026-09-27` + แก้ `/bundles` → `/products/{id}/bundle-items` · `srs-p2.html` ตาราง B4/C4/สรุป |
+
+**ยังไม่ทดสอบสด** — ลบสินค้าที่มีสต็อก: มีแค่ unit test เพราะ smoke/curl ต้องยิงกับสินค้าจริง ถ้า guard พังจะลบข้อมูลจริงโดยไม่มี API กู้คืน
+**ยังค้าง (ข้อ 4–7 จาก audit)** — ลบ/แก้ master data ที่สินค้ายังอ้างอยู่: กลุ่มสินค้า (ลบ leaf ที่มีสินค้า, พลิกเป็น `is_group=true`), UOM ที่ใช้อยู่, ค่าคุณลักษณะที่ variant ใช้, ยี่ห้อ/ประเภทภาษี ·
+ราคา/ซัพพลายเออร์ที่ผูกไว้ก่อนเปลี่ยนประเภท (`item_prices`/`item_suppliers`) ก็ยังไม่ได้ตรวจ แต่ถูกกันทางอ้อมถ้าสินค้ามี lot แล้ว
+
 ### 2026-09-26 · SKU ไม่บังคับกรอก — ระบบรันให้ตามประเภท ✅ **implement + migrate + verify + smoke**
 
 | ที่ | ของใหม่ |
