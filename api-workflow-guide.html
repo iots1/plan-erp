@@ -2154,6 +2154,18 @@ sequenceDiagram
             รายละเอียดความสัมพันธ์ข้อมูลทุกรูปแบบ: <a href="srs-p2.html#product-shapes" style="color:var(--signal);text-decoration:underline">srs-p2 · ความสัมพันธ์ข้อมูลสินค้า</a>
           </p>
         </div>
+        <div class="rulebox mb-4" id="master-data-in-use-2026-09-27">
+          <div class="rc mb-1">master data ที่สินค้ายังอ้างอยู่ ลบไม่ได้ &rarr; 409 (2026-09-27)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">DELETE /item-groups/{id}</span> (ยังมีสินค้า) · <span class="mono text-[12px]">PUT /item-groups/{id}</span> ด้วย <span class="mono text-[12px]">is_group: true</span> (leaf ที่ยังมีสินค้า) ·
+            <span class="mono text-[12px]">DELETE /brands/{id}</span> · <span class="mono text-[12px]">DELETE /tax-categories/{id}</span> (ยังมีสินค้าใช้) ·
+            <span class="mono text-[12px]">DELETE /uoms/{id}</span> (เป็นหน่วยเก็บสต็อกของสินค้า / มีอัตราแปลงหน่วย / มีราคาในหน่วยนี้) ·
+            <span class="mono text-[12px]">DELETE /item-attributes/{id}</span> และ <span class="mono text-[12px]">/item-attributes/{id}/values/{value_id}</span> (ยังมี variant ใช้) → <span class="mono text-[12px]">409</span>
+            ข้อความใน <span class="mono text-[12px]">errors[0].detail</span> บอกจำนวน + ตัวอย่าง SKU ที่ยังอ้างอยู่ — <b>FE:</b> แสดงข้อความนั้นตรง ๆ (หน้า admin ของ iam ทำอยู่แล้วผ่าน <span class="mono text-[12px]">toApiError</span>) ·
+            route และ permission ไม่เปลี่ยน (controller ของ <span class="mono text-[12px]">/item-groups</span> ย้ายไปโมดูล <span class="mono text-[12px]">item-group-operations</span> เท่านั้น) ·
+            รายละเอียด: <a href="srs-p2.html#master-data-in-use" style="color:var(--signal);text-decoration:underline">srs-p2 · master data ที่ยังถูกอ้างอยู่</a>
+          </p>
+        </div>
         <div class="rulebox mb-6">
           <div class="rc mb-1">สแกนบาร์โค้ด — ไม่ใช่ CRUD ตรง เพิ่ม 2026-08-30</div>
           <p class="text-[13.5px]">

@@ -954,6 +954,23 @@ POST /products/B1/bundle-items  { <span class="s">"component_product_id"</span>:
               </tbody>
             </table>
           </div>
+          <div class="rulebox mb-6" id="master-data-in-use">
+            <div class="rc mb-1">RULE &middot; master data ที่ยังถูกอ้างอยู่ ลบไม่ได้ &rarr; 409 (2026-09-27)</div>
+            <p class="text-[13.5px]">soft delete ไม่ติด FK จึงต้องกันที่ service &middot; ข้อความ 409 บอกจำนวนและตัวอย่าง SKU (สูงสุด 5 ตัว) ที่ยังอ้างอยู่ &middot; เมื่อไม่มีใครอ้างแล้วลบได้ตามปกติ</p>
+            <table class="d mt-3">
+              <thead><tr><th>ลบ / แก้</th><th>ถูกปฏิเสธเมื่อ</th><th>ตัวที่ตรวจ</th></tr></thead>
+              <tbody>
+                <tr><td>กลุ่มสินค้า &middot; <span class="mono text-[12px]">DELETE</span></td><td>ยังมีสินค้าที่ไม่ถูกลบอยู่ในกลุ่ม</td><td rowspan="2"><span class="mono text-[12px]">ItemGroupOperationsService</span> (facade · <span class="mono text-[12px]">ProductModule</span> import <span class="mono text-[12px]">ItemGroupModule</span> อยู่แล้ว)</td></tr>
+                <tr><td>กลุ่มสินค้า &middot; <span class="mono text-[12px]">PUT is_group=true</span></td><td>leaf ที่ยังมีสินค้า (สินค้าอยู่ได้เฉพาะใต้ leaf)</td></tr>
+                <tr><td>ยี่ห้อ</td><td>ยังมีสินค้าใช้ยี่ห้อนี้</td><td><span class="mono text-[12px]">BrandsService</span></td></tr>
+                <tr><td>ประเภทภาษี</td><td>ยังมีสินค้าใช้ประเภทนี้ (มีผลกับการคิด VAT)</td><td><span class="mono text-[12px]">TaxCategoriesService</span></td></tr>
+                <tr><td>หน่วยนับ (UOM)</td><td>เป็น <span class="mono text-[12px]">stock_uom_id</span> ของสินค้า &middot; มีอัตราแปลงหน่วย &middot; มีแถวราคา (<span class="mono text-[12px]">item_prices</span>) ในหน่วยนี้ &middot; (หน่วยของระบบ <span class="mono text-[12px]">is_system</span> ลบไม่ได้อยู่แล้ว)</td><td><span class="mono text-[12px]">UomsService</span></td></tr>
+                <tr><td>คุณลักษณะ / ค่าคุณลักษณะ</td><td>ยังมี variant ที่ไม่ถูกลบสร้างจากค่านั้น</td><td><span class="mono text-[12px]">ItemAttributesService</span> / <span class="mono text-[12px]">ItemAttributeValuesService</span></td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)"><b>จงใจไม่ตรวจ:</b> เอกสารที่บันทึกแล้ว (ใบรับสินค้า, ใบคืนสินค้า) ที่อ้าง UOM — ประวัติอ้างหน่วยที่เลิกใช้แล้วได้ &middot; <b>ยังไม่ตรวจ:</b> บาร์โค้ด <span class="mono text-[12px]">target_type=item_group</span> ที่ชี้กลุ่มที่ถูกลบ และรูปสินค้าที่ผูกกับค่าคุณลักษณะ (<span class="mono text-[12px]">product_images.attribute_value_id</span>)</p>
+          </div>
+
         </div>
 
         <!-- 2.3 Barcode -->

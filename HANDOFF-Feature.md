@@ -176,6 +176,24 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-27 · master data ที่สินค้ายังอ้างอยู่ ลบไม่ได้ ✅ **implement + verify + smoke**
+
+**ต้นเหตุ** — soft delete ไม่ติด FK: ลบกลุ่มสินค้า/ยี่ห้อ/ประเภทภาษี/UOM/คุณลักษณะที่สินค้ายังอ้างอยู่ได้เงียบ ๆ
+และพลิกกลุ่ม leaf ที่มีสินค้าเป็น node (`is_group=true`) ได้ ทั้งที่สินค้าต้องอยู่ใต้ leaf เท่านั้น
+
+| ที่ | ของใหม่ → **409** พร้อมจำนวน + ตัวอย่าง SKU ≤ 5 |
+|---|---|
+| กลุ่มสินค้า | โมดูลใหม่ `item-group-operations` (facade + ย้าย `ItemGroupsController` มา — `ProductModule` import `ItemGroupModule` อยู่แล้ว) · DELETE ที่ยังมีสินค้า · PUT `is_group: true` บน leaf ที่มีสินค้า |
+| ยี่ห้อ / ประเภทภาษี | `BrandsService.delete` / `TaxCategoriesService.delete` ถาม `ProductsService.findUsageBy()` (import `ProductModule` ตรง ไม่มี cycle) |
+| UOM | `UomsService.delete` เพิ่มจาก `is_system`: เป็น stock UOM, มีอัตราแปลงหน่วย (`UomConversionFactorsService.countForUom`), มีแถวราคา (`ItemPricesService.countForUom`) · เอกสารที่บันทึกแล้วจงใจไม่ตรวจ |
+| คุณลักษณะ / ค่า | `ItemAttributesService.delete` / `ItemAttributeValuesService.delete` ถาม `ItemVariantAttributesService.findUsageBy()` (กรอง variant ที่ลบแล้วออก) |
+| ร่วม | `IReferenceUsage` + `describeReferenceUsage()` ใน `product/` · `ProductModule` export `ItemVariantAttributesService` เพิ่ม |
+| เทสต์ | unit `item-group-operations.service.spec.ts`, `master-data/master-data-delete-guards.spec.ts`, `describe-reference-usage.util.spec.ts` · smoke `master-data-delete-guards.smoke.mjs` (สร้างชุด master data ส่วนตัว → 409 ครบ 8 เคส → ลบตัวอ้างออก → 204 ครบ) |
+| docs | `srs-p2.html` `#master-data-in-use` · `api-workflow-guide.html` `#master-data-in-use-2026-09-27` |
+
+**หน้า admin ของ iam** (UOM/ประเภทภาษี ฯลฯ) ไม่ต้องแก้ — `json-api-client.js` `toApiError` แสดง `errors[0].detail` อยู่แล้ว
+**ยังไม่ตรวจ** — บาร์โค้ด `target_type=item_group` ที่ชี้กลุ่มที่ลบ · รูปสินค้าที่ผูก `attribute_value_id`
+
 ### 2026-09-27 · สินค้า: กันแก้/ลบของที่มีประวัติ + generate-variants ตรวจ input ✅ **implement + verify + smoke**
 
 **ต้นเหตุ** — audit logic สินค้าหลังงาน SKU เจอ 3 จุดที่บันทึกผ่านเงียบ: (1) PUT เปลี่ยน `type`/`has_variants`
@@ -191,8 +209,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | docs | `api-workflow-guide.html` rulebox ใหม่ `#products-2026-09-27` + แก้ `/bundles` → `/products/{id}/bundle-items` · `srs-p2.html` ตาราง B4/C4/สรุป |
 
 **ลบสินค้าที่มีสต็อก ทดสอบสดแล้ว (2026-09-27)** — curl `DELETE` บน production ใส่สินค้าจริง 2 ตัวที่มีสต็อก (`EQP-TOOL-T01-M` 20, `FERT-CHM-T01-25KG` 140) → **409** ทั้งคู่ ตรวจ DB แล้วไม่ถูกแตะ · ยังไม่อยู่ใน smoke ถาวร เพราะ smoke รันทุก verify และ helper DB เป็น read-only (ถ้า guard พังวันหน้าจะลบสินค้าจริงโดย smoke กู้คืนเองไม่ได้)
-**ยังค้าง (ข้อ 4–7 จาก audit)** — ลบ/แก้ master data ที่สินค้ายังอ้างอยู่: กลุ่มสินค้า (ลบ leaf ที่มีสินค้า, พลิกเป็น `is_group=true`), UOM ที่ใช้อยู่, ค่าคุณลักษณะที่ variant ใช้, ยี่ห้อ/ประเภทภาษี ·
-ราคา/ซัพพลายเออร์ที่ผูกไว้ก่อนเปลี่ยนประเภท (`item_prices`/`item_suppliers`) ก็ยังไม่ได้ตรวจ แต่ถูกกันทางอ้อมถ้าสินค้ามี lot แล้ว
+**ข้อ 4–7 จาก audit** — ทำแล้ว 2026-09-27 ดูรายการถัดขึ้นไป · ราคา/ซัพพลายเออร์ที่ผูกไว้ก่อนเปลี่ยนประเภท (`item_prices`/`item_suppliers`) ยังไม่ได้ตรวจ แต่ถูกกันทางอ้อมถ้าสินค้ามี lot แล้ว
 
 ### 2026-09-26 · SKU ไม่บังคับกรอก — ระบบรันให้ตามประเภท ✅ **implement + migrate + verify + smoke**
 
