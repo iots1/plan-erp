@@ -176,6 +176,21 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-26 · บาร์โค้ด pack ยิงได้ `qty_per_scan: null` ถาวร ✅ **แก้ + verify + smoke** *(ยังไม่ commit · ยังไม่ deploy)*
+
+**ต้นเหตุ** — สร้างบาร์โค้ด `target_type=pack` ระบบตรวจว่ามี `uom_conversion_factors` ของ product + uom
+แต่ลบ/ย้ายอัตรานั้นทีหลังไม่ได้ตรวจกลับ ป้ายที่ติดของไปแล้วจึงยิงเจอแต่แปลงจำนวนไม่ได้อีกเลย
+
+| ที่ | ของใหม่ |
+|---|---|
+| inventory-bc | โมดูล `uom-conversion-operations` — facade `UomConversionOperationsService` + ย้าย `UomConversionFactorsController` มาอยู่ที่นี่ (route เดิมทุกเส้น) · PUT ที่เปลี่ยน `product_id`/`uom_id` และ DELETE ของ**แถวสุดท้าย**ของคู่ที่ยังมีบาร์โค้ด pack (รวมป้ายปิดใช้) → **409** พร้อมรายชื่อบาร์โค้ด |
+| inventory-bc | `GET /barcodes/lookup` (+ RPC `BarcodeResources.Lookup`) คืน `uom_id` ของแพ็ก — FE ส่ง GRN เป็น "N แพ็ก" ให้ GRN ใช้อัตรา `purchase` เองได้ (`qty_per_scan` ใช้อัตราแถวไหนก็ได้ของหน่วยนั้น) |
+| เทสต์ | unit `uom-conversion-operations.service.spec.ts` · smoke `pack-barcode-conversion.smoke.mjs` (สร้าง → ยิง → 409 → ลบ ครบวงจรบน DB จริง) |
+
+**ทำไมเป็น facade** — `BarcodeModule` import `UomConversionModule` อยู่แล้ว ถ้า uom-conversion เรียก
+`BarcodesService` กลับจะเป็น cycle · `UomConversionModule` จึงเหลือแค่ service ไม่มี controller
+**ยังค้าง** — ข้อมูลเก่าที่ลบอัตราไปก่อนวันนี้ยังยิงได้ null อยู่ ต้องเติมอัตรากลับเอง (วิธีดู `api-workflow-guide.html` §A3.1)
+
 ### 2026-09-20 · B5 ขายหน้าร้าน (POS) — เส้นเดียวจบ ✅ *(ยังไม่ commit)*
 
 **ของใหม่ทั้งหมด** — เดิมระบบไม่มีทางขายหน้าร้านเลย มีแต่วงจร B2B (ใบเสนอราคา → SO → ใบส่งของ)
