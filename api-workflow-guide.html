@@ -494,6 +494,70 @@ sequenceDiagram
           </p>
         </div>
 
+        <h3 class="display text-xl mt-10 mb-4">A3.1 · รับเข้าด้วยการยิงบาร์โค้ด <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Staff · เพิ่ม 2026-09-26</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          endpoint ที่ขยับสต็อก (GRN · Stock Entry · Delivery Note · POS) <b>ไม่รับบาร์โค้ดหรือ SKU</b> — รับแค่
+          <span class="mono text-[12px]">product_id</span> + จำนวน · บาร์โค้ดเป็นแค่ทางเข้าหน้าจอ: ยิงแล้วเรียก
+          <span class="mono text-[12px]">GET /barcodes/lookup</span> ให้แปลงเป็น <span class="mono text-[12px]">product_id</span>
+          + <span class="mono text-[12px]">qty_per_scan</span> ก่อน แล้ว FE สะสมจำนวนในฟอร์มเอง ·
+          SKU ใช้แสดงผล/ค้นหาด้วยมือเท่านั้น
+        </p>
+        <div class="diagram mb-8">
+<pre class="mermaid">
+flowchart TD
+  S["ยิงบาร์โค้ด"] --> L["GET /inventory-bc/v1/barcodes/lookup?barcode=…"]
+  L --> F{"found?"}
+  F -->|"false"| X1["แจ้ง 'ไม่พบบาร์โค้ด'<br/>ให้ค้นสินค้าด้วยมือ (SKU/ชื่อ)"]
+  F -->|"true"| T{"is_transactable?"}
+  T -->|"false"| X2["template / item_group<br/>รับเข้าตรง ๆ ไม่ได้ · ให้เลือก variant"]
+  T -->|"true"| Q{"qty_per_scan<br/>เป็น null?"}
+  Q -->|"ใช่ (แพ็กไม่มีอัตราแปลง)"| X3["หยุด · แจ้งผู้ดูแลตั้งค่า<br/>uom-conversions ก่อน"]
+  Q -->|"ไม่"| A{"is_active?"}
+  A -->|"false"| C["ป้ายเก่า · ยืนยันกับผู้ใช้ก่อน"] --> ADD
+  A -->|"true"| ADD["บวกเข้าบรรทัดของ product_id นั้น<br/>qty += qty_per_scan"]
+  ADD --> S
+  ADD --> SUB["กดบันทึก → POST /goods-receipts (DRAFT)<br/>→ POST /goods-receipts/{id}/submit"]
+</pre>
+        </div>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>ลำดับ</th><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /supplier-bc/v1/purchase-orders/{id}?relations=items</td><td class="mono text-[11px]">purchase_order:view</td><td>โหลดบรรทัด PO ไว้จับคู่ <span class="mono text-[11px]">product_id</span> → <span class="mono text-[11px]">po_item_id</span> (มีรับเข้าแบบไม่มี PO ให้ข้ามไปใช้ Stock Entry <span class="mono text-[11px]">MATERIAL_RECEIPT</span> ที่ D1)</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/barcodes/lookup?barcode=…</td><td class="mono text-[11px]">barcode:lookup</td><td>ทุกครั้งที่ยิง · ได้ <span class="mono text-[11px]">product_id</span> · <span class="mono text-[11px]">qty_per_scan</span> · <span class="mono text-[11px]">uom_id</span> (หน่วยของแพ็ก · null ถ้าไม่ใช่แพ็ก) · <span class="mono text-[11px]">reason</span> · ไม่มี 404</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">—</td><td class="mono text-[11px]">—</td><td>FE สะสมจำนวนต่อ <span class="mono text-[11px]">product_id</span> (ยิงลัง 2 ครั้ง × 12 = 24) · สินค้าที่ไม่อยู่ใน PO ให้เตือนตั้งแต่ตอนยิง</td></tr>
+              <tr><td class="mono">4</td><td class="mono text-[11.5px]">POST /inventory-bc/v1/goods-receipts</td><td class="mono text-[11px]">goods_receipt:create</td><td><b>DRAFT</b> · สองแบบ เลือกแบบเดียวต่อบรรทัด: (ก) ยิงแพ็ก → ส่ง <span class="mono text-[11px]">uom_id</span> = <span class="mono text-[11px]">uom_id</span> จาก lookup + <span class="mono text-[11px]">qty</span> = จำนวนครั้งที่ยิง ให้ GRN แปลงด้วยอัตรา <span class="mono text-[11px]">purchase</span> เอง (<b>แนะนำ</b> · เอกสารเก็บ "2 ลัง" ไว้ตรวจย้อนได้) · (ข) ไม่ส่ง <span class="mono text-[11px]">uom_id</span> แล้วส่ง <span class="mono text-[11px]">qty</span> ที่สะสมเป็นหน่วยสต็อก (Stock Entry / POS ไม่มี <span class="mono text-[11px]">uom_id</span> ใช้ได้แต่แบบนี้)</td></tr>
+              <tr><td class="mono">5</td><td class="mono text-[11.5px]">POST /inventory-bc/v1/goods-receipts/{id}/submit</td><td class="mono text-[11px]">goods_receipt:submit</td><td>สร้าง Lot + ลงบัญชีสต็อก + ตัดยอด PO (เหมือน A3)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ยิงบาร์โค้ดแพ็กแล้ว qty_per_scan = null</div>
+          <p class="text-[13.5px]">
+            แปลว่าบาร์โค้ดชนิด <span class="mono text-[12px]">pack</span> นี้หาอัตราแปลงหน่วย (<span class="mono text-[12px]">uom_conversion_factors</span>) ของ
+            สินค้า + หน่วยแพ็กไม่เจอ ตั้งแต่ 2026-09-26 ระบบกันไว้แล้ว — <span class="mono text-[12px]">DELETE</span> อัตราแปลง หรือ <span class="mono text-[12px]">PUT</span> ที่ย้ายไปสินค้า/หน่วยอื่น จะได้ <b>409</b> พร้อมรายชื่อบาร์โค้ด
+            ถ้าเป็นอัตราแถวสุดท้ายของคู่ สินค้า + หน่วย ที่ยังมีบาร์โค้ดแพ็กชี้อยู่ (แก้แค่ <span class="mono text-[12px]">conversion_factor</span> ได้ตามปกติ · ถ้ายังมีแถว purchase/sales อีกแถวของหน่วยเดียวกันก็ลบได้) —
+            จึงเหลือเจอได้เฉพาะ<b>ข้อมูลเก่า</b>ที่ลบอัตราไปก่อนวันนั้น ·
+            <span class="mono text-[12px]">reason</span> จะบอก "pack barcode with no matching uom_conversion_factors row" ·
+            <b>FE ต้องไม่เดาเป็น 1</b> เพราะจะรับเข้าขาดทีละลัง · วิธีแก้ (ผู้ดูแลข้อมูลสินค้า):
+            ① <span class="mono text-[12px]">GET /barcodes/{id}</span> (<span class="mono text-[12px]">barcode:view</span>) ดู <span class="mono text-[12px]">product_id</span> + <span class="mono text-[12px]">uom_id</span> ของแพ็ก ·
+            ② <span class="mono text-[12px]">GET /products/{product_id}/uom-conversions</span> (<span class="mono text-[12px]">product:view</span>) เช็คว่าไม่มีจริง ·
+            ③ <span class="mono text-[12px]">POST /products/{product_id}/uom-conversions</span>
+            <span class="mono text-[12px]">{ "uom_id": "&lt;หน่วยแพ็ก&gt;", "conversion_factor": 12, "uom_type": "purchase" }</span> (<span class="mono text-[12px]">product:update</span>) ·
+            ④ ยิงซ้ำ — ไม่ต้องแก้บาร์โค้ด
+          </p>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc mb-1">อัตรา purchase กับ sales ของหน่วยแพ็กเดียวกันควรเท่ากัน</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">qty_per_scan</span> ของแพ็กมาจากอัตราแปลงแถวใดก็ได้ของสินค้า + หน่วยนั้น (<b>ไม่แยก</b> purchase/sales เพราะ lookup ไม่รู้ว่ากำลังรับหรือขาย)
+            ขณะที่ GRN ที่ส่ง <span class="mono text-[12px]">uom_id</span> มาเองจะใช้เฉพาะอัตรา <span class="mono text-[12px]">purchase</span> ·
+            ถ้าหน่วยแพ็กเดียวกันมีสองอัตราที่ไม่เท่ากัน ตัวเลขจากการยิงอาจไม่ตรงกับอัตรารับซื้อ — ตั้งให้เท่ากัน
+            หรือใช้หน่วยแยกกันสำหรับแพ็กซื้อกับแพ็กขาย · ใน GRN ใช้แบบ (ก) ส่ง <span class="mono text-[12px]">uom_id</span> ของแพ็กจะไม่เจอปัญหานี้
+            (ถ้าหน่วยนั้นไม่มีอัตรา <span class="mono text-[12px]">purchase</span> GRN ตอบ 400 บอกชัด ไม่รับเข้าผิดเงียบ ๆ)
+          </p>
+        </div>
+
         <h3 class="display text-xl mt-10 mb-4">A4 · ส่งคืนสินค้าให้ผู้ขาย <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Staff</span></h3>
         <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
           เพิ่มเข้ามา 2026-08-30 — ใบส่งคืนสินค้า (Purchase Return, PRN) เป็นเอกสารของ <b>inventory-bc</b> เอง ไม่ใช่ supplier-bc
@@ -2080,6 +2144,7 @@ sequenceDiagram
             ตอบ <span class="mono text-[12px]">found</span>/<span class="mono text-[12px]">is_transactable</span>/<span class="mono text-[12px]">is_active</span>
             แยกกัน (ป้ายที่ปิดใช้ยังยิงเจอแต่มี <span class="mono text-[12px]">reason</span> เตือน), ข้อมูลสินค้าถ้ามี, และ
             <span class="mono text-[12px]">qty_per_scan</span> (จำนวนต่อการยิง แปลงเป็นหน่วยสต็อกแล้ว) ·
+            <span class="mono text-[12px]">uom_id</span> (หน่วยของแพ็ก เฉพาะบาร์โค้ด pack · เพิ่ม 2026-09-26) ·
             <b>ไม่ตอบ 404 เมื่อหาไม่เจอ</b> — <span class="mono text-[12px]">found: false</span> คือผลลัพธ์ปกติของการสแกน ให้เช็คฟิลด์นี้แทนการดัก error
           </p>
         </div>
