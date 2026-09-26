@@ -190,7 +190,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | เทสต์ | unit `product-operations.service.spec.ts` (เขียนใหม่ 9 เคส), `products.service.spec.ts` (+8) · smoke `product-shape-guards.smoke.mjs` เพิ่ม 6 เคส รวม type change บนสินค้าที่มี lot จริง (request ย้อนตัวเองถ้า guard พัง) |
 | docs | `api-workflow-guide.html` rulebox ใหม่ `#products-2026-09-27` + แก้ `/bundles` → `/products/{id}/bundle-items` · `srs-p2.html` ตาราง B4/C4/สรุป |
 
-**ยังไม่ทดสอบสด** — ลบสินค้าที่มีสต็อก: มีแค่ unit test เพราะ smoke/curl ต้องยิงกับสินค้าจริง ถ้า guard พังจะลบข้อมูลจริงโดยไม่มี API กู้คืน
+**ลบสินค้าที่มีสต็อก ทดสอบสดแล้ว (2026-09-27)** — curl `DELETE` บน production ใส่สินค้าจริง 2 ตัวที่มีสต็อก (`EQP-TOOL-T01-M` 20, `FERT-CHM-T01-25KG` 140) → **409** ทั้งคู่ ตรวจ DB แล้วไม่ถูกแตะ · ยังไม่อยู่ใน smoke ถาวร เพราะ smoke รันทุก verify และ helper DB เป็น read-only (ถ้า guard พังวันหน้าจะลบสินค้าจริงโดย smoke กู้คืนเองไม่ได้)
 **ยังค้าง (ข้อ 4–7 จาก audit)** — ลบ/แก้ master data ที่สินค้ายังอ้างอยู่: กลุ่มสินค้า (ลบ leaf ที่มีสินค้า, พลิกเป็น `is_group=true`), UOM ที่ใช้อยู่, ค่าคุณลักษณะที่ variant ใช้, ยี่ห้อ/ประเภทภาษี ·
 ราคา/ซัพพลายเออร์ที่ผูกไว้ก่อนเปลี่ยนประเภท (`item_prices`/`item_suppliers`) ก็ยังไม่ได้ตรวจ แต่ถูกกันทางอ้อมถ้าสินค้ามี lot แล้ว
 
@@ -205,8 +205,10 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 **ต้องรู้** — smoke ไฟล์นี้ออกเลขจริงทุกครั้งที่รัน verify (สินค้าทดสอบถูก soft delete แต่เลขถูกใช้ไปแล้ว)
 รอบแรกใช้ `ITM-000001/2`, `VAR-000001`, `SET-000001` ไป สินค้าจริงตัวแรกจึงเริ่มเลขถัดจากนั้น — เลข SKU ไม่ต้องต่อเนื่อง จึงไม่ผิด
-แต่ถ้าอยากให้ของจริงเริ่มที่ 1 ต้อง reset `product_sku_counters` เองก่อนเปิดใช้ ·
-seeder ไม่ต้องแก้ (seed ส่ง SKU ของตัวเองเสมอ และ `--fresh` ไม่ truncate counter เหมือน `barcode_number_counters`)
+ถ้าจะให้ของจริงเริ่มที่ 1: seeder `products` ล้าง `product_sku_counters` ด้วยแล้ว (2026-09-27) ·
+`--fresh` ที่รวม seeder `products` (เช่น `pnpm run seed --fresh --yes`) ก่อน go-live จะรีเซ็ตเลข — แต่ `--fresh` ปฏิเสธถ้าตารางธุรกรรม
+(`lots`, `bundle_items`, `goods_receipts`, …) ยังมีแถว (ตอนนี้ `lots` มี 3 แถว) ต้องล้างข้อมูลธุรกรรมทดสอบก่อน
+หรือถ้าไม่อยากล้างทั้งหมด `TRUNCATE product_sku_counters;` บรรทัดเดียวก็พอ (เลขที่ชนกับ SKU ทดสอบที่ลบแล้วระบบข้ามให้เอง)
 
 ### 2026-09-26 · รูปแบบสินค้าผิดชุด + ลบสินค้าย่อยของชุด บันทึกผ่านเงียบ ✅ **แก้ + verify + smoke** *(ยังไม่ commit · ยังไม่ deploy)*
 
