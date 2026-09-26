@@ -160,7 +160,7 @@
             <table class="d">
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
-                <tr><td>sku</td><td><span style="color:#15803D">✓</span></td><td>รหัสสินค้า — <b>unique</b> (<span class="mono text-[12px]">uq_products_sku</span>)</td></tr>
+                <tr><td>sku</td><td><span style="color:var(--muted)">–</span></td><td>รหัสสินค้า — <b>unique</b> (<span class="mono text-[12px]">uq_products_sku</span>) · ไม่ส่ง/ส่งค่าว่าง = ระบบรันให้ <span class="mono text-[12px]">ITM-000001</span> / <span class="mono text-[12px]">VAR-000001</span> / <span class="mono text-[12px]">SET-000001</span> ตามประเภท (ดู <a href="#product-shapes" style="color:var(--signal);text-decoration:underline">SKU อัตโนมัติ</a>) · คอลัมน์ใน DB ยังเป็น NOT NULL</td></tr>
                 <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อสินค้า (ไทย)</td></tr>
                 <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อสินค้า (อังกฤษ)</td></tr>
                 <tr><td>type</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">single</span> | <span class="mono text-[12px]">bundle</span> (ชุด/kit)</td></tr>
@@ -631,7 +631,21 @@ item_prices: [
           <h4 class="font-semibold mt-12 mb-2 text-[16px]">ความสัมพันธ์ข้อมูลสินค้าแบบละเอียด · เดี่ยว / ต้นแบบ + variant / ชุด (ทุกเคส)</h4>
           <p class="text-[13.5px] mb-5" style="color:var(--ink-soft)">ส่วนนี้ขยายจากตารางสรุปด้านบน โดยแสดง<b>แถวข้อมูลจริงในแต่ละตาราง</b>ของทุกรูปแบบสินค้า พร้อม API ที่ต้องเรียกตามลำดับ และสิ่งที่ระบบจะปฏิเสธ &middot; ทุกกติกาในส่วนนี้ตรวจกับโค้ดจริงใน <span class="mono text-[12px]">apps/inventory-bc</span> (2026-09-26)</p>
 
-          <div class="rulebox ok mb-6"><div class="rc mb-1">หลักข้อเดียวที่ต้องจำ &middot; 1 แถวใน <span class="mono">products</span> = 1 SKU เสมอ</div><p class="text-[13.5px]">ระบบไม่มี flag ที่บอกว่า &ldquo;นี่คือ SKU&rdquo; &mdash; ทุกแถวมี <span class="mono text-[12px]">sku</span> (บังคับกรอก &middot; unique ด้วย <span class="mono text-[12px]">uq_products_sku</span>) สินค้าเดี่ยว ต้นแบบ variant และชุด <b>อยู่ในตาราง <span class="mono text-[12px]">products</span> ตารางเดียวกันทั้งหมด</b> ต่างกันแค่ 3 คอลัมน์: <span class="mono text-[12px]">type</span>, <span class="mono text-[12px]">has_variants</span>, <span class="mono text-[12px]">template_product_id</span> &middot; ความสัมพันธ์ที่เหลือเก็บในตารางเสริม 3 ตาราง: <span class="mono text-[12px]">item_variant_attributes</span> (variant ประกอบด้วยค่าอะไร), <span class="mono text-[12px]">bundle_items</span> (ชุดประกอบด้วยอะไร) และ <span class="mono text-[12px]">uom_conversion_factors</span> (หน่วยบรรจุ)</p></div>
+          <div class="rulebox ok mb-6"><div class="rc mb-1">หลักข้อเดียวที่ต้องจำ &middot; 1 แถวใน <span class="mono">products</span> = 1 SKU เสมอ</div><p class="text-[13.5px]">ระบบไม่มี flag ที่บอกว่า &ldquo;นี่คือ SKU&rdquo; &mdash; ทุกแถวมี <span class="mono text-[12px]">sku</span> (unique ด้วย <span class="mono text-[12px]">uq_products_sku</span> &middot; กรอกเองหรือให้ระบบรันให้ก็ได้) สินค้าเดี่ยว ต้นแบบ variant และชุด <b>อยู่ในตาราง <span class="mono text-[12px]">products</span> ตารางเดียวกันทั้งหมด</b> ต่างกันแค่ 3 คอลัมน์: <span class="mono text-[12px]">type</span>, <span class="mono text-[12px]">has_variants</span>, <span class="mono text-[12px]">template_product_id</span> &middot; ความสัมพันธ์ที่เหลือเก็บในตารางเสริม 3 ตาราง: <span class="mono text-[12px]">item_variant_attributes</span> (variant ประกอบด้วยค่าอะไร), <span class="mono text-[12px]">bundle_items</span> (ชุดประกอบด้วยอะไร) และ <span class="mono text-[12px]">uom_conversion_factors</span> (หน่วยบรรจุ)</p></div>
+
+          <div class="card p-6 mb-6">
+            <div class="mono text-[12px] mb-3" style="color:#7C3AED">SKU อัตโนมัติ &middot; กรอกเองได้ ไม่กรอกระบบรันให้ (2026-09-26)</div>
+            <table class="d mb-3">
+              <thead><tr><th>สร้างแบบ</th><th>ไม่ส่ง sku (หรือส่ง "")</th><th>ส่ง sku มา</th></tr></thead>
+              <tbody>
+                <tr><td>สินค้าเดี่ยว (<span class="mono text-[12px]">type=single</span>)</td><td class="mono">ITM-000001</td><td rowspan="3">ใช้ตามที่ส่ง (ซ้ำ &rarr; 409 เหมือนเดิม)</td></tr>
+                <tr><td>ต้นแบบ (<span class="mono text-[12px]">has_variants=true</span>) หรือ variant ที่ส่ง <span class="mono text-[12px]">template_product_id</span> เอง</td><td class="mono">VAR-000001</td></tr>
+                <tr><td>ชุด (<span class="mono text-[12px]">type=bundle</span>)</td><td class="mono">SET-000001</td></tr>
+                <tr><td>variant จาก <span class="mono text-[12px]">generate-variants</span></td><td colspan="2">SKU แม่ + ตัวย่อเหมือนเดิม เช่น <span class="mono text-[12px]">VAR-000001-RD-M</span></td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px]" style="color:var(--ink-soft)"><b>เลขรันแยกต่อ prefix</b> ในตาราง <span class="mono text-[12px]">product_sku_counters</span> (ล็อกแถวด้วย <span class="mono text-[12px]">SELECT … FOR UPDATE</span> แบบ <span class="mono text-[12px]">barcode_number_counters</span>) &middot; <b>ไม่รีเซ็ตทุกปี</b> เพราะ SKU อยู่บนป้ายหลายปี &middot; <b>ไม่ต้องต่อเนื่อง</b> (สร้างล้มเหลวเลขนั้นข้ามไป ไม่ใช่เลขเอกสารภาษี) &middot; ถ้าเลขที่ออกชนกับ SKU ที่มีคนกรอกเองไว้ (รวมแถวที่ลบแล้ว) ระบบข้ามไปเลขถัดไปเอง &middot; prefix ตั้งผ่าน env <span class="mono text-[12px]">SKU_PREFIX_ITEM</span> / <span class="mono text-[12px]">SKU_PREFIX_VARIANT</span> / <span class="mono text-[12px]">SKU_PREFIX_BUNDLE</span> (1–10 ตัว A–Z/0–9) &middot; <b>prefix เลือกจากประเภท ณ ตอนสร้างเท่านั้น</b> เป็นคำใบ้สำหรับคนอ่านป้าย ตัวที่ระบบเชื่อคือ <span class="mono text-[12px]">type</span>/<span class="mono text-[12px]">has_variants</span> &middot; <span class="mono text-[12px]">PUT</span> ส่ง <span class="mono text-[12px]">sku: ""</span> &rarr; 400 (แก้ไขไม่ generate ใหม่)</p>
+          </div>
 
           <!-- Shape decision table -->
           <div class="card overflow-hidden mb-6">

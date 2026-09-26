@@ -176,6 +176,20 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-26 · SKU ไม่บังคับกรอก — ระบบรันให้ตามประเภท ✅ **implement + migrate + verify + smoke**
+
+| ที่ | ของใหม่ |
+|---|---|
+| inventory-bc | `CreateProductDTO.sku` optional · ไม่ส่ง/ส่ง `""` → `ProductSkuNumberService` ออก `ITM-000001` (เดี่ยว) / `VAR-000001` (ต้นแบบ หรือ variant ที่ส่ง `template_product_id` เอง) / `SET-000001` (ชุด) · เลขชนกับ SKU ที่กรอกเอง (รวมแถวที่ลบแล้ว) → ข้ามไปเลขถัดไป, ครบ 50 ครั้ง → 409 · `PUT` ส่ง `sku: ""` → 400 |
+| schema | ตารางใหม่ `product_sku_counters` (prefix unique, `last_number` bigint, ไม่แยกปี) — migration `1790438842912-AddProductSkuCounters` **รันกับ DB แล้ว** (DB เดียวกับ prod) |
+| env | `SKU_PREFIX_ITEM` / `SKU_PREFIX_VARIANT` / `SKU_PREFIX_BUNDLE` (ค่าเริ่มต้น ITM/VAR/SET · ผิดรูปแบบ = service ไม่ start) — อยู่ใน `.env.example` แล้ว ไม่ต้องตั้งถ้าใช้ค่าเริ่มต้น |
+| เทสต์ | unit `product-sku-number.service.spec.ts` + เคส SKU ใน `products.service.spec.ts` · smoke `product-sku-generation.smoke.mjs` |
+
+**ต้องรู้** — smoke ไฟล์นี้ออกเลขจริงทุกครั้งที่รัน verify (สินค้าทดสอบถูก soft delete แต่เลขถูกใช้ไปแล้ว)
+รอบแรกใช้ `ITM-000001/2`, `VAR-000001`, `SET-000001` ไป สินค้าจริงตัวแรกจึงเริ่มเลขถัดจากนั้น — เลข SKU ไม่ต้องต่อเนื่อง จึงไม่ผิด
+แต่ถ้าอยากให้ของจริงเริ่มที่ 1 ต้อง reset `product_sku_counters` เองก่อนเปิดใช้ ·
+seeder ไม่ต้องแก้ (seed ส่ง SKU ของตัวเองเสมอ และ `--fresh` ไม่ truncate counter เหมือน `barcode_number_counters`)
+
 ### 2026-09-26 · รูปแบบสินค้าผิดชุด + ลบสินค้าย่อยของชุด บันทึกผ่านเงียบ ✅ **แก้ + verify + smoke** *(ยังไม่ commit · ยังไม่ deploy)*
 
 **ต้นเหตุ** — (1) `POST/PUT /products` ตรวจทีละคอลัมน์ ไม่ตรวจ `type` × `has_variants` × `template_product_id`
