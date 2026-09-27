@@ -176,6 +176,45 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 📌 ส่งต่อ session — 2026-09-26 → 27 (อ่านอันนี้ก่อน)
+
+**ขึ้น main + deploy แล้วทั้งหมด** (erp-api เรียงเก่า → ใหม่): `1699599` SKU อัตโนมัติ ITM/VAR/SET · `a0b14ce` กันแก้/ลบสินค้าที่มีประวัติ ·
+`b4d1c87` seed reset counter · `50fd2fb` master data ที่ถูกอ้างลบไม่ได้ · `9e0cab7` hook cwd + `commit-guard` ·
+`ae9b31a` ลบซ้ำ 404 + base รับ `manager` + refactor ~77 จุด · `bb77b9d` ยกเลิก DN / void ใบกำกับผิดลำดับ → 409 + พิมพ์ใบรับคืน
+— รายละเอียดแต่ละตัวคือรายการถัดลงไปในหัวข้อนี้ · บั๊กทั้งหมดของรอบ: `bugfix-log.html` รอบ 2
+
+**ของที่ต้องรู้ก่อนทำงานต่อ**
+- base: ทุก method รับ `manager?` ท้ายสุด + `createEntity`/`updateEntity` — ห้าม soft delete / ประทับ audit เอง (`.claude/rules/data-access.md`)
+- hook `commit-guard` บล็อก `git commit` ถ้า BC ที่แก้ยังไม่มี `pnpm verify` เขียวที่ใหม่กว่าการแก้ — แก้อะไรหลัง verify ต้องรันใหม่
+- facade modules ที่เพิ่มรอบนี้ (controller ย้ายไปอยู่): `product-operations`, `item-group-operations` (inventory-bc) · `delivery-note-operations` (sales-bc)
+- COGS ใน GL ผูกกับ **รายการ** ใบส่งของ (`ref_doc_type = DELIVERY_LINE`) ไม่ใช่ id ใบส่งของ · รับคืนเต็มจำนวนจะลบแถว `cogs_entries` ตามการกลับรายการ
+- ทดสอบบน dev ได้ (ยังไม่มีลูกค้า) — สคริปต์ curl ที่ใช้รอบนี้ไม่ได้ commit; รูปแบบที่ได้ผล: ยิงทั้งสายจริง แล้วตรวจ lot / stock_movements / ledger (ยอดสุทธิต่อบัญชี ไม่ใช่แค่ debit = credit) / cogs_entries ใน Postgres
+
+**ค้าง — เรียงตามที่แนะนำ**
+1. ยกเลิกผิดลำดับที่ยังไม่ทดสอบ (น่าจะช่องโหว่แบบเดียวกับ `bb77b9d`): SO ขณะมีใบส่งของ DRAFT · GR ขณะมีใบแจ้งหนี้ผู้ขาย DRAFT · PO ขณะมีใบรับสินค้า DRAFT · ใบเสนอราคาที่แปลงเป็น SO แล้ว
+2. ใบลดหนี้/ใบเพิ่มหนี้ (CN/DN ของ receipts) ยังไม่ทดสอบสดเลย
+3. ข้อมูลค้างบน dev: GL ของรายการ `DN-2026-00008` เหลือ `1140-02 −250 / 5110-00 +250` (ต้นทุนขายไม่มีการขาย — ก่อนแก้ `bb77b9d`) · journal ปรับปรุง หรือปล่อยไว้
+4. `api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ (ข้อ "ของที่ต้องรู้" ข้างบน)
+5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
+6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
+   ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
+
+### 2026-09-27 · ยกเลิก/void ผิดลำดับถูกปฏิเสธ + พิมพ์ใบรับคืนได้ ✅ **แก้ + verify + smoke + deploy** · `bb77b9d`
+
+**ที่มา** — ยิง e2e ที่มีผลจริงบน dev (submit ทั้งสายขาย/จัดซื้อ/คลัง) แล้วยกเลิกย้อนทีละใบ รวมถึงตั้งใจยกเลิกผิดลำดับ — `bugfix-log.html` bug 12–14
+
+| ที่ | แก้ |
+|---|---|
+| sales-bc | โมดูลใหม่ `delivery-note-operations` (facade + ย้าย `DeliveryNotesController`) · ยกเลิกใบส่งของ → **409** ถ้ามีใบรับคืน DRAFT/SUBMITTED ผูก — ตรวจก่อน `reverseDelivery` · `SalesReturnsService.findLiveNumbersForDeliveryNote()` |
+| finance-bc | `ReceiptsService.void` → **409** ถ้ามีใบวางบิล DRAFT/ISSUED หรือการรับชำระ DRAFT/SUBMITTED ผูก (ใน transaction หลังล็อกแถว) · `BillingNotesService.findLiveNumbersForReceipt()` · `PaymentAllocationsService.findLivePaymentNumbersForReceipt()` (ไม่นับที่ยกเลิกแล้ว — POS void ยังทำงาน) · `ReceiptModule` import `BillingNoteModule` + `PaymentModule` |
+| sales-bc (บั๊กแฝง) | `SalesReturnsService.print` relation `items.sales_order_item` → `items.delivery_note_item.sales_order_item` — พิมพ์ใบรับคืนพังมาตั้งแต่ `c82c964` แต่ dev ไม่เคยมีใบรับคืน |
+| เทสต์ | unit `delivery-note-operations.service.spec.ts`, `receipts.service.spec.ts` (+2), `payment-allocations.live-for-receipt.spec.ts` · smoke `delivery-note-cancel-guard.smoke.mjs` (sales-bc), `receipt-void-guard.smoke.mjs` (finance-bc) — ทั้งสองไม่มีผลข้างเคียงถ้า guard ทำงาน |
+| docs | `bugfix-log.html` รอบ 2 (bug 10–14 + บทเรียน) · `api-workflow-guide.html` ตารางกลับรายการ B3/C1/C3 + กล่อง `#reverse-chain-2026-09-27` |
+
+**ข้อมูลค้างบน dev** — จากการทดสอบก่อนแก้: GL ของรายการใบส่งของ `DN-2026-00008` ยังเหลือ `1140-02 −250 / 5110-00 +250`
+(ต้นทุนขายที่ไม่มีการขายจริง) · แก้ด้วย journal ปรับปรุง หรือปล่อยไว้ (ข้อมูลทดสอบ) — ยังไม่ได้ทำ
+**ยังไม่ตรวจ** — ยกเลิกใบสั่งขายขณะยังมีใบส่งของ DRAFT ผูก · ยกเลิกใบรับสินค้าขณะใบแจ้งหนี้ผู้ขาย DRAFT ผูก (ถูกกันทางอ้อมด้วยล็อตถ้ามีการเบิก)
+
 ### 2026-09-27 · base operations เป็น single source of truth ทั้งระบบ (รวมใน transaction) ✅ **refactor + verify ทุก BC**
 
 **ต้นเหตุ** — บั๊ก DELETE ซ้ำ (รายการถัดลงไป) ต้องไล่แก้ 4 ที่ เพราะ service ที่ทำงานใน transaction เรียก `super.*` ไม่ได้

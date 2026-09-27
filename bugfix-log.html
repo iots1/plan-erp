@@ -34,6 +34,13 @@
       <a href="#i18n-query" class="navlink"><span class="n">07</span> i18n กับ query params</a>
       <a href="#not-a-bug"  class="navlink"><span class="n">08</span> ตรวจแล้วไม่ใช่บั๊ก</a>
       <a href="#lesson"     class="navlink"><span class="n">09</span> บทเรียนร่วม</a>
+      <a href="#round-2"    class="navlink"><span class="n">R2</span> รอบ 2 · 26–27 ก.ย.</a>
+      <a href="#bug-7"      class="navlink"><span class="n">10</span> ลบซ้ำ 204 เขียนทับ audit</a>
+      <a href="#bug-8"      class="navlink"><span class="n">11</span> hook พังเมื่อ cd</a>
+      <a href="#bug-9"      class="navlink"><span class="n">12</span> ยกเลิก DN ซ้ำกับรับคืน</a>
+      <a href="#bug-10"     class="navlink"><span class="n">13</span> void ใบที่ยังวางบิล</a>
+      <a href="#bug-11"     class="navlink"><span class="n">14</span> พิมพ์ใบรับคืน 400</a>
+      <a href="#lesson-2"   class="navlink"><span class="n">15</span> บทเรียนรอบ 2</a>
     </nav>
     <div slot="footnote">
       <a href="backend-convention.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Backend Conventions</a>
@@ -420,8 +427,205 @@ stock=20 value=5000  <span class="c">← คืนสภาพเดิมทุ
         </p></div>
       </section>
 
+      <div class="rule my-14"></div>
+
+      <!-- ========== ROUND 2 ========== -->
+      <section id="round-2" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">รอบ 2 — 2026-09-26 · 27</div>
+        <h2 class="display text-3xl mb-6">ยิงของจริงบน dev ทั้งสาย แล้วยกเลิกย้อนทีละใบ</h2>
+        <div class="rulebox"><div class="rc mb-1">รอบนี้หาเจออย่างไร</div><p class="text-[13.5px]">
+          ยิง curl บนโดเมนจริงกับฐานข้อมูล dev ครบทุกเอกสาร — สร้าง → แก้ → ลบ ของ DRAFT 12 ประเภท (99 จุดตรวจ) · submit จริงทั้งสาย
+          จัดซื้อ → รับของ → คืนผู้ขาย → ตั้งหนี้ / ขาย → ส่งของ → รับคืน → ใบแจ้งหนี้ → วางบิล → รับชำระ (48 จุดตรวจ ยืนยันผลใน Postgres ทุกขั้น) ·
+          แล้ว<b>ยกเลิก/void ย้อนกลับ รวมถึงลองยกเลิกผิดลำดับโดยตั้งใจ</b> — 3 ใน 5 ตัวข้างล่างโผล่ตอนนั้น และทั้ง 5 ตัวผ่าน typecheck/lint/unit/e2e/build มาได้หมด
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 10 ========== -->
+      <section id="bug-7" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">10 — base operations</div>
+        <h2 class="display text-3xl mb-6">ลบซ้ำได้ <span class="mono text-[12px]">204</span> และเขียนทับว่าใครลบ</h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ · DELETE ครั้งที่ 2</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ตอบ <b>204</b> ทั้งที่แถวถูกลบไปแล้ว — ขณะที่ <span class="mono text-[12px]">GET</span> แถวเดียวกันตอบ 404</p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ · audit (ร้ายกว่า)</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)"><span class="mono text-[12px]">deleted_at</span> / <span class="mono text-[12px]">deleted_by</span> ถูกเขียนทับเป็นเวลาและคนของครั้งหลัง — ประวัติว่าใครลบครั้งแรก<b>หายเงียบ</b></p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">BaseServiceOperations._deleteEntity</span> soft delete ด้วย <span class="mono text-[12px]">update(id, …)</span> — match ด้วย id อย่างเดียว ไม่กรองแถวที่ลบแล้ว ทั้งที่ path ลบหลายแถว (<span class="mono text-[12px]">_deleteBulkEntities</span>) กรอง <span class="mono text-[12px]">softDeleteFilter</span> ไว้ถูกแล้วพร้อมคอมเมนต์อธิบายปัญหาเดียวกันนี้ · 3 service ที่ soft delete เองเพราะอยู่ใน transaction ก็ copy บั๊กเดียวกันไป
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          ไม่มีเทสต์ไหนยิง DELETE ซ้ำ — ผู้ใช้จริงจะเจอตอน FE retry หลังเน็ตหลุด · เจอระหว่างยิง curl ทดสอบ guard การลบของ master data
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">ae9b31a</span></div><p class="text-[13.5px]">
+          scope soft delete ที่แถวที่ยังไม่ลบ → ลบซ้ำได้ <span class="mono text-[12px]">affected=0</span> → 404 ด้วยโค้ดเดิม · แล้วแก้ที่ต้นเหตุที่ทำให้บั๊กถูก copy: base ทุก method รับ <span class="mono text-[12px]">manager?: EntityManager</span> + <span class="mono text-[12px]">createEntity</span>/<span class="mono text-[12px]">updateEntity</span> และแทนที่ของที่เขียนเอง ~77 จุดทั้งระบบ — รายละเอียด <a href="backend-convention.html" style="color:var(--accent);text-decoration:underline">Backend Conventions</a> RULE "soft delete ซ้ำ = 404" และ "base operations เป็น single source of truth"
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">base-service-operations.delete.spec.ts</span> · <span class="mono text-[12px]">base-service-operations.manager.spec.ts</span> · smoke <span class="mono text-[12px]">gl-accounts.smoke.mjs</span> และ <span class="mono text-[12px]">master-data-delete-guards.smoke.mjs</span> ยิง DELETE ซ้ำแล้วอ่าน <span class="mono text-[12px]">deleted_at</span> กลับจาก Postgres · curl บนโดเมนจริง 8 ทาง (4 BC) ได้ 404 ครบ
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 11 ========== -->
+      <section id="bug-8" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">11 — tooling</div>
+        <h2 class="display text-3xl mb-6">hook พังทุกครั้งที่ session <span class="mono text-[24px]">cd</span> ออกจาก root</h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ · ตอนจบ turn</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)"><span class="mono text-[12px]">Cannot find module …/docs/plan-erp/scripts/hooks/verify-reminder.mjs</span></p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ · เงียบ (ร้ายกว่า)</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)"><span class="mono text-[12px]">convention-guard</span> อ่าน root ผิดที่แล้ว<b>ปล่อยการแก้ที่ผิดกติกาผ่าน</b> (exit 0) — พิสูจน์: payload เดียวกันจาก root ได้ exit 2 จาก subfolder ได้ 0</p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          คำสั่งใน <span class="mono text-[12px]">.claude/settings.json</span> เป็น path relative (<span class="mono text-[12px]">node scripts/hooks/…</span>) และสคริปต์ใช้ <span class="mono text-[12px]">process.cwd()</span> เป็น root — แต่ hook รันใน cwd ปัจจุบันของ session ซึ่งคือที่ที่ <span class="mono text-[12px]">cd</span> ครั้งล่าสุดทิ้งไว้
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          ปกติ session อยู่ที่ root · ต้องมีคำสั่งที่ cd เข้า submodule ค้างไว้ถึงจะเกิด และตอนเกิด error เป็นแบบ non-blocking จึงดูเหมือนแค่ข้อความรบกวน
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">9e0cab7</span></div><p class="text-[13.5px]">
+          คำสั่งเป็น <span class="mono text-[12px]">"$CLAUDE_PROJECT_DIR/scripts/hooks/…"</span> · ทุกสคริปต์หา root จากตำแหน่งไฟล์ตัวเอง (<span class="mono text-[12px]">new URL(&#39;../..&#39;, import.meta.url)</span>) · เพิ่ม hook <span class="mono text-[12px]">commit-guard</span> (PreToolUse) กัน <span class="mono text-[12px]">git commit</span> ระหว่าง turn ถ้า BC ที่แก้ยังไม่มี verify เขียวที่ใหม่กว่าการแก้
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          ทดสอบด้วยมือ: รัน hook ทั้ง 4 ตัวจาก <span class="mono text-[12px]">docs/plan-erp</span> · <span class="mono text-[12px]">commit-guard</span> ทดสอบ 6 รูปแบบคำสั่ง (บล็อก/ปล่อย submodule/chain) — บันทึกไว้ใน <span class="mono text-[12px]">.claude/hooks/README.md</span>
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 12 ========== -->
+      <section id="bug-9" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">12 — ขาย · สต็อก · บัญชี</div>
+        <h2 class="display text-3xl mb-6">ยกเลิกใบส่งของได้ทั้งที่รับคืนไปแล้ว — ของกลับเข้าคลัง 2 รอบ</h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ · สต็อก</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ยกเลิก <span class="mono text-[12px]">DN-2026-00008</span> ขณะใบรับคืนยัง SUBMITTED → <b>200</b> · stock movement: ส่งของ −1 → รับคืน +1 → <b>ยกเลิกใบส่งของ +1</b> (ของที่คืนแล้วถูกนับกลับซ้ำ)</p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ · บัญชี (ร้ายกว่า)</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">หลังยกเลิกทั้งใบส่งของและใบรับคืน GL ของรายการนั้นยังเหลือ <span class="mono text-[12px]">1140-02 Finished Goods −250</span> / <span class="mono text-[12px]">5110-00 COGS +250</span> — <b>ต้นทุนขาย 250 บาทที่ไม่มีการขายจริง</b></p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">DeliveryNotesService.cancel</span> ตรวจแค่ state machine ของใบส่งของเอง ไม่ถามว่ามีใบรับคืนผูกอยู่ — ต่างจาก GR ที่ปฏิเสธเมื่อล็อตถูกใช้ไปแล้ว · ใบรับคืนเก็บ COGS กลับไปแล้ว การยกเลิกใบส่งของจึง<b>กลับรายการซ้ำ</b>
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          ไม่มีเทสต์ยกเลิกผิดลำดับ และเอกสาร <a href="api-workflow-guide.html" style="color:var(--accent);text-decoration:underline">API Workflow Guide</a> เองบอกว่า B3 "ไม่มี guard พิเศษ — คืนได้เสมอ" · เจอตอนตั้งใจยิงยกเลิกผิดลำดับบน dev
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">bb77b9d</span></div><p class="text-[13.5px]">
+          โมดูลใหม่ <span class="mono text-[12px]">delivery-note-operations</span> (facade — <span class="mono text-[12px]">SalesReturnModule</span> import <span class="mono text-[12px]">DeliveryNoteModule</span> อยู่แล้ว) · ยกเลิกใบส่งของ → <b>409</b> พร้อมเลขใบรับคืนที่ยังไม่ถูกยกเลิก (DRAFT หรือ SUBMITTED) · ตรวจ<b>ก่อน</b> <span class="mono text-[12px]">reverseDelivery</span> ซึ่งคืนสต็อกข้าม BC ก่อนเปิด transaction — ปฏิเสธหลังจากนั้นจะสายไป
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">delivery-note-operations.service.spec.ts</span> (ต้องไม่เรียก cancel ของ owning service เลยเมื่อถูกปฏิเสธ) · smoke <span class="mono text-[12px]">delivery-note-cancel-guard.smoke.mjs</span> สร้างใบรับคืน DRAFT บน DN ที่ SUBMITTED แล้วยกเลิก DN ต้องได้ 409 และ DN ยัง SUBMITTED — ไม่เคลื่อนสต็อกถ้า guard ทำงาน
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 13 ========== -->
+      <section id="bug-10" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">13 — การเงิน</div>
+        <h2 class="display text-3xl mb-6">void ใบแจ้งหนี้ได้ทั้งที่ใบวางบิลยังเรียกเก็บอยู่</h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">void <span class="mono text-[12px]">BILL-2026-00001</span> ได้ <b>200</b> ขณะ <span class="mono text-[12px]">BN-2026-00002</span> ที่รวมใบนี้ยัง ISSUED</p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">ผลที่ตามมา</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ใบวางบิลยังเรียกเงินจากลูกค้าตามใบกำกับที่ void ไปแล้ว · ใบที่มีการรับชำระผูกอยู่ก็ void ได้แบบเดียวกัน</p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">ReceiptsService.void</span> ตรวจแค่สถานะของใบเอง (<span class="mono text-[12px]">ISSUED → VOID</span>) ไม่ถามว่ามีใครยังเก็บเงินจากใบนี้อยู่
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          ไม่มีเทสต์ลำดับ void · POS ยิง void เสมอ แต่ POS ยกเลิกการรับเงินก่อน void ใบกำกับทุกครั้ง จึงไม่เคยชน
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">bb77b9d</span></div><p class="text-[13.5px]">
+          void → <b>409</b> ถ้ามีใบวางบิล (DRAFT/ISSUED) ที่ยังรวมใบนี้ หรือการรับชำระ (DRAFT/SUBMITTED) ที่ยังตัดยอดใบนี้ — ตรวจใน transaction ของ void หลังล็อกแถวใบกำกับ · การรับชำระที่ยกเลิกแล้วไม่นับ ทำให้ <span class="mono text-[12px]">PosSaleOperationsService.voidSale</span> (ยกเลิกเงินก่อน แล้ว void) ยังทำงานเหมือนเดิม
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">receipts.service.spec.ts</span> (+2: ปฏิเสธเมื่อใบวางบิล/การรับชำระยังผูก และไม่ลงบัญชี) · <span class="mono text-[12px]">payment-allocations.live-for-receipt.spec.ts</span> (การรับชำระที่ยกเลิกแล้วต้องไม่นับ) · smoke <span class="mono text-[12px]">receipt-void-guard.smoke.mjs</span> ยิง void ใบที่ใบวางบิลถือ และใบที่ชำระแล้ว ต้องได้ 409 ทั้งคู่ · <span class="mono text-[12px]">pos-sales.smoke.mjs</span> ยัง void บิลหน้าร้านผ่าน
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 14 ========== -->
+      <section id="bug-11" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">14 — พิมพ์เอกสาร</div>
+        <h2 class="display text-3xl mb-6">พิมพ์ใบรับคืนสินค้าไม่ได้เลย — <span class="mono text-[12px]">400</span></h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)"><span class="mono text-[12px]">POST /sales-returns/{id}/print</span> → 400 <span class="mono text-[12px]">Property &quot;sales_order_item&quot; was not found in &quot;SalesReturnItem&quot;</span></p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">ขอบเขต</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ใบรับคืนทุกใบ ตั้งแต่ฟีเจอร์พิมพ์ออกมา</p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">print()</span> โหลด relation <span class="mono text-[12px]">items.sales_order_item</span> ซึ่ง <span class="mono text-[12px]">SalesReturnItem</span> ไม่มี — ข้อมูลสินค้าอยู่บนบรรทัด SO ที่ต้องเดินผ่านบรรทัดใบส่งของ (<span class="mono text-[12px]">items.delivery_note_item.sales_order_item</span>) ซึ่ง util <span class="mono text-[12px]">toPrintParams</span> และ constant ของ relation เขียนไว้ถูกแล้ว
+        </p></div>
+        <div class="rulebox mb-4"><div class="rc mb-1">ทำไมไม่มีใครเห็น</div><p class="text-[13.5px]">
+          smoke <span class="mono text-[12px]">documents-print.smoke.mjs</span> พิมพ์เอกสารที่มีอยู่ใน DB — dev <b>ไม่เคยมีใบรับคืนสักใบ</b> จนการทดสอบ e2e รอบนี้สร้างขึ้น smoke จึงเพิ่งได้เดินทางนี้ครั้งแรก
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · <span class="mono text-[12px]">bb77b9d</span></div><p class="text-[13.5px]">
+          relation เป็น <span class="mono text-[12px]">items.delivery_note_item</span> + <span class="mono text-[12px]">items.delivery_note_item.sales_order_item</span>
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">documents-print.smoke.mjs</span> — ตอนนี้พิมพ์ <span class="mono text-[12px]">SRN-2026-00003</span> ผ่าน · ข้อควรรู้: smoke ที่อ่านข้อมูลจาก DB จะเงียบถ้าไม่มีข้อมูลประเภทนั้น
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <section id="lesson-2" class="section py-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">15 — บทเรียนรอบ 2</div>
+        <h2 class="display text-3xl mb-6">ของที่ไม่เคยถูกเดิน · ลำดับที่ไม่มีใครลอง</h2>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th style="width:230px">รูปแบบ</th><th>ตัวอย่างในรอบนี้</th></tr></thead>
+            <tbody>
+              <tr><td><b>ลำดับที่ผิดไม่มีใครลอง</b></td><td>ยกเลิกใบส่งของก่อนใบรับคืน · void ใบกำกับก่อนยกเลิกใบวางบิล — happy path ทุกตัวถูกหมด</td></tr>
+              <tr><td><b>ทำซ้ำไม่มีใครลอง</b></td><td>DELETE ครั้งที่ 2 — ผู้ใช้จริงทำผ่าน retry ไม่ใช่ตั้งใจ</td></tr>
+              <tr><td><b>ข้อมูลที่ยังไม่มี = เทสต์ที่ยังไม่เคยรัน</b></td><td>smoke พิมพ์ใบรับคืนผ่านมาตลอดเพราะไม่มีใบรับคืนให้พิมพ์</td></tr>
+              <tr><td><b>สำเนาของ logic ที่ base มีอยู่แล้ว</b></td><td>บั๊กลบซ้ำต้องแก้ 4 ที่ เพราะ service ใน transaction เรียก base ไม่ได้ — แก้ที่ต้นเหตุด้วย <span class="mono text-[12px]">manager</span></td></tr>
+              <tr><td><b>เอกสารยืนยันพฤติกรรมที่ผิด</b></td><td>"ยกเลิกใบส่งของได้เสมอ ไม่มี guard" เขียนไว้ใน guide — ถูกต้องตามโค้ดแต่ผิดตามบัญชี</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox ok"><div class="rc mb-1">สิ่งที่ทำให้จับได้</div><p class="text-[13.5px]">
+          <b>ทำสิ่งที่มีผลจริงบน dev แล้วตรวจผลใน Postgres ทุกขั้น</b> — สต็อกต่อล็อต, stock movement, ledger (เดบิต = เครดิต และยอดสุทธิต่อบัญชี), COGS · ยอดสุทธิต่อบัญชีคือสิ่งที่เผยบั๊ก 12 — ทุกบรรทัด balance แต่ยอดรวมไม่เป็นศูนย์
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
       <erp-footer
-        line1="ERP SYSTEM · BUG FIX LOG · 2026-09-20"
+        line1="ERP SYSTEM · BUG FIX LOG · 2026-09-20 · 2026-09-27"
         line2="i18n · Envelope · Rate Limit · Pagination Links · Sparse Fieldset · Tooling">
       </erp-footer>
 

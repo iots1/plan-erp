@@ -147,16 +147,27 @@ flowchart LR
               <tr><td>A3 GRN</td><td class="mono text-[12px]">cancel</td><td>คืนล็อตที่สร้างไว้กลับเป็น 0</td><td>ล็อตถูกเบิกไปแล้วแม้ชิ้นเดียว (409) — ให้ใช้ A4 (Purchase Return) แทน</td></tr>
               <tr><td>A4 PRN</td><td class="mono text-[12px]">cancel</td><td>คืนจำนวนกลับเข้าล็อตเดิม</td><td>ไม่มี (คืนได้เสมอ — ล็อตยังอยู่ต่อให้ว่างแล้ว)</td></tr>
               <tr><td>A5 AP Invoice</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL (ล้างหนี้ + ภาษีซื้อที่ตั้งไว้)</td><td>มีใบจ่ายเงินตัดใบนี้อยู่ (409) — ยกเลิกใบจ่ายก่อน · งวดบัญชีปิดแล้ว</td></tr>
-              <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td>ไม่มี guard พิเศษ — คืนได้เสมอ</td></tr>
+              <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td><b>ยังมีใบรับคืน (DRAFT/SUBMITTED) ผูกอยู่ (409)</b> — ยกเลิกใบรับคืนก่อน · ถ้าปล่อยผ่าน ของที่คืนแล้วจะถูกนับกลับซ้ำและต้นทุนขายค้างในบัญชี (<a href="bugfix-log.html#bug-9" style="color:var(--accent);text-decoration:underline">bug 12</a>, 2026-09-27)</td></tr>
               <tr><td>B4 Sales Return</td><td class="mono text-[12px]">cancel</td><td>ดึงของออกจากล็อตเดิม (ต้นทุนเดิม) + คืน COGS ที่กลับไปแล้วขึ้นบัญชีอีกครั้ง</td><td><b>ของที่รับคืนถูกขายออกไปอีกแล้ว (503)</b> — ต่างจากใบส่งของที่คืนได้เสมอ ต้องกลับรายการที่ขายออกไปก่อน</td></tr>
               <tr><td>B5 POS Sale</td><td class="mono text-[12px]">void</td><td>คืนสต็อกกลับล็อตเดิม + ยกเลิกใบรับชำระ + void ใบกำกับภาษี (ทั้งสามอย่างในคำสั่งเดียว)</td><td><b>ของถูกขายออกไปอีกแล้ว</b> หรือ finance-bc ตอบไม่ได้ (503) · งวดบัญชี/สต็อกปิดแล้ว (409)</td></tr>
-              <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ</td></tr>
+              <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ · <b>ยังมีใบวางบิล (DRAFT/ISSUED) หรือการรับชำระ (DRAFT/SUBMITTED) ผูกอยู่ (409)</b> — ยกเลิกสองอย่างนั้นก่อน (2026-09-27)</td></tr>
+              <tr><td>C3 Billing Note</td><td class="mono text-[12px]">cancel</td><td>ปล่อยใบกำกับที่รวมไว้ให้ void/วางบิลใหม่ได้ · ไม่มีรายการบัญชี</td><td>ไม่มี</td></tr>
               <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td>ไม่มี guard พิเศษ</td></tr>
               <tr><td>D1 Stock Entry</td><td class="mono text-[12px]">cancel</td><td>คืนล็อต/ย้ายกลับตาม entry_type</td><td>ล็อตปลายทางถูกเบิกไปแล้ว (409)</td></tr>
               <tr><td>D2 Stock Adjustment</td><td class="mono text-[12px]">cancel</td><td>คืน available_qty กลับเป็นค่าก่อนปรับ</td><td>ล็อตถูกแก้ไปอีกหลังปรับยอด (409) — เช็คว่า available_qty ตรงกับตอน submit</td></tr>
             </tbody>
           </table>
           </div>
+        <div class="rulebox mb-4" id="reverse-chain-2026-09-27">
+          <div class="rc mb-1">ยกเลิกทั้งสาย · ต้องย้อนจากปลายน้ำขึ้นไปต้นน้ำ (ทดสอบจริงบน dev 2026-09-27)</div>
+          <p class="text-[13.5px]">
+            <b>ขาย:</b> รับชำระ (C4) → ใบวางบิล (C3) → void ใบกำกับ (C1) → ใบรับคืน (B4) → ใบส่งของ (B3) → ใบสั่งขาย ·
+            <b>จัดซื้อ:</b> จ่ายเงิน (C4) → ใบแจ้งหนี้ผู้ขาย (A5) → ใบคืนผู้ขาย (A4) → ใบรับสินค้า (A3) → ใบสั่งซื้อ ·
+            <b>คลัง:</b> ปรับยอด (D2) → stock entry (D1) ·
+            ทำผิดลำดับ ระบบตอบ <span class="mono text-[12px]">409</span> พร้อมเลขเอกสารที่ต้องยกเลิกก่อนใน <span class="mono text-[12px]">errors[0].detail</span> —
+            <b>FE:</b> แสดงข้อความนั้นตรง ๆ หรือพาไปเอกสารที่ขวางอยู่ · ผลที่ยืนยันใน Postgres หลังยกเลิกครบทั้งสาย: สต็อกกลับเท่าเดิม, ล็อตที่สร้างกลับเป็น 0, ทุก journal มีรายการกลับด้าน (debit = credit), แถว COGS ของใบส่งของที่ยกเลิกถูกลบ
+          </p>
+        </div>
         </div>
 
         <div class="card overflow-hidden mb-8">
