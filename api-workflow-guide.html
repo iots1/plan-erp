@@ -152,7 +152,7 @@ flowchart LR
               <tr><td>B5 POS Sale</td><td class="mono text-[12px]">void</td><td>คืนสต็อกกลับล็อตเดิม + ยกเลิกใบรับชำระ + void ใบกำกับภาษี (ทั้งสามอย่างในคำสั่งเดียว)</td><td><b>ของถูกขายออกไปอีกแล้ว</b> หรือ finance-bc ตอบไม่ได้ (503) · งวดบัญชี/สต็อกปิดแล้ว (409)</td></tr>
               <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ · <b>ยังมีใบวางบิล (DRAFT/ISSUED), การรับชำระ (DRAFT/SUBMITTED) หรือใบลดหนี้/ใบเพิ่มหนี้ (ISSUED) ผูกอยู่ (409)</b> — void/ยกเลิกสิ่งเหล่านั้นก่อน · ใบลดหนี้/ใบเพิ่มหนี้ DRAFT ไม่ขวาง แต่ issue ไม่ได้อีกเมื่อใบต้นทางถูก void (409) (2026-09-27)</td></tr>
               <tr><td>C3 Billing Note</td><td class="mono text-[12px]">cancel</td><td>ปล่อยใบกำกับที่รวมไว้ให้ void/วางบิลใหม่ได้ · ไม่มีรายการบัญชี</td><td>ไม่มี</td></tr>
-              <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td>ไม่มี guard พิเศษ</td></tr>
+              <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td>ไม่มี guard พิเศษ · (ตอนสร้าง/submit: ยอดที่ตัดแต่ละใบ ≤ total − ใบลดหนี้ − ที่ตัดไปแล้ว · 2026-09-27)</td></tr>
               <tr><td>D1 Stock Entry</td><td class="mono text-[12px]">cancel</td><td>คืนล็อต/ย้ายกลับตาม entry_type</td><td>ล็อตปลายทางถูกเบิกไปแล้ว (409)</td></tr>
               <tr><td>D2 Stock Adjustment</td><td class="mono text-[12px]">cancel</td><td>คืน available_qty กลับเป็นค่าก่อนปรับ</td><td>ล็อตถูกแก้ไปอีกหลังปรับยอด (409) — เช็คว่า available_qty ตรงกับตอน submit</td></tr>
             </tbody>
@@ -1183,7 +1183,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">FULL_TAX_INVOICE</td><td>ใบกำกับภาษีเต็มรูป</td><td>บวกเพิ่ม</td><td>ต้องมีเลขผู้เสียภาษีของลูกค้า</td></tr>
               <tr><td class="mono text-[11.5px]">INV_TAX_INVOICE</td><td>ใบแจ้งหนี้/ใบกำกับภาษี</td><td>บวกเพิ่ม</td><td>เอกสารรวม · ต้องมีเลขผู้เสียภาษี</td></tr>
               <tr><td class="mono text-[11.5px]">ABB_TAX_INVOICE</td><td>ใบกำกับภาษีอย่างย่อ</td><td><b>รวมในราคาแล้ว</b></td><td>ค้าปลีก · ไม่ต้องมีเลขผู้เสียภาษี</td></tr>
-              <tr><td class="mono text-[11.5px]">CREDIT_NOTE</td><td>ใบลดหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span> · <b>ยอดรวม ≤ ยอดที่ใบต้นทางยังยืนอยู่</b> = total + ใบเพิ่มหนี้ ISSUED − ใบลดหนี้ ISSUED อื่น (409 ตอนสร้าง/แก้ และตรวจซ้ำตอน issue · 2026-09-27)</td></tr>
+              <tr><td class="mono text-[11.5px]">CREDIT_NOTE</td><td>ใบลดหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span> · <b>ยอดรวม ≤ ยอดที่ใบต้นทางยังยืนอยู่</b> = total + ใบเพิ่มหนี้ ISSUED − ใบลดหนี้ ISSUED อื่น (409 ตอนสร้าง/แก้ และตรวจซ้ำตอน issue · 2026-09-27) · <b>ยอดค้างของใบต้นทางหักใบลดหนี้ ISSUED แล้ว</b> — รับชำระได้ไม่เกินยอดสุทธิ (400) และใบวางบิลเรียกเก็บยอดสุทธิ · ฝั่งซื้อเหมือนกัน: จ่ายชำระใบแจ้งหนี้ผู้ขายได้ไม่เกิน total − ใบลดหนี้ผู้ขาย SUBMITTED − ที่จ่ายแล้ว</td></tr>
               <tr><td class="mono text-[11.5px]">DEBIT_NOTE</td><td>ใบเพิ่มหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span></td></tr>
             </tbody>
           </table>
