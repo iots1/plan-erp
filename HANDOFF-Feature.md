@@ -180,7 +180,8 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 **ขึ้น main + deploy แล้วทั้งหมด** (erp-api เรียงเก่า → ใหม่): `1699599` SKU อัตโนมัติ ITM/VAR/SET · `a0b14ce` กันแก้/ลบสินค้าที่มีประวัติ ·
 `b4d1c87` seed reset counter · `50fd2fb` master data ที่ถูกอ้างลบไม่ได้ · `9e0cab7` hook cwd + `commit-guard` ·
-`ae9b31a` ลบซ้ำ 404 + base รับ `manager` + refactor ~77 จุด · `bb77b9d` ยกเลิก DN / void ใบกำกับผิดลำดับ → 409 + พิมพ์ใบรับคืน
+`ae9b31a` ลบซ้ำ 404 + base รับ `manager` + refactor ~77 จุด · `bb77b9d` ยกเลิก DN / void ใบกำกับผิดลำดับ → 409 + พิมพ์ใบรับคืน ·
+`0c48cd1` submit ลูกบนแม่ที่ยกเลิก → 409 (SO→DN, GR→AP) + ยกเลิก GR ใต้ใบแจ้งหนี้ SUBMITTED → 409 (RPC ใหม่ไป finance-bc)
 — รายละเอียดแต่ละตัวคือรายการถัดลงไปในหัวข้อนี้ · บั๊กทั้งหมดของรอบ: `bugfix-log.html` รอบ 2
 
 **ของที่ต้องรู้ก่อนทำงานต่อ**
@@ -199,7 +200,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-09-27 · submit ลูกบนแม่ที่ยกเลิกแล้วถูกปฏิเสธ (SO→DN, GR→AP) + ยกเลิก GR ใต้ใบแจ้งหนี้ SUBMITTED ✅ **แก้ + verify sales-bc/finance-bc/inventory-bc + smoke**
+### 2026-09-27 · submit ลูกบนแม่ที่ยกเลิกแล้วถูกปฏิเสธ (SO→DN, GR→AP) + ยกเลิก GR ใต้ใบแจ้งหนี้ SUBMITTED ✅ **แก้ + verify sales-bc/finance-bc/inventory-bc + smoke + deploy + ทดสอบบนโดเมนจริง** · `0c48cd1`
 
 **ที่มา** — ไล่ข้อ 1 ของรายการค้าง (ยกเลิกผิดลำดับ 4 จุด) จากโค้ด: ลูก DRAFT ไม่ขวางการยกเลิกแม่ และ `submit()` ของลูกไม่เช็กแม่ซ้ำ — `bugfix-log.html` bug 15
 
@@ -213,6 +214,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | เทสต์ | unit `delivery-notes.service.spec.ts` (+3), `ap-invoices.service.spec.ts` (+3), `goods-receipts.service.spec.ts` (+2) · smoke `delivery-note-submit-guard.smoke.mjs` (sales-bc), `ap-invoice-submit-guard.smoke.mjs` (finance-bc), `goods-receipt-cancel-guard.smoke.mjs` (inventory-bc — ใช้ `GRN-2026-00001` ที่มี APINV-00001/00002 ผูก ไม่สร้างเอกสาร) |
 | docs | `bugfix-log.html` bug 15 · `api-workflow-guide.html` `#draft-child-under-cancelled-parent-2026-09-27` + แถว A3 · `srs-p3.html` D3 · `srs-p4.html` sequence DN submit · `srs-p5.html` RULE AP 3-WAY MATCH |
 
+**ทดสอบบนโดเมนจริงหลัง deploy (2026-09-27)** — ทั้ง 3 BC รายงาน `version=0c48cd1…` · รัน smoke 4 ไฟล์ (3 ไฟล์ใหม่ + `delivery-note-cancel-guard`) ผ่านโดเมนแทน localhost → **4/4 ผ่าน** · ตรวจ Postgres: SO-2026-00009 CANCELLED `delivered_qty=0` ไม่มี DN ค้าง · APINV ทดสอบถูกลบ ไม่มี ledger · GRN ทดสอบ CANCELLED ล็อต `available_qty=0` stock movement สุทธิ 0 · `GRN-2026-00001` ยัง SUBMITTED
 **ลูก DRAFT: กันที่ submit ของลูก · ลูก SUBMITTED: กันที่การยกเลิกแม่** — ลูก DRAFT ยังไม่มีผลอะไร (ตรงกับรูปแบบ PO → GR) ส่วนลูกที่ submit แล้วมีผลจริงจึงต้องขวางแม่ (แบบ `bb77b9d`) · **GR cancel ตอนนี้พึ่ง finance-bc** — finance-bc ล่ม = ยกเลิก GR ไม่ได้ (503) โดยตั้งใจ
 **smoke สองตัวนี้สร้างเอกสารจริงทุกครั้งที่ verify** (ไม่มีข้อมูลรูปนี้บน dev ให้ใช้): sales-bc ทิ้งใบเสนอราคา APPROVED + SO CANCELLED ไว้ · finance-bc ทิ้ง PO + GR CANCELLED (ล็อตรับเข้าแล้วกลับเป็น 0) และใช้เลข APINV ไป 1 เลข (ใบ DRAFT ถูกลบ) — เลขพวกนี้ไม่ใช่เลขตามกฎหมาย
 
