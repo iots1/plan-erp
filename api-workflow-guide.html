@@ -144,7 +144,7 @@ flowchart LR
           <table class="d">
             <thead><tr><th>เอกสาร</th><th>action</th><th>ตีกลับอะไร</th><th>บล็อกยกเลิกเมื่อไหร่</th></tr></thead>
             <tbody>
-              <tr><td>A3 GRN</td><td class="mono text-[12px]">cancel</td><td>คืนล็อตที่สร้างไว้กลับเป็น 0</td><td>ล็อตถูกเบิกไปแล้วแม้ชิ้นเดียว (409) — ให้ใช้ A4 (Purchase Return) แทน</td></tr>
+              <tr><td>A3 GRN</td><td class="mono text-[12px]">cancel</td><td>คืนล็อตที่สร้างไว้กลับเป็น 0</td><td>ล็อตถูกเบิกไปแล้วแม้ชิ้นเดียว (409) — ให้ใช้ A4 (Purchase Return) แทน · <b>มีใบแจ้งหนี้/ใบลดหนี้ผู้ขาย (A5) SUBMITTED ผูกอยู่ (409 พร้อมเลขเอกสาร)</b> — ยกเลิก A5 ก่อน · finance-bc ไม่ตอบ (503) (2026-09-27)</td></tr>
               <tr><td>A4 PRN</td><td class="mono text-[12px]">cancel</td><td>คืนจำนวนกลับเข้าล็อตเดิม</td><td>ไม่มี (คืนได้เสมอ — ล็อตยังอยู่ต่อให้ว่างแล้ว)</td></tr>
               <tr><td>A5 AP Invoice</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL (ล้างหนี้ + ภาษีซื้อที่ตั้งไว้)</td><td>มีใบจ่ายเงินตัดใบนี้อยู่ (409) — ยกเลิกใบจ่ายก่อน · งวดบัญชีปิดแล้ว</td></tr>
               <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td><b>ยังมีใบรับคืน (DRAFT/SUBMITTED) ผูกอยู่ (409)</b> — ยกเลิกใบรับคืนก่อน · ถ้าปล่อยผ่าน ของที่คืนแล้วจะถูกนับกลับซ้ำและต้นทุนขายค้างในบัญชี (<a href="bugfix-log.html#bug-9" style="color:var(--accent);text-decoration:underline">bug 12</a>, 2026-09-27)</td></tr>
@@ -166,6 +166,11 @@ flowchart LR
             <b>คลัง:</b> ปรับยอด (D2) → stock entry (D1) ·
             ทำผิดลำดับ ระบบตอบ <span class="mono text-[12px]">409</span> พร้อมเลขเอกสารที่ต้องยกเลิกก่อนใน <span class="mono text-[12px]">errors[0].detail</span> —
             <b>FE:</b> แสดงข้อความนั้นตรง ๆ หรือพาไปเอกสารที่ขวางอยู่ · ผลที่ยืนยันใน Postgres หลังยกเลิกครบทั้งสาย: สต็อกกลับเท่าเดิม, ล็อตที่สร้างกลับเป็น 0, ทุก journal มีรายการกลับด้าน (debit = credit), แถว COGS ของใบส่งของที่ยกเลิกถูกลบ
+          </p>
+          <p class="text-[13.5px] mt-2" id="draft-child-under-cancelled-parent-2026-09-27">
+            <b>ลูกที่ยัง DRAFT ไม่ขวางการยกเลิกแม่</b> — ยกเลิกใบสั่งขายได้แม้มีใบส่งของ DRAFT/รออนุมัติ, ยกเลิกใบรับสินค้าได้แม้มีใบแจ้งหนี้ผู้ขาย DRAFT (แต่ SUBMITTED ขวาง — ดูแถว A3), ยกเลิก PO ได้แม้มีใบรับสินค้า DRAFT ·
+            แต่ลูกนั้น <b>submit / approve ไม่ได้อีก</b>: ใบส่งของ <span class="mono text-[12px]">409</span>, ใบแจ้งหนี้ผู้ขาย <span class="mono text-[12px]">409</span>, ใบรับสินค้า <span class="mono text-[12px]">400</span> — ไม่มีการตัดสต็อกหรือลงบัญชี ·
+            <b>FE:</b> ลูกที่ค้างให้ลบ (DRAFT) หรือยกเลิก · ใบเสนอราคาที่แปลงเป็นใบสั่งขายแล้วยกเลิกไม่ได้ (<span class="mono text-[12px]">409</span>) จนกว่าจะยกเลิกใบสั่งขาย (2026-09-27)
           </p>
         </div>
         </div>

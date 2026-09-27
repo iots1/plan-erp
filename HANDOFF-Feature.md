@@ -191,13 +191,30 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 - ทดสอบบน dev ได้ (ยังไม่มีลูกค้า) — สคริปต์ curl ที่ใช้รอบนี้ไม่ได้ commit; รูปแบบที่ได้ผล: ยิงทั้งสายจริง แล้วตรวจ lot / stock_movements / ledger (ยอดสุทธิต่อบัญชี ไม่ใช่แค่ debit = credit) / cogs_entries ใน Postgres
 
 **ค้าง — เรียงตามที่แนะนำ**
-1. ยกเลิกผิดลำดับที่ยังไม่ทดสอบ (น่าจะช่องโหว่แบบเดียวกับ `bb77b9d`): SO ขณะมีใบส่งของ DRAFT · GR ขณะมีใบแจ้งหนี้ผู้ขาย DRAFT · PO ขณะมีใบรับสินค้า DRAFT · ใบเสนอราคาที่แปลงเป็น SO แล้ว
+1. ~~ยกเลิกผิดลำดับที่ยังไม่ทดสอบ~~ ✅ 2026-09-27 (รายการถัดลงไป "submit ลูกบนแม่ที่ยกเลิก") · รวมช่องข้าม BC ที่เจอระหว่างทาง (ยกเลิก GR ใต้ใบแจ้งหนี้ผู้ขาย SUBMITTED) — แก้แล้วเช่นกัน
 2. ใบลดหนี้/ใบเพิ่มหนี้ (CN/DN ของ receipts) ยังไม่ทดสอบสดเลย
 3. ข้อมูลค้างบน dev: GL ของรายการ `DN-2026-00008` เหลือ `1140-02 −250 / 5110-00 +250` (ต้นทุนขายไม่มีการขาย — ก่อนแก้ `bb77b9d`) · journal ปรับปรุง หรือปล่อยไว้
 4. `api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ (ข้อ "ของที่ต้องรู้" ข้างบน)
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
+
+### 2026-09-27 · submit ลูกบนแม่ที่ยกเลิกแล้วถูกปฏิเสธ (SO→DN, GR→AP) + ยกเลิก GR ใต้ใบแจ้งหนี้ SUBMITTED ✅ **แก้ + verify sales-bc/finance-bc/inventory-bc + smoke**
+
+**ที่มา** — ไล่ข้อ 1 ของรายการค้าง (ยกเลิกผิดลำดับ 4 จุด) จากโค้ด: ลูก DRAFT ไม่ขวางการยกเลิกแม่ และ `submit()` ของลูกไม่เช็กแม่ซ้ำ — `bugfix-log.html` bug 15
+
+| จุด | ผล |
+|---|---|
+| ใบเสนอราคาที่แปลงเป็น SO แล้ว | มี guard อยู่แล้ว → 409 · ทดสอบสดแล้วใน smoke ใหม่ |
+| PO ขณะมี GR DRAFT | ปลอดภัยอยู่แล้ว — `GoodsReceiptsService.submit()` ดึง PO ใหม่ เช็ก SENT/PARTIAL → 400 |
+| SO ขณะมี DN DRAFT/รออนุมัติ | **รั่ว** — submit/approve ตัดสต็อกจริง + บวก `delivered_qty` บน SO ที่ CANCELLED · แก้: `DeliveryNotesService.assertSalesOrderStillDeliverable()` ใน `submit()` (ก่อนเช็กวงเงิน) และ `approve()` → **409** |
+| GR ขณะมี AP invoice DRAFT | **รั่ว** — submit ตั้งหนี้สำหรับของที่ถูกกลับออกแล้ว · แก้: `APInvoicesService.submit()` เช็ก `grn_status === SUBMITTED` ต่อบรรทัด → **409** ก่อนลง GL |
+| GR ขณะมี AP invoice **SUBMITTED** (เจอระหว่างทาง) | **รั่ว** — ล็อตยังไม่ถูกเบิกก็ยกเลิกได้ หนี้ผู้ขายค้างโดยไม่มีของ · แก้: RPC ใหม่ `financeBc.apInvoice.findSubmittedNumbersForGoodsReceipt` (`APInvoiceEventsController` ใหม่ + `APInvoicesService.findSubmittedNumbersForGoodsReceipt`) · inventory-bc `APInvoicesProxyService` + `GoodsReceiptsService.assertNotBilled()` ก่อนเปิดทรานแซกชัน → **409** ระบุเลขใบ / **503** ถ้า finance-bc ไม่ตอบ |
+| เทสต์ | unit `delivery-notes.service.spec.ts` (+3), `ap-invoices.service.spec.ts` (+3), `goods-receipts.service.spec.ts` (+2) · smoke `delivery-note-submit-guard.smoke.mjs` (sales-bc), `ap-invoice-submit-guard.smoke.mjs` (finance-bc), `goods-receipt-cancel-guard.smoke.mjs` (inventory-bc — ใช้ `GRN-2026-00001` ที่มี APINV-00001/00002 ผูก ไม่สร้างเอกสาร) |
+| docs | `bugfix-log.html` bug 15 · `api-workflow-guide.html` `#draft-child-under-cancelled-parent-2026-09-27` + แถว A3 · `srs-p3.html` D3 · `srs-p4.html` sequence DN submit · `srs-p5.html` RULE AP 3-WAY MATCH |
+
+**ลูก DRAFT: กันที่ submit ของลูก · ลูก SUBMITTED: กันที่การยกเลิกแม่** — ลูก DRAFT ยังไม่มีผลอะไร (ตรงกับรูปแบบ PO → GR) ส่วนลูกที่ submit แล้วมีผลจริงจึงต้องขวางแม่ (แบบ `bb77b9d`) · **GR cancel ตอนนี้พึ่ง finance-bc** — finance-bc ล่ม = ยกเลิก GR ไม่ได้ (503) โดยตั้งใจ
+**smoke สองตัวนี้สร้างเอกสารจริงทุกครั้งที่ verify** (ไม่มีข้อมูลรูปนี้บน dev ให้ใช้): sales-bc ทิ้งใบเสนอราคา APPROVED + SO CANCELLED ไว้ · finance-bc ทิ้ง PO + GR CANCELLED (ล็อตรับเข้าแล้วกลับเป็น 0) และใช้เลข APINV ไป 1 เลข (ใบ DRAFT ถูกลบ) — เลขพวกนี้ไม่ใช่เลขตามกฎหมาย
 
 ### 2026-09-27 · ยกเลิก/void ผิดลำดับถูกปฏิเสธ + พิมพ์ใบรับคืนได้ ✅ **แก้ + verify + smoke + deploy** · `bb77b9d`
 

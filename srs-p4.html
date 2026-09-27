@@ -796,6 +796,7 @@ sequenceDiagram
     Note over WH,INV: M4 · ยืนยันส่งของ — implement แล้ว (ลำดับการเรียก "สลับทาง" กับ Goods Receipt โดยตั้งใจ - ดู &sect;08 D4)
     WH->>SAL: POST /delivery-notes/{id}/submit
     SAL->>SAL: อ่านใบส่งของ + บรรทัด (ยังไม่ล็อก) — ต้อง DRAFT
+    SAL->>DB: อ่านใบสั่งขายซ้ำ — ยังต้อง CONFIRMED/PARTIAL (ถูกยกเลิกระหว่างใบนี้เป็น DRAFT → 409 ก่อนเช็กวงเงินและก่อนตัดสต็อก · approve เช็กเหมือนกัน · 2026-09-27)
     SAL->>INV: StockResources.ConfirmDelivery(warehouse_id, lines[source_doc_id=dn_item_id, product_id, qty]) — RPC sync ไม่มีทรานแซกชัน sales-bc ค้างอยู่
     INV->>INV: ตรวจ warehouse เป็น stock leaf จริง
     loop ทุกบรรทัด (ข้ามถ้า source_doc_id เคยบันทึกใน delivery_issues แล้ว — idempotent)

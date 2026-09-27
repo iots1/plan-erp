@@ -1046,6 +1046,7 @@ sequenceDiagram
           <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D3</span><h4 class="font-semibold text-[16px]">ยกเลิก GRN — บล็อกทั้งใบ ไม่ย้อนบางส่วน</h4></div>
           <div class="card p-6 mb-4">
             <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> ถ้าล็อตที่ GRN ใบนั้นสร้างไว้ <b>ถูกตัดสต็อกออกไปแล้วแม้แต่หน่วยเดียว</b> (<span class="mono text-[12px]">available_qty ≠ received_qty</span>) → ปฏิเสธการยกเลิกทั้งใบ (409) ไม่ย้อนคืนเท่าที่เหลือ</p>
+            <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">และ (2026-09-27):</b> ถ้ามี<b>ใบแจ้งหนี้ผู้ขาย/ใบลดหนี้ผู้ขายที่ SUBMITTED</b> ผูกกับ GRN ใบนั้นใน finance-bc → ปฏิเสธ (409 พร้อมเลขเอกสาร) — ถาม finance-bc ผ่าน RPC <span class="mono text-[12px]">financeBc.apInvoice.findSubmittedNumbersForGoodsReceipt</span> ก่อนเปิดทรานแซกชัน · finance-bc ไม่ตอบ → 503 (ไม่ถือว่า "ไม่มี") · ก่อนหน้านี้ถ้าล็อตยังไม่ถูกเบิก GRN ยกเลิกได้ทั้งที่หนี้ผู้ขายตั้งไว้แล้ว → หนี้ค้างโดยไม่มีของ · ใบ DRAFT ไม่ขวาง เพราะ submit ใบแจ้งหนี้จะปฏิเสธเองเมื่อ GRN ไม่ SUBMITTED แล้ว</p>
             <table class="d">
               <thead><tr><th style="width:26%">ทางเลือก</th><th>ผลที่ตามมา</th></tr></thead>
               <tbody>
