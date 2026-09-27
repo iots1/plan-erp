@@ -41,7 +41,8 @@
       <a href="#bug-10"     class="navlink"><span class="n">13</span> void ใบที่ยังวางบิล</a>
       <a href="#bug-11"     class="navlink"><span class="n">14</span> พิมพ์ใบรับคืน 400</a>
       <a href="#bug-12"     class="navlink"><span class="n">15</span> submit ลูกบนแม่ที่ยกเลิก</a>
-      <a href="#lesson-2"   class="navlink"><span class="n">16</span> บทเรียนรอบ 2</a>
+      <a href="#bug-13"     class="navlink"><span class="n">16</span> ใบลดหนี้/เพิ่มหนี้ 3 ช่อง</a>
+      <a href="#lesson-2"   class="navlink"><span class="n">17</span> บทเรียนรอบ 2</a>
     </nav>
     <div slot="footnote">
       <a href="backend-convention.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Backend Conventions</a>
@@ -640,8 +641,44 @@ stock=20 value=5000  <span class="c">← คืนสภาพเดิมทุ
 
       <div class="rule my-14"></div>
 
+      <section id="bug-13" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">16 — ใบลดหนี้ / ใบเพิ่มหนี้ (§86/22)</div>
+        <h2 class="display text-3xl mb-6">ใบลดหนี้เกินใบต้นทาง · void ใบต้นทางใต้ใบปรับปรุง · ออกเลขใบปรับปรุงบนใบที่ void แล้ว</h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ (ยิงสดบนเครื่อง deploy)</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)"><b>A</b> ใบลดหนี้ 13,375 บนใบกำกับ 1,337.50 → ออกเลข <span class="mono text-[12px]">CN-2026-00002</span> ได้ ลูกหนี้ติดลบ ภาษีขายถูกคืนเกินที่เก็บ ·
+            <b>B</b> void <span class="mono text-[12px]">INV-2026-00023</span> ได้ ขณะ <span class="mono text-[12px]">CN-2026-00001</span>/<span class="mono text-[12px]">DN-2026-00001</span> ยัง ISSUED ·
+            <b>C</b> ใบลดหนี้ DRAFT → void ใบต้นทาง → issue ได้เลข <span class="mono text-[12px]">CN-2026-00003</span></p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">ขอบเขต</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ใบลดหนี้/ใบเพิ่มหนี้ฝั่งขายทุกใบ ตั้งแต่ฟีเจอร์ออกมา — ไม่เคยถูกทดสอบสดเลยจนรอบนี้ · ส่วนที่ถูกต้องอยู่แล้ว (10/13): เลข CN-/DN- แยกชุด, สืบทอด VAT 7%, GL ทั้งสองทิศ, void กลับรายการสุทธิ 0, บังคับเหตุผล/อ้างใบต้นทาง, ห้ามอ้างใบลดหนี้ · เลขที่ออกไปในการทดสอบ void แล้วทั้งหมด</p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          ตรวจใบต้นทางครั้งเดียวตอน <span class="mono text-[12px]">create()</span> (ISSUED · เป็นใบกำกับ · ลูกค้าเดียวกัน) แล้วไม่มีใครดูอีก ·
+          <b>A</b> ไม่มีเพดานยอดเลย — ฝั่งซื้อมีเพดาน 2 ชั้นตั้งแต่ 2026-09-02 แต่ไม่ได้ทำฝั่งขายให้สมมาตร ·
+          <b>B</b> <span class="mono text-[12px]">assertNothingStillCollects</span> ของ bug 13 ดูแค่ใบวางบิลกับการรับชำระ ·
+          <b>C</b> <span class="mono text-[12px]">issue()</span> ไม่เช็กใบต้นทางซ้ำ — รูปแบบเดียวกับ bug 15
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · finance-bc <span class="mono text-[12px]">ReceiptsService</span> · 2026-09-27</div><p class="text-[13.5px]">
+          <b>A</b> <span class="mono text-[12px]">assertCreditNoteWithinReference()</span> — ยอดใบลดหนี้ ≤ total ใบต้นทาง + ใบเพิ่มหนี้ ISSUED − ใบลดหนี้ ISSUED อื่น → <b>409</b> ใน create/update และซ้ำใน issue (ระดับเอกสาร เพราะบรรทัดไม่ผูกกัน) ·
+          <b>C</b> <span class="mono text-[12px]">assertReferenceStillAdjustable()</span> ใน <span class="mono text-[12px]">issue()</span> ล็อกแถวใบต้นทาง ต้องยัง ISSUED → <b>409</b> ก่อนออกเลข — ล็อกนี้ทำให้ issue ใบลดหนี้สองใบพร้อมกันและ void ใบต้นทางเรียงคิวกัน ·
+          <b>B</b> <span class="mono text-[12px]">assertNothingStillCollects</span> นับใบลดหนี้/ใบเพิ่มหนี้ ISSUED ด้วย → <b>409</b> พร้อมเลขใบ · DRAFT ไม่ขวาง (ถูกกันที่ C)
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          unit <span class="mono text-[12px]">receipts.service.spec.ts</span> +6 (เกินใบต้นทาง, นับใบลดหนี้ก่อนหน้า/ใบเพิ่มหนี้, ใบเพิ่มหนี้ไม่มีเพดาน, issue หลังใบต้นทาง void, เพดานซ้ำตอน issue, void ใต้ใบปรับปรุง) ·
+          smoke <span class="mono text-[12px]">receipt-adjustment-guards.smoke.mjs</span> — ครบ A/B/C บนใบที่สร้างเอง · ใช้เลข INV + CN ไปรอบละ 1 เลข (void คงไว้ตาม §86/4 แบบเดียวกับ smoke POS)
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
       <section id="lesson-2" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">16 — บทเรียนรอบ 2</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">17 — บทเรียนรอบ 2</div>
         <h2 class="display text-3xl mb-6">ของที่ไม่เคยถูกเดิน · ลำดับที่ไม่มีใครลอง</h2>
         <div class="card overflow-hidden mb-6">
           <table class="d">
@@ -649,7 +686,8 @@ stock=20 value=5000  <span class="c">← คืนสภาพเดิมทุ
             <tbody>
               <tr><td><b>ลำดับที่ผิดไม่มีใครลอง</b></td><td>ยกเลิกใบส่งของก่อนใบรับคืน · void ใบกำกับก่อนยกเลิกใบวางบิล · ยกเลิก SO/GR ใต้ลูกที่ยัง DRAFT — happy path ทุกตัวถูกหมด</td></tr>
               <tr><td><b>ทำซ้ำไม่มีใครลอง</b></td><td>DELETE ครั้งที่ 2 — ผู้ใช้จริงทำผ่าน retry ไม่ใช่ตั้งใจ</td></tr>
-              <tr><td><b>ข้อมูลที่ยังไม่มี = เทสต์ที่ยังไม่เคยรัน</b></td><td>smoke พิมพ์ใบรับคืนผ่านมาตลอดเพราะไม่มีใบรับคืนให้พิมพ์</td></tr>
+              <tr><td><b>ข้อมูลที่ยังไม่มี = เทสต์ที่ยังไม่เคยรัน</b></td><td>smoke พิมพ์ใบรับคืนผ่านมาตลอดเพราะไม่มีใบรับคืนให้พิมพ์ · ใบลดหนี้ฝั่งขายไม่เคยถูกออกจริงสักใบ — ยิงครั้งแรกเจอ 3 ช่อง</td></tr>
+              <tr><td><b>ฝั่งหนึ่งมี อีกฝั่งไม่มี</b></td><td>ใบลดหนี้ผู้ขายมีเพดาน 2 ชั้น ใบลดหนี้ฝั่งขายไม่มีเลย — เวลาเพิ่ม guard ให้เอกสารฝั่งหนึ่ง ให้ถามว่าคู่สมมาตรของมันมีหรือยัง</td></tr>
               <tr><td><b>สำเนาของ logic ที่ base มีอยู่แล้ว</b></td><td>บั๊กลบซ้ำต้องแก้ 4 ที่ เพราะ service ใน transaction เรียก base ไม่ได้ — แก้ที่ต้นเหตุด้วย <span class="mono text-[12px]">manager</span></td></tr>
               <tr><td><b>เอกสารยืนยันพฤติกรรมที่ผิด</b></td><td>"ยกเลิกใบส่งของได้เสมอ ไม่มี guard" เขียนไว้ใน guide — ถูกต้องตามโค้ดแต่ผิดตามบัญชี</td></tr>
             </tbody>

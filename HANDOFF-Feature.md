@@ -193,12 +193,28 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 **ค้าง — เรียงตามที่แนะนำ**
 1. ~~ยกเลิกผิดลำดับที่ยังไม่ทดสอบ~~ ✅ 2026-09-27 (รายการถัดลงไป "submit ลูกบนแม่ที่ยกเลิก") · รวมช่องข้าม BC ที่เจอระหว่างทาง (ยกเลิก GR ใต้ใบแจ้งหนี้ผู้ขาย SUBMITTED) — แก้แล้วเช่นกัน
-2. ใบลดหนี้/ใบเพิ่มหนี้ (CN/DN ของ receipts) ยังไม่ทดสอบสดเลย
+2. ~~ใบลดหนี้/ใบเพิ่มหนี้ (CN/DN ของ receipts) ยังไม่ทดสอบสดเลย~~ ✅ 2026-09-27 ทดสอบสด 13 เคส เจอ 3 ช่อง แก้แล้ว (รายการถัดลงไป "ใบลดหนี้/เพิ่มหนี้")
 3. ข้อมูลค้างบน dev: GL ของรายการ `DN-2026-00008` เหลือ `1140-02 −250 / 5110-00 +250` (ต้นทุนขายไม่มีการขาย — ก่อนแก้ `bb77b9d`) · journal ปรับปรุง หรือปล่อยไว้
 4. `api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ (ข้อ "ของที่ต้องรู้" ข้างบน)
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
+
+### 2026-09-27 · ใบลดหนี้/ใบเพิ่มหนี้ฝั่งขาย: เพดาน + ใบต้นทางต้องยังยืนอยู่ ✅ **ทดสอบสด + แก้ + verify finance-bc + smoke**
+
+**ที่มา** — ข้อ 2 ของรายการค้าง: ยิงสดบนโดเมนจริง 13 เคส (สคริปต์ใน scratchpad ไม่ได้ commit) · ผ่าน 10 · ไม่ผ่าน 3 — `bugfix-log.html` bug 16
+
+| | ผล |
+|---|---|
+| ถูกต้องอยู่แล้ว | เลข `CN-`/`DN-` แยกชุด · สืบทอด `vat_rate` 7% · GL ใบลดหนี้ Dr 4100-01 500 + Dr 2135-00 35 / Cr 1130-01 535 · ใบเพิ่มหนี้กลับทิศ · void ทั้งสองแบบกลับรายการสุทธิ 0 ต่อบัญชี · 400 เมื่อไม่มีเหตุผล / ไม่อ้างใบต้นทาง / อ้างใบลดหนี้ |
+| A ใบลดหนี้เกินใบต้นทาง | 13,375 บน 1,337.50 ออกเลขได้ → `assertCreditNoteWithinReference()` ≤ total + DN ISSUED − CN ISSUED อื่น → **409** (create/update + issue) |
+| B void ใบต้นทางใต้ CN/DN ISSUED | → `assertNothingStillCollects` นับ CN/DN ISSUED → **409** ระบุเลข |
+| C issue CN DRAFT หลังใบต้นทาง void | → `assertReferenceStillAdjustable()` ล็อกใบต้นทาง ต้อง ISSUED → **409** ก่อนออกเลข |
+| เทสต์ | unit `receipts.service.spec.ts` +6 (harness: `issuedAdjustments`, `manager.find(Receipt)` แยกจากบรรทัด) · smoke `receipt-adjustment-guards.smoke.mjs` (finance-bc) |
+| docs | `bugfix-log.html` bug 16 · `srs-p5.html` RULE ใหม่หลัง §86/22 INHERITS · `api-workflow-guide.html` แถว C1 + ตาราง CREDIT_NOTE |
+
+**เลขตามกฎหมายที่ใช้ไปในการทดสอบ** (void คงไว้ทั้งหมด): `INV-2026-00022…00024`, `CN-2026-00001…00003`, `DN-2026-00001` + smoke ใช้ INV/CN เพิ่มรอบละ 1 เลข — ต้องรวมอยู่ในการล้างข้อมูลก่อน go-live
+**ยังไม่ทดสอบ** — ใบลดหนี้ใน ภ.พ.30 (หักภาษีขายในงวด) · ใบวางบิล/การรับชำระที่ตัดใบเพิ่มหนี้ · aging เมื่อมีใบลดหนี้
 
 ### 2026-09-27 · submit ลูกบนแม่ที่ยกเลิกแล้วถูกปฏิเสธ (SO→DN, GR→AP) + ยกเลิก GR ใต้ใบแจ้งหนี้ SUBMITTED ✅ **แก้ + verify sales-bc/finance-bc/inventory-bc + smoke + deploy + ทดสอบบนโดเมนจริง** · `0c48cd1`
 
