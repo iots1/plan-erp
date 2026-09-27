@@ -200,7 +200,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-09-27 · ยอดค้างชำระหักใบลดหนี้ (ขาย + ซื้อ) ✅ **ทดสอบสด + แก้ + verify finance-bc + smoke**
+### 2026-09-27 · ยอดค้างชำระหักใบลดหนี้ (ขาย + ซื้อ) ✅ **ทดสอบสด + แก้ + verify finance-bc + smoke + deploy + ทดสอบซ้ำบนโดเมน** · `a577f06`
 
 **ที่มา** — ทดสอบสดรอบที่ 2 ของ CN/DN หลัง deploy `cd271d7` (ชุดแรกซ้ำ **14/14 ผ่าน**) · ชุดที่ 2: 7 เคส ผ่าน 4 · ไม่ผ่าน 3 จากต้นเหตุเดียว — `bugfix-log.html` bug 17
 
@@ -209,7 +209,8 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | ถูกต้องอยู่แล้ว | ภ.พ.30 หักใบลดหนี้ในงวด (`sales_standard_vat_price` −500, `output_vat` −35) · aging ฝั่งขาย −535 · รับชำระตัดใบลดหนี้ → 400 · รับชำระตัดใบเพิ่มหนี้ได้ |
 | บั๊ก | รับชำระ 1,337.50 บนใบที่ลดหนี้ 535 แล้วได้ → ลูกหนี้ −535 · หลังจากนั้นยอดจริง 802.50 กลับรับไม่ได้ (ค้าง 0) · ใบวางบิลตอบ "already settled" |
 | แก้ | ยอดค้าง = total − ใบลดหนี้ − allocated ใน `PaymentEntriesService` (RECEIVE + **PAY**), `findOutstanding` (ขาย + `APInvoicesService`), `BillingNotesService` · utils `receipt/utils/credited-by-receipt.util.ts`, `ap-invoice/utils/credited-by-ap-invoice.util.ts` |
-| ฝั่งซื้อ | ช่องเดียวกัน พบจากโค้ด (ไม่ได้ยิงสด — ต้องมี Purchase Return + ใบลดหนี้ผู้ขาย) · AP aging เคยนับใบแจ้งหนี้ผู้ขายเต็มหน้าใบ ตอนนี้หักแล้ว |
+| ฝั่งซื้อ | ช่องเดียวกัน พบจากโค้ด · AP aging เคยนับใบแจ้งหนี้ผู้ขายเต็มหน้าใบ ตอนนี้หักแล้ว |
+| หลัง deploy `a577f06` | ขายชุด 1 **14/14** · ชุด 2 **7/7** (รับชำระเต็ม 1,337.50 → 400 "outstanding 802.5", ยอดสุทธิรับได้, ใบวางบิล 802.5) · **ซื้อยิงสดครั้งแรก 4/4**: PO → GR 4 ชิ้น → APINV-2026-00019 1,070 → คืน 1 ชิ้น → APCN-2026-00002 267.50 → จ่าย 1,070 → 400 · จ่าย 802.50 ได้ · เจ้าหนี้ `2120-01` สุทธิ 0 · AP aging 802.50 · เก็บกวาดแล้ว ล็อต `LIVE-APCN-*` = 0 และทุกบัญชีสุทธิ 0 (บรรทัดกลับรายการมี `is_cancelled=true` — ตรวจยอดสุทธิให้รวมทุกบรรทัด) |
 | เทสต์ | unit +4 + util spec ใหม่ · smoke `receipt-adjustment-guards.smoke.mjs` ข้อ D |
 | docs | `bugfix-log.html` bug 17 · `srs-p5.html` RULE · OUTSTANDING IS NET OF CREDIT NOTES · `api-workflow-guide.html` แถว C4 + CREDIT_NOTE |
 
