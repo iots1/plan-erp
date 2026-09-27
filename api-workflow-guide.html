@@ -899,6 +899,16 @@ sequenceDiagram
             หรือมีปุ่มโหลดใหม่ ไม่ควร block ผู้ใช้รอ
           </p>
         </div>
+        <div class="rulebox mb-8" id="cogs-per-delivery-line">
+          <div class="rc mb-1">ต้นทุนขายผูกกับ <u>รายการ</u> ใบส่งของ ไม่ใช่ตัวใบส่งของ</div>
+          <p class="text-[13.5px]">
+            แถว <span class="mono text-[12px]">cogs_entries</span> อ้าง <span class="mono text-[12px]">sale_id = delivery_note_items.id</span> (หนึ่งแถวต่อบรรทัดต่อล็อตที่ตัด) และ journal ต้นทุนขายใน GL มี
+            <span class="mono text-[12px]">ref_doc_type = DELIVERY_LINE</span> · <span class="mono text-[12px]">ref_doc_id = delivery_note_items.id</span> —
+            <b>ไม่ใช่</b> id ของใบส่งของ · ต้นทุนรับรู้ตอนส่งของ ไม่ขึ้นกับว่าออกใบกำกับเมื่อไร ·
+            <b>FE / รายงาน:</b> จะหาต้นทุนขายของใบส่งของหนึ่งใบ ให้รวมจากทุกบรรทัดของใบนั้น (<span class="mono text-[12px]">GET /cogs-entries?filter[]=sale_id||$in||…</span>) · ค้น GL ด้วย id ใบส่งของจะไม่เจออะไรเลย ·
+            รับคืนเต็มจำนวนจะลบแถว <span class="mono text-[12px]">cogs_entries</span> ของบรรทัดนั้นตามการกลับรายการ รับคืนบางส่วนจะลดแถวเดิม
+          </p>
+        </div>
 
         <h3 class="display text-xl mt-10 mb-4">B4 · รับคืนสินค้าจากลูกค้า <span class="mono text-[13px] text-[var(--muted)]">— Warehouse Staff</span></h3>
         <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
@@ -1401,7 +1411,7 @@ sequenceDiagram
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">PUT /finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:update</td><td><b>แทนที่ทั้งชุด</b> · ผลรวมต้องเท่ายอดใบพอดี</td></tr>
-              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:view</td><td>แต่ละงวดพร้อม <span class="mono">settled</span> / <span class="mono">outstanding</span> / <span class="mono">is_overdue</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:view</td><td>แต่ละงวดพร้อม <span class="mono">credited</span> / <span class="mono">settled</span> / <span class="mono">outstanding</span> / <span class="mono">is_overdue</span> · เงินรับชำระตัดงวดเก่าสุดก่อน · ใบลดหนี้ ISSUED หักจาก<b>งวดท้ายสุดย้อนขึ้นมา</b> (<span class="mono">credited</span>) · <span class="mono">outstanding = amount − credited − settled</span> (2026-09-27)</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE /finance-bc/v1/receipts/{receipt_id}/payment-schedules</td><td class="mono text-[11px]">payment_schedule:delete</td><td>ลบงวดทั้งชุด</td></tr>
             </tbody>
           </table>
