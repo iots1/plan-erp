@@ -176,6 +176,40 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
+### 2026-09-27 · base operations เป็น single source of truth ทั้งระบบ (รวมใน transaction) ✅ **refactor + verify ทุก BC**
+
+**ต้นเหตุ** — บั๊ก DELETE ซ้ำ (รายการถัดลงไป) ต้องไล่แก้ 4 ที่ เพราะ service ที่ทำงานใน transaction เรียก `super.*` ไม่ได้
+(base ใช้ repository ที่ inject มาเสมอ) จึง copy การประทับ `created_by`/`updated_by`/`deleted_*` และการกรองแถวที่ลบแล้วไว้เอง
+
+| ที่ | ของใหม่ |
+|---|---|
+| `libs/common` base | ทุก method รับ `manager?: EntityManager` ท้ายสุด — `findById` / `findByIdOrNull` / `create` / `update` / `delete` (ส่งมาแล้วทำงานใน transaction ของผู้เรียก) · protected `createEntity(payload)` / `updateEntity(id, patch)` typed `DeepPartial<Entity>` สำหรับเขียนข้อมูลภายในที่มีคอลัมน์นอก DTO (เลขเอกสาร, สถานะ, snapshot) โดยไม่ต้อง cast · ทั้งคู่เรียก implementation ภายในตรง ไม่ผ่าน `this.create/update` จึงไม่ recursion เมื่อ subclass override |
+| services 6 BC | audit 126 service → แทนที่ของที่เขียนเองประมาณ 77 จุดด้วย `super.*` / `createEntity` / `updateEntity` (inventory 34 · finance+report 21 + ลบ cast `as unknown as` ใน tax-configs · sales/supplier/iam 22) |
+| คงไว้โดยตั้งใจ (~20 จุด) | read ที่ต้อง `lock: pessimistic_write` (`loadLocked*`) · status transition ที่แก้ row ที่ล็อกแล้ว save · bulk insert audit log · read ที่จงใจไม่กรองแถวที่ลบ (`roles`/`users`) |
+| เทสต์ | unit ใหม่ `base-service-operations.manager.spec.ts` (manager ทุก method + กัน recursion) · fake repo ใน spec ของ BC ได้ `target` + `preload` · เพิ่มเทสต์ hard/soft delete ของเอกสาร · ทั้ง repo 2011 เทสต์ผ่าน |
+| docs | `.claude/rules/data-access.md` หัวข้อ "Inside a transaction too — pass the `manager`" · `backend-convention.html` RULE ใหม่ |
+
+**พฤติกรรมที่เปลี่ยน (เล็กน้อย)** — ข้อความ 404 ของจุดที่แทนที่เป็นแบบ base (`<table> with ID '…' not found.` แทน `GlAccount with ID …`) exception ยังเป็น
+`NotFoundException` · เอกสารที่เคยประทับแค่ `created_by` ตอนสร้าง (billing note, payment entry, fx revaluation, fiscal close) ตอนนี้ประทับ `updated_by` ด้วย ·
+`updateEntity` ทำ `preload` เพิ่ม 1 SELECT ใน transaction เดิม
+**ครอบคลุมด้วย typecheck/smoke เท่านั้น** — `print-templates` / `document-prints` (report-bc), update ของ delivery notes / sales returns, settings update
+
+### 2026-09-27 · DELETE ซ้ำบนของที่ลบแล้ว → 404 และไม่เขียนทับ audit อีก ✅ **แก้ + verify ทุก BC**
+
+**ต้นเหตุ** — `BaseServiceOperations._deleteEntity` soft delete ด้วย `update(id, …)` ไม่กรองแถวที่ลบแล้ว:
+DELETE ซ้ำได้ `204` และ**เขียนทับ `deleted_at`/`deleted_by`** (ประวัติว่าใครลบครั้งแรกหาย) · เจอระหว่างยิง curl
+ทั้งที่ `_deleteBulkEntities` กรอง `softDeleteFilter` อยู่แล้ว
+
+| ที่ | แก้ |
+|---|---|
+| `libs/common` base | soft delete `update({ id, ...softDeleteFilter }, …)` → แถวที่ลบแล้ว `affected=0` → 404 (โค้ดเดิม) |
+| service ที่ soft delete เอง | `ItemGroupsService`, `WarehousesService` (inventory-bc), `GlAccountsService` (finance-bc) → `update({ id, is_deleted: false }, …)` |
+| ตรวจแล้วไม่ต้องแก้ | เอกสาร submittable 10 ตัว (`loadLocked*` กรอง `is_deleted: false` แล้ว 404 ก่อน), orphan children ใน base `update()`, `permissions-sync` (diff จากแถวที่ยัง live) |
+| เทสต์ | unit ใหม่ `base-service-operations.delete.spec.ts` + เคสลบซ้ำใน `gl-accounts.service.spec.ts` · แก้ assertion ที่ตรึงรูปแบบเก่า (`customer-groups.service.spec.ts`) · smoke: `gl-accounts.smoke.mjs` และ `master-data-delete-guards.smoke.mjs` ยิง DELETE ซ้ำ → 404 + `deleted_at` ไม่เปลี่ยน (base + ที่เขียนเอง) |
+| docs | `backend-convention.html` RULE ใหม่ · `api-workflow-guide.html` `#delete-twice-404-2026-09-27` · `.claude/rules/data-access.md` |
+
+**FE ต้องรู้** — retry DELETE แล้วได้ 404 ให้ถือว่าลบแล้ว
+
 ### 2026-09-27 · master data ที่สินค้ายังอ้างอยู่ ลบไม่ได้ ✅ **implement + verify + smoke**
 
 **ต้นเหตุ** — soft delete ไม่ติด FK: ลบกลุ่มสินค้า/ยี่ห้อ/ประเภทภาษี/UOM/คุณลักษณะที่สินค้ายังอ้างอยู่ได้เงียบ ๆ

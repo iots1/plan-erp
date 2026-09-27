@@ -2166,6 +2166,13 @@ sequenceDiagram
             รายละเอียด: <a href="srs-p2.html#master-data-in-use" style="color:var(--signal);text-decoration:underline">srs-p2 · master data ที่ยังถูกอ้างอยู่</a>
           </p>
         </div>
+        <div class="rulebox mb-4" id="delete-twice-404-2026-09-27">
+          <div class="rc mb-1">ทุก BC · <span class="mono">DELETE</span> ซ้ำบนของที่ลบไปแล้ว → 404 (2026-09-27)</div>
+          <p class="text-[13.5px]">
+            เดิม <span class="mono text-[12px]">DELETE</span> ซ้ำได้ <span class="mono text-[12px]">204</span> และเขียนทับเวลา/ผู้ลบ ตอนนี้ได้ <span class="mono text-[12px]">404</span> (<span class="mono text-[12px]">404000</span>) เหมือน <span class="mono text-[12px]">GET</span> ของแถวที่ถูกลบ ·
+            <b>FE:</b> ถ้า retry DELETE หลังเน็ตหลุดแล้วได้ 404 ให้ถือว่าลบสำเร็จแล้ว (ไม่ต้องแจ้ง error) · เอกสาร submittable (ใบเสนอราคา, PO, GR ฯลฯ) ตอบ 404 แบบนี้อยู่แล้วก่อนหน้า
+          </p>
+        </div>
         <div class="rulebox mb-6">
           <div class="rc mb-1">สแกนบาร์โค้ด — ไม่ใช่ CRUD ตรง เพิ่ม 2026-08-30</div>
           <p class="text-[13.5px]">
