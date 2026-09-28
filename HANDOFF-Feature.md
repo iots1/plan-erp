@@ -200,7 +200,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-09-27 · AR aging แบบเดียวกับ AP: `credit_available` + `net_total` ✅ **implement + verify finance-bc + smoke**
+### 2026-09-27 · AR aging แบบเดียวกับ AP: `credit_available` + `net_total` ✅ **implement + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `e24d0e7`
 
 | | ของใหม่ |
 |---|---|
@@ -208,6 +208,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | **พฤติกรรมที่เปลี่ยน** | ลูกค้าที่มีใบลดหนี้: ตัวเลขใน bucket เปลี่ยน — ใบลดหนี้เคยลงช่อง `no_due_date` เป็นยอดติดลบ ตอนนี้หักที่ช่องของใบต้นทาง · `total` = ผลรวมยอดค้างรายใบ (ไม่หักเครดิตส่วนเกิน) — ของเดิมที่ต้องการยอดสุทธิให้ใช้ `net_total` |
 | วงเงินเครดิต | `findCustomerOutstanding` ไม่เปลี่ยน · พิสูจน์แล้วว่าเท่ากับ max(0, total − ส่วนของใบลดหนี้ใน credit_available) — เงินรับล่วงหน้าไม่ลดวงเงิน โดยตั้งใจ |
 | เทสต์ | unit `receipts.service.spec.ts` +2 (เดิมไม่มีเทสต์ aging) · smoke `customer-credit` ตรวจ `credit_available` +367.5 และ `total` ไม่เปลี่ยน |
+| หลัง deploy `e24d0e7` | smoke บนโดเมน `customer-credit` / `supplier-credit` / `receipt-adjustment-guards` **ผ่านทั้งหมด** · ชุดใบลดหนี้ 2 **7/7** · aging ยิงสด **4/4** อ่าน `net_total`: 642 → ออกใบลดหนี้ 267.5 → 374.5 → คืนเงินครบ → 642 (สคริปต์เดิมที่อ่าน `total` ได้ 642 ตลอด — ตรงกับพฤติกรรมใหม่ที่ตั้งใจ) |
 
 ### 2026-09-27 · AP aging แสดงยอดที่ผู้ขายติดเรา + ปิดช่องดึงเครดิตเกินส่วนเกินกลุ่มใบลดหนี้ ✅ **implement + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `c5982a7`
 
