@@ -200,7 +200,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-09-27 · เครดิตผู้ขาย: ใบตัดเครดิตผู้ขาย (SCA-) + ใบรับคืนเงินจากผู้ขาย (SRF-) + ยกเลิกใบแจ้งหนี้ใต้ใบลดหนี้ผู้ขาย → 409 ✅ **implement + migrate + permissions + verify finance-bc + smoke**
+### 2026-09-27 · เครดิตผู้ขาย: ใบตัดเครดิตผู้ขาย (SCA-) + ใบรับคืนเงินจากผู้ขาย (SRF-) + ยกเลิกใบแจ้งหนี้ใต้ใบลดหนี้ผู้ขาย → 409 ✅ **implement + migrate + permissions + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `c139782`
 
 **ที่มา** — ต่อจากเครดิตลูกค้า (รายการถัดลงไป) ฝั่งเจ้าหนี้ · srs-p5 `#supplier-credit` · bugfix-log bug 18
 
@@ -213,6 +213,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | บั๊กที่ปิดไปด้วย | ยกเลิกใบแจ้งหนี้ผู้ขายได้ทั้งที่ใบลดหนี้ผู้ขาย SUBMITTED ยังอ้างอยู่ → ตอนนี้ **409** |
 | เทสต์ | unit `supplier-credit/*.spec.ts` (16) + `ap-invoices` (+3) + `payment-entries` (+1) — รวม finance-bc 549 · smoke `supplier-credit.smoke.mjs` (PO 6 → GR → ใบแจ้งหนี้ A 4 / B 2 → จ่าย A เต็ม → คืน 1 → ใบลดหนี้ → จ่ายล่วงหน้า 100 → ตัดเครดิต 100+60 เข้า B → ผู้ขายคืน 167.5 · guard 5 ข้อ → 409 · เก็บกวาด ledger 0 ล็อต 0) |
 
+**หลัง deploy `c139782`** — smoke บนโดเมน `supplier-credit` (SRF-2026-00002) + `customer-credit` + `ap-invoice-submit-guard` + `goods-receipt-cancel-guard` **ผ่านทั้งหมด** · ฝั่งซื้อ **4/4** · ชุดใบลดหนี้ 2 **7/7**
 **ยังไม่มี** — ส่วนเกินที่ผู้ขายติดเรา (เครดิตผู้ขาย) ไม่แสดงเป็นยอดติดลบใน AP aging · แบบฟอร์มพิมพ์ SCA/SRF
 
 ### 2026-09-27 · เครดิตลูกค้า: ใบตัดเครดิต (CA-) + ใบคืนเงิน (RFD-) ✅ **implement + migrate + permissions + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `2a25f15`
