@@ -200,7 +200,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-09-27 · AP aging แสดงยอดที่ผู้ขายติดเรา + ปิดช่องดึงเครดิตเกินส่วนเกินกลุ่มใบลดหนี้ ✅ **implement + verify finance-bc + smoke**
+### 2026-09-27 · AP aging แสดงยอดที่ผู้ขายติดเรา + ปิดช่องดึงเครดิตเกินส่วนเกินกลุ่มใบลดหนี้ ✅ **implement + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `c5982a7`
 
 | | ของใหม่ |
 |---|---|
@@ -208,6 +208,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | bug 19 | ใบลดหนี้หลายใบบนใบต้นทางเดียวแชร์ส่วนเกินก้อนเดียว แต่ตรวจทีละใบ → เอกสารเดียวดึงจากสองใบเกินได้ · `resolveCreditNoteGroups` + ตรวจเพิ่มใน `assertSourcesAvailable` (ทั้ง `customer-credit` และ `supplier-credit`) → **409** |
 | เทสต์ | unit `ap-invoices.service.spec.ts` +2 (credit ข้างแถว, ผู้ขายที่มีแต่เครดิต) · smoke `supplier-credit` ตรวจ aging `credit_available` +367.5 · smoke `customer-credit` เคสสองใบลดหนี้แชร์ส่วนเกิน 300 → 409 |
 
+**หลัง deploy `c5982a7`** — smoke บนโดเมน `supplier-credit` (aging `credit_available` +367.5) + `customer-credit` (สองใบลดหนี้แชร์ส่วนเกิน 300 → 409) + `receipt-adjustment-guards` **ผ่านทั้งหมด** · ฝั่งซื้อ **4/4** · aging ขาย **4/4**
 **ยังไม่มี** — ฝั่งลูกค้า aging ยังนับใบลดหนี้เป็นยอดติดลบใน bucket และกรองลูกค้าที่ยอดสุทธิ ≤ 0 ออก (ลูกค้าที่เราติดเงินจึงไม่แสดง) + ไม่นับเงินรับล่วงหน้า — ถ้าต้องการให้เหมือน AP ทำ `credit_available` แบบเดียวกัน
 
 ### 2026-09-27 · เครดิตผู้ขาย: ใบตัดเครดิตผู้ขาย (SCA-) + ใบรับคืนเงินจากผู้ขาย (SRF-) + ยกเลิกใบแจ้งหนี้ใต้ใบลดหนี้ผู้ขาย → 409 ✅ **implement + migrate + permissions + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `c139782`
