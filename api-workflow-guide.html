@@ -150,9 +150,11 @@ flowchart LR
               <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td><b>ยังมีใบรับคืน (DRAFT/SUBMITTED) ผูกอยู่ (409)</b> — ยกเลิกใบรับคืนก่อน · ถ้าปล่อยผ่าน ของที่คืนแล้วจะถูกนับกลับซ้ำและต้นทุนขายค้างในบัญชี (<a href="bugfix-log.html#bug-9" style="color:var(--accent);text-decoration:underline">bug 12</a>, 2026-09-27)</td></tr>
               <tr><td>B4 Sales Return</td><td class="mono text-[12px]">cancel</td><td>ดึงของออกจากล็อตเดิม (ต้นทุนเดิม) + คืน COGS ที่กลับไปแล้วขึ้นบัญชีอีกครั้ง</td><td><b>ของที่รับคืนถูกขายออกไปอีกแล้ว (503)</b> — ต่างจากใบส่งของที่คืนได้เสมอ ต้องกลับรายการที่ขายออกไปก่อน</td></tr>
               <tr><td>B5 POS Sale</td><td class="mono text-[12px]">void</td><td>คืนสต็อกกลับล็อตเดิม + ยกเลิกใบรับชำระ + void ใบกำกับภาษี (ทั้งสามอย่างในคำสั่งเดียว)</td><td><b>ของถูกขายออกไปอีกแล้ว</b> หรือ finance-bc ตอบไม่ได้ (503) · งวดบัญชี/สต็อกปิดแล้ว (409)</td></tr>
-              <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ · <b>ยังมีใบวางบิล (DRAFT/ISSUED), การรับชำระ (DRAFT/SUBMITTED) หรือใบลดหนี้/ใบเพิ่มหนี้ (ISSUED) ผูกอยู่ (409)</b> — void/ยกเลิกสิ่งเหล่านั้นก่อน · ใบลดหนี้/ใบเพิ่มหนี้ DRAFT ไม่ขวาง แต่ issue ไม่ได้อีกเมื่อใบต้นทางถูก void (409) (2026-09-27)</td></tr>
+              <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ · <b>ยังมีใบวางบิล (DRAFT/ISSUED), การรับชำระ (DRAFT/SUBMITTED), ใบลดหนี้/ใบเพิ่มหนี้ (ISSUED) หรือใบตัดเครดิต (SUBMITTED) ผูกอยู่ · ใบลดหนี้ที่เครดิตถูกตัด/คืนไปแล้ว (409)</b> — void/ยกเลิกสิ่งเหล่านั้นก่อน · ใบลดหนี้/ใบเพิ่มหนี้ DRAFT ไม่ขวาง แต่ issue ไม่ได้อีกเมื่อใบต้นทางถูก void (409) (2026-09-27)</td></tr>
               <tr><td>C3 Billing Note</td><td class="mono text-[12px]">cancel</td><td>ปล่อยใบกำกับที่รวมไว้ให้ void/วางบิลใหม่ได้ · ไม่มีรายการบัญชี</td><td>ไม่มี</td></tr>
-              <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td>ไม่มี guard พิเศษ · (ตอนสร้าง/submit: ยอดที่ตัดแต่ละใบ ≤ total − ใบลดหนี้ − ที่ตัดไปแล้ว · 2026-09-27)</td></tr>
+              <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td><b>เครดิตจากการรับชำระนี้ถูกตัด/คืนไปแล้ว (409)</b> — หรือเครดิตของใบลดหนี้บนใบที่การรับชำระนี้ตัดไว้ถูกใช้ไปแล้ว · ยกเลิกใบตัดเครดิต/ใบคืนเงินก่อน · (ตอนสร้าง/submit: ยอดที่ตัดแต่ละใบ ≤ total − ใบลดหนี้ − เครดิตที่ตัดเข้า − ที่ตัดไปแล้ว · 2026-09-27)</td></tr>
+              <tr><td>C10 Credit Application</td><td class="mono text-[12px]">cancel</td><td>คืนเครดิตให้แหล่งเดิม + คืนยอดค้างให้ใบที่ถูกตัด · ไม่มีรายการบัญชี</td><td>ใบที่ถูกตัดมีใบลดหนี้ที่เครดิตถูกใช้ไปแล้ว และการยกเลิกจะทำให้เครดิตนั้นไม่มีอะไรรองรับ (409)</td></tr>
+              <tr><td>C10 Customer Refund</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้าน (Dr เงินสด / Cr ลูกหนี้) + คืนเครดิตให้แหล่งเดิม</td><td>ไม่มี guard พิเศษ · งวดบัญชีปิดแล้ว</td></tr>
               <tr><td>D1 Stock Entry</td><td class="mono text-[12px]">cancel</td><td>คืนล็อต/ย้ายกลับตาม entry_type</td><td>ล็อตปลายทางถูกเบิกไปแล้ว (409)</td></tr>
               <tr><td>D2 Stock Adjustment</td><td class="mono text-[12px]">cancel</td><td>คืน available_qty กลับเป็นค่าก่อนปรับ</td><td>ล็อตถูกแก้ไปอีกหลังปรับยอด (409) — เช็คว่า available_qty ตรงกับตอน submit</td></tr>
             </tbody>
@@ -197,6 +199,7 @@ flowchart LR
               <tr><td class="mono">C6</td><td>ปิดงวดบัญชี</td><td>Finance Manager</td><td>ไม่มีสถานะ (one-way ratchet)</td></tr>
               <tr><td class="mono">C7</td><td>รายงานลูกหนี้/เจ้าหนี้ค้างชำระ</td><td>AR / AP Clerk · Finance Manager</td><td>อ่านอย่างเดียว</td></tr>
               <tr><td class="mono">C8</td><td>ยื่นภาษีมูลค่าเพิ่ม (ภ.พ.30)</td><td>Accountant · Finance Manager</td><td>อ่านอย่างเดียว (v1 — คำนวณสด)</td></tr>
+              <tr><td class="mono">C10</td><td>เครดิตลูกค้า — ตัดเครดิต / คืนเงิน</td><td>AR Clerk · Accountant</td><td>Credit Application · DRAFT→SUBMITTED→CANCELLED · Customer Refund · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">D1</td><td>โอน / เบิก / แปรรูป</td><td>Warehouse Staff</td><td>Stock Entry · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">D2</td><td>ปรับยอดสต็อก</td><td>Warehouse Manager</td><td>Stock Adjustment · DRAFT→<b>PENDING_APPROVAL</b>→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">E1</td><td>รายงานสต็อก</td><td>Warehouse Manager</td><td>อ่านอย่างเดียว</td></tr>
@@ -1402,6 +1405,57 @@ sequenceDiagram
             <b>ยังไม่รองรับหลายสกุลเงิน</b> — การชำระตัดกับยอด THB ของใบเสมอ ·
             ใบตั้งหนี้ที่ถูกจ่ายตัดไปแล้ว <b>ยกเลิกไม่ได้</b> ต้องยกเลิกใบจ่ายก่อน ·
             เอกสารที่ไม่ได้ระบุ <span class="mono text-[12px]">wht_config_code</span> ตอนสร้าง = <span class="mono text-[12px]">total_wht</span> เป็น 0 → ใบจ่ายหักไม่ได้เลย (แก้ที่เอกสาร ไม่ใช่ที่ใบจ่าย)
+          </p>
+        </div>
+
+        <h3 class="display text-xl mt-10 mb-4" id="customer-credit">C10 · เครดิตลูกค้า — ตัดเครดิต / คืนเงิน <span class="mono text-[13px] text-[var(--muted)]">— AR Clerk · Accountant</span></h3>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">เครดิตมาจากไหน (2026-09-27)</div>
+          <p class="text-[13.5px]">
+            <b>1. ใบลดหนี้ส่วนที่ใบต้นทางไม่ต้องใช้แล้ว</b> — เช่นออกใบลดหนี้หลังลูกค้าจ่ายครบ · คิดเป็นกลุ่มต่อใบต้นทาง:
+            <span class="mono text-[12px]">ส่วนเกิน = max(0, ใบลดหนี้ + ที่รับชำระ + เครดิตที่ตัดเข้า − ยอดใบ)</span> แต่ละใบลดหนี้ใช้ได้ไม่เกินยอดของตัวเอง ·
+            <b>2. ยอดรับชำระที่ยังไม่ได้ตัดใบไหน</b> (<span class="mono text-[12px]">unallocated_amount</span> — เงินรับล่วงหน้าหรือจ่ายเกิน) ·
+            ทั้งสองแบบ <b>THB เท่านั้น</b> · เครดิตคงเหลือ = ที่มี − ที่ตัด (ใบตัดเครดิต) − ที่คืน (ใบคืนเงิน) ที่ SUBMITTED
+          </p>
+        </div>
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/credit-applications</td><td class="mono text-[11px]">credit_application:create</td><td><b>DRAFT</b> · แต่ละบรรทัด: แหล่งเครดิตหนึ่งแหล่ง → ใบที่ถูกตัด + ยอด</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/credit-applications/{id}/submit</td><td class="mono text-[11px]">credit_application:submit</td><td>ตรวจซ้ำใต้ row lock · ออกเลข <span class="mono">CA-{ปี}-{ลำดับ}</span> · ยอดค้างของใบที่ถูกตัดลดลง · <b>ไม่ลง GL</b></td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/credit-applications/{id}/cancel</td><td class="mono text-[11px]">credit_application:cancel</td><td>คืนเครดิตและยอดค้าง · เก็บเลขไว้</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE /finance-bc/v1/credit-applications/{id}</td><td class="mono text-[11px]">credit_application:delete</td><td>DRAFT เท่านั้น (ไม่มี PUT — แก้ด้วยการลบแล้วสร้างใหม่)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/customer-refunds</td><td class="mono text-[11px]">customer_refund:create</td><td><b>DRAFT</b> · <span class="mono">payment_method</span> + บรรทัดแหล่งเครดิต + ยอด</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/customer-refunds/{id}/submit</td><td class="mono text-[11px]">customer_refund:submit</td><td>ตรวจซ้ำใต้ row lock · ออกเลข <span class="mono">RFD-{ปี}-{ลำดับ}</span> · GL <b>Dr ลูกหนี้ / Cr เงินสด</b> (voucher <span class="mono">CUSTOMER_REFUND</span>)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/customer-refunds/{id}/cancel</td><td class="mono text-[11px]">customer_refund:cancel</td><td>กลับรายการบัญชี · คืนเครดิต</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/credit-applications · /customer-refunds</td><td class="mono text-[11px]">*:view</td><td>relations: <span class="mono">lines</span>, <span class="mono">lines.source_receipt</span>, <span class="mono">lines.source_payment_entry</span> (+ <span class="mono">lines.target_receipt</span>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /finance-bc/v1/credit-applications — ใช้เครดิตสองแหล่งตัดใบ INV ใบเดียว</span>
+{
+  <span class="s">"customer_id"</span>: <span class="s">"1ffe…"</span>,
+  <span class="s">"lines"</span>: [
+    { <span class="s">"source_receipt_id"</span>: <span class="s">"cn-…"</span>,        <span class="s">"target_receipt_id"</span>: <span class="s">"inv-…"</span>, <span class="s">"amount"</span>: <span class="t">100</span> },
+    { <span class="s">"source_payment_entry_id"</span>: <span class="s">"pmt-…"</span>, <span class="s">"target_receipt_id"</span>: <span class="s">"inv-…"</span>, <span class="s">"amount"</span>: <span class="t">60</span> }
+  ]
+}
+<span class="c">// POST /finance-bc/v1/customer-refunds — คืนส่วนที่เหลือของใบลดหนี้เป็นเงินโอน</span>
+{
+  <span class="s">"customer_id"</span>: <span class="s">"1ffe…"</span>, <span class="s">"payment_method"</span>: <span class="s">"BANK_TRANSFER"</span>, <span class="s">"reference"</span>: <span class="s">"TRF-001"</span>,
+  <span class="s">"lines"</span>: [ { <span class="s">"source_receipt_id"</span>: <span class="s">"cn-…"</span>, <span class="s">"amount"</span>: <span class="t">167.5</span> } ]
+}</pre>
+        </div>
+        <div class="rulebox mb-8">
+          <div class="rc ok mb-1">ผลกับที่อื่น + guard ที่ FE ต้องรู้</div>
+          <p class="text-[13.5px]">
+            เครดิตที่ตัดเข้าใบ <b>นับเหมือนการรับชำระ</b>ทุกที่: เพดานรับชำระ, ยอดเรียกเก็บของใบวางบิล, งวดชำระ (ตัดงวดเก่าสุดก่อน), aging และยอดค้างระดับลูกค้า ·
+            ใบลดหนี้ที่เครดิตถูกใช้ไปแล้วนับติดลบเฉพาะส่วนที่เหลือ ·
+            <b>409 เมื่อ</b>: ตัดหรือคืนเกินเครดิตคงเหลือ · ตัดเกินยอดค้างของใบ · ยกเลิกการรับชำระที่เป็นแหล่งเครดิต หรือที่ทำให้ใบลดหนี้มีส่วนเกิน ขณะที่เครดิตนั้นถูกใช้ไปแล้ว ·
+            void ใบลดหนี้ที่เครดิตถูกใช้ไปแล้ว · void ใบที่ถูกตัดเครดิต — <b>ยกเลิกใบตัดเครดิต/ใบคืนเงินก่อนเสมอ</b> (ข้อความ 409 ระบุเลขใบ) ·
+            ยังไม่มีฝั่งซื้อ (ผู้ขายคืนเงินให้เรา) และยังไม่มีแบบฟอร์มพิมพ์
           </p>
         </div>
 

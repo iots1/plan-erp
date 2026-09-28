@@ -193,12 +193,29 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 **ค้าง — เรียงตามที่แนะนำ**
 1. ~~ยกเลิกผิดลำดับที่ยังไม่ทดสอบ~~ ✅ 2026-09-27 (รายการถัดลงไป "submit ลูกบนแม่ที่ยกเลิก") · รวมช่องข้าม BC ที่เจอระหว่างทาง (ยกเลิก GR ใต้ใบแจ้งหนี้ผู้ขาย SUBMITTED) — แก้แล้วเช่นกัน
-2. ~~ใบลดหนี้/ใบเพิ่มหนี้ (CN/DN ของ receipts) ยังไม่ทดสอบสดเลย~~ ✅ 2026-09-27 ทดสอบสด 2 ชุด (13 + 7 เคส) เจอ 4 ช่อง แก้แล้ว (รายการถัดลงไป "ใบลดหนี้/เพิ่มหนี้" และ "ยอดค้างชำระหักใบลดหนี้") · งวดชำระหักใบลดหนี้แล้ว · ค้างต่อ: refund เมื่อออกใบลดหนี้หลังรับชำระเต็ม
+2. ~~ใบลดหนี้/ใบเพิ่มหนี้ (CN/DN ของ receipts) ยังไม่ทดสอบสดเลย~~ ✅ 2026-09-27 ทดสอบสด 2 ชุด (13 + 7 เคส) เจอ 4 ช่อง แก้แล้ว (รายการถัดลงไป "ใบลดหนี้/เพิ่มหนี้" และ "ยอดค้างชำระหักใบลดหนี้") · งวดชำระหักใบลดหนี้แล้ว · refund/หักบิลถัดไป ✅ (รายการ "เครดิตลูกค้า") · ค้างต่อ: เครดิตฝั่งซื้อ, แบบฟอร์มพิมพ์ CA/RFD
 3. ข้อมูลค้างบน dev: GL ของรายการ `DN-2026-00008` เหลือ `1140-02 −250 / 5110-00 +250` (ต้นทุนขายไม่มีการขาย — ก่อนแก้ `bb77b9d`) · journal ปรับปรุง หรือปล่อยไว้
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
+
+### 2026-09-27 · เครดิตลูกค้า: ใบตัดเครดิต (CA-) + ใบคืนเงิน (RFD-) ✅ **implement + migrate + permissions + verify finance-bc + smoke**
+
+**ที่มา** — งานค้างข้อ 1 (refund เมื่อออกใบลดหนี้หลังรับชำระเต็ม) แบบ ค. ที่ผู้ใช้เลือก: รองรับทั้งหักบิลถัดไปและคืนเงิน · ออกแบบใน `srs-p5.html` `#customer-credit`
+
+| | ของใหม่ |
+|---|---|
+| โมดูล | `finance-bc/modules/customer-credit` — `CreditApplicationsService` (`/credit-applications`, ไม่ลง GL), `CustomerRefundsService` + `CustomerRefundGlPostingService` (`/customer-refunds`, Dr AR / Cr Cash) · ไม่มี PUT (ลบ DRAFT แล้วสร้างใหม่) |
+| schema | `credit_applications`, `credit_application_lines`, `credit_application_number_counters`, `customer_refunds`, `customer_refund_lines`, `customer_refund_number_counters` + `ledger_entries.voucher_type` เพิ่ม `CUSTOMER_REFUND` — migration `1790552873158-AddCustomerCredit` **รันกับ DB แล้ว** |
+| permissions | `credit_application:*` / `customer_refund:*` (create/view/delete/submit/cancel) — **sync แล้ว** + grant `1790552962027-GrantCustomerCreditPermissionsToMockPolicies` **รันแล้ว** (catalog มีก่อน migration จึงไม่ติดกับดักลำดับ deploy) |
+| คำนวณ | `customer-credit/utils/customer-credit.util.ts` — แหล่งเดียวของเครดิตคงเหลือ, ยอดที่ตัดเข้า, guard `assertCreditNoteGroupsCovered` · ยอดค้าง −เครดิตที่ตัดเข้า ใน `PaymentEntriesService` (bound + findOutstanding), `BillingNotesService`, `PaymentSchedulesService`, `ReceiptsService` (ยอดค้างลูกค้า + aging — ใบลดหนี้นับติดลบเฉพาะส่วนที่ยังไม่ถูกใช้) |
+| guard | ยกเลิกการรับชำระที่เป็นแหล่งเครดิต / ที่ทำให้ส่วนเกินของใบลดหนี้หาย · void ใบลดหนี้ที่ถูกใช้ · void ใบที่ถูกตัดเครดิต · ยกเลิกใบตัดเครดิตที่ทำให้ส่วนเกินหาย → **409** ระบุเลขใบ |
+| เทสต์ | unit ใหม่ `credit-applications.service.spec.ts` (11), `customer-refunds.service.spec.ts` (5) + guard ใน `payment-entries` (+2), `receipts` (+2) · spec เดิม 4 ไฟล์ mock util นี้ · smoke `customer-credit.smoke.mjs` (สร้างเอง: ใบกำกับ 2 · ใบลดหนี้ 1 · รับชำระ 2 · ตัดเครดิต 100+60 → B ค้าง 375 · คืน 167.5 · 167.51 → 409 · guard 4 ข้อ → 409 · เก็บกวาด ledger สุทธิ 0) |
+
+**เปลี่ยนจากที่เสนอผู้ใช้** — ใบคืนเงินเป็นเอกสารแยก (`customer_refunds`, เลข `RFD-`) แทน `payment_type = REFUND` บน `payment_entries`: payment_entries แตกทาง RECEIVE/PAY ผ่านตรรกะหลายสกุลเงิน + WHT ราว 15 จุด · ผลที่ผู้ใช้อนุมัติยังครบ (เลข RFD- แยก, Dr AR / Cr Cash, ไม่มีแบบฟอร์มพิมพ์รอบแรก)
+**ตกหล่นระหว่างทาง (แก้แล้ว)** — grant migration รอบแรกถูกสร้างด้วยรายการ `pos_sale:*` (สคริปต์แทนที่ไม่ติด) รันเป็น no-op เพราะ `NOT EXISTS` · ลบแถวใน `erp_iam.migrations` แก้ไฟล์ แล้วรันใหม่ (ไม่ใช้ revert เพราะ `down()` จะลบสิทธิ์ `pos_sale`) · ไฟล์ไม่เคย commit/deploy
+**ยังไม่มี** — ฝั่งซื้อ (ผู้ขายคืนเงิน/เครดิตผู้ขาย) · แบบฟอร์มพิมพ์ CA/RFD · หน้า admin
 
 ### 2026-09-27 · ยอดค้างชำระหักใบลดหนี้ (ขาย + ซื้อ) ✅ **ทดสอบสด + แก้ + verify finance-bc + smoke + deploy + ทดสอบซ้ำบนโดเมน** · `a577f06`
 
