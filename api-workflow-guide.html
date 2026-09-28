@@ -1621,7 +1621,7 @@ sequenceDiagram
           <table class="d">
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
-              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/receipt-agings</td><td class="mono text-[11px]">receipt:view</td><td>ยอดลูกหนี้ค้างชำระ แยกช่วงอายุหนี้ ต่อลูกค้า</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/receipt-agings</td><td class="mono text-[11px]">receipt:view</td><td>ยอดลูกหนี้ค้างชำระ แยกช่วงอายุหนี้ ต่อลูกค้า · <b>+ <span class="mono">credit_available</span></b> ยอดที่เราติดลูกค้า (ส่วนเกินใบลดหนี้ + เงินรับล่วงหน้าที่ยังไม่ใช้ — ไม่นับรวมใน bucket และ <span class="mono">total</span>) และ <span class="mono">net_total</span> · ใบลดหนี้<b>ไม่ใช่แถวติดลบใน bucket แล้ว</b> — หักที่ใบต้นทาง · ลูกค้าที่มีแต่เครดิตก็มีแถว (2026-09-27)</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ap-invoice-agings</td><td class="mono text-[11px]">ap_invoice:view</td><td>ยอดเจ้าหนี้ค้างชำระ แยกช่วงอายุหนี้ ต่อผู้ขาย · <b>+ <span class="mono">credit_available</span></b> ยอดที่ผู้ขายติดเรา (ส่วนเกินใบลดหนี้ผู้ขาย + เงินจ่ายล่วงหน้าที่ยังไม่ใช้ — ไม่นับรวมใน bucket และ <span class="mono">total</span>) และ <span class="mono">net_total = total − credit_available</span> (ติดลบ = ผู้ขายติดเรา) · ผู้ขายที่มีแต่เครดิตก็มีแถว (2026-09-27)</td></tr>
             </tbody>
           </table>
@@ -1641,7 +1641,9 @@ sequenceDiagram
     <span class="s">"days_61_90"</span>:   <span class="t">0</span>,
     <span class="s">"over_90"</span>:      <span class="t">1500</span>,
     <span class="s">"no_due_date"</span>:  <span class="t">2000</span>,    <span class="c">// ไม่ได้ตกลงเครดิตเทอมไว้ — ไม่ใช่ "ยังไม่ครบกำหนด"</span>
-    <span class="s">"total"</span>:        <span class="t">26500</span> }
+    <span class="s">"total"</span>:        <span class="t">26500</span>,
+    <span class="s">"credit_available"</span>: <span class="t">500</span>,  <span class="c">// ที่เราติดลูกค้า — ไม่อยู่ในช่องไหนเลย</span>
+    <span class="s">"net_total"</span>:    <span class="t">26000</span> }   <span class="c">// total − credit_available · ติดลบ = เราติดลูกค้า</span>
 ]</pre>
         </div>
         <div class="rulebox mb-4">
@@ -1657,7 +1659,7 @@ sequenceDiagram
           <div class="rc mb-1">ยอดที่เห็นตรงกับที่ระบบใช้ตัดสินใจจริง</div>
           <p class="text-[13.5px]">
             คิดสดทุกครั้งจากตัวเลขชุดเดียวกับที่ sales-bc ใช้เช็ควงเงินเครดิต (ดู B2) — ไม่มีคอลัมน์ <span class="mono text-[12px]">outstanding</span> เก็บไว้ให้เพี้ยน ·
-            AR นับเฉพาะเอกสาร <b>ISSUED</b> หักยอดที่ตัดชำระแล้ว หักใบลดหนี้ · AP นับเฉพาะใบ <b>SUBMITTED</b> หักยอดที่จ่ายตัดแล้ว ·
+            AR นับเฉพาะเอกสาร <b>ISSUED</b> ต่อใบ = total − ใบลดหนี้ − เครดิตที่ตัดเข้า − ยอดที่ตัดชำระแล้ว (ไม่ติดลบ) · วงเงินเครดิต (B2) = max(0, total − ส่วนของใบลดหนี้ใน credit_available) — เงินรับล่วงหน้าไม่ลดวงเงินที่ใช้ โดยตั้งใจ · AP นับเฉพาะใบ <b>SUBMITTED</b> หักยอดที่จ่ายตัดแล้ว ·
             ยอดสุทธิ ≤ 0 ไม่แสดง (ลูกค้าที่จ่ายเกินไม่ใช่ลูกหนี้)<br>
             <b>จัดกลุ่มระดับเอกสาร</b> ตาม <span class="mono text-[12px]">due_date</span> ของหัวเอกสาร — ใบที่แบ่งงวด (C5) ต้องดูรายงวดที่
             <span class="mono text-[12px]">GET /receipts/{id}/payment-schedules</span> ซึ่งมี <span class="mono text-[12px]">outstanding</span>/<span class="mono text-[12px]">is_overdue</span> ของแต่ละงวดอยู่แล้ว
