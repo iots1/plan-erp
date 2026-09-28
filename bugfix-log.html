@@ -43,7 +43,8 @@
       <a href="#bug-12"     class="navlink"><span class="n">15</span> submit ลูกบนแม่ที่ยกเลิก</a>
       <a href="#bug-13"     class="navlink"><span class="n">16</span> ใบลดหนี้/เพิ่มหนี้ 3 ช่อง</a>
       <a href="#bug-14"     class="navlink"><span class="n">17</span> รับชำระไม่หักใบลดหนี้</a>
-      <a href="#lesson-2"   class="navlink"><span class="n">18</span> บทเรียนรอบ 2</a>
+      <a href="#bug-15"     class="navlink"><span class="n">18</span> ยกเลิกใบแจ้งหนี้ใต้ใบลดหนี้ผู้ขาย</a>
+      <a href="#lesson-2"   class="navlink"><span class="n">19</span> บทเรียนรอบ 2</a>
     </nav>
     <div slot="footnote">
       <a href="backend-convention.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Backend Conventions</a>
@@ -706,8 +707,36 @@ stock=20 value=5000  <span class="c">← คืนสภาพเดิมทุ
 
       <div class="rule my-14"></div>
 
+      <section id="bug-15" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">18 — ใบลดหนี้ผู้ขาย</div>
+        <h2 class="display text-3xl mb-6">ยกเลิกใบแจ้งหนี้ผู้ขายได้ ทั้งที่ใบลดหนี้ผู้ขายยังอ้างอยู่</h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ใบแจ้งหนี้ผู้ขาย (VENDOR_BILL) ที่มีใบลดหนี้ผู้ขาย SUBMITTED อ้างอยู่ ยกเลิกได้ถ้าไม่มีการจ่ายตัด · ใบลดหนี้ยังยืนอยู่และ journal ของมัน (Dr เจ้าหนี้ / Cr สินค้า / Cr ภาษีซื้อ) ค้างในบัญชีโดยไม่มีใบต้นทาง</p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">ขอบเขต</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">พบจากการอ่านโค้ดตอนทำเครดิตผู้ขาย — กระจกของ bug 16 ข้อ B ฝั่งขาย · ยังไม่เกิดบน dev</p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">APInvoicesService.cancel()</span> เช็กแค่การจ่ายชำระที่ตัดใบนี้ · ไม่มีใครถามว่ามีเอกสารอื่นอ้างใบนี้อยู่ไหม — ฝั่งขายแก้ไปแล้วใน bug 16 แต่ไม่ได้ย้อนมาดูฝั่งซื้อ
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · 2026-09-27</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">assertNothingStillAdjustsOrCredits()</span> ใน cancel: ใบแจ้งหนี้ที่มีใบลดหนี้ผู้ขาย SUBMITTED อ้างอยู่ หรือถูกตัดเครดิตผู้ขาย → <b>409</b> ระบุเลขใบ · ใบลดหนี้ผู้ขายที่เครดิตถูกตัด/คืนไปแล้ว → <b>409</b> (มาพร้อมเครดิตผู้ขาย srs-p5 <span class="mono text-[12px]">#supplier-credit</span>)
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          unit <span class="mono text-[12px]">ap-invoices.service.spec.ts</span> +3 · smoke <span class="mono text-[12px]">supplier-credit.smoke.mjs</span> (guard "cancel bill A (vendor credit note on it)" → 409)
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
       <section id="lesson-2" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">18 — บทเรียนรอบ 2</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">19 — บทเรียนรอบ 2</div>
         <h2 class="display text-3xl mb-6">ของที่ไม่เคยถูกเดิน · ลำดับที่ไม่มีใครลอง</h2>
         <div class="card overflow-hidden mb-6">
           <table class="d">
@@ -716,7 +745,7 @@ stock=20 value=5000  <span class="c">← คืนสภาพเดิมทุ
               <tr><td><b>ลำดับที่ผิดไม่มีใครลอง</b></td><td>ยกเลิกใบส่งของก่อนใบรับคืน · void ใบกำกับก่อนยกเลิกใบวางบิล · ยกเลิก SO/GR ใต้ลูกที่ยัง DRAFT — happy path ทุกตัวถูกหมด</td></tr>
               <tr><td><b>ทำซ้ำไม่มีใครลอง</b></td><td>DELETE ครั้งที่ 2 — ผู้ใช้จริงทำผ่าน retry ไม่ใช่ตั้งใจ</td></tr>
               <tr><td><b>ข้อมูลที่ยังไม่มี = เทสต์ที่ยังไม่เคยรัน</b></td><td>smoke พิมพ์ใบรับคืนผ่านมาตลอดเพราะไม่มีใบรับคืนให้พิมพ์ · ใบลดหนี้ฝั่งขายไม่เคยถูกออกจริงสักใบ — ยิงครั้งแรกเจอ 3 ช่อง</td></tr>
-              <tr><td><b>ฝั่งหนึ่งมี อีกฝั่งไม่มี</b></td><td>ใบลดหนี้ผู้ขายมีเพดาน 2 ชั้น ใบลดหนี้ฝั่งขายไม่มีเลย — เวลาเพิ่ม guard ให้เอกสารฝั่งหนึ่ง ให้ถามว่าคู่สมมาตรของมันมีหรือยัง · กลับกันก็ได้: bug 17 เจอสดฝั่งขาย แล้วฝั่งซื้อมีช่องเดียวกัน</td></tr>
+              <tr><td><b>ฝั่งหนึ่งมี อีกฝั่งไม่มี</b></td><td>ใบลดหนี้ผู้ขายมีเพดาน 2 ชั้น ใบลดหนี้ฝั่งขายไม่มีเลย — เวลาเพิ่ม guard ให้เอกสารฝั่งหนึ่ง ให้ถามว่าคู่สมมาตรของมันมีหรือยัง · กลับกันก็ได้: bug 17 เจอสดฝั่งขาย แล้วฝั่งซื้อมีช่องเดียวกัน · bug 18 = bug 16 ข้อ B ฝั่งซื้อ ที่ไม่ได้ย้อนไปดูตอนแก้</td></tr>
               <tr><td><b>เอกสารที่ "ไม่ตัดชำระ" ก็ยังต้องมีผล</b></td><td>ใบลดหนี้ถูกกันไม่ให้ตัดชำระอย่างถูกต้อง แต่ไม่มีใครถามว่าผลของมันไปลงที่ไหน — คำตอบคือไม่ลงที่ไหนเลยในการคำนวณรายใบ</td></tr>
               <tr><td><b>สำเนาของ logic ที่ base มีอยู่แล้ว</b></td><td>บั๊กลบซ้ำต้องแก้ 4 ที่ เพราะ service ใน transaction เรียก base ไม่ได้ — แก้ที่ต้นเหตุด้วย <span class="mono text-[12px]">manager</span></td></tr>
               <tr><td><b>เอกสารยืนยันพฤติกรรมที่ผิด</b></td><td>"ยกเลิกใบส่งของได้เสมอ ไม่มี guard" เขียนไว้ใน guide — ถูกต้องตามโค้ดแต่ผิดตามบัญชี</td></tr>

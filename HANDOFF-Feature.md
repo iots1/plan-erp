@@ -193,12 +193,27 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 **ค้าง — เรียงตามที่แนะนำ**
 1. ~~ยกเลิกผิดลำดับที่ยังไม่ทดสอบ~~ ✅ 2026-09-27 (รายการถัดลงไป "submit ลูกบนแม่ที่ยกเลิก") · รวมช่องข้าม BC ที่เจอระหว่างทาง (ยกเลิก GR ใต้ใบแจ้งหนี้ผู้ขาย SUBMITTED) — แก้แล้วเช่นกัน
-2. ~~ใบลดหนี้/ใบเพิ่มหนี้ (CN/DN ของ receipts) ยังไม่ทดสอบสดเลย~~ ✅ 2026-09-27 ทดสอบสด 2 ชุด (13 + 7 เคส) เจอ 4 ช่อง แก้แล้ว (รายการถัดลงไป "ใบลดหนี้/เพิ่มหนี้" และ "ยอดค้างชำระหักใบลดหนี้") · งวดชำระหักใบลดหนี้แล้ว · refund/หักบิลถัดไป ✅ (รายการ "เครดิตลูกค้า") · ค้างต่อ: เครดิตฝั่งซื้อ, แบบฟอร์มพิมพ์ CA/RFD
+2. ~~ใบลดหนี้/ใบเพิ่มหนี้ (CN/DN ของ receipts) ยังไม่ทดสอบสดเลย~~ ✅ 2026-09-27 ทดสอบสด 2 ชุด (13 + 7 เคส) เจอ 4 ช่อง แก้แล้ว (รายการถัดลงไป "ใบลดหนี้/เพิ่มหนี้" และ "ยอดค้างชำระหักใบลดหนี้") · งวดชำระหักใบลดหนี้แล้ว · refund/หักบิลถัดไป ✅ ทั้งลูกค้าและผู้ขาย (รายการ "เครดิตลูกค้า" / "เครดิตผู้ขาย") · ค้างต่อ: แบบฟอร์มพิมพ์ CA/RFD/SCA/SRF, เครดิตผู้ขายใน AP aging
 3. ข้อมูลค้างบน dev: GL ของรายการ `DN-2026-00008` เหลือ `1140-02 −250 / 5110-00 +250` (ต้นทุนขายไม่มีการขาย — ก่อนแก้ `bb77b9d`) · journal ปรับปรุง หรือปล่อยไว้
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
+
+### 2026-09-27 · เครดิตผู้ขาย: ใบตัดเครดิตผู้ขาย (SCA-) + ใบรับคืนเงินจากผู้ขาย (SRF-) + ยกเลิกใบแจ้งหนี้ใต้ใบลดหนี้ผู้ขาย → 409 ✅ **implement + migrate + permissions + verify finance-bc + smoke**
+
+**ที่มา** — ต่อจากเครดิตลูกค้า (รายการถัดลงไป) ฝั่งเจ้าหนี้ · srs-p5 `#supplier-credit` · bugfix-log bug 18
+
+| | ของใหม่ |
+|---|---|
+| โมดูล | `finance-bc/modules/supplier-credit` — กระจกของ `customer-credit` (สร้างด้วยการแปลงโค้ดแล้วแก้จุดที่บัญชีกลับทิศ): `/supplier-credit-applications` (ไม่ลง GL), `/supplier-refunds` (Dr เงินสด / Cr เจ้าหนี้) |
+| schema | `supplier_credit_applications` (+ lines, counters), `supplier_refunds` (+ lines, counters) + voucher `SUPPLIER_REFUND` — migration `1790580943187-AddSupplierCredit` **รันแล้ว** · ชื่อ FK ของบรรทัดย่อเป็น `fk_supplier_credit_application_lines_application_id` (ชื่อเต็ม 67 ตัวเกินเพดาน 63 ของ Postgres จะถูกตัดเงียบ ๆ แล้ว generate ครั้งหน้าเห็นเป็น diff) |
+| permissions | `supplier_credit_application:*` / `supplier_refund:*` — **sync แล้ว** + grant `1790580984628-GrantSupplierCreditPermissionsToMockPolicies` **รันแล้ว** (10 / 70 statement) |
+| ผูกกับของเดิม | ยอดค้างจ่าย −เครดิตที่ตัดเข้า ใน `PaymentEntriesService` (เพดาน PAY) และ `APInvoicesService.findOutstanding` (AP aging) · ยกเลิก PAY: `assertSupplierCreditNotUsedElsewhere` · ยกเลิก AP invoice: `assertNothingStillAdjustsOrCredits` |
+| บั๊กที่ปิดไปด้วย | ยกเลิกใบแจ้งหนี้ผู้ขายได้ทั้งที่ใบลดหนี้ผู้ขาย SUBMITTED ยังอ้างอยู่ → ตอนนี้ **409** |
+| เทสต์ | unit `supplier-credit/*.spec.ts` (16) + `ap-invoices` (+3) + `payment-entries` (+1) — รวม finance-bc 549 · smoke `supplier-credit.smoke.mjs` (PO 6 → GR → ใบแจ้งหนี้ A 4 / B 2 → จ่าย A เต็ม → คืน 1 → ใบลดหนี้ → จ่ายล่วงหน้า 100 → ตัดเครดิต 100+60 เข้า B → ผู้ขายคืน 167.5 · guard 5 ข้อ → 409 · เก็บกวาด ledger 0 ล็อต 0) |
+
+**ยังไม่มี** — ส่วนเกินที่ผู้ขายติดเรา (เครดิตผู้ขาย) ไม่แสดงเป็นยอดติดลบใน AP aging · แบบฟอร์มพิมพ์ SCA/SRF
 
 ### 2026-09-27 · เครดิตลูกค้า: ใบตัดเครดิต (CA-) + ใบคืนเงิน (RFD-) ✅ **implement + migrate + permissions + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `2a25f15`
 

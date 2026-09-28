@@ -146,7 +146,7 @@ flowchart LR
             <tbody>
               <tr><td>A3 GRN</td><td class="mono text-[12px]">cancel</td><td>คืนล็อตที่สร้างไว้กลับเป็น 0</td><td>ล็อตถูกเบิกไปแล้วแม้ชิ้นเดียว (409) — ให้ใช้ A4 (Purchase Return) แทน · <b>มีใบแจ้งหนี้/ใบลดหนี้ผู้ขาย (A5) SUBMITTED ผูกอยู่ (409 พร้อมเลขเอกสาร)</b> — ยกเลิก A5 ก่อน · finance-bc ไม่ตอบ (503) (2026-09-27)</td></tr>
               <tr><td>A4 PRN</td><td class="mono text-[12px]">cancel</td><td>คืนจำนวนกลับเข้าล็อตเดิม</td><td>ไม่มี (คืนได้เสมอ — ล็อตยังอยู่ต่อให้ว่างแล้ว)</td></tr>
-              <tr><td>A5 AP Invoice</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL (ล้างหนี้ + ภาษีซื้อที่ตั้งไว้)</td><td>มีใบจ่ายเงินตัดใบนี้อยู่ (409) — ยกเลิกใบจ่ายก่อน · งวดบัญชีปิดแล้ว</td></tr>
+              <tr><td>A5 AP Invoice</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL (ล้างหนี้ + ภาษีซื้อที่ตั้งไว้)</td><td>มีใบจ่ายเงินตัดใบนี้อยู่ (409) — ยกเลิกใบจ่ายก่อน · <b>ใบแจ้งหนี้ที่มีใบลดหนี้ผู้ขาย SUBMITTED อ้างอยู่ หรือถูกตัดเครดิตผู้ขาย (409)</b> · <b>ใบลดหนี้ผู้ขายที่เครดิตถูกตัด/คืนไปแล้ว (409)</b> (2026-09-27) · งวดบัญชีปิดแล้ว</td></tr>
               <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td><b>ยังมีใบรับคืน (DRAFT/SUBMITTED) ผูกอยู่ (409)</b> — ยกเลิกใบรับคืนก่อน · ถ้าปล่อยผ่าน ของที่คืนแล้วจะถูกนับกลับซ้ำและต้นทุนขายค้างในบัญชี (<a href="bugfix-log.html#bug-9" style="color:var(--accent);text-decoration:underline">bug 12</a>, 2026-09-27)</td></tr>
               <tr><td>B4 Sales Return</td><td class="mono text-[12px]">cancel</td><td>ดึงของออกจากล็อตเดิม (ต้นทุนเดิม) + คืน COGS ที่กลับไปแล้วขึ้นบัญชีอีกครั้ง</td><td><b>ของที่รับคืนถูกขายออกไปอีกแล้ว (503)</b> — ต่างจากใบส่งของที่คืนได้เสมอ ต้องกลับรายการที่ขายออกไปก่อน</td></tr>
               <tr><td>B5 POS Sale</td><td class="mono text-[12px]">void</td><td>คืนสต็อกกลับล็อตเดิม + ยกเลิกใบรับชำระ + void ใบกำกับภาษี (ทั้งสามอย่างในคำสั่งเดียว)</td><td><b>ของถูกขายออกไปอีกแล้ว</b> หรือ finance-bc ตอบไม่ได้ (503) · งวดบัญชี/สต็อกปิดแล้ว (409)</td></tr>
@@ -1455,7 +1455,16 @@ sequenceDiagram
             ใบลดหนี้ที่เครดิตถูกใช้ไปแล้วนับติดลบเฉพาะส่วนที่เหลือ ·
             <b>409 เมื่อ</b>: ตัดหรือคืนเกินเครดิตคงเหลือ · ตัดเกินยอดค้างของใบ · ยกเลิกการรับชำระที่เป็นแหล่งเครดิต หรือที่ทำให้ใบลดหนี้มีส่วนเกิน ขณะที่เครดิตนั้นถูกใช้ไปแล้ว ·
             void ใบลดหนี้ที่เครดิตถูกใช้ไปแล้ว · void ใบที่ถูกตัดเครดิต — <b>ยกเลิกใบตัดเครดิต/ใบคืนเงินก่อนเสมอ</b> (ข้อความ 409 ระบุเลขใบ) ·
-            ยังไม่มีฝั่งซื้อ (ผู้ขายคืนเงินให้เรา) และยังไม่มีแบบฟอร์มพิมพ์
+            ยังไม่มีแบบฟอร์มพิมพ์
+          </p>
+        </div>
+        <div class="rulebox mb-8" id="supplier-credit">
+          <div class="rc ok mb-1">ฝั่งซื้อ — เครดิตผู้ขาย (2026-09-27) · กติกาเดียวกันทุกข้อ กลับด้านบัญชี</div>
+          <p class="text-[13.5px]">
+            เครดิตที่เราถือไว้กับผู้ขาย: ส่วนเกินของ<b>ใบลดหนี้ผู้ขาย</b> (SUBMITTED) บนใบแจ้งหนี้ที่จ่ายไปแล้ว · ยอด<b>จ่ายชำระ PAY</b> ที่ยังไม่ได้ตัดใบไหน (จ่ายล่วงหน้า) ·
+            <span class="mono text-[12px]">POST /finance-bc/v1/supplier-credit-applications</span> (<span class="mono text-[12px]">supplier_credit_application:*</span>, เลข <span class="mono text-[12px]">SCA-</span>, ไม่ลง GL) — บรรทัดใช้ <span class="mono text-[12px]">source_ap_invoice_id</span> | <span class="mono text-[12px]">source_payment_entry_id</span> → <span class="mono text-[12px]">target_ap_invoice_id</span> ·
+            <span class="mono text-[12px]">POST /finance-bc/v1/supplier-refunds</span> (<span class="mono text-[12px]">supplier_refund:*</span>, เลข <span class="mono text-[12px]">SRF-</span>) — ผู้ขายจ่ายเงินคืนเรา GL <b>Dr เงินสด / Cr เจ้าหนี้</b> (voucher <span class="mono text-[12px]">SUPPLIER_REFUND</span>) · endpoint ย่อยเหมือนฝั่งลูกค้า (submit / cancel / DELETE DRAFT) ·
+            ยอดค้างจ่ายของใบแจ้งหนี้หักเครดิตที่ตัดเข้า (เพดานจ่ายชำระ, <span class="mono text-[12px]">findOutstanding</span>, AP aging) · guard: ยกเลิกการจ่าย PAY ที่เป็นแหล่งเครดิต · ยกเลิกใบลดหนี้ผู้ขายที่ถูกใช้ · ยกเลิกใบแจ้งหนี้ที่ถูกตัดเครดิตหรือมีใบลดหนี้อ้างอยู่ → 409
           </p>
         </div>
 
