@@ -200,7 +200,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-09-27 · เครดิตลูกค้า: ใบตัดเครดิต (CA-) + ใบคืนเงิน (RFD-) ✅ **implement + migrate + permissions + verify finance-bc + smoke**
+### 2026-09-27 · เครดิตลูกค้า: ใบตัดเครดิต (CA-) + ใบคืนเงิน (RFD-) ✅ **implement + migrate + permissions + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `2a25f15`
 
 **ที่มา** — งานค้างข้อ 1 (refund เมื่อออกใบลดหนี้หลังรับชำระเต็ม) แบบ ค. ที่ผู้ใช้เลือก: รองรับทั้งหักบิลถัดไปและคืนเงิน · ออกแบบใน `srs-p5.html` `#customer-credit`
 
@@ -213,6 +213,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | guard | ยกเลิกการรับชำระที่เป็นแหล่งเครดิต / ที่ทำให้ส่วนเกินของใบลดหนี้หาย · void ใบลดหนี้ที่ถูกใช้ · void ใบที่ถูกตัดเครดิต · ยกเลิกใบตัดเครดิตที่ทำให้ส่วนเกินหาย → **409** ระบุเลขใบ |
 | เทสต์ | unit ใหม่ `credit-applications.service.spec.ts` (11), `customer-refunds.service.spec.ts` (5) + guard ใน `payment-entries` (+2), `receipts` (+2) · spec เดิม 4 ไฟล์ mock util นี้ · smoke `customer-credit.smoke.mjs` (สร้างเอง: ใบกำกับ 2 · ใบลดหนี้ 1 · รับชำระ 2 · ตัดเครดิต 100+60 → B ค้าง 375 · คืน 167.5 · 167.51 → 409 · guard 4 ข้อ → 409 · เก็บกวาด ledger สุทธิ 0) |
 
+**หลัง deploy `2a25f15`** — smoke บนโดเมน `customer-credit` + `receipt-adjustment-guards` + `receipt-void-guard` **ผ่านทั้งหมด** (RFD-2026-00002) · ชุดใบลดหนี้ 2 **7/7** · ฝั่งซื้อ **4/4** · aging ยิงสด **4/4**: จ่ายครบ 642 → ออกใบลดหนี้ 267.5 → aging 374.5 → คืนเงินครบ → 642 · เก็บกวาดทุกบัญชีสุทธิ 0
 **เปลี่ยนจากที่เสนอผู้ใช้** — ใบคืนเงินเป็นเอกสารแยก (`customer_refunds`, เลข `RFD-`) แทน `payment_type = REFUND` บน `payment_entries`: payment_entries แตกทาง RECEIVE/PAY ผ่านตรรกะหลายสกุลเงิน + WHT ราว 15 จุด · ผลที่ผู้ใช้อนุมัติยังครบ (เลข RFD- แยก, Dr AR / Cr Cash, ไม่มีแบบฟอร์มพิมพ์รอบแรก)
 **ตกหล่นระหว่างทาง (แก้แล้ว)** — grant migration รอบแรกถูกสร้างด้วยรายการ `pos_sale:*` (สคริปต์แทนที่ไม่ติด) รันเป็น no-op เพราะ `NOT EXISTS` · ลบแถวใน `erp_iam.migrations` แก้ไฟล์ แล้วรันใหม่ (ไม่ใช้ revert เพราะ `down()` จะลบสิทธิ์ `pos_sale`) · ไฟล์ไม่เคย commit/deploy
 **ยังไม่มี** — ฝั่งซื้อ (ผู้ขายคืนเงิน/เครดิตผู้ขาย) · แบบฟอร์มพิมพ์ CA/RFD · หน้า admin
