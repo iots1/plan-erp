@@ -1622,7 +1622,7 @@ sequenceDiagram
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/receipt-agings</td><td class="mono text-[11px]">receipt:view</td><td>ยอดลูกหนี้ค้างชำระ แยกช่วงอายุหนี้ ต่อลูกค้า</td></tr>
-              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ap-invoice-agings</td><td class="mono text-[11px]">ap_invoice:view</td><td>ยอดเจ้าหนี้ค้างชำระ แยกช่วงอายุหนี้ ต่อผู้ขาย</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ap-invoice-agings</td><td class="mono text-[11px]">ap_invoice:view</td><td>ยอดเจ้าหนี้ค้างชำระ แยกช่วงอายุหนี้ ต่อผู้ขาย · <b>+ <span class="mono">credit_available</span></b> ยอดที่ผู้ขายติดเรา (ส่วนเกินใบลดหนี้ผู้ขาย + เงินจ่ายล่วงหน้าที่ยังไม่ใช้ — ไม่นับรวมใน bucket และ <span class="mono">total</span>) และ <span class="mono">net_total = total − credit_available</span> (ติดลบ = ผู้ขายติดเรา) · ผู้ขายที่มีแต่เครดิตก็มีแถว (2026-09-27)</td></tr>
             </tbody>
           </table>
         </div>

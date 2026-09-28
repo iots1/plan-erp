@@ -44,7 +44,8 @@
       <a href="#bug-13"     class="navlink"><span class="n">16</span> ใบลดหนี้/เพิ่มหนี้ 3 ช่อง</a>
       <a href="#bug-14"     class="navlink"><span class="n">17</span> รับชำระไม่หักใบลดหนี้</a>
       <a href="#bug-15"     class="navlink"><span class="n">18</span> ยกเลิกใบแจ้งหนี้ใต้ใบลดหนี้ผู้ขาย</a>
-      <a href="#lesson-2"   class="navlink"><span class="n">19</span> บทเรียนรอบ 2</a>
+      <a href="#bug-16"     class="navlink"><span class="n">19</span> ดึงเครดิตเกินส่วนเกินกลุ่มใบลดหนี้</a>
+      <a href="#lesson-2"   class="navlink"><span class="n">20</span> บทเรียนรอบ 2</a>
     </nav>
     <div slot="footnote">
       <a href="backend-convention.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Backend Conventions</a>
@@ -735,8 +736,36 @@ stock=20 value=5000  <span class="c">← คืนสภาพเดิมทุ
 
       <div class="rule my-14"></div>
 
+      <section id="bug-16" class="section py-4">
+        <div class="eyebrow text-[var(--signal)] mb-3">19 — เครดิตลูกค้า / ผู้ขาย</div>
+        <h2 class="display text-3xl mb-6">ดึงเครดิตจากใบลดหนี้สองใบในเอกสารเดียว เกินส่วนเกินที่ใช้ร่วมกันได้</h2>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">อาการ</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">ใบกำกับ 535 จ่ายไป 300 · ใบลดหนี้สองใบ ใบละ 267.50 → ส่วนเกินของกลุ่มคือ 300 · ใบคืนเงินใบเดียวที่ดึงใบละ 267.50 (รวม 535) ผ่านการตรวจ — คืนเกินจริง 235 · ข้ามเอกสารปลอดภัย (ใบที่สองเห็นว่าถูกใช้ไปแล้ว)</p>
+          </div>
+          <div class="p-5 rounded-xl" style="background:rgba(220,90,22,.06);border:1px solid rgba(220,90,22,.25)">
+            <div class="mono text-[11px] mb-2" style="color:var(--signal)">ขอบเขต</div>
+            <p class="text-[13px]" style="color:var(--ink-soft)">เครดิตลูกค้าและเครดิตผู้ขายที่เพิ่ง deploy (<span class="mono text-[12px]">2a25f15</span>, <span class="mono text-[12px]">c139782</span>) · พบจากการอ่านโค้ดตอนทำยอดเครดิตใน AP aging — ต้องรวมยอดต่อกลุ่ม แล้วเห็นว่าการตรวจก็ต้องรวมแบบเดียวกัน · ยังไม่เกิดบน dev</p>
+          </div>
+        </div>
+
+        <div class="rulebox mb-4"><div class="rc mb-1">ต้นเหตุ</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">resolveAvailableCredit</span> ให้ค่าต่อใบเป็น <span class="mono text-[12px]">min(ยอดของใบ − ที่ใช้, ส่วนเกินกลุ่ม − ที่กลุ่มใช้)</span> และ <span class="mono text-[12px]">assertSourcesAvailable</span> ตรวจทีละแหล่ง — ค่าต่อใบถูกต้องทีละใบ แต่สองใบในกลุ่มเดียวกันนับส่วนเกินก้อนเดียวกันซ้ำ
+        </p></div>
+        <div class="rulebox ok mb-4"><div class="rc mb-1">แก้อย่างไร · 2026-09-27</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">resolveCreditNoteGroups()</span> (ทั้งสองฝั่ง) — ใบลดหนี้แต่ละใบอยู่กลุ่มไหน และกลุ่มเหลือเท่าไร · <span class="mono text-[12px]">assertSourcesAvailable</span> ตรวจเพิ่มว่ายอดที่ดึงจากทุกใบในกลุ่มรวมกันไม่เกิน → <b>409</b> · <span class="mono text-[12px]">sumAvailableCredit()</span> รวมยอดแบบ cap ต่อกลุ่ม ใช้ใน AP aging
+        </p></div>
+        <div class="rulebox"><div class="rc mb-1">เทสต์ที่คุมไว้</div><p class="text-[13.5px]">
+          smoke <span class="mono text-[12px]">customer-credit.smoke.mjs</span> — ใบกำกับจ่ายบางส่วน + ใบลดหนี้สองใบ ขอคืนทั้งสองใบเต็มจำนวนในใบเดียว → 409 · (ฝั่งผู้ขายใช้โค้ดชุดเดียวกัน)
+        </p></div>
+      </section>
+
+      <div class="rule my-14"></div>
+
       <section id="lesson-2" class="section py-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">19 — บทเรียนรอบ 2</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">20 — บทเรียนรอบ 2</div>
         <h2 class="display text-3xl mb-6">ของที่ไม่เคยถูกเดิน · ลำดับที่ไม่มีใครลอง</h2>
         <div class="card overflow-hidden mb-6">
           <table class="d">
@@ -746,6 +775,7 @@ stock=20 value=5000  <span class="c">← คืนสภาพเดิมทุ
               <tr><td><b>ทำซ้ำไม่มีใครลอง</b></td><td>DELETE ครั้งที่ 2 — ผู้ใช้จริงทำผ่าน retry ไม่ใช่ตั้งใจ</td></tr>
               <tr><td><b>ข้อมูลที่ยังไม่มี = เทสต์ที่ยังไม่เคยรัน</b></td><td>smoke พิมพ์ใบรับคืนผ่านมาตลอดเพราะไม่มีใบรับคืนให้พิมพ์ · ใบลดหนี้ฝั่งขายไม่เคยถูกออกจริงสักใบ — ยิงครั้งแรกเจอ 3 ช่อง</td></tr>
               <tr><td><b>ฝั่งหนึ่งมี อีกฝั่งไม่มี</b></td><td>ใบลดหนี้ผู้ขายมีเพดาน 2 ชั้น ใบลดหนี้ฝั่งขายไม่มีเลย — เวลาเพิ่ม guard ให้เอกสารฝั่งหนึ่ง ให้ถามว่าคู่สมมาตรของมันมีหรือยัง · กลับกันก็ได้: bug 17 เจอสดฝั่งขาย แล้วฝั่งซื้อมีช่องเดียวกัน · bug 18 = bug 16 ข้อ B ฝั่งซื้อ ที่ไม่ได้ย้อนไปดูตอนแก้</td></tr>
+              <tr><td><b>ถูกทีละชิ้น ≠ ถูกรวมกัน</b></td><td>bug 19 — เพดานต่อใบลดหนี้ถูกทุกใบ แต่หลายใบแชร์ส่วนเกินก้อนเดียว · เวลามีทรัพยากรที่หลายแหล่งแชร์กัน ตรวจทั้งต่อแหล่งและต่อกลุ่ม</td></tr>
               <tr><td><b>เอกสารที่ "ไม่ตัดชำระ" ก็ยังต้องมีผล</b></td><td>ใบลดหนี้ถูกกันไม่ให้ตัดชำระอย่างถูกต้อง แต่ไม่มีใครถามว่าผลของมันไปลงที่ไหน — คำตอบคือไม่ลงที่ไหนเลยในการคำนวณรายใบ</td></tr>
               <tr><td><b>สำเนาของ logic ที่ base มีอยู่แล้ว</b></td><td>บั๊กลบซ้ำต้องแก้ 4 ที่ เพราะ service ใน transaction เรียก base ไม่ได้ — แก้ที่ต้นเหตุด้วย <span class="mono text-[12px]">manager</span></td></tr>
               <tr><td><b>เอกสารยืนยันพฤติกรรมที่ผิด</b></td><td>"ยกเลิกใบส่งของได้เสมอ ไม่มี guard" เขียนไว้ใน guide — ถูกต้องตามโค้ดแต่ผิดตามบัญชี</td></tr>
