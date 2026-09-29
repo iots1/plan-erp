@@ -1429,6 +1429,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/customer-refunds</td><td class="mono text-[11px]">customer_refund:create</td><td><b>DRAFT</b> · <span class="mono">payment_method</span> + บรรทัดแหล่งเครดิต + ยอด</td></tr>
               <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/customer-refunds/{id}/submit</td><td class="mono text-[11px]">customer_refund:submit</td><td>ตรวจซ้ำใต้ row lock · ออกเลข <span class="mono">RFD-{ปี}-{ลำดับ}</span> · GL <b>Dr ลูกหนี้ / Cr เงินสด</b> (voucher <span class="mono">CUSTOMER_REFUND</span>)</td></tr>
               <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/customer-refunds/{id}/cancel</td><td class="mono text-[11px]">customer_refund:cancel</td><td>กลับรายการบัญชี · คืนเครดิต</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/credit-applications/{id}/print · /customer-refunds/{id}/print</td><td class="mono text-[11px]">credit_application:print · customer_refund:print</td><td>พิมพ์ผ่าน report-bc (template <span class="mono">credit-document.html</span>, document type <span class="mono">credit_application</span> / <span class="mono">customer_refund</span>) · body <span class="mono">{ locale, idempotency_key, print_reason }</span> แบบเดียวกับใบวางบิล · DRAFT พิมพ์ได้พร้อมลายน้ำ (2026-09-29)</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/credit-applications · /customer-refunds</td><td class="mono text-[11px]">*:view</td><td>relations: <span class="mono">lines</span>, <span class="mono">lines.source_receipt</span>, <span class="mono">lines.source_payment_entry</span> (+ <span class="mono">lines.target_receipt</span>)</td></tr>
             </tbody>
           </table>
@@ -1455,7 +1456,7 @@ sequenceDiagram
             ใบลดหนี้ที่เครดิตถูกใช้ไปแล้วนับติดลบเฉพาะส่วนที่เหลือ ·
             <b>409 เมื่อ</b>: ตัดหรือคืนเกินเครดิตคงเหลือ · ตัดเกินยอดค้างของใบ · ยกเลิกการรับชำระที่เป็นแหล่งเครดิต หรือที่ทำให้ใบลดหนี้มีส่วนเกิน ขณะที่เครดิตนั้นถูกใช้ไปแล้ว ·
             void ใบลดหนี้ที่เครดิตถูกใช้ไปแล้ว · void ใบที่ถูกตัดเครดิต — <b>ยกเลิกใบตัดเครดิต/ใบคืนเงินก่อนเสมอ</b> (ข้อความ 409 ระบุเลขใบ) ·
-            ยังไม่มีแบบฟอร์มพิมพ์
+            พิมพ์ได้แล้วทั้ง 4 เอกสาร (2026-09-29) — ยังไม่มีหน้า admin
           </p>
         </div>
         <div class="rulebox mb-8" id="supplier-credit">
@@ -1463,7 +1464,7 @@ sequenceDiagram
           <p class="text-[13.5px]">
             เครดิตที่เราถือไว้กับผู้ขาย: ส่วนเกินของ<b>ใบลดหนี้ผู้ขาย</b> (SUBMITTED) บนใบแจ้งหนี้ที่จ่ายไปแล้ว · ยอด<b>จ่ายชำระ PAY</b> ที่ยังไม่ได้ตัดใบไหน (จ่ายล่วงหน้า) ·
             <span class="mono text-[12px]">POST /finance-bc/v1/supplier-credit-applications</span> (<span class="mono text-[12px]">supplier_credit_application:*</span>, เลข <span class="mono text-[12px]">SCA-</span>, ไม่ลง GL) — บรรทัดใช้ <span class="mono text-[12px]">source_ap_invoice_id</span> | <span class="mono text-[12px]">source_payment_entry_id</span> → <span class="mono text-[12px]">target_ap_invoice_id</span> ·
-            <span class="mono text-[12px]">POST /finance-bc/v1/supplier-refunds</span> (<span class="mono text-[12px]">supplier_refund:*</span>, เลข <span class="mono text-[12px]">SRF-</span>) — ผู้ขายจ่ายเงินคืนเรา GL <b>Dr เงินสด / Cr เจ้าหนี้</b> (voucher <span class="mono text-[12px]">SUPPLIER_REFUND</span>) · endpoint ย่อยเหมือนฝั่งลูกค้า (submit / cancel / DELETE DRAFT) ·
+            <span class="mono text-[12px]">POST /finance-bc/v1/supplier-refunds</span> (<span class="mono text-[12px]">supplier_refund:*</span>, เลข <span class="mono text-[12px]">SRF-</span>) — ผู้ขายจ่ายเงินคืนเรา GL <b>Dr เงินสด / Cr เจ้าหนี้</b> (voucher <span class="mono text-[12px]">SUPPLIER_REFUND</span>) · endpoint ย่อยเหมือนฝั่งลูกค้า (submit / cancel / DELETE DRAFT / <b>print</b> — <span class="mono text-[12px]">supplier_credit_application:print</span>, <span class="mono text-[12px]">supplier_refund:print</span>) ·
             ยอดค้างจ่ายของใบแจ้งหนี้หักเครดิตที่ตัดเข้า (เพดานจ่ายชำระ, <span class="mono text-[12px]">findOutstanding</span>, AP aging) · guard: ยกเลิกการจ่าย PAY ที่เป็นแหล่งเครดิต · ยกเลิกใบลดหนี้ผู้ขายที่ถูกใช้ · ยกเลิกใบแจ้งหนี้ที่ถูกตัดเครดิตหรือมีใบลดหนี้อ้างอยู่ → 409
           </p>
         </div>

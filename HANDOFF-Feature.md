@@ -176,7 +176,27 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 ## 2 · งานที่ค้าง — เรียงตามที่แนะนำให้ทำ
 
-### 📌 ส่งต่อ session — 2026-09-26 → 27 (อ่านอันนี้ก่อน)
+### 📌 ส่งต่อ session — 2026-09-27 → 29 (อ่านอันนี้ก่อน)
+
+**ขึ้น main + deploy + ทดสอบบนโดเมนแล้วทั้งหมด** (erp-api เก่า → ใหม่): `0c48cd1` submit ลูกบนแม่ที่ยกเลิก + ยกเลิก GR ใต้ใบแจ้งหนี้ SUBMITTED ·
+`cd271d7` ใบลดหนี้ฝั่งขาย: เพดาน / void ใบต้นทางใต้ใบปรับปรุง / issue หลังใบต้นทาง void · `a577f06` ยอดค้างหักใบลดหนี้ (ขาย+ซื้อ) ·
+`e063288` งวดชำระหักใบลดหนี้ (งวดท้ายก่อน) · `2a25f15` เครดิตลูกค้า (CA- / RFD-) · `c139782` เครดิตผู้ขาย (SCA- / SRF-) + ยกเลิกใบแจ้งหนี้ใต้ใบลดหนี้ผู้ขาย ·
+`c5982a7` AP aging `credit_available` + เพดานกลุ่มใบลดหนี้ (bug 19) · `e24d0e7` AR aging `credit_available` — รายละเอียดคือรายการถัดลงไป · บั๊กของรอบ: `bugfix-log.html` bug 15–19
+
+**ของที่ต้องรู้ก่อนทำงานต่อ**
+- เครดิตลูกค้า/ผู้ขายคำนวณที่เดียว: `finance-bc/modules/customer-credit/utils/customer-credit.util.ts` และ `supplier-credit/utils/supplier-credit.util.ts` (ฟังก์ชันบน EntityManager — ReceiptModule/PaymentModule ถามกลับจะเป็น cycle) · ยอดค้างทุกจุด = total − ใบลดหนี้ − เครดิตที่ตัดเข้า − ที่ชำระ · spec เดิมหลายไฟล์ `jest.mock` util สองตัวนี้ไว้ — เพิ่มฟังก์ชันใหม่ต้องเพิ่มใน mock ด้วย
+- ใบลดหนี้หลายใบบนใบต้นทางเดียว **แชร์ส่วนเกินก้อนเดียว** — ตรวจทั้งต่อใบและต่อกลุ่ม (`resolveCreditNoteGroups`)
+- AR/AP aging: `total` = ที่ค้าง (ต่อใบ ไม่ติดลบ) · `credit_available` = ที่อีกฝ่ายติดเรา · `net_total` — FE ที่เคยใช้ `total` เป็นยอดสุทธิต้องเปลี่ยนเป็น `net_total`
+- ทดสอบสดบนโดเมน: รัน smoke ผ่าน wrapper ที่ชี้ `api`/`apiFor` ไปที่ domain (โดเมน/วิธี login อยู่ใน memory ของเครื่อง ไม่อยู่ใน repo) · ตัวช่วย `db.query` ห่อด้วย `json_agg(t)` — **ห้ามตั้งชื่อคอลัมน์ว่า `t`** (ชนแล้วได้ค่าผิดโดยไม่ error)
+- permission ใหม่: รัน `permissions:sync` ก่อนเขียน grant migration (DB เดียวกับ prod) · ชื่อ constraint ต้อง ≤ 63 ตัวอักษร (Postgres ตัดเงียบ ๆ)
+- สร้าง migration: `npm_config_name=<Name> pnpm run migration:generate:<bc>` (`--name=` ใช้กับ pnpm ไม่ได้)
+
+**ค้าง — เรียงตามที่แนะนำ**
+1. ~~แบบฟอร์มพิมพ์ CA / RFD / SCA / SRF~~ ✅ 2026-09-29 (รายการ "พิมพ์ใบตัดเครดิต / ใบคืนเงิน") · เหลือหน้า admin
+2. ก่อน go-live: ล้างข้อมูลทดสอบ — เลขเอกสารที่ smoke ใช้ทุกรอบ (INV/CN/DN/APINV/APCN/CA/RFD/SCA/SRF/PMT/PO/GRN), `product_sku_counters`, GL ค้าง `DN-2026-00008` (`1140-02 −250 / 5110-00 +250`)
+3. meditech-api: ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ยังไม่ commit (ดูหัวข้อถัดลงไป)
+
+### 📌 ส่งต่อ session — 2026-09-26 → 27 (ก่อนหน้า)
 
 **ขึ้น main + deploy แล้วทั้งหมด** (erp-api เรียงเก่า → ใหม่): `1699599` SKU อัตโนมัติ ITM/VAR/SET · `a0b14ce` กันแก้/ลบสินค้าที่มีประวัติ ·
 `b4d1c87` seed reset counter · `50fd2fb` master data ที่ถูกอ้างลบไม่ได้ · `9e0cab7` hook cwd + `commit-guard` ·
@@ -199,6 +219,17 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
+
+### 2026-09-29 · พิมพ์ใบตัดเครดิต / ใบคืนเงิน ทั้งลูกค้าและผู้ขาย ✅ **implement + permissions + ลงทะเบียน template + verify finance-bc + smoke**
+
+| | ของใหม่ |
+|---|---|
+| endpoint | `POST /credit-applications/{id}/print`, `/customer-refunds/{id}/print`, `/supplier-credit-applications/{id}/print`, `/supplier-refunds/{id}/print` — body แบบใบวางบิล (`locale`, `idempotency_key`, `print_reason`) · mapper `customer-credit-print-params.util.ts` / `supplier-credit-print-params.util.ts` |
+| template | ไฟล์เดียว `apps/report-bc/.../templates/credit-document.html` (แถว = เครดิตจาก → นำไปตัดใบ/คืนเป็น) — ข้อความที่ต่างกันมาเป็น params · **สร้างแถว `print_templates` + `document_types` 4 ชุดผ่าน API ของ report-bc บน DB จริงแล้ว** (`credit_application`, `customer_refund`, `supplier_credit_application`, `supplier_refund` — banded, A4) · สคริปต์ลงทะเบียนอยู่ใน scratchpad ไม่ได้ commit (ทำตาม `_README.md`: HTML ใน repo คือต้นฉบับ แถวใน DB คือของจริง) |
+| permissions | `*:print` 4 ตัว — sync แล้ว + grant `1790687142030-GrantCreditDocumentPrintPermissionsToMockPolicies` รันแล้ว (4 / 28) |
+| เทสต์ | unit `customer-credit-print-params.util.spec.ts`, `supplier-credit-print-params.util.spec.ts` · smoke `customer-credit` / `supplier-credit` พิมพ์จริงทั้งสองเอกสาร ตรวจ snapshot ใน `document_prints` (ชื่อเอกสาร + จำนวนบรรทัด) และดาวน์โหลด PDF (`%PDF-`) |
+
+**ยังไม่มี** — หน้า admin ของ 4 เอกสาร
 
 ### 2026-09-27 · AR aging แบบเดียวกับ AP: `credit_available` + `net_total` ✅ **implement + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `e24d0e7`
 
