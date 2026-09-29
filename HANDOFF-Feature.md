@@ -220,7 +220,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-09-29 · พิมพ์ใบตัดเครดิต / ใบคืนเงิน ทั้งลูกค้าและผู้ขาย ✅ **implement + permissions + ลงทะเบียน template + verify finance-bc + smoke**
+### 2026-09-29 · พิมพ์ใบตัดเครดิต / ใบคืนเงิน ทั้งลูกค้าและผู้ขาย ✅ **implement + permissions + ลงทะเบียน template + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `04c81de`
 
 | | ของใหม่ |
 |---|---|
@@ -228,6 +228,9 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | template | ไฟล์เดียว `apps/report-bc/.../templates/credit-document.html` (แถว = เครดิตจาก → นำไปตัดใบ/คืนเป็น) — ข้อความที่ต่างกันมาเป็น params · **สร้างแถว `print_templates` + `document_types` 4 ชุดผ่าน API ของ report-bc บน DB จริงแล้ว** (`credit_application`, `customer_refund`, `supplier_credit_application`, `supplier_refund` — banded, A4) · สคริปต์ลงทะเบียนอยู่ใน scratchpad ไม่ได้ commit (ทำตาม `_README.md`: HTML ใน repo คือต้นฉบับ แถวใน DB คือของจริง) |
 | permissions | `*:print` 4 ตัว — sync แล้ว + grant `1790687142030-GrantCreditDocumentPrintPermissionsToMockPolicies` รันแล้ว (4 / 28) |
 | เทสต์ | unit `customer-credit-print-params.util.spec.ts`, `supplier-credit-print-params.util.spec.ts` · smoke `customer-credit` / `supplier-credit` พิมพ์จริงทั้งสองเอกสาร ตรวจ snapshot ใน `document_prints` (ชื่อเอกสาร + จำนวนบรรทัด) และดาวน์โหลด PDF (`%PDF-`) |
+
+**ทดสอบบนโดเมน (หลัง deploy `04c81de`)** — smoke `customer-credit` + `supplier-credit` ผ่าน wrapper ที่ชี้ไปโดเมน: ALL PASS ทั้งคู่ · พิมพ์ได้จริง 4 ใบ (CA-2026-00011, RFD-2026-00016, SCA-2026-00009, SRF-2026-00009) และ**เปิดดู PDF ด้วยตาแล้ว** — หัวเอกสาร/ผู้ออก/แถว เครดิตจาก → นำไปตัด·คืนเป็น/ยอดรวม/ช่องเซ็นถูกทั้ง 4 ใบ ·
+เจอ 1 จุด: ใบฝั่งผู้ขายป้ายคู่ค้าเป็น `ผู้ขาย / CUSTOMER` → แก้เป็น `ผู้ขาย / SUPPLIER` ใน `supplier-credit-print-params.util.ts` + เพิ่ม assert `party_label` ใน unit spec
 
 **ยังไม่มี** — หน้า admin ของ 4 เอกสาร
 
