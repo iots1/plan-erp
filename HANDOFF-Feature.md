@@ -220,7 +220,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-09-30 · หน้า admin ใบตัดเครดิต / ใบคืนเงิน (CA / RFD / SCA / SRF) ✅ **implement + permissions + verify iam + smoke + ดูหน้าจริงด้วย headless Chromium**
+### 2026-09-30 · หน้า admin ใบตัดเครดิต / ใบคืนเงิน (CA / RFD / SCA / SRF) ✅ **implement + permissions + verify iam + smoke + ดูหน้าจริงด้วย headless Chromium + deploy + ทดสอบบนโดเมน** · `fdb8f96`
 
 | | ของใหม่ |
 |---|---|
@@ -229,6 +229,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | permissions | `page:view_credit_applications` / `_customer_refunds` / `_supplier_credit_applications` / `_supplier_refunds` ใน `ui-permissions.manifest.json` — **sync แล้ว** + grant `GrantCreditDocumentPagePermissionsToMockPolicies` **รันแล้ว** (4 × 2 policy) · ปุ่มในแถวใช้สิทธิ์ api ของเอกสารเอง (`credit_application:submit` ฯลฯ) ไม่มี `component:*` ใหม่ |
 | เทสต์ | unit `credit-documents.controller.spec.ts` · smoke ใหม่ `credit-documents-pages.smoke.mjs` (needs finance-bc) — ดึง `relations` / ฟิลด์ค้นหา / ฟิลด์วันที่ **ออกจาก bundle ที่ build จริง** แล้วยิง finance-bc ตรง ๆ (relation ผิด = 400002 ตอนเปิด dialog ซึ่งเทสต์อื่นมองไม่เห็น) · `admin-pages.smoke.mjs` เพิ่ม 4 หน้า + กลุ่ม nav + ตรวจลำดับคอลัมน์ audit ด้วย label "จัดการ" แทน class แรก (คอลัมน์เงินชิดขวาก็ใช้ `um-th-right`) · ดูหน้าจริงด้วย playwright + headless Chromium (Chrome extension ต่อไม่ได้): 4 หน้าโหลดรายการ, dialog รายละเอียดถูก, filter CANCELLED ถูก, **ไม่มี JS error** |
 
+**ทดสอบบนโดเมน (หลัง deploy `fdb8f96`)** — headless Chromium login จริงผ่านหน้า login ของ console: sidebar แสดงกลุ่มใหม่ครบ 4 รายการ (สิทธิ์ `page:view_*` ใช้ได้บน prod) · ทั้ง 4 หน้าโหลดรายการ (CA 12 / RFD 17 / SCA 11 / SRF 11 แถว) · dialog รายละเอียดแสดงบรรทัดถูก · **กดปุ่มพิมพ์จริงทั้ง 4 หน้า** → `POST …/print` 200 → เปิดแท็บ PDF (`%PDF-`) · ไม่มี JS error บนหน้าใหม่ (มีแค่ fetch ของ dashboard ที่ถูก abort เพราะสคริปต์เปลี่ยนหน้าหนีเอง)
 **ยังไม่ได้ทดสอบกับตา** — ปุ่มยืนยัน/ลบ/ยกเลิกบนหน้า (บน dev ไม่มี DRAFT/SUBMITTED ค้าง — smoke ล้างเองทุกรอบ); endpoint เดียวกัน smoke ของ finance-bc ครอบแล้ว ส่วนการผูกปุ่ม smoke ตรวจว่าทุก handler อยู่ใน bundle
 **ข้อควรรู้ทดสอบ headless บนเครื่อง** — service ฟัง IPv4 แต่หน้า login ยิง `localhost` → Chromium ต้อง `--host-resolver-rules=MAP localhost 127.0.0.1` · `--keep-alive` ของ verify ไม่ได้อยู่ยาว (service ปิดเองระหว่างทาง) — สตาร์ท `node dist/apps/<bc>/main` เองจะนิ่งกว่า
 
