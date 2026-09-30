@@ -192,7 +192,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 - สร้าง migration: `npm_config_name=<Name> pnpm run migration:generate:<bc>` (`--name=` ใช้กับ pnpm ไม่ได้)
 
 **ค้าง — เรียงตามที่แนะนำ**
-1. ~~แบบฟอร์มพิมพ์ CA / RFD / SCA / SRF~~ ✅ 2026-09-29 (รายการ "พิมพ์ใบตัดเครดิต / ใบคืนเงิน") · เหลือหน้า admin
+1. ~~แบบฟอร์มพิมพ์ CA / RFD / SCA / SRF~~ ✅ 2026-09-29 (รายการ "พิมพ์ใบตัดเครดิต / ใบคืนเงิน") · ~~หน้า admin~~ ✅ 2026-09-30 (รายการ "หน้า admin ใบตัดเครดิต / ใบคืนเงิน")
 2. ก่อน go-live: ล้างข้อมูลทดสอบ — เลขเอกสารที่ smoke ใช้ทุกรอบ (INV/CN/DN/APINV/APCN/CA/RFD/SCA/SRF/PMT/PO/GRN), `product_sku_counters`, GL ค้าง `DN-2026-00008` (`1140-02 −250 / 5110-00 +250`)
 3. meditech-api: ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ยังไม่ commit (ดูหัวข้อถัดลงไป)
 
@@ -219,6 +219,18 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
+
+### 2026-09-30 · หน้า admin ใบตัดเครดิต / ใบคืนเงิน (CA / RFD / SCA / SRF) ✅ **implement + permissions + verify iam + smoke + ดูหน้าจริงด้วย headless Chromium**
+
+| | ของใหม่ |
+|---|---|
+| ขอบเขต | ผู้ใช้เลือก **ดู + จัดการ** — รายการ (ค้นเลข/ชื่อคู่ค้า, กรองสถานะ, เรียง, แบ่งหน้า, คอลัมน์ audit) · dialog รายละเอียดรายบรรทัด (เครดิตจาก → นำไปตัด/คืนเป็น) · ยืนยัน DRAFT · ลบ DRAFT · ยกเลิก SUBMITTED พร้อมเหตุผล · พิมพ์ (เปิด PDF แท็บใหม่) · **ไม่มีฟอร์มสร้าง** (จับคู่แหล่งเครดิตกับใบค้างเป็นงาน FE หลัก) — เป็นหน้าเอกสารธุรกรรมชุดแรกใน admin console |
+| โครง | 4 route แต่ template เดียว `views/pages/credit-documents/index.ejs` + `CreditDocumentsViewController` (4 `@Get`) · JS ร่วม `credit-documents.service.js` (ตาราง `KINDS` = path / resource / party / dateField / relations ต่อเอกสาร) + `credit-document-page.js` · แต่ละหน้ามี bundle ของตัวเอง (`public/pages/<route>/js`) หน้าบอก bundle ว่าเป็นเอกสารไหนผ่าน `data-credit-document-page` · sidebar กลุ่มใหม่ "เครดิตและการคืนเงิน" · `formatAmount` ย้ายไป `utils.js` (ใช้ซ้ำครั้งที่สอง) · `.um-summary-value-text` ใน `table.css` |
+| permissions | `page:view_credit_applications` / `_customer_refunds` / `_supplier_credit_applications` / `_supplier_refunds` ใน `ui-permissions.manifest.json` — **sync แล้ว** + grant `GrantCreditDocumentPagePermissionsToMockPolicies` **รันแล้ว** (4 × 2 policy) · ปุ่มในแถวใช้สิทธิ์ api ของเอกสารเอง (`credit_application:submit` ฯลฯ) ไม่มี `component:*` ใหม่ |
+| เทสต์ | unit `credit-documents.controller.spec.ts` · smoke ใหม่ `credit-documents-pages.smoke.mjs` (needs finance-bc) — ดึง `relations` / ฟิลด์ค้นหา / ฟิลด์วันที่ **ออกจาก bundle ที่ build จริง** แล้วยิง finance-bc ตรง ๆ (relation ผิด = 400002 ตอนเปิด dialog ซึ่งเทสต์อื่นมองไม่เห็น) · `admin-pages.smoke.mjs` เพิ่ม 4 หน้า + กลุ่ม nav + ตรวจลำดับคอลัมน์ audit ด้วย label "จัดการ" แทน class แรก (คอลัมน์เงินชิดขวาก็ใช้ `um-th-right`) · ดูหน้าจริงด้วย playwright + headless Chromium (Chrome extension ต่อไม่ได้): 4 หน้าโหลดรายการ, dialog รายละเอียดถูก, filter CANCELLED ถูก, **ไม่มี JS error** |
+
+**ยังไม่ได้ทดสอบกับตา** — ปุ่มยืนยัน/ลบ/ยกเลิกบนหน้า (บน dev ไม่มี DRAFT/SUBMITTED ค้าง — smoke ล้างเองทุกรอบ); endpoint เดียวกัน smoke ของ finance-bc ครอบแล้ว ส่วนการผูกปุ่ม smoke ตรวจว่าทุก handler อยู่ใน bundle
+**ข้อควรรู้ทดสอบ headless บนเครื่อง** — service ฟัง IPv4 แต่หน้า login ยิง `localhost` → Chromium ต้อง `--host-resolver-rules=MAP localhost 127.0.0.1` · `--keep-alive` ของ verify ไม่ได้อยู่ยาว (service ปิดเองระหว่างทาง) — สตาร์ท `node dist/apps/<bc>/main` เองจะนิ่งกว่า
 
 ### 2026-09-29 · พิมพ์ใบตัดเครดิต / ใบคืนเงิน ทั้งลูกค้าและผู้ขาย ✅ **implement + permissions + ลงทะเบียน template + verify finance-bc + smoke + deploy + ทดสอบบนโดเมน** · `04c81de`
 
