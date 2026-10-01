@@ -2530,3 +2530,16 @@ jest ทุกตัว (log หายจริง) **แต่ boot จริ�
 
 **ตรวจแล้ว**: `NODE_ENV=local npx nest start sales-bc` จริง — ไม่มีบรรทัด "injected env ... tip:"
 โผล่มาเลยหลังแก้ทั้ง 2 จุด (ก่อนแก้ยังเห็นอยู่) · 1500/1500 test ผ่าน · eslint 0/0
+
+---
+
+## 7 · Bundle Items allowedRelations (inventory-bc) ✅ **2026-09-17**
+
+- **สิ่งที่แก้ไข**: ใน `BundleItemsService` (`apps/inventory-bc/src/modules/bundle/services/bundle-items.service.ts`) เพิ่ม `allowedRelations`:
+  ```typescript
+  protected readonly allowedRelations: string[] = [
+    'component_product',
+    'bundle_product',
+  ];
+  ```
+- **เหตุผล**: รองรับการ query `GET /inventory-bc/v1/products/:product_id/bundle-items?relations=component_product` เพื่อให้ Frontend และระบบภายนอกสามารถดึงรายละเอียดข้อมูลสินค้าส่วนประกอบ (SKU, ชื่อสินค้า, หน่วยนับ) ของ BOM มาแสดงผลได้โดยไม่ถูก BaseServiceOperations ปฏิเสธด้วย Error 400 (`Relation not allowed: 'component_product'`)
