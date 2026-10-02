@@ -188,7 +188,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 - ใบลดหนี้หลายใบบนใบต้นทางเดียว **แชร์ส่วนเกินก้อนเดียว** — ตรวจทั้งต่อใบและต่อกลุ่ม (`resolveCreditNoteGroups`)
 - AR/AP aging: `total` = ที่ค้าง (ต่อใบ ไม่ติดลบ) · `credit_available` = ที่อีกฝ่ายติดเรา · `net_total` — FE ที่เคยใช้ `total` เป็นยอดสุทธิต้องเปลี่ยนเป็น `net_total`
 - ทดสอบสดบนโดเมน: รัน smoke ผ่าน wrapper ที่ชี้ `api`/`apiFor` ไปที่ domain (โดเมน/วิธี login อยู่ใน memory ของเครื่อง ไม่อยู่ใน repo) · ตัวช่วย `db.query` ห่อด้วย `json_agg(t)` — **ห้ามตั้งชื่อคอลัมน์ว่า `t`** (ชนแล้วได้ค่าผิดโดยไม่ error)
-- permission ใหม่: รัน `permissions:sync` ก่อนเขียน grant migration (DB เดียวกับ prod) · ชื่อ constraint ต้อง ≤ 63 ตัวอักษร (Postgres ตัดเงียบ ๆ)
+- permission ใหม่: **ไม่ต้องใส่ `POL_SUPERADMIN_FULL_ACCESS` ใน grant migration แล้ว** — sync grant ให้ policy `is_super_admin` เอง (2026-10-02) · policy อื่นยังต้องรัน `permissions:sync` ก่อนเขียน grant migration (DB เดียวกับ prod) · ชื่อ constraint ต้อง ≤ 63 ตัวอักษร (Postgres ตัดเงียบ ๆ)
 - สร้าง migration: `npm_config_name=<Name> pnpm run migration:generate:<bc>` (`--name=` ใช้กับ pnpm ไม่ได้)
 
 **ค้าง — เรียงตามที่แนะนำ**
@@ -219,6 +219,25 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
+
+### 2026-10-02 · `permissions:sync` grant ทุก permission ให้ policy `is_super_admin` เอง ✅ **implement + migrate + verify iam ครบ 6 ขั้น (smoke ผ่าน)** · *ยังไม่ commit · ยังไม่ deploy*
+
+| | ของใหม่ |
+|---|---|
+| ทำไม | grant migration 68 ไฟล์ใน `erp_iam` ทุกไฟล์ต้องใส่ superadmin · กับดักลำดับ deploy (migrate ก่อน sync) ทำให้ 403 บน live มาแล้ว 2 ครั้ง · permission ใหม่ทุกตัวต้องแยก 2 deploy |
+| schema | `policies.is_super_admin` (default false · backfill `POL_SUPERADMIN_FULL_ACCESS`) · `permission_sync_logs.auto_granted` jsonb + `auto_granted_count` — migration `1790874530349-AddSuperAdminAutoGrant` (เขียนมือตอน DB ต่อไม่ได้ · ภายหลังรัน `migration:generate` เทียบแล้ว DDL ตรงทุกบรรทัด) · **รันบน DB จริงแล้ว** (additive ล้วน — โค้ดเก่าบน prod ไม่รู้จักคอลัมน์ใหม่และไม่เดือดร้อน · ตอน deploy `migration:run` จะข้ามเพราะบันทึกว่า executed แล้ว) |
+| logic | `libs/database/src/scripts/super-admin-grant.util.ts` — ใช้ร่วม CLI + `PermissionsSyncService` (รับ `SqlRunner` แทน connection) · รันหลัง upsert ครบสอง plane ใน transaction เดียวกัน · ข้าม permission ที่ policy อ้างอยู่แล้วใน statement ใดก็ได้ (deny/condition ไม่ถูกทับ) · ลง allow statement ไม่มี condition ตัวเก่าสุดของ plane ไม่มีก็สร้าง · ถอดออกในหน้า Policy Generator จะกลับมาในรอบ sync ถัดไป (จำกัดด้วย deny) |
+| security | flag ไม่อยู่ใน `CreatePolicyDTO` — global `whitelist: true` ตัดทิ้ง (ไม่งั้นใครมี `policy:update` ก็ติด flag ให้ตัวเองได้) · `PolicyResponseDTO` แสดงแบบอ่านอย่างเดียว · smoke ยิง `POST /policies` พร้อม `is_super_admin: true` แล้วเช็คใน DB ว่าเป็น false |
+| deploy | `deploy-app.sh` เพิ่ม `presync_permissions` (best-effort) **ก่อน** `run_migrations` — ปิดกับดักลำดับใน deploy ปกติ · fail ได้ถ้า migration ของ `erp_iam` รอบนั้นเพิ่มคอลัมน์ที่ sync ใหม่อ่าน (**deploy รอบนี้เองจะ fail ตรงนั้นแน่นอน** เพราะ `is_super_admin` ยังไม่มี — ตั้งใจ, warn แล้วไปต่อ) · sync หลัง migrate ยังเป็นรอบจริง |
+| UI | หน้า "ประวัติการ Sync Permissions" มีคอลัมน์ "Grant Super Admin" · toast ของปุ่ม Sync บอกจำนวน |
+| เทสต์ | unit `super-admin-grant.util.spec.ts` (libs/database) + `permissions-sync.service.spec.ts` (iam) · smoke ใหม่ `super-admin-auto-grant.smoke.mjs`: ยิง `POST /permission-syncs` จริง → เช็ค Postgres ว่า policy flag ไม่ขาด permission ใดเลย → รอบสอง `auto_granted_count = 0` (idempotent) → flag ตั้งผ่าน API ไม่ได้ |
+
+**บั๊กที่ smoke จับได้ (แก้แล้ว)** — `INSERT … SELECT pol.id, 'allow', $1 … WHERE ps.plane = $1` → Postgres `text versus character varying` (อนุมานชนิด `$1` สองที่ไม่ตรงกัน) → ทั้ง sync rollback · unit test มองไม่เห็นเพราะ mock SQL · แก้เป็น `$1::varchar` ทั้งสองจุด
+
+**ผลบน DB จริง** — ก่อน sync superadmin ขาด 4 ตัว ฝั่ง ui ทั้งหมด (`frontend-web` `page:view_reports` + 2 component, `iam` `page:view_dashboard`) · sync รอบแรก (smoke) grant 4 ตัวนั้น · รอบสอง 0 · CLI `permissions:sync` 0 · ทดสอบเส้น "policy flag ใหม่ยังไม่มี statement" ใน transaction ที่ ROLLBACK: สร้าง allow statement ทั้งสอง plane (target `*`/`*` และ `frontend-ui`/`*`) + grant 294 (256 api + 38 ui) รอบสอง 0 · smoke ทิ้ง policy `POL_SMOKE_SUPER_<ts>` ไว้หนึ่งแถว (soft-deleted ถูกต้อง)
+
+**ต้องทำต่อ** — commit → deploy → ดู log ว่า presync warn (คาดไว้ รอบนี้รอบเดียว) และ sync หลัง migrate แสดง `Auto-granted to is_super_admin policies: 0`
+**ไม่ได้แตะ** — grant migration เก่าทั้ง 68 ไฟล์ (รันไปแล้ว ไม่มีผล) · policy อื่น (`POL_STAFF_GENERAL_ACCESS`) ยังต้องใช้ grant migration เหมือนเดิม
 
 ### 2026-09-30 · หน้า admin ใบตัดเครดิต / ใบคืนเงิน (CA / RFD / SCA / SRF) ✅ **implement + permissions + verify iam + smoke + ดูหน้าจริงด้วย headless Chromium + deploy + ทดสอบบนโดเมน** · `fdb8f96`
 

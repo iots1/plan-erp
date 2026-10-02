@@ -598,6 +598,23 @@ erDiagram
             <div class="edge mt-4" style="background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.3)"><div class="tag mb-1" style="color:#15803D">ตัวอย่างจริงในโปรเจกต์นี้</div><p class="text-[13px]"><span class="mono text-[12px]">apps/frontend-web/ui-permissions.manifest.json</span> คือ placeholder จริง — โฟลเดอร์นั้นมีแค่ไฟล์นี้ไฟล์เดียว ไม่มี <span class="mono text-[12px]">src/</span>/NestJS app จริงอยู่เลย ยืนตำแหน่งแทน frontend ในอนาคต (เช่น Next.js) ที่ JSX ไม่เหลือ literal string ให้ scan (หน้า <span class="mono text-[12px]">page:view_reports</span> + <span class="mono text-[12px]">page:view_dashboard</span> คนละหน้ากับของ iam-view) — ส่วน <span class="mono text-[12px]">apps/iam/ui-permissions.manifest.json</span> คือกรณีมีทั้ง manifest และ <span class="mono text-[12px]">data-permission</span> จริงในไฟล์เดียวกัน (dashboard widgets) ให้เทียบดูว่า manifest ทับผลของการ scan attribute อย่างไร</p></div>
           </div>
 
+          <div class="card p-6 mb-6">
+            <div class="mono text-[11px] mb-3" style="color:#2563EB">AUTO-GRANT · policy is_super_admin ได้ทุก permission จาก sync เอง</div>
+            <p class="text-[13px] mb-3" style="color:var(--ink-soft)">คอลัมน์ <span class="mono text-[12px]">policies.is_super_admin</span> (boolean, default false — migration <span class="mono text-[12px]">AddSuperAdminAutoGrant</span> ตั้งให้ <span class="mono text-[12px]">POL_SUPERADMIN_FULL_ACCESS</span>) · ทุกรอบ <span class="mono text-[12px]">permissions:sync</span> (CLI หรือปุ่ม Sync) หลัง upsert catalog ครบสอง plane ใน transaction เดียวกัน จะเติม <span class="mono text-[12px]">statement_actions</span> ให้ policy ที่ติด flag จนครบทุก permission ที่ยังไม่ถูกลบ — permission ใหม่จึงใช้กับ superadmin ได้ทันทีโดยไม่ต้องเขียน grant migration</p>
+            <table class="d">
+              <thead><tr><th style="width:220px">กฎ</th><th>รายละเอียด</th></tr></thead>
+              <tbody>
+                <tr><td>ข้าม permission ที่อ้างอยู่แล้ว</td><td>อ้างใน statement ใดก็ได้ของ policy นั้น — allow หรือ deny, มี condition หรือไม่ — deny/condition ที่ผู้ดูแลตั้งไว้ไม่ถูกทับด้วย allow ใหม่</td></tr>
+                <tr><td>ลงที่ statement ไหน</td><td>allow statement ที่ไม่มี condition ตัวแรก (เก่าสุด) ของ plane นั้น — ไม่มีก็สร้างให้ (target <span class="mono text-[12px]">'*'/'*'</span> ฝั่ง api, <span class="mono text-[12px]">'frontend-ui'/'*'</span> ฝั่ง ui เหมือน seed)</td></tr>
+                <tr><td>ถอดออกด้วยมือ</td><td>ถอด permission ออกจาก policy นี้ใน Policy Generator จะ<b>กลับมาในรอบ sync ถัดไป</b> — ถ้าต้องจำกัดสิทธิ์ superadmin ให้เพิ่ม deny statement</td></tr>
+                <tr><td>ตั้ง flag</td><td>ผ่าน migration เท่านั้น — ไม่อยู่ใน <span class="mono text-[12px]">CreatePolicyDTO</span>/<span class="mono text-[12px]">UpdatePolicyDTO</span> (<span class="mono text-[12px]">whitelist: true</span> ตัดทิ้ง) เพราะใครมี <span class="mono text-[12px]">policy:update</span> จะ grant ทุกอย่างให้ตัวเองได้ · response ของ <span class="mono text-[12px]">GET /policies</span> แสดงค่า (อ่านอย่างเดียว)</td></tr>
+                <tr><td>audit</td><td><span class="mono text-[12px]">permission_sync_logs.auto_granted</span> (jsonb: policy_code, service, permission, plane) + <span class="mono text-[12px]">auto_granted_count</span> · หน้า "ประวัติการ Sync Permissions" มีคอลัมน์ "Grant Super Admin"</td></tr>
+                <tr><td>JWT</td><td>permission ฝังใน token ตอน login — session เดิมเห็นสิทธิ์ใหม่หลัง login/refresh ใหม่ (เหมือนเดิม)</td></tr>
+              </tbody>
+            </table>
+            <p class="text-[12.5px] mt-3" style="color:var(--ink-soft)">policy อื่นทุกตัว (<span class="mono text-[12px]">POL_STAFF_GENERAL_ACCESS</span>, role ของลูกค้าจริง) ยังต้องมี grant migration — ใครควรได้ permission ใหม่เป็นการตัดสินใจทางธุรกิจที่ sync ตัดสินแทนไม่ได้</p>
+          </div>
+
           <div class="rulebox"><div class="rc mb-1">RULE · SIDEBAR = PAGE PERMISSION, ไม่ใช่ ROUTE PATH</div><p class="text-[13.5px]">ห้าม hardcode การซ่อนเมนูด้วย role/username — เช็คกับ <span class="mono text-[12px]">page:view_&lt;slug&gt;</span> ใน JWT เท่านั้น (เหมือนกันทั้ง EJS วันนี้และ Next.js ในอนาคต) เพื่อให้ Policy Generator ฝั่ง Security Admin ควบคุมเมนูได้โดยไม่ต้อง deploy โค้ดใหม่</p></div>
         </div>
 

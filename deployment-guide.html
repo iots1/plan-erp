@@ -594,7 +594,8 @@ pm2 save</pre>
   → <b>snapshot dist ที่รันอยู่</b> ไป backups/dist_YYYYMMDD_NNN   <span class="c"># ← ก่อนทับ dist เสมอ</span>
   → <b>①</b> install_artifacts()  <span class="c"># rsync มาแล้ว: ย้ายจาก .deploy-staging/ ลง dist/ ไม่ build</span>
     <b>②</b> build ทุก BC + build asset ของ iam บน server
-  → migration → permissions:sync
+  → permissions:sync <span class="c"># best-effort ก่อน migrate — fail ได้ (เช่น migration รอบนี้เพิ่มคอลัมน์ที่ sync ใหม่อ่าน) แล้ว deploy เดินต่อ</span>
+  → migration → permissions:sync <span class="c"># รอบจริง — grant ให้ policy is_super_admin อัตโนมัติในรอบนี้ด้วย</span>
   → pm2 startOrReload <span class="c"># zero-downtime; recycle เฉพาะ app ที่ exec_mode/instances เปลี่ยน</span> → pm2 save
   → health check <span class="mono">/health/ready</span> ครบทั้ง 8 app</pre>
         </div>
