@@ -220,7 +220,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
-### 2026-10-02 · `permissions:sync` grant ทุก permission ให้ policy `is_super_admin` เอง ✅ **implement + migrate + verify iam ครบ 6 ขั้น (smoke ผ่าน)** · *ยังไม่ commit · ยังไม่ deploy*
+### 2026-10-02 · `permissions:sync` grant ทุก permission ให้ policy `is_super_admin` เอง ✅ **implement + migrate + verify iam ครบ 6 ขั้น + deploy + ทดสอบบนโดเมน** · `e17ec65` (+ pin fix `7a7318d`)
 
 | | ของใหม่ |
 |---|---|
@@ -236,7 +236,10 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 
 **ผลบน DB จริง** — ก่อน sync superadmin ขาด 4 ตัว ฝั่ง ui ทั้งหมด (`frontend-web` `page:view_reports` + 2 component, `iam` `page:view_dashboard`) · sync รอบแรก (smoke) grant 4 ตัวนั้น · รอบสอง 0 · CLI `permissions:sync` 0 · ทดสอบเส้น "policy flag ใหม่ยังไม่มี statement" ใน transaction ที่ ROLLBACK: สร้าง allow statement ทั้งสอง plane (target `*`/`*` และ `frontend-ui`/`*`) + grant 294 (256 api + 38 ui) รอบสอง 0 · smoke ทิ้ง policy `POL_SMOKE_SUPER_<ts>` ไว้หนึ่งแถว (soft-deleted ถูกต้อง)
 
-**ต้องทำต่อ** — commit → deploy → ดู log ว่า presync warn (คาดไว้ รอบนี้รอบเดียว) และ sync หลัง migrate แสดง `Auto-granted to is_super_admin policies: 0`
+**deploy (run `36998378762`)** — presync **ผ่าน ไม่ได้ fail** อย่างที่คาดไว้ (migration ถูกรันบน DB จริงไปก่อน deploy คอลัมน์จึงมีแล้ว) · ทั้ง presync และ sync หลัง migrate: `Added 0 · Unchanged 294 · Auto-granted 0` (4 ตัวถูก grant ไปแล้วตอน smoke) · ⚠️ commit แรก `e17ec65` pin submodule ที่ push ไม่ขึ้น (non-fast-forward — มี commit ของเพื่อนร่วมทีมเข้ามาก่อน) → rebase + push แล้ว bump pin ใหม่ใน `7a7318d` · deploy ไม่ได้ checkout submodule จึงไม่กระทบ
+
+**ทดสอบบนโดเมน (iam `/health` = `7a7318d`)** — `super-admin-auto-grant.smoke.mjs` ผ่าน (sync 0, ไม่มีช่องว่าง, รอบสอง 0, ตั้ง flag ผ่าน API ไม่ได้) · `admin-pages.smoke.mjs` ผ่าน · หน้า `/views/permission-sync-logs` มีคอลัมน์ "Grant Super Admin" · login ใหม่เป็น superadmin → `GET /auth/me` ได้ permission 292 รายการ รวม 4 ตัวที่ grant ใหม่ (`page:view_dashboard`, `page:view_reports`, 2 component) · 292 ไม่ใช่ 294 เพราะ session เก็บตามชื่อ และ `page:view_dashboard` (frontend-web + iam) กับ `expiry_alert:view` (report-bc + inventory-bc) ซ้ำข้ามบริการ — ครบแล้ว
+**ข้อควรรู้** — permission **ไม่อยู่ใน JWT** (payload มีแค่ sub/username/fullname/email/jti) อยู่ใน Redis session ที่สร้างตอน login → ตรวจด้วย `GET /auth/auth/me`
 **ไม่ได้แตะ** — grant migration เก่าทั้ง 68 ไฟล์ (รันไปแล้ว ไม่มีผล) · policy อื่น (`POL_STAFF_GENERAL_ACCESS`) ยังต้องใช้ grant migration เหมือนเดิม
 
 ### 2026-09-30 · หน้า admin ใบตัดเครดิต / ใบคืนเงิน (CA / RFD / SCA / SRF) ✅ **implement + permissions + verify iam + smoke + ดูหน้าจริงด้วย headless Chromium + deploy + ทดสอบบนโดเมน** · `fdb8f96`
