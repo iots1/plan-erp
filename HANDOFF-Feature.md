@@ -239,7 +239,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 **deploy (run `36998378762`)** — presync **ผ่าน ไม่ได้ fail** อย่างที่คาดไว้ (migration ถูกรันบน DB จริงไปก่อน deploy คอลัมน์จึงมีแล้ว) · ทั้ง presync และ sync หลัง migrate: `Added 0 · Unchanged 294 · Auto-granted 0` (4 ตัวถูก grant ไปแล้วตอน smoke) · ⚠️ commit แรก `e17ec65` pin submodule ที่ push ไม่ขึ้น (non-fast-forward — มี commit ของเพื่อนร่วมทีมเข้ามาก่อน) → rebase + push แล้ว bump pin ใหม่ใน `7a7318d` · deploy ไม่ได้ checkout submodule จึงไม่กระทบ
 
 **ทดสอบบนโดเมน (iam `/health` = `7a7318d`)** — `super-admin-auto-grant.smoke.mjs` ผ่าน (sync 0, ไม่มีช่องว่าง, รอบสอง 0, ตั้ง flag ผ่าน API ไม่ได้) · `admin-pages.smoke.mjs` ผ่าน · หน้า `/views/permission-sync-logs` มีคอลัมน์ "Grant Super Admin" · login ใหม่เป็น superadmin → `GET /auth/me` ได้ permission 292 รายการ รวม 4 ตัวที่ grant ใหม่ (`page:view_dashboard`, `page:view_reports`, 2 component) · 292 ไม่ใช่ 294 เพราะ session เก็บตามชื่อ และ `page:view_dashboard` (frontend-web + iam) กับ `expiry_alert:view` (report-bc + inventory-bc) ซ้ำข้ามบริการ — ครบแล้ว
-**ข้อควรรู้** — permission **ไม่อยู่ใน JWT** (payload มีแค่ sub/username/fullname/email/jti) อยู่ใน Redis session ที่สร้างตอน login → ตรวจด้วย `GET /auth/auth/me`
+**ข้อควรรู้** — permission **ไม่อยู่ใน JWT** (payload มีแค่ sub/username/fullname/email/jti) อยู่ใน Redis session ที่สร้างตอน login → ตรวจด้วย `GET /auth/v1/auth/me`
 **ไม่ได้แตะ** — grant migration เก่าทั้ง 68 ไฟล์ (รันไปแล้ว ไม่มีผล) · policy อื่น (`POL_STAFF_GENERAL_ACCESS`) ยังต้องใช้ grant migration เหมือนเดิม
 
 ### 2026-09-30 · หน้า admin ใบตัดเครดิต / ใบคืนเงิน (CA / RFD / SCA / SRF) ✅ **implement + permissions + verify iam + smoke + ดูหน้าจริงด้วย headless Chromium + deploy + ทดสอบบนโดเมน** · `fdb8f96`
