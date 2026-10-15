@@ -182,7 +182,7 @@
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
                 <tr><td>product_id</td><td><span style="color:#15803D">✓</span></td><td>สินค้าที่ใช้อัตรานี้</td></tr>
-                <tr><td>uom_id</td><td><span style="color:#15803D">✓</span></td><td>หน่วยทางเลือก (เช่น กล่อง)</td></tr>
+                <tr><td>uom_id</td><td><span style="color:#15803D">✓</span></td><td>หน่วยทางเลือก (เช่น กล่อง) · FK → <span class="mono text-[12px]">uoms.id</span> (<span class="mono text-[12px]">ON DELETE RESTRICT</span>) · <span class="mono text-[12px]">GET /products/{id}/uom-conversions</span> แนบ <span class="mono text-[12px]">uom</span> มาให้เป็นค่าเริ่มต้น (<span class="mono text-[12px]">?relations=</span> ที่ส่งมาจะแทนที่ค่าเริ่มต้น)</td></tr>
                 <tr><td>conversion_factor</td><td><span style="color:#15803D">✓</span></td><td>เท่าของ stock_uom (เช่น 1 กล่อง = 12 ชิ้น → 12)</td></tr>
                 <tr><td>uom_type</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">purchase</span> | <span class="mono text-[12px]">sales</span></td></tr>
               </tbody>
