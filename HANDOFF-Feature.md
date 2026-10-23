@@ -220,6 +220,22 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
+### 2026-10-23 · รีวิว + แก้ branch `feature/purchase-discound-document` แล้ว merge เข้า main ✅ **verify 5 BC ครบ 6 ขั้น + migrate + deploy + ทดสอบบนโดเมน** · `c7e1fae`…`903a171`
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| ใบรับสินค้าที่พิมพ์ | ยอดเงิน = เงื่อนไข PO × จำนวนที่รับจริง (เดิมเอายอดรวมทั้งใบของ PO มาพิมพ์ ผิดเมื่อรับไม่ครบ) · supplier-bc ไม่ตอบ = 503 ไม่พิมพ์ (เดิม `catch {}` เปล่าที่ไม่เคยทำงาน) · `formatDiscountModeLabel()` ย้ายไป `libs/common` ใช้ร่วม PO |
+| สลิปใบเสร็จ 80mm | `format: slip` ได้เฉพาะ `RECEIPT`/`ABB_TAX_INVOICE` (อื่น 400) · enum `ReceiptPrintFormat` · `receipt_slip` **ลงทะเบียน template + document type บน DB จริงด้วย API แล้ว — ไม่ใช่ migration** environment อื่นต้องทำเอง |
+| stock ledger | `stock_movements.source_doc_number` (เลข GRN/DN/POS) · `source_doc_type` ของ POS = `POS_SALE` ตรงกันทั้ง movement และ event |
+| เลข POS | ดึงก่อนตัดสต็อก นอก transaction → บิลที่ล้มข้ามเลขได้ — **ตัดสินใจยอมรับ** เพราะไม่ใช่เลข §86/4 (เลขใบกำกับของ finance-bc ยังไม่ขาด) · บันทึกใน srs-p4 |
+| setting | `sales_settings.default_receipt_format` เป็น enum ระดับ DB · FE อ่านแล้วส่งเป็น `format` เอง |
+| migration | inventory + sales รันบน DB ก่อน deploy (deploy ข้าม) · report (comment-only) CI รันให้ |
+| deploy | run `39902079798` รอบแรก SSH หลุดตอน `git reset` บน box (exit 255, ไม่มีอะไรเปลี่ยน) → re-run ผ่าน · ทุก service `/health` = `903a171` |
+| ทดสอบบนโดเมน | slip / sales-settings / GR print / POS ผ่าน · POS ล้ม 1 ครั้งจาก read-after-write ข้าม connection (§4 ข้อ 21) → smoke รอสถานะแล้ว ผ่าน 5/5 รอบติด + จำลองล้มกลางทางแล้วบิลถูก void ครบ |
+
+**ข้อมูลทดสอบที่ทิ้งไว้** — บิล POS ทุกใบจากรอบทดสอบเป็น `VOIDED` (เลขใบกำกับที่ void ไปแล้วยังนับว่าใช้ ตามกฎ gapless) · `POS-2026-00058` ค้าง `COMPLETED` จาก smoke รอบแรก → void ด้วยมือแล้ว
+**ยังค้าง** — commit pin submodule `9d81fd6` ใน `0a114ae` ไม่เคยอยู่บน remote (pin ปัจจุบัน `d8e1de9` ใช้เป็นหลัก) · `npx tsc -p tsconfig.json` ยังมี error เดิม 7 จุดใน spec (finance credit + `delivery-note-operations`) ไม่เกี่ยวกับรอบนี้
+
 ### 2026-10-02 · `permissions:sync` grant ทุก permission ให้ policy `is_super_admin` เอง ✅ **implement + migrate + verify iam ครบ 6 ขั้น + deploy + ทดสอบบนโดเมน** · `e17ec65` (+ pin fix `7a7318d`)
 
 | | ของใหม่ |
@@ -2481,6 +2497,19 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     (`... อยู่ในระนาบ (plane) "api" จึงใช้กับ statement ระนาบ "ui" ไม่ได้`) — operator ลบมันจาก UI ไม่ได้
     เพราะ UI เซฟไม่ผ่านตั้งแต่แรก · บทเรียนกว้างกว่านั้น: **validation ใหม่ที่เพิ่มทีหลัง ต้องมาคู่กับ
     migration ที่เก็บกวาดแถวเดิมที่มันจะปฏิเสธ** ไม่งั้นข้อมูลเก่ากลายเป็นกำแพงเงียบใน UI ที่อ่าน-แก้-เขียนกลับ
+21. **(จาก 2026-10-23) อ่านทันทีหลัง write ของอีก service ได้แถวเก่า — ไม่ใช่บั๊ก แต่ smoke ต้องรอ** —
+    smoke POS บนโดเมนจริง void บิลแล้ว `GET /receipts/{id}` ทันที ได้ `ISSUED` ทั้งที่ finance-bc
+    void + commit ก่อนตอบ RPC แล้ว (`voided_at` ใน DB ช้ากว่าการอ่าน ~200ms) · สาเหตุ: pgpool
+    `load_balance_mode = on` กระจาย SELECT ไป primary + standby **async** 2 ตัว (`synchronous_commit = off`)
+    และ `disable_load_balance_on_write='always'` ปักหมุดเฉพาะ connection ที่ write — connection ใหม่มีโอกาส
+    2/3 ตกไป standby ที่ยัง replay ไม่ทัน · เป็น Known Gap ที่เขียนไว้แล้วใน
+    `postgresql-pgpool-cluster-guide.html` · `delay_threshold = 0` + `sr_check_period = 5s` จับ lag
+    ระดับ ms ไม่ได้อยู่แล้ว · **smoke ที่อ่านต่อจาก write ข้าม service ต้องรอสถานะ (`eventually()` ใน
+    `pos-sales.smoke.mjs`) ไม่ใช่สมมติว่าเห็นทันที** · FE ก็เจอแบบเดียวกันถ้า GET ซ้ำทันทีหลัง action —
+    ให้ใช้ response ของ action นั้นเอง · ถ้าต้องการ read-your-writes ข้าม connection จริง ต้องเป็นการตัดสินใจ
+    ระดับ infra (เช่น `synchronous_commit = remote_apply` + `synchronous_standby_names`) ซึ่งแลกกับ
+    latency และความพร้อมใช้งานของการเขียน · smoke ที่ล้มกลางทางเคยทิ้งบิล POS `COMPLETED` (ตัดสต็อก +
+    ออกใบกำกับแล้ว) ค้างไว้ — ตอนนี้ `run()` void ทุกบิลที่สร้างใน `finally`
 
 ---
 

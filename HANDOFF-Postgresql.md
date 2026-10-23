@@ -4,6 +4,8 @@
 > เขียนเมื่อ **2026-09-01** · คู่กับ `HANDOFF-Feature.md` (ฝั่ง application) แต่แยกกันคนละเรื่อง
 > **อัปเดต 2026-09-13 — ยังเป็น environment ของ dev ผู้ใช้ตัดสินใจว่ายังไม่ต้องทำตอนนี้ · ดู §0**
 > เนื้อหาถาวรอยู่ที่ `postgresql-pgpool-cluster-guide.html` / `ha-failover-operations-guide.html` / `runbook-*.html`
+> **2026-10-23 — `synchronous_commit = off` + replication แบบ async ทำให้ commit ที่ยืนยันแล้วหายได้ (เลขใบกำกับซ้ำได้)
+> และ read-after-write ข้าม connection ได้ข้อมูลเก่า · ดู `HANDOFF-Infra-Durability-Replication.md`**
 
 ---
 
