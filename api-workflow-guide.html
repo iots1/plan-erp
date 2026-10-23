@@ -1021,7 +1021,7 @@ sequenceDiagram
             <tbody>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/barcodes/lookup?barcode=…</td><td class="mono text-[11px]">barcode:lookup</td><td>ยิงบาร์โค้ด → ได้ <span class="mono text-[11px]">product_id</span> (มีอยู่แล้ว ไม่ใช่ของใหม่)</td></tr>
               <tr><td class="mono">1</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:create</td><td><b>ตัดสต็อก + ออกใบกำกับภาษี + รับชำระ</b> ครบในคำขอเดียว · ได้เลข <span class="mono text-[11px]">POS-{ปี}-{ลำดับ}</span> และเลขใบกำกับกลับมาพร้อมกัน</td></tr>
-              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{receipt_id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์สลิป — ใช้ <span class="mono text-[11px]">receipt_id</span> ที่ขั้น 1 ตอบกลับมา (ไม่มี <span class="mono text-[11px]">/pos-sales/{id}/print</span> แยก)</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{receipt_id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์สลิป — ใช้ <span class="mono text-[11px]">receipt_id</span> ที่ขั้น 1 ตอบกลับมา (ไม่มี <span class="mono text-[11px]">/pos-sales/{id}/print</span> แยก) · ส่ง <span class="mono text-[11px]">"format": "slip"</span> เพื่อพิมพ์สลิปความร้อน 80mm (ค่าเริ่มต้นของร้านอ่านจาก <span class="mono text-[11px]">GET /sales-settings</span> → <span class="mono text-[11px]">default_receipt_format</span>) ดู E3.1</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /sales-bc/v1/pos-sales?relations=items</td><td class="mono text-[11px]">pos_sale:view</td><td>ดูรายการขายของกะ/สาขา</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/void</td><td class="mono text-[11px]">pos_sale:void</td><td>ยกเลิกบิล — คืนสต็อก + ยกเลิกใบรับชำระ + void ใบกำกับ</td></tr>
             </tbody>
@@ -1060,6 +1060,16 @@ sequenceDiagram
 }</pre>
         </div>
 
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">สต็อกที่ตัดถูกบันทึกเป็น POS_SALE พร้อมเลข POS — และเลข POS อาจข้ามได้ (2026-10-23)</div>
+          <p class="text-[13.5px]">
+            sales-bc ส่ง <span class="mono text-[12px]">source_doc_type: "POS_SALE"</span> และ <span class="mono text-[12px]">source_doc_number</span> = เลข POS ไปกับทุกบรรทัดที่ตัดสต็อก
+            → <span class="mono text-[12px]">stock_movements</span> ของบิลนี้อ่านใน <span class="mono text-[12px]">GET /stock-ledger-entries</span> ได้ทันทีว่ามาจากบิลไหน (ใบส่งของยังเป็น <span class="mono text-[12px]">DELIVERY</span> + เลข DN) ·
+            เพื่อให้ทำแบบนั้นได้ <b>เลข POS ถูกออกก่อนตัดสต็อก</b> นอก transaction ของ sales-bc — บิลที่ล้มหลังจากนั้น (สต็อกไม่พอ / finance-bc ไม่ตอบ)
+            จึง<b>ข้ามเลข POS ไปหนึ่งเลข</b> โดยตั้งใจ: <span class="mono text-[12px]">pos_number</span> เป็นเลขอ้างอิงภายใน ไม่ใช่เลขตาม §86/4 ·
+            เลขใบกำกับ (<span class="mono text-[12px]">receipt_number</span>) ที่ finance-bc ออกยังเรียงไม่ขาดเหมือนเดิม — FE/ผู้ตรวจห้ามใช้ความต่อเนื่องของ <span class="mono text-[12px]">pos_number</span> เป็นหลักฐานว่าบิลไม่หาย
+          </p>
+        </div>
         <div class="rulebox mb-4">
           <div class="rc mb-1">ใบกำกับภาษีอย่างย่อเป็นค่าเริ่มต้น — สลับเป็นเต็มรูปได้ด้วยฟิลด์เดียว</div>
           <p class="text-[13.5px]">
@@ -1210,7 +1220,7 @@ sequenceDiagram
               <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/issue</td><td class="mono text-[11px]">receipt:issue</td><td><b>ออกเลขที่แบบไม่ข้ามลำดับ + ลงบัญชี</b> · ล็อกถาวร</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/void</td><td class="mono text-[11px]">receipt:void</td><td>ยกเลิกใบที่ออกแล้ว · <b>เก็บเลขไว้ ไม่นำกลับมาใช้ซ้ำ</b></td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">DELETE /finance-bc/v1/receipts/{id}</td><td class="mono text-[11px]">receipt:update</td><td>ลบได้เฉพาะ DRAFT (ไม่มีเลข = ไม่มีตัวตนทางกฎหมาย)</td></tr>
-              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/print</td><td class="mono text-[11px]">receipt:print</td><td><b>ใหม่ (P2, 2026-09-06)</b> พิมพ์เป็น PDF จริง — ทำได้ทั้ง DRAFT/ISSUED ไม่เปลี่ยนสถานะเอกสาร ดู E3</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/print</td><td class="mono text-[11px]">receipt:print</td><td><b>ใหม่ (P2, 2026-09-06)</b> พิมพ์เป็น PDF จริง — ทำได้ทั้ง DRAFT/ISSUED ไม่เปลี่ยนสถานะเอกสาร · <span class="mono text-[11px]">format: "slip"</span> (80mm) ได้เฉพาะ RECEIPT / ABB_TAX_INVOICE ดู E3</td></tr>
             </tbody>
           </table>
         </div>
@@ -1875,7 +1885,7 @@ sequenceDiagram
             <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-balances</td><td class="mono text-[11px]">stock_balance:view</td><td>ยอดคงเหลือ + มูลค่าคงคลัง · <span class="mono">group_by=product|product_warehouse|lot</span></td></tr>
-              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-ledger-entries</td><td class="mono text-[11px]">stock_ledger:view</td><td>ไล่การเคลื่อนไหวพร้อมยอดสะสม · <b>ต้องส่ง <span class="mono">product_id</span></b></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-ledger-entries</td><td class="mono text-[11px]">stock_ledger:view</td><td>ไล่การเคลื่อนไหวพร้อมยอดสะสม · <b>ต้องส่ง <span class="mono">product_id</span></b> · แต่ละแถวมี <span class="mono">source_doc_type</span> + <span class="mono">source_doc_number</span> (เลข GRN/DN/POS — 2026-10-23)</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td><td>ล็อตใกล้/เลยหมดอายุ · <span class="mono">within_days</span> ปรับได้</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/reorder-alerts</td><td class="mono text-[11px]">reorder_alert:view</td><td>สินค้าที่ต่ำกว่าจุดสั่งซื้อ · เรียงจากขาดมากไปน้อย</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/lots</td><td class="mono text-[11px]">lot:view</td><td>ล็อตดิบ ไม่รวมยอด</td></tr>
@@ -1896,7 +1906,9 @@ sequenceDiagram
 
 <span class="c">// GET /inventory-bc/v1/stock-ledger-entries?product_id=…&amp;date_from=…&amp;date_to=…</span>
 <span class="c">// balance_before/after = ยอดสะสมของ "ขอบเขต" ที่ถาม (สินค้า×คลัง×ล็อต)</span>
-<span class="c">// lot_balance_after  = ยอดของ "ล็อตนั้น" — ต่างกันเมื่อขอบเขตกินหลายล็อต</span></pre>
+<span class="c">// lot_balance_after  = ยอดของ "ล็อตนั้น" — ต่างกันเมื่อขอบเขตกินหลายล็อต</span>
+<span class="c">// source_doc_type    = GOODS_RECEIPT | DELIVERY | POS_SALE | STOCK_ENTRY | STOCK_ADJUSTMENT | PURCHASE_RETURN | …</span>
+<span class="c">// source_doc_number  = เลขเอกสารแม่ (GRN-… / DN-… / POS-…) · null = movement ที่เกิดก่อนมีคอลัมน์นี้ (DN/POS เก่า)</span></pre>
         </div>
         <div class="rulebox mb-4">
           <div class="rc mb-1">จุดสั่งซื้อมีคนเฝ้าให้แล้ว (2026-08-31)</div>
@@ -2044,7 +2056,8 @@ sequenceDiagram
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
               <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/print</td><td class="mono text-[11px]">quotation:print</td><td>พิมพ์ใบเสนอราคา — ทำได้ทุกสถานะ</td></tr>
-              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์ใบเสร็จ/ใบกำกับภาษี (ทั้ง 8 <span class="mono text-[12px]">document_type</span>) — ทำได้ทั้ง DRAFT/ISSUED</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์ใบเสร็จ/ใบกำกับภาษี (ทั้ง 8 <span class="mono text-[12px]">document_type</span>) — ทำได้ทั้ง DRAFT/ISSUED · <span class="mono text-[12px]">format: "slip"</span> = สลิป 80mm (2026-10-23) เฉพาะ RECEIPT / ABB_TAX_INVOICE</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /inventory-bc/v1/goods-receipts/{id}/print</td><td class="mono text-[11px]">goods_receipt:print</td><td>พิมพ์ใบรับสินค้า — ราคา/ส่วนลดดึงจาก PO ผ่าน supplier-bc ตอนพิมพ์ (2026-10-23) · supplier-bc ไม่ตอบ = <b>503 ไม่พิมพ์</b> (ดู rulebox ด้านล่าง)</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-prints</td><td class="mono text-[11px]">document_print:view</td><td>ประวัติการพิมพ์ทั้งระบบ — filter ด้วย <span class="mono text-[12px]">source_document_id</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-prints/{id}</td><td class="mono text-[11px]">document_print:view</td><td>รายละเอียด + ออก presigned URL ใหม่ (ไม่นับเป็นการพิมพ์ซ้ำ)</td></tr>
             </tbody>
@@ -2055,7 +2068,8 @@ sequenceDiagram
 {
   <span class="s">"locale"</span>: <span class="s">"th"</span>,                                          <span class="c">// "th" | "en" — ไม่ระบุ = "th"</span>
   <span class="s">"idempotency_key"</span>: <span class="s">"b6e6c6b0-6b3e-4b3e-8b3e-6b3e4b3e8b3e"</span>,  <span class="c">// กันกดพิมพ์ซ้ำ (แนะนำให้ FE สุ่ม UUID ต่อการกดปุ่ม 1 ครั้ง)</span>
-  <span class="s">"print_reason"</span>: <span class="k">null</span>                                     <span class="c">// ใช้เมื่อพิมพ์ใบแทน (ยังไม่บังคับกรอกในเวอร์ชันนี้)</span>
+  <span class="s">"print_reason"</span>: <span class="k">null</span>,                                    <span class="c">// ใช้เมื่อพิมพ์ใบแทน (ยังไม่บังคับกรอกในเวอร์ชันนี้)</span>
+  <span class="s">"format"</span>: <span class="s">"slip"</span>                                       <span class="c">// "slip" (80mm) | "a4" — ไม่ระบุ = "a4" · slip ได้เฉพาะ RECEIPT/ABB_TAX_INVOICE ไม่งั้น 400</span>
 }
 
 <span class="c">// ตอบกลับ (JSON:API)</span>
@@ -2073,6 +2087,26 @@ sequenceDiagram
             ใบเสนอราคามีเลขที่ตั้งแต่สร้าง จึงไม่เจอ <span class="mono text-[12px]">copy_number: 0</span> ยกเว้นกรณีพิเศษในอนาคต<br>
             <b>ส่ง <span class="mono text-[12px]">idempotency_key</span> เดิมซ้ำ = ได้ผลลัพธ์เดิมเป๊ะ</b> (คนละ URL เพราะ presigned URL เซ็นใหม่ทุกครั้ง แต่ <span class="mono text-[12px]">id</span>/<span class="mono text-[12px]">copy_number</span> เดิม)
             ไม่เพิ่มสำเนา — FE ควรสุ่ม UUID ใหม่ทุกครั้งที่ผู้ใช้ตั้งใจกดปุ่ม "พิมพ์" จริง ๆ (ไม่ใช่ทุกครั้งที่ re-render component)
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">สลิป 80mm (format: "slip") — เฉพาะใบเสร็จธรรมดาและใบกำกับภาษีอย่างย่อ (2026-10-23)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">format: "slip"</span> render ผ่าน <span class="mono text-[12px]">document_types.code = receipt_slip</span> (เทมเพลต <span class="mono text-[12px]">receipt-slip.html</span>, กระดาษ <span class="mono text-[12px]">Roll80</span> ขอบ 0.1 นิ้ว) ·
+            ใช้ได้เฉพาะ <span class="mono text-[12px]">RECEIPT</span> และ <span class="mono text-[12px]">ABB_TAX_INVOICE</span> — ประเภทอื่น (ใบกำกับเต็มรูป, ใบลด/เพิ่มหนี้ ฯลฯ) ตอบ <b>400</b>
+            เพราะสลิปไม่มีที่ใส่ที่อยู่/เลขผู้เสียภาษี/สาขาของผู้ซื้อที่ §86/4 และ §86/22 บังคับ · ค่า format อื่นนอกจาก <span class="mono text-[12px]">slip</span>/<span class="mono text-[12px]">a4</span> ตอบ 400 ·
+            <b><span class="mono text-[12px]">receipt_slip</span> ไม่ได้สร้างด้วย migration</b> — ต้องลงทะเบียน template + document type ในแต่ละ environment ก่อน
+            (ดู <span class="mono text-[12px]">apps/report-bc/…/assets/templates/_README.md</span>) ไม่งั้นพิมพ์สลิปได้ 404 ·
+            ค่าเริ่มต้นของร้านเก็บที่ <span class="mono text-[12px]">sales_settings.default_receipt_format</span> — FE อ่านแล้วส่งเป็น <span class="mono text-[12px]">format</span> เอง backend ไม่เดาให้
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ใบรับสินค้า: ยอดเงินคือเงื่อนไข PO คูณจำนวนที่รับจริง — ไม่ใช่ยอดรวมทั้งใบของ PO (2026-10-23)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">unit_price</span> = <span class="mono text-[12px]">unit_cost</span> ของบรรทัด PO · โหมด <span class="mono text-[12px]">per_item</span>: ส่วนลด % ใช้ตามเดิม ส่วนลดเป็นจำนวนเงินเฉลี่ยตาม รับจริง ÷ สั่ง ·
+            โหมด <span class="mono text-[12px]">header</span>: <span class="mono text-[12px]">total_discount</span> ของ PO คูณสัดส่วนที่ใบนี้รับเทียบ <span class="mono text-[12px]">sub_total</span> ของ PO · <span class="mono text-[12px]">total = sub_total − total_discount</span> เสมอ
+            และมี <span class="mono text-[12px]">discount_label</span> บอกว่าเป็นส่วนลดแบบไหน · ตัวเลขนี้อาจต่างจาก <span class="mono text-[12px]">qty × import_cost</span> (มูลค่าที่ลงสต็อก) โดยตั้งใจ — ใบรับแสดงสิ่งที่ตกลงกับผู้ขาย ·
+            <b>supplier-bc ไม่ตอบตอนพิมพ์ = 503 ไม่พิมพ์</b> เพราะการพิมพ์ครั้งแรกถูกบันทึกเป็นต้นฉบับ ต้นฉบับที่ไม่มีส่วนลดแก้ด้วยการพิมพ์ซ้ำไม่ได้
           </p>
         </div>
         <div class="rulebox mb-8">
@@ -2186,7 +2220,7 @@ sequenceDiagram
               <tr><td>inventory</td><td class="mono text-[11.5px]">/products/{id}/reorder-levels · /products/{id}/variant-barcodes</td><td>จุดสั่งซื้อซ้ำ · บาร์โค้ด</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/purchase-returns</td><td>ส่งคืนสินค้าให้ผู้ขาย (ดู A4 ด้านบน) — submittable, ไม่ใช่ CRUD ตรง</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/stock-settings</td><td><b>GET/PUT เท่านั้น</b> · FIFO/FEFO · วันแจ้งเตือนหมดอายุ · % รับเกิน · <b>เพดานอนุมัติใบปรับยอด</b></td></tr>
-              <tr><td>sales</td><td class="mono text-[11.5px]">/sales-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบเสนอราคา (%)</td></tr>
+              <tr><td>sales</td><td class="mono text-[11.5px]">/sales-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบเสนอราคา (%) · <span class="mono text-[11.5px]">default_receipt_format</span> <span class="mono text-[11.5px]">slip|a4</span> (2026-10-23)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/supplier-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบสั่งซื้อ (%)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/finance-settings</td><td><b>GET/PATCH</b> · กรอบราคาใบตั้งหนี้ (%) — <span class="mono text-[11px]">ledger_frozen_upto</span> แก้ที่นี่ไม่ได้ ต้องผ่าน close-period (ดู C6)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/finance-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า finance_settings/tax_configs ทีละฟิลด์ (ดู C9)</td></tr>
