@@ -5,45 +5,46 @@
 
 ---
 
-## 0. สถานะตอนเขียน
+## 0. สถานะล่าสุด (อัปเดต 2026-10-27 ~01:00)
 
 | | commit ที่ขึ้นระบบจริง | หมายเหตุ |
 |---|---|---|
-| **erp-api** (`main`) | `8798fc5` — ทุก service `/health` ตรง (ตรวจล่าสุดที่ `af37f1c` ซึ่งต่างกันแค่ pin เอกสาร) | รวม 3 branch ของ poompakorn แล้วทั้งหมด |
-| **erp-frontend** (`main`) | `cdc91c0` — `erp-web` online, หน้าแรก 200 | ชนิดข้อมูล + ฟอร์มรองรับชื่ออังกฤษเป็น null แล้ว |
-| **docs/plan-erp** | `e305b24` | SRS / api-workflow / i18n-guide อัปเดตครบถึงลูกค้า-ผู้ขาย |
+| **erp-api** (`main`) | `6c44f47` (iam) · `bd48925` (BC อื่น — deploy เฉพาะ BC ที่เปลี่ยน) | §1.1 + §1.2 deploy แล้ว |
+| **erp-frontend** (`main`) | `cdc91c0` — `erp-web` online, หน้าแรก 200 | ไม่มีอะไรต้องแก้เพิ่มจาก §1.1 (ดู §1.1 "frontend") · checkout หลักในเครื่องค้างที่ `08cf389` (ตามหลัง `origin/main` 3 commit) |
+| **docs/plan-erp** | `b457243` | SRS / api-workflow / i18n-guide ครบถึง "ทุกช่อง `_en` ไม่บังคับ" · pin ใน erp-api ชี้ตัวนี้แล้ว |
 | **server** | Node `24.22.1` ทั้ง PM2 daemon และ systemd unit | `24.18.0` ยังติดตั้งไว้เผื่อย้อนกลับ |
 
-ทดสอบบนโดเมนจริงผ่านทุกชุดที่รันรอบนี้ (บิลพัก, ส่วนลด POS, ขาย POS, ใบเสนอราคา, สินค้า/ลูกค้า/ผู้ขายไม่มีชื่ออังกฤษ, พิมพ์สลิป)
+ทดสอบบนโดเมนจริงผ่านทุกชุดที่รันรอบ 2026-10-26 (บิลพัก, ส่วนลด POS, ขาย POS, ใบเสนอราคา, สินค้า/ลูกค้า/ผู้ขายไม่มีชื่ออังกฤษ, พิมพ์สลิป)
+และรอบ §1.1 (smoke `*en*optional*` 7 ไฟล์ 7/7 บนโดเมน)
 
 ---
 
-## 1. งานที่ค้างกลางทาง — ทำต่อก่อนอย่างอื่น
+## 1. งานที่ค้างกลางทาง
 
-### 1.1 ทุกช่อง `_en` ของระบบเป็น optional (backend) — **ยังไม่ commit**
+### 1.1 ทุกช่อง `_en` ของระบบเป็น optional (backend) — ✅ **merge + deploy แล้ว** (`4bbd489`, `76cc610`, merge `9a41bbb`, pin `bd48925`)
 
-- worktree: `../erp-api-wt/optional-en` · branch `chore/optional-en-columns` (แตกจาก `main` @ `21aa675`)
-- ตอนเขียน: แก้ไปแล้ว ~92 ไฟล์ ยังไม่ commit — **ต้องตรวจว่างานเสร็จหรือยัง** (`git -C ../erp-api-wt/optional-en status`)
-- ขอบเขตที่สั่งไว้:
-  1. ช่อง `*_en` ที่ยัง `NOT NULL` ~17 ช่อง → `nullable: true` + `string | null`
-     (finance: company profile/branch ชื่อ+ที่อยู่, GL account, tax config · iam: permission, policy, role ·
-     inventory: item group, price list, tax category, uom, warehouse · report: document type, print template,
-     `warehouse_name_en` ใน low_stocks/expiry_alerts · sales/supplier: customer/supplier group)
-  2. snapshot ของช่องเหล่านั้นทุกที่ → nullable
-  3. body DTO ทุกตัวที่มี `*_en` → `@IsOptional()` + `T | null` (ไม่มี `?`)
-  4. interface ข้าม BC / response DTO / print mapper รองรับ null
-  5. migration **generate** ทุก BC ที่กระทบ + รัน + `migration:generate` ต้องไม่เจอ diff ครบ 7 database
-  6. กฎใหม่ใน `entities-and-schema.md` + check `en-column-not-null` ใน convention-guard
-  7. smoke ต่อ BC ที่แก้: สร้าง master data ไม่ใส่ชื่ออังกฤษ → เก็บ NULL, ตอบ `{ th, en: null }`
-- ขั้นต่อไป: ตรวจ diff เอง (เคยมี agent รายงานว่าแก้แล้วแต่ไม่ได้เขียนจริง) → `pnpm verify` ทุก BC ที่แตะ (ครบ 6 ขั้น)
-  → `node scripts/check-branch.mjs` 0 error → commit แยกเรื่อง → push branch → merge เข้า `main`
-  → อัปเดต SRS (`srs-p1..p6` ตาราง master data) + `api-workflow-guide` + `i18n-guide` §02 → push submodule ก่อน แล้ว pin
-  → push `main` (= deploy) → ทดสอบบนโดเมน → แจ้ง frontend ว่าฟอร์ม master data ไม่ต้องบังคับชื่ออังกฤษ (ฝั่ง frontend ทำรอไว้แล้ว)
-- **ความคืบหน้า (2026-10-26 ดึก):** ตรวจ diff แล้วงานเขียนจริงครบ · แก้เพิ่ม 2 จุด (profile บริษัทที่สร้างอัตโนมัติ + permission ที่สร้างมือ เก็บ `NULL` แทน `''`/`undefined`) ·
-  migration 6 BC รันแล้ว · `schema:log` 7 database ไม่มี diff · verify iam/inventory/supplier/sales ผ่านครบ 6 ขั้น (finance/report กำลังรัน) ·
-  เอกสาร SRS p1–p6 / api-workflow / i18n-guide §02 / HANDOFF-Feature §2 อัปเดตและ push แล้ว (ก่อนโค้ด merge) — ที่เหลือ: verify finance/report → check:branch → commit → merge → deploy → ทดสอบบนโดเมน
-- ⚠️ **ห้ามรัน `migration:generate` จากที่อื่นพร้อมกัน** — DB ใช้ร่วมกัน ถ้า migration ของ branch นี้รันไปแล้วแต่ entity บน `main` ยังเป็น
-  `NOT NULL` การ generate จาก `main` จะสร้าง migration ใส่ `NOT NULL` กลับ
+- ทำครบตามขอบเขต: ช่อง `*_en` ที่ยัง `NOT NULL` 17 ช่อง + snapshot → nullable · body DTO `@IsOptional()` + `T | null` ·
+  interface ข้าม BC / contracts / response DTO / print mapper รับ null · migration generate 6 BC รันแล้ว ·
+  `schema:log` ครบ 7 database ไม่มี diff · กฎใน `entities-and-schema.md` + check `en-column-not-null` · smoke 6 BC
+- แก้เพิ่มจากที่ worktree ทำไว้: profile บริษัทที่สร้างอัตโนมัติครั้งแรก และ permission ที่สร้างมือ เก็บ `NULL` แทน `''`/`undefined`
+- verify ครบ 6 ขั้นทั้ง iam / inventory / supplier / sales / finance / report · `check:branch` 0 error
+- **ทดสอบบนโดเมน:** smoke 7 ไฟล์ (`apps/*/test/smoke/*en*optional*.smoke.mjs`) ยิงผ่าน wrapper ที่ชี้ไปโดเมนจริง + ตรวจ Postgres → **7/7 PASS**
+  (ข้อมูลทดสอบถูกลบเอง · smoke finance PATCH company profile แล้วคืนค่าเดิมใน `finally`)
+- **frontend:** ไม่มีอะไรต้องแก้เพิ่ม — `origin/main` ไม่มีฟอร์มไหนบังคับชื่ออังกฤษแล้ว และฟอร์มที่มี (ลูกค้า, ผู้ขาย, สินค้า, กลุ่มสินค้า, ตั้งค่าร้าน) ส่ง `name_en: x.trim() || null` อยู่แล้ว ·
+  master อื่น (คลัง, หน่วยนับ, price list, ประเภทภาษี, ผังบัญชี, role/policy ฯลฯ) ยังไม่มีหน้าใน frontend — อยู่ในหน้า admin EJS ของ iam (§1.2)
+- worktree `../erp-api-wt/optional-en` + branch `chore/optional-en-columns` ลบได้แล้ว (merge แล้ว)
+
+### 1.2 หน้า admin EJS ของ iam ยังบังคับชื่ออังกฤษ — ✅ **แก้ + deploy แล้ว** (`6c44f47`)
+
+- เจอตอนตรวจหลัง deploy: 10 ฟอร์ม (คลัง, หน่วยนับ, ประเภทภาษี, tax config, ผังบัญชี, permission, policy, role, เทมเพลตพิมพ์, ประเภทเอกสาร)
+  ยังตั้ง `required: true` ที่ช่อง English และส่ง `name_en: '...'.trim()` → ปล่อยว่างแล้ว **กดบันทึกไม่ได้** และถ้าข้าม required ไปได้จะเก็บ `''` ไม่ใช่ `NULL`
+- แก้: ถอด `required: true` ทั้ง 10 ช่อง (`apps/iam/views/pages/*/form.ejs`, `permissions/index.ejs`) + payload `.trim() || null` (`apps/iam/public/pages/user-management/js/*.service.js`)
+  · ตารางแสดงผลไม่ต้องแก้ — `escapeHtml(null)` คืน `''` อยู่แล้ว
+- smoke: `apps/iam/test/smoke/admin-pages.smoke.mjs` เพิ่มเช็ค 10 ช่อง English ต้องไม่มี `required` (ลองถอดตัวแก้ออกแล้ว smoke FAIL ตามคาด)
+- verify iam ครบ 6 ขั้น · **บนโดเมน:** `admin-pages` + `en-names-optional` ของ iam ผ่าน 2/2 (10 ช่องไม่มี `required`) และ bundle ที่ deploy ส่ง `.trim()||null` จริง
+- ตัดสินใจแล้ว: **ไม่กลับไปบังคับ** — ถ้าบังคับเฉพาะหน้า admin ขณะที่ API รับค่าว่าง ข้อมูลก็ยังว่างได้จากทางอื่น และคนจะกรอกชื่อปลอมให้ผ่าน ·
+  ถ้าลูกค้ารายไหนต้องการชื่ออังกฤษจริง (เช่น ใบกำกับส่งออก) ให้เป็นกฎใน API เฉพาะเอกสารนั้น หรือเตือนตอนพิมพ์
+- ⚠️ **ห้ามรัน `migration:generate` จาก checkout ที่ยังไม่ pull `bd48925`** — DB ใช้ร่วมกันและเป็น nullable แล้ว entity เก่าจะ generate `SET NOT NULL` กลับ
 
 ---
 
@@ -67,7 +68,7 @@
 - 🟡 UX: ตารางกลุ่มสินค้าโชว์ "-" ในช่องชื่ออังกฤษที่ว่าง ส่วนตารางลูกค้า/ผู้ขายซ่อนบรรทัดอังกฤษ — ให้เหมือนกันไหม
 - หน้าจอบิลพัก (HELD) ยังไม่มี — service + type พร้อมแล้ว (`packages/shared/services/sales/*-held-pos-sale.ts`)
 
-### 3.2 backend — ข้อ 6–10 (ทำหลัง 1.1 merge แล้ว)
+### 3.2 backend — ข้อ 6–10 (1.1 merge แล้ว — เริ่มได้)
 
 | # | เรื่อง | ที่ | แนวแก้ |
 |---|---|---|---|
@@ -99,10 +100,8 @@ worktree ที่ merge แล้ว ลบได้ (`git worktree remove <pat
 
 | repo | path | branch | สถานะ |
 |---|---|---|---|
-| erp-api | `../erp-api-wt/product` | `feature/product` | merge แล้ว |
-| erp-api | `../erp-api-wt/suspend-sales` | `feature/suspend-sales` | merge แล้ว |
-| erp-api | `../erp-api-wt/optional-cus-supplier` | `feature/optional-cus-supplier` | merge แล้ว |
-| erp-api | `../erp-api-wt/optional-en` | `chore/optional-en-columns` | **ยังไม่เสร็จ — อย่าลบ** (§1.1) |
+| erp-api | `../erp-api-wt/product` · `suspend-sales` · `optional-cus-supplier` | `feature/*` 3 ตัว | ✅ ลบ worktree + branch ในเครื่องแล้ว (2026-10-26 ตอนดิสก์เต็ม) |
+| erp-api | `../erp-api-wt/optional-en` | `chore/optional-en-columns` | merge แล้ว — ลบได้ |
 | erp-frontend | `../erp-frontend-wt/api-contract` | `fix/api-contract-2026-10-26` | merge แล้ว |
 
 branch บน remote (`feature/product`, `feature/suspend-sales`, `feature/optional-cus-supplier`, `fix/api-contract-2026-10-26`)
@@ -122,4 +121,7 @@ checkout หลักของ erp-frontend มี `M docs/plan-erp` ค้า�
 - **อ่าน DB หลังเขียนใน smoke ใช้ `eventually`** (อยู่ใน smoke context แล้ว) — pgpool กระจาย SELECT ไป standby ที่อาจยัง replay ไม่ทัน
 - **smoke ของหลาย worktree ห้ามรันพร้อมกัน** — ใช้ port และ Postgres ชุดเดียวกัน
 - **รายงานของ agent ต้องตรวจกับ `git diff` เสมอ** — รอบนี้มี agent บอกว่าแก้ Swagger แล้วแต่ไฟล์ไม่เปลี่ยน
+- **"English ไม่บังคับ" ต้องไล่ถึง UI ใน repo นี้ด้วย** — หน้า admin EJS ของ iam (`apps/iam/views` + `public/.../*.service.js`) มี `required: true` และส่ง `''` แยกจาก DTO
+  smoke / unit มองไม่เห็น เพราะยิง API ตรง (§1.2)
+- **ดิสก์เต็มทำให้ verify ล้มที่ขั้น build** (`ENOSPC`) และ Claude Code รันคำสั่งไม่ได้เลย — worktree หนึ่งตัว ~580 MB · `Docker.raw` คือดิสก์ของ VM (image + volume) ไม่ใช่ cache ห้ามลบเพื่อเอาที่
 - เครื่องมือใหม่: `pnpm check:branch`, check ใหม่ใน convention-guard, skill `review-branch`, rule `branches-and-commits.md`
