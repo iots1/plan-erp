@@ -84,7 +84,7 @@
           ระบบแบ่งเป็น <b>5 กลุ่มงาน</b> รวม <b>23 flow</b> ที่ผู้ใช้จับต้องได้จริง เกือบทุก flow เป็นเอกสารที่มีสถานะ
           (<span class="mono text-[12px]">DRAFT → …</span>) และ <b>สต็อก/บัญชีจะเคลื่อนก็ต่อเมื่อกดยืนยันเท่านั้น</b> —
           ตอนสร้างร่างยังไม่มีอะไรเกิดขึ้นในระบบหลังบ้าน · <b>ข้อยกเว้นเดียวคือ B5 ขายหน้าร้าน (POS)</b> ที่ไม่มีขั้น DRAFT เลย
-          เพราะบิลหน้าร้านเกิดขึ้นครั้งเดียวจบในคำขอเดียว
+          เพราะบิลหน้าร้านเกิดขึ้นครั้งเดียวจบในคำขอเดียว (บิลพัก <span class="mono text-[12px]">HELD</span> ไม่ใช่ DRAFT — เป็นตะกร้าที่ไม่ขยับอะไรนอก sales-bc จนกว่าจะปิดบิล ดู B5)
         </p>
 
         <div class="diagram mb-8">
@@ -150,6 +150,7 @@ flowchart LR
               <tr><td>B3 Delivery</td><td class="mono text-[12px]">cancel</td><td>คืนสต็อกกลับล็อตเดิมทุกใบที่เคยตัด (อ่านจาก stock_movements ย้อนกลับ) + ยกเลิก COGS/กำไรที่เคยบันทึกจาก stock.deducted</td><td><b>ยังมีใบรับคืน (DRAFT/SUBMITTED) ผูกอยู่ (409)</b> — ยกเลิกใบรับคืนก่อน · ถ้าปล่อยผ่าน ของที่คืนแล้วจะถูกนับกลับซ้ำและต้นทุนขายค้างในบัญชี (<a href="bugfix-log.html#bug-9" style="color:var(--accent);text-decoration:underline">bug 12</a>, 2026-09-27)</td></tr>
               <tr><td>B4 Sales Return</td><td class="mono text-[12px]">cancel</td><td>ดึงของออกจากล็อตเดิม (ต้นทุนเดิม) + คืน COGS ที่กลับไปแล้วขึ้นบัญชีอีกครั้ง</td><td><b>ของที่รับคืนถูกขายออกไปอีกแล้ว (503)</b> — ต่างจากใบส่งของที่คืนได้เสมอ ต้องกลับรายการที่ขายออกไปก่อน</td></tr>
               <tr><td>B5 POS Sale</td><td class="mono text-[12px]">void</td><td>คืนสต็อกกลับล็อตเดิม + ยกเลิกใบรับชำระ + void ใบกำกับภาษี (ทั้งสามอย่างในคำสั่งเดียว)</td><td><b>ของถูกขายออกไปอีกแล้ว</b> หรือ finance-bc ตอบไม่ได้ (503) · งวดบัญชี/สต็อกปิดแล้ว (409)</td></tr>
+              <tr><td>B5 POS Sale (บิลพัก)</td><td class="mono text-[12px]">cancel</td><td>ไม่มีอะไรต้องตีกลับ — บิลพักไม่เคยตัดสต็อก/ออกใบกำกับ แค่ <span class="mono text-[12px]">HELD → CANCELLED</span> · ยกเว้นบิลที่ <span class="mono text-[12px]">has_pending_stock_cut = true</span> จะคืนสต็อกที่ตัดค้างให้ด้วย</td><td>ไม่ใช่ <span class="mono text-[12px]">HELD</span> (409 — บิล <span class="mono text-[12px]">COMPLETED</span> ใช้ void) · คืนสต็อกค้างไม่ผ่าน (503 — บิลเป็น <span class="mono text-[12px]">CANCELLED</span> แล้ว ยิงซ้ำได้จนคืนสำเร็จ)</td></tr>
               <tr><td>C1 Receipt</td><td class="mono text-[12px]">void</td><td>โพสต์ journal กลับด้าน (debit↔credit) ใน GL — ไม่ลบของเดิม</td><td>เฉพาะ ISSUED เท่านั้นที่ void ได้ · DRAFT ลบตรงๆ · <b>ยังมีใบวางบิล (DRAFT/ISSUED), การรับชำระ (DRAFT/SUBMITTED), ใบลดหนี้/ใบเพิ่มหนี้ (ISSUED) หรือใบตัดเครดิต (SUBMITTED) ผูกอยู่ · ใบลดหนี้ที่เครดิตถูกตัด/คืนไปแล้ว (409)</b> — void/ยกเลิกสิ่งเหล่านั้นก่อน · ใบลดหนี้/ใบเพิ่มหนี้ DRAFT ไม่ขวาง แต่ issue ไม่ได้อีกเมื่อใบต้นทางถูก void (409) (2026-09-27)</td></tr>
               <tr><td>C3 Billing Note</td><td class="mono text-[12px]">cancel</td><td>ปล่อยใบกำกับที่รวมไว้ให้ void/วางบิลใหม่ได้ · ไม่มีรายการบัญชี</td><td>ไม่มี</td></tr>
               <tr><td>C4 Payment</td><td class="mono text-[12px]">cancel</td><td>โพสต์ journal กลับด้านใน GL</td><td><b>เครดิตจากการรับชำระนี้ถูกตัด/คืนไปแล้ว (409)</b> — หรือเครดิตของใบลดหนี้บนใบที่การรับชำระนี้ตัดไว้ถูกใช้ไปแล้ว · ยกเลิกใบตัดเครดิต/ใบคืนเงินก่อน · (ตอนสร้าง/submit: ยอดที่ตัดแต่ละใบ ≤ total − ใบลดหนี้ − เครดิตที่ตัดเข้า − ที่ตัดไปแล้ว · 2026-09-27)</td></tr>
@@ -190,7 +191,7 @@ flowchart LR
               <tr><td class="mono">B2</td><td>แปลงเป็นใบสั่งขาย</td><td>Sales Rep · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>SO · <b>PENDING_APPROVAL</b>→CONFIRMED→PARTIAL→CLOSED</td></tr>
               <tr><td class="mono">B3</td><td>ส่งของ</td><td>Warehouse Staff · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>DN · DRAFT→<b>PENDING_APPROVAL</b>→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">B4</td><td>รับคืนสินค้าจากลูกค้า</td><td>Warehouse Staff</td><td>SRN · DRAFT→SUBMITTED→CANCELLED</td></tr>
-              <tr><td class="mono">B5</td><td><b>ขายหน้าร้าน (POS)</b></td><td>Cashier / พนักงานหน้าร้าน</td><td>POS Sale · <b>COMPLETED</b>→VOIDED (ไม่มี DRAFT)</td></tr>
+              <tr><td class="mono">B5</td><td><b>ขายหน้าร้าน (POS)</b></td><td>Cashier / พนักงานหน้าร้าน</td><td>POS Sale · <b>COMPLETED</b>→VOIDED (ไม่มี DRAFT) · บิลพัก: <b>HELD</b>→COMPLETING→COMPLETED · HELD→CANCELLED</td></tr>
               <tr><td class="mono">C1</td><td>ออกใบกำกับภาษี/ใบเสร็จ</td><td>Accountant</td><td>Receipt · DRAFT→ISSUED→VOID</td></tr>
               <tr><td class="mono">C2</td><td>ใบลดหนี้ / ใบเพิ่มหนี้</td><td>Accountant</td><td>Receipt (CN/DN) · DRAFT→ISSUED</td></tr>
               <tr><td class="mono">C3</td><td>วางบิล</td><td>AR Clerk</td><td>Billing Note · DRAFT→ISSUED→CANCELLED</td></tr>
@@ -458,7 +459,8 @@ sequenceDiagram
             <span class="mono text-[12px]">none</span> ไม่มีส่วนลด ·
             <span class="mono text-[12px]">header</span> ลดที่ยอดรวม (ต้องส่ง <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span>) ·
             <span class="mono text-[12px]">per_item</span> ลดรายบรรทัด · <b>ส่วนลดที่ส่งมาผิดโหมดจะถูกทิ้ง</b> ไม่ error
-            เช่นส่ง <span class="mono text-[12px]">discount</span> รายบรรทัดมาตอน <span class="mono text-[12px]">header</span> — FE ควรซ่อนช่องที่ไม่เกี่ยวไว้เลย
+            เช่นส่ง <span class="mono text-[12px]">discount</span> รายบรรทัดมาตอน <span class="mono text-[12px]">header</span> — FE ควรซ่อนช่องที่ไม่เกี่ยวไว้เลย ·
+            ไม่ส่ง <span class="mono text-[12px]">discount_mode</span> ตอนสร้าง = <span class="mono text-[12px]">none</span> (ตอนแก้ = คงค่าเดิม) — <b>ยกเว้น POS</b> ที่เดาเป็น <span class="mono text-[12px]">per_item</span> เมื่อมีส่วนลดรายบรรทัด (ดู B5)
           </p>
         </div>
 
@@ -783,6 +785,7 @@ sequenceDiagram
               <tr><td class="mono">4</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/send</td><td class="mono text-[11px]">quotation:send</td><td>DRAFT → <b>SENT</b> · ล็อกการแก้ไข</td></tr>
               <tr><td class="mono">5</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/approve</td><td class="mono text-[11px]">quotation:approve</td><td>SENT → <b>APPROVED</b> (ลูกค้าตกลง)</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/cancel</td><td class="mono text-[11px]">quotation:cancel</td><td>ยกเลิก</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /sales-bc/v1/quotations?customer_id=&lt;uuid&gt;</td><td class="mono text-[11px]">quotation:view</td><td>ใบเสนอราคาของลูกค้ารายเดียว — <b>alias</b> ของ <span class="mono text-[11px]">?filter=customer_id||$eq||&lt;uuid&gt;</span> · ส่งทั้งสองแบบได้ (AND กันเหมือน filter สองตัว) · ไม่ใช่ uuid → <span class="mono text-[11px]">400</span> · ใช้ได้เฉพาะ collection route (<span class="mono text-[11px]">GET /quotations</span>) ไม่ใช่ <span class="mono text-[11px]">/{id}</span></td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/quotations/{id}/print</td><td class="mono text-[11px]">quotation:print</td><td><b>ใหม่ (P2, 2026-09-06)</b> พิมพ์เป็น PDF จริง — ทำได้ทุกสถานะ ไม่เปลี่ยนสถานะเอกสาร ดู E3</td></tr>
             </tbody>
           </table>
@@ -991,7 +994,8 @@ sequenceDiagram
           เพิ่มเข้ามา 2026-09-20 — <b>ทางลัดเส้นเดียวสำหรับเครื่อง POS</b> · B1→B2→B3 เป็นวงจรขายแบบ B2B
           (เสนอราคา → ลูกค้าตกลง → ส่งของทีหลัง) ซึ่งกินอย่างน้อย <b>5 request</b> และบังคับให้ทุก SO
           สืบย้อนไปหาใบเสนอราคา · หน้าร้านไม่มีอะไรให้สืบย้อน — ลูกค้ายืนอยู่ตรงหน้า หยิบของ จ่ายเงิน รับใบกำกับ แล้วเดินออก
-          ทั้งหมดใน <b>คำขอเดียว</b> ที่ต้องตอบกลับภายในเวลาที่คนยืนรอไหว
+          ทั้งหมดใน <b>คำขอเดียว</b> ที่ต้องตอบกลับภายในเวลาที่คนยืนรอไหว ·
+          <b>2026-10-26</b> เพิ่ม <b>พักบิล</b> (<span class="mono text-[12px]">is_held: true</span>) สำหรับลูกค้าที่ยังไม่จ่ายตอนนี้ — ดู <a href="#pos-held" style="color:var(--accent);text-decoration:underline">B5.1</a>
         </p>
 
         <div class="diagram mb-6">
@@ -1024,6 +1028,10 @@ sequenceDiagram
               <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{receipt_id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์สลิป — ใช้ <span class="mono text-[11px]">receipt_id</span> ที่ขั้น 1 ตอบกลับมา (ไม่มี <span class="mono text-[11px]">/pos-sales/{id}/print</span> แยก) · ส่ง <span class="mono text-[11px]">"format": "slip"</span> เพื่อพิมพ์สลิปความร้อน 80mm (ค่าเริ่มต้นของร้านอ่านจาก <span class="mono text-[11px]">GET /sales-settings</span> → <span class="mono text-[11px]">default_receipt_format</span>) ดู E3.1</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /sales-bc/v1/pos-sales?relations=items</td><td class="mono text-[11px]">pos_sale:view</td><td>ดูรายการขายของกะ/สาขา</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/void</td><td class="mono text-[11px]">pos_sale:void</td><td>ยกเลิกบิล — คืนสต็อก + ยกเลิกใบรับชำระ + void ใบกำกับ</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales <span class="text-[var(--muted)]">+ "is_held": true</span></td><td class="mono text-[11px]">pos_sale:create</td><td><b>พักบิล</b> → <span class="mono text-[11px]">HELD</span> · ไม่ตัดสต็อก ไม่ออกใบกำกับ ไม่รับเงิน (ดู B5.1)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">PUT /sales-bc/v1/pos-sales/{id}</td><td class="mono text-[11px]">pos_sale:create</td><td>แก้บิลพัก — เฉพาะ <span class="mono text-[11px]">HELD</span></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/complete</td><td class="mono text-[11px]">pos_sale:create</td><td>ปิดบิลพัก — ตัดสต็อก + ออกใบกำกับ + รับชำระ → <span class="mono text-[11px]">COMPLETED</span></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/cancel</td><td class="mono text-[11px]">pos_sale:void</td><td>ยกเลิกบิลพัก → <span class="mono text-[11px]">CANCELLED</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -1037,7 +1045,7 @@ sequenceDiagram
   <span class="s">"payment_method"</span>: <span class="s">"CASH"</span>,     <span class="c">// CASH | BANK_TRANSFER | CREDIT_CARD | QR_PROMPTPAY | OTHER</span>
   <span class="s">"paid_amount"</span>: <span class="t">1000</span>,             <span class="c">// เงินที่ลูกค้ายื่นให้ — ไม่ส่ง = พอดี total (บัตร/QR) · ต้อง &gt;= total</span>
   <span class="s">"reference"</span>: <span class="s">"APPROVAL-8842"</span>,   <span class="c">// เลข slip / approval code — ไม่บังคับ</span>
-  <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,
+  <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,   <span class="c">// ไม่ส่ง = per_item ถ้ามีบรรทัด discount &gt; 0 มิฉะนั้น none (เฉพาะ POS — ดู rulebox ส่วนลด)</span>
   <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount_value"</span>: <span class="t">0</span>,
   <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
   <span class="s">"items"</span>: [
@@ -1099,8 +1107,10 @@ sequenceDiagram
             <b>ทำไมต้องเรียงแบบนี้</b> — เหตุผลเดียวกับ B3 (ดู docblock ของ <span class="mono text-[12px]">DeliveryNotesService</span>):
             ผลทางกายภาพอยู่<b>นอก</b> BC นี้ จึงต้องสำเร็จก่อน โดยไม่มี transaction ของ sales-bc เปิดค้างไว้ ·
             ขั้นไหนพัง = <b>ขั้นถัดไปไม่เกิด</b> และ client ได้ error กลับ (ไม่ใช่บิลครึ่งใบ) ·
-            ตัดสต็อกสำเร็จแล้วขั้น 2 ล้ม → ยิงซ้ำได้เลย การตัดสต็อกซ้ำเป็น no-op ตาม
-            <span class="mono text-[12px]">source_doc_id</span> เดิม
+            ตัดสต็อกสำเร็จแล้วขั้น 2 ล้ม → <span class="mono text-[12px]">503</span> และบิล<b>ไม่ถูกบันทึก</b> ·
+            <span class="mono text-[12px]">source_doc_id</span> (id บรรทัดที่ pre-generate) ตายไปพร้อมคำขอนั้น การยิงซ้ำจึงเป็นบิลใหม่ที่ตัดสต็อกใหม่ —
+            สต็อกที่ตัดค้างต้องคืนด้วยการปรับยอด (D2) ก่อนยิงซ้ำ (ระบบไม่ reverse ให้อัตโนมัติ เพราะการ reverse เองก็เป็น RPC ที่ล้มได้ และ retry เงียบ ๆ เสี่ยงคืนของสองรอบ) ·
+            ต่างจากการปิด<b>บิลพัก</b> (B5.1) ที่ id บรรทัดอยู่ต่อกับบิล จึงคืนสต็อกให้อัตโนมัติได้
           </p>
         </div>
         <div class="rulebox mb-4">
@@ -1125,7 +1135,17 @@ sequenceDiagram
             · <b>ไม่มี Sales Order / Delivery Note</b> — บิลหน้าร้านไม่เข้า <span class="mono text-[12px]">delivered_qty</span> ของ SO ใดๆ
             และไม่โผล่ในรายการใบส่งของ · ใบรับคืน B4 จึงอ้างบิล POS <b>ไม่ได้</b> คืนของหน้าร้าน = <span class="mono text-[12px]">void</span> ทั้งบิล
             (ถ้าคืนบางส่วน ให้ void แล้วขายใหม่เฉพาะที่เหลือ)<br>
-            · <b>ไม่มีปุ่มแก้ไข</b> — ไม่มี <span class="mono text-[12px]">PUT</span> และไม่มี <span class="mono text-[12px]">DELETE</span>
+            · <b>บิลที่ขายแล้วแก้ไม่ได้</b> — ไม่มี <span class="mono text-[12px]">DELETE</span> และ <span class="mono text-[12px]">PUT</span> แตะได้เฉพาะบิลพัก (<span class="mono text-[12px]">HELD</span>) เท่านั้น บิล <span class="mono text-[12px]">COMPLETED</span> ได้ <span class="mono text-[12px]">409</span>
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ส่วนลดหน้าร้าน — ไม่ส่ง <span class="mono text-[12px]">discount_mode</span> = เดาจากบรรทัด (เฉพาะ POS · 2026-10-26)</div>
+          <p class="text-[13.5px]">
+            ข้อยกเว้นเดียวของกฎ "ส่วนลด · เลือกได้โหมดเดียว" (A2) และมีเฉพาะ POS (<span class="mono text-[12px]">PosSalesService.resolveDiscountMode</span>):
+            <b>ไม่ส่ง <span class="mono text-[12px]">discount_mode</span></b> + มีบรรทัดใดที่ <span class="mono text-[12px]">discount &gt; 0</span> → <span class="mono text-[12px]">per_item</span> ·
+            ไม่มีบรรทัดไหนลด → <span class="mono text-[12px]">none</span> · เหตุผล: เครื่อง POS ที่คีย์ลดราคาสินค้าชิ้นหนึ่งแล้วไม่ส่งโหมดมา ตั้งใจให้ลดจริง — ถ้าตีเป็น <span class="mono text-[12px]">none</span> ลูกค้าจะโดนคิดราคาป้ายเต็มเงียบ ๆ<br>
+            <b>ส่งโหมดมาชัดเจน = ใช้ตามนั้นเสมอ</b> — <span class="mono text-[12px]">none</span>/<span class="mono text-[12px]">header</span> ยังทิ้งส่วนลดรายบรรทัดตามกฎ DiscountMode ปกติ (ไม่ถูกยกระดับเป็น <span class="mono text-[12px]">per_item</span>) ·
+            เอกสารอื่นทุกใบไม่ส่งโหมดตอนสร้าง = <span class="mono text-[12px]">none</span> · บิลพัก (B5.1) เดาแบบเดียวกันตอนพัก แต่ <span class="mono text-[12px]">PUT</span> ที่ไม่ส่งโหมด = คงโหมดเดิม
           </p>
         </div>
         <div class="rulebox mb-4">
@@ -1162,6 +1182,124 @@ sequenceDiagram
             แล้วกลับเป็น <span class="mono text-[12px]">900 / 0</span> ภายในไม่กี่วินาที) — <b>งบยังสมดุลตลอด ไม่ได้เพี้ยน</b>
             แค่ตัวเลขขยับระหว่างการอ่านสองครั้ง · หน้าจอที่ยิง void แล้วรีเฟรชรายงานทันทีจึงควรหน่วงหรือให้ผู้ใช้กดโหลดใหม่
             ไม่ใช่สรุปว่ายอดผิด
+          </p>
+        </div>
+
+        <h3 id="pos-held" class="display text-xl mt-10 mb-4">B5.1 · พักบิล (Held bill) <span class="mono text-[13px] text-[var(--muted)]">— Cashier · เพิ่ม 2026-10-26</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          ลูกค้าหยิบของครบแล้วแต่ยังไม่จ่าย (ไปหยิบของเพิ่ม, รอโอน, ให้คิวถัดไปก่อน) → แคชเชียร์ <b>พักบิล</b> ไว้แล้วค่อยเรียกกลับมาปิด ·
+          บิลพัก<b>ไม่ใช่ DRAFT</b> ของการขาย — เป็นตะกร้าที่เก็บไว้ใน sales-bc <b>เท่านั้น</b>: ไม่ตัดสต็อก ไม่ออกใบกำกับ ไม่รับเงิน
+          ไม่มี BC อื่นรู้ว่ามันมีอยู่ จึงแก้และยกเลิกได้โดยไม่ต้องย้อนอะไรข้าม BC · การขายจริงเกิดตอน <b>ปิดบิล</b> ด้วยสามขั้นเดียวกับ B5 ลำดับเดียวกัน
+        </p>
+
+        <div class="diagram mb-6">
+<pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    [*] --> COMPLETED : POST /pos-sales
+    [*] --> HELD : POST /pos-sales is_held=true
+    HELD --> HELD : PUT /pos-sales/id
+    HELD --> COMPLETING : POST complete · claim committed
+    COMPLETING --> COMPLETED : stock cut + invoice + payment
+    COMPLETING --> HELD : completion failed · bill given back
+    HELD --> CANCELLED : POST cancel
+    COMPLETED --> VOIDED : POST void
+    COMPLETED --> [*]
+    VOIDED --> [*]
+    CANCELLED --> [*]
+</pre>
+        </div>
+
+        <div class="card overflow-hidden mb-5">
+          <table class="d">
+            <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>รับอะไร</th><th>ผลที่เกิด</th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:create</td><td>body เดียวกับ B5 + <span class="mono text-[11px]">"is_held": true</span> · <span class="mono text-[11px]">payment_method</span>/<span class="mono text-[11px]">paid_amount</span>/<span class="mono text-[11px]">reference</span> <b>ถูกละเลย</b> (ไม่บังคับ)</td><td><span class="mono text-[11px]">201</span> → <b>HELD</b> · ตรวจลูกค้า/สินค้า/สินค้าซ้ำ/variant template/ส่วนลด เหมือนขายจริง (ส่วนลดหัวบิลผิด = <span class="mono text-[11px]">400</span> ตั้งแต่ตอนพัก) · ได้ <span class="mono text-[11px]">pos_number</span> ทันที</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT /sales-bc/v1/pos-sales/{id}</td><td class="mono text-[11px]">pos_sale:create</td><td>ทุกฟิลด์ไม่บังคับ ไม่ส่ง = คงเดิม: <span class="mono text-[11px]">customer_id</span>, <span class="mono text-[11px]">warehouse_id</span>, <span class="mono text-[11px]">document_type</span>, <span class="mono text-[11px]">discount_mode</span>/<span class="mono text-[11px]">discount_type</span>/<span class="mono text-[11px]">discount_value</span>, <span class="mono text-[11px]">remark_th</span>/<span class="mono text-[11px]">remark_en</span>, <span class="mono text-[11px]">items</span></td><td><span class="mono text-[11px]">200</span> · <span class="mono text-[11px]">items</span> ถูก <b>sync ตาม <span class="mono text-[11px]">product_id</span></b> (บรรทัดที่มีทั้งสองฝั่งคง id, ใหม่ = insert, หาย = delete) · ไม่ส่ง <span class="mono text-[11px]">items</span> = คิดยอดบรรทัดเดิมใหม่ตามโหมดส่วนลด · โหมดที่ไม่ใช่ <span class="mono text-[11px]">header</span> ล้าง <span class="mono text-[11px]">discount_type</span>/<span class="mono text-[11px]">discount_value</span> เป็น null · <span class="mono text-[11px]">409</span> ถ้าไม่ใช่ <span class="mono text-[11px]">HELD</span> หรือ <span class="mono text-[11px]">has_pending_stock_cut = true</span></td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/complete</td><td class="mono text-[11px]">pos_sale:create</td><td><span class="mono text-[11px]">{ payment_method, paid_amount?, reference?, document_date? }</span></td><td><span class="mono text-[11px]">200</span> → <span class="mono text-[11px]">HELD → COMPLETING → COMPLETED</span> พร้อม <span class="mono text-[11px]">receipt_id</span>/<span class="mono text-[11px]">receipt_number</span> และยอดที่ finance-bc คิด (พิมพ์สลิปต่อด้วย <span class="mono text-[11px]">receipt_id</span> เหมือน B5)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/cancel</td><td class="mono text-[11px]">pos_sale:void</td><td><span class="mono text-[11px]">{ cancel_reason? }</span> (ไม่บังคับ ต่างจาก <span class="mono text-[11px]">void_reason</span> ที่บังคับ)</td><td><span class="mono text-[11px]">200</span> → <b>CANCELLED</b> · แถวและ <span class="mono text-[11px]">pos_number</span> ยังอยู่ · บิล <span class="mono text-[11px]">COMPLETED</span> → <span class="mono text-[11px]">409</span> ให้ใช้ void</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /sales-bc/v1/pos-sales?filter=status||$eq||HELD&amp;relations=items</td><td class="mono text-[11px]">pos_sale:view</td><td>—</td><td>รายการบิลที่พักไว้ เพื่อเรียกกลับมาปิด</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[12.5px] text-[var(--muted)] mb-4">ใช้สิทธิ์เดิมทั้งหมด (แก้/ปิดบิลพัก = การขาย <span class="mono">pos_sale:create</span> · ยกเลิกบิลพัก = "undo" อีกแบบของหน้าร้าน <span class="mono">pos_sale:void</span>) — ไม่มี grant migration ใหม่</p>
+
+        <div class="code p-5 mb-4">
+<pre><span class="c">// POST /sales-bc/v1/pos-sales — พักบิล</span>
+{
+  <span class="s">"is_held"</span>: <span class="k">true</span>,
+  <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>, <span class="s">"warehouse_id"</span>: <span class="s">"9f04…"</span>,
+  <span class="s">"items"</span>: [ { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">2</span>, <span class="s">"unit_price"</span>: <span class="t">428</span> } ]
+}
+
+<span class="c">// 201 — ยอดเป็นยอดชั่วคราว ยังไม่มีใบกำกับ</span>
+{
+  <span class="s">"pos_number"</span>: <span class="s">"POS-2026-00032"</span>, <span class="s">"status"</span>: <span class="s">"HELD"</span>,
+  <span class="s">"has_pending_stock_cut"</span>: <span class="k">false</span>,
+  <span class="s">"payment_method"</span>: <span class="k">null</span>, <span class="s">"paid_amount"</span>: <span class="t">0</span>, <span class="s">"change_amount"</span>: <span class="t">0</span>,
+  <span class="s">"sub_total"</span>: <span class="t">856</span>, <span class="s">"total_discount"</span>: <span class="t">0</span>,
+  <span class="s">"vat_rate"</span>: <span class="t">0</span>, <span class="s">"net_amount"</span>: <span class="t">0</span>, <span class="s">"vat_amount"</span>: <span class="t">0</span>,   <span class="c">// 0 = ยังไม่ได้คิดราคา ไม่ใช่ "ไม่มี VAT"</span>
+  <span class="s">"total"</span>: <span class="t">856</span>,                   <span class="c">// ชั่วคราว = sub_total − total_discount</span>
+  <span class="s">"receipt_id"</span>: <span class="k">null</span>, <span class="s">"receipt_number"</span>: <span class="k">null</span>, <span class="s">"payment_entry_id"</span>: <span class="k">null</span>
+}
+
+<span class="c">// POST /sales-bc/v1/pos-sales/{id}/complete</span>
+{ <span class="s">"payment_method"</span>: <span class="s">"CASH"</span>, <span class="s">"paid_amount"</span>: <span class="t">1000</span> }   <span class="c">// document_date ไม่ส่ง = ตอนนี้ (วันที่ใบกำกับ)</span></pre>
+        </div>
+
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ยอดของบิลพักเป็นยอดชั่วคราว — VAT เป็น 0 เพราะ "ยังไม่ได้คิด"</div>
+          <p class="text-[13.5px]">
+            ขณะ <span class="mono text-[12px]">HELD</span>/<span class="mono text-[12px]">COMPLETING</span> finance-bc ยังไม่ได้คิดราคาบิลนี้ ·
+            <span class="mono text-[12px]">vat_rate</span>/<span class="mono text-[12px]">net_amount</span>/<span class="mono text-[12px]">vat_amount</span> = <span class="mono text-[12px]">0</span>
+            หมายถึง<b>ยังไม่รู้</b> ไม่ใช่ไม่มี VAT (sales-bc คิดเองไม่ได้: ประเภทภาษีเป็นของ inventory-bc อัตราเป็นของ finance-bc — เดา 7% จะผิดกับสินค้ายกเว้นภาษี) ·
+            <span class="mono text-[12px]">total</span> = <span class="mono text-[12px]">sub_total − total_discount</span> — สำหรับ <b>ABB</b> คือยอดจริง สำหรับ <b>FULL</b> เป็น<b>ขั้นต่ำ</b> (VAT บวกทับตอนปิดบิล) ·
+            <span class="mono text-[12px]">items[].line_total</span> ก็เป็นยอดชั่วคราวเช่นกัน · ปิดบิลแล้วทุกช่องเงินถูกเขียนทับด้วยตัวเลขของ finance-bc เหมือนบิล B5 ปกติ
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ปิดบิล — จองแถวก่อน · ตรวจเงินก่อน · ลงวันที่ ณ วันปิด</div>
+          <p class="text-[13.5px]">
+            <b>0) จอง</b> — ภายใต้ row lock: ต้องเป็น <span class="mono text-[12px]">HELD</span> แล้วตรวจ <span class="mono text-[12px]">paid_amount</span> กับยอดชั่วคราวของบรรทัดที่เก็บไว้
+            (เงินไม่พอ = <span class="mono text-[12px]">400</span> ไม่มีอะไรขยับ บิลยัง <span class="mono text-[12px]">HELD</span>) แล้ว commit <span class="mono text-[12px]">COMPLETING</span> <b>ก่อน</b>เรียกข้าม BC ·
+            ปิดบิลเดียวกันพร้อมกันสองเครื่อง เครื่องที่สองอ่านเจอ <span class="mono text-[12px]">COMPLETING</span> แล้วได้ <span class="mono text-[12px]">409</span> — ไม่มีใบกำกับใบที่สอง<br>
+            <b>1) ตัดสต็อก</b> ด้วย <span class="mono text-[12px]">pos_sale_items.id</span> ที่เก็บไว้ · <b>2) ออกใบกำกับ + รับชำระ</b> · <b>3) COMPLETING → COMPLETED</b> พร้อมตัวเลขของ finance-bc<br>
+            <b>วันที่</b> — <span class="mono text-[12px]">document_date</span> คือ<b>เวลาปิดบิล</b> (ไม่ส่ง = ตอนนี้) ใช้ทั้งเป็นวันที่ใบกำกับและวันตัดสต็อก และเขียนทับเวลาที่พัก ·
+            ตะกร้าที่พักเมื่อวานแล้วจ่ายวันนี้จึงได้ใบกำกับลงวันนี้ และพักข้ามสิ้นเดือน/สิ้นปีก็ไม่ตกไปอยู่ในงวดก่อน
+          </p>
+        </div>
+
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th>ปิดบิลล้มที่ไหน</th><th>client ได้อะไร</th><th>บิลอยู่สถานะไหน</th></tr></thead>
+            <tbody>
+              <tr><td>ไม่ใช่ <span class="mono text-[12px]">HELD</span> / กำลังปิดอยู่</td><td><span class="mono text-[12px]">409</span></td><td>เดิม (ไม่แตะ)</td></tr>
+              <tr><td>เงินไม่พอ</td><td><span class="mono text-[12px]">400</span></td><td><span class="mono text-[12px]">HELD</span> — ยังไม่มี RPC ใดถูกเรียก</td></tr>
+              <tr><td>inventory-bc ปฏิเสธการตัด (ของไม่พอ, งวดสต็อกปิด)</td><td>error ของ inventory-bc เอง (status ของมัน)</td><td><span class="mono text-[12px]">HELD</span> — ไม่มีอะไรขยับ (ตัดแบบ all-or-nothing) id บรรทัดเดิม</td></tr>
+              <tr><td>inventory-bc ไม่ตอบ</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> — id บรรทัดเดิม</td></tr>
+              <tr><td>finance-bc ปฏิเสธ/ไม่ตอบ หลังตัดสต็อกแล้ว → ระบบคืนสต็อกสำเร็จ</td><td>error ของ finance-bc เอง (เช่นลูกค้าไม่มีเลขผู้เสียภาษีสำหรับ FULL) หรือ <span class="mono text-[12px]">503</span> ถ้าไม่ตอบ</td><td><span class="mono text-[12px]">HELD</span> — <b>ทุกบรรทัดได้ id ใหม่</b> (re-key) · แก้/ปิดซ้ำ/ยกเลิกได้ตามปกติ</td></tr>
+              <tr><td>…และคืนสต็อกก็ไม่ผ่าน</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> + <span class="mono text-[12px]">has_pending_stock_cut = true</span> · id เดิม (การตัดยังมีผล) · ปิดซ้ำ = ใช้การตัดเดิม · ยกเลิก = คืนสต็อก · แก้ = <span class="mono text-[12px]">409</span></td></tr>
+              <tr><td>finance-bc ออกใบกำกับแล้ว แต่เขียนแถวใน sales-bc ไม่ผ่าน / process ตายกลางทาง</td><td>error</td><td>ค้าง <span class="mono text-[12px]">COMPLETING</span> <b>โดยตั้งใจ</b> (ปิดซ้ำอาจได้ใบกำกับใบที่สอง) · log <span class="mono text-[12px]">POS_SALE_COMPLETE_LOCAL_FAILED</span> พร้อมเลขใบกำกับ — ต้องให้คนเขียนแถว <span class="mono text-[12px]">COMPLETED</span> จากใบกำกับนั้น ห้ามปิดบิลซ้ำ</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ทำไมต้องเปลี่ยน id บรรทัดหลังคืนสต็อก</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">ConfirmDelivery</span> ของ inventory-bc idempotent ต่อ <span class="mono text-[12px]">source_doc_id</span> และ<b>ข้าม id ที่เคยบันทึกแล้วแม้จะถูก reverse ไปแล้ว</b> ·
+            ถ้าปิดบิลซ้ำด้วย id เดิมหลังคืนสต็อก การตัดจะ "สำเร็จ" โดยไม่ได้ตัดของเลย — ระบบจึงออก id ใหม่ให้ทุกบรรทัดก่อนคืนบิลเป็น <span class="mono text-[12px]">HELD</span> ·
+            ส่วนการยกเลิกบิลที่มีการตัดค้าง เขียน <span class="mono text-[12px]">CANCELLED</span> <b>ก่อน</b>คืนสต็อก (กลับทิศกับ void) เพื่อไม่ให้การปิดบิลแทรกเข้ามาขายด้วย id ที่ถูก reverse แล้ว ·
+            คืนสต็อกไม่ผ่าน = <span class="mono text-[12px]">503</span> และยิง <span class="mono text-[12px]">/cancel</span> เดิมซ้ำได้จนสำเร็จ (บิล <span class="mono text-[12px]">CANCELLED</span> ที่ยังมี flag รับคำขอนี้ซ้ำ)
+          </p>
+        </div>
+        <div class="rulebox ok mb-8">
+          <div class="rc ok mb-1">FE ต้องรู้ — 5 ข้อ</div>
+          <p class="text-[13.5px]">
+            · <b>สถานะใหม่</b> <span class="mono text-[12px]">HELD</span>, <span class="mono text-[12px]">COMPLETING</span>, <span class="mono text-[12px]">CANCELLED</span> ใน <span class="mono text-[12px]">status</span> — <span class="mono text-[12px]">COMPLETING</span> = กำลังปิดบิล ให้ปิดปุ่มทุกปุ่ม ถ้าค้างนานให้แจ้งผู้ดูแล (อย่ากดปิดซ้ำ)<br>
+            · <b>ฟิลด์ใหม่</b> <span class="mono text-[12px]">has_pending_stock_cut</span> ใน response — <span class="mono text-[12px]">true</span> = ซ่อนปุ่มแก้ไข เหลือแค่ "ปิดบิลอีกครั้ง" กับ "ยกเลิก"<br>
+            · <b>id บรรทัดของบิลพักเปลี่ยนได้</b> หลังการปิดบิลที่ finance-bc ปฏิเสธ (และคืนสต็อกสำเร็จ) — อย่า cache <span class="mono text-[12px]">items[].id</span> ข้ามการปิดบิลที่ล้ม ให้ <span class="mono text-[12px]">GET /pos-sales/{id}?relations=items</span> ใหม่ (การ <span class="mono text-[12px]">PUT items</span> จับคู่ด้วย <span class="mono text-[12px]">product_id</span> จึงไม่กระทบ)<br>
+            · <b>บิลพักมี <span class="mono text-[12px]">payment_method = null</span> และ <span class="mono text-[12px]">receipt_id = null</span></b> — พิมพ์สลิปได้หลัง <span class="mono text-[12px]">COMPLETED</span> เท่านั้น · ยอด VAT ที่เป็น 0 ห้ามแสดงว่า "ไม่มี VAT" · บิล FULL ให้แสดงว่า "+VAT"<br>
+            · <b>ของไม่ถูกกันไว้</b> — สินค้าอาจหมดระหว่างพัก แล้วการปิดบิลล้มที่ขั้นตัดสต็อกโดยบิลยัง <span class="mono text-[12px]">HELD</span> (แก้บรรทัดแล้วปิดใหม่ได้)
           </p>
         </div>
       </section>
@@ -2559,7 +2697,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ · ขายหน้าร้าน <span class="mono text-[13px] text-[var(--muted)]">— 52 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ · ขายหน้าร้าน <span class="mono text-[13px] text-[var(--muted)]">— 55 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2585,6 +2723,9 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:create</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales/{id}</td><td class="mono text-[11px]">pos_sale:view</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales/{id}</td><td class="mono text-[11px]">pos_sale:create</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales/{id}/cancel</td><td class="mono text-[11px]">pos_sale:void</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales/{id}/complete</td><td class="mono text-[11px]">pos_sale:create</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/pos-sales/{id}/void</td><td class="mono text-[11px]">pos_sale:void</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations</td><td class="mono text-[11px]">quotation:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/quotations</td><td class="mono text-[11px]">quotation:create</td></tr>
@@ -2728,7 +2869,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 332 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 335 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->

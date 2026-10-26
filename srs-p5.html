@@ -208,7 +208,7 @@ erDiagram
         uuid product_id "ref inventory-bc"
         string product_sku "snapshot 86/4(5)"
         string product_name_th "snapshot 86/4(5)"
-        string product_name_en "snapshot"
+        string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
         int qty
         decimal unit_price
         string discount_type "per_item mode only"
@@ -322,6 +322,9 @@ erDiagram
         uuid grn_item_id "ref inventory-bc · the 3-way match anchor"
         uuid po_id "ref supplier-bc · via the GRN"
         uuid product_id "ref inventory-bc"
+        string product_sku "snapshot"
+        string product_name_th "snapshot"
+        string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
         int qty "<= un-invoiced qty of the GRN line"
         decimal unit_cost "within 20pct of import_cost"
         decimal line_total "EX-VAT"

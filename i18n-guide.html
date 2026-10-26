@@ -157,6 +157,36 @@
   description_en: <span class="t">string</span>;
 }</pre>
         </div>
+
+        <div class="rulebox mt-6">
+          <div class="rc mb-1">RULE · ฝั่ง <span class="mono text-[12px]">_en</span> ที่ไม่บังคับ — ผ่อนคอลัมน์ต้นทาง = ต้องผ่อนทุกสำเนาของมันด้วย (2026-10-26)</div>
+          <p class="text-[13.5px]">
+            ตัวอย่างจริง: <span class="mono text-[12px]">products.name_en</span> (inventory-bc) <b>ไม่บังคับ</b>แล้ว — ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span>
+            และ response ยังเป็น <span class="mono text-[12px]">name: { th, en: null }</span> ตามคอนแทร็กต์คงที่ของ <span class="mono text-[12px]">LocalizationInterceptor</span>
+            (<span class="mono text-[12px]">name_th</span> ยังบังคับเหมือนเดิม) ·
+            แต่ชื่อสินค้าถูก <b>snapshot</b> ลงเอกสารและ read model หลายที่ ถ้าสำเนาตัวไหนยัง <span class="mono text-[12px]">NOT NULL</span>
+            สินค้าที่ไม่มีชื่ออังกฤษจะ<b>ใส่ลงเอกสารนั้นไม่ได้เลย</b> (insert ล้ม <span class="mono text-[12px]">23502</span>) ·
+            กติกา: <b>ทุก snapshot ของ <span class="mono text-[12px]">_en</span> ที่ไม่บังคับต้อง nullable ด้วย</b> — ครบทั้งคอลัมน์ entity, interface ของ lookup/event payload และ response DTO
+            (<span class="mono text-[12px]">string | null</span>) ไม่ใช่แก้แค่ต้นทาง
+          </p>
+          <div class="card overflow-hidden mt-3">
+            <table class="d">
+              <thead><tr><th>BC</th><th>คอลัมน์ snapshot ที่เป็น nullable</th></tr></thead>
+              <tbody>
+                <tr><td>inventory-bc</td><td class="mono text-[12px]">products.name_en (ต้นทาง) · goods_receipt_items.product_name_en</td></tr>
+                <tr><td>supplier-bc</td><td class="mono text-[12px]">purchase_order_items.product_name_en</td></tr>
+                <tr><td>sales-bc</td><td class="mono text-[12px]">quotation_items · sales_order_items · pos_sale_items .product_name_en</td></tr>
+                <tr><td>finance-bc</td><td class="mono text-[12px]">receipt_items · ap_invoice_items .product_name_en</td></tr>
+                <tr><td>report-bc</td><td class="mono text-[12px]">low_stocks · expiry_alerts .product_name_en (snapshot จาก event payload)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-[13.5px] mt-3">
+            <b>ฝั่งพิมพ์</b> — print mapper ส่ง <span class="mono text-[12px]">''</span> แทน <span class="mono text-[12px]">null</span>
+            (<span class="mono text-[12px]">name_en: item.product_name_en ?? ''</span>) เทมเพลตจึงไม่ต้องเช็ค null และไม่พิมพ์คำว่า "null" ออกมา ·
+            ทิศกลับกัน (ทำ <span class="mono text-[12px]">_en</span> ให้บังคับ) ต้อง backfill ทุกสำเนาก่อน ไม่งั้น migration <span class="mono text-[12px]">SET NOT NULL</span> ล้มบนแถวที่มีอยู่
+          </p>
+        </div>
       </section>
 
       <div class="rule my-14"></div>

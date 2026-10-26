@@ -220,6 +220,20 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
+### 2026-10-26 · รีวิว + แก้ `feature/product` และ `feature/suspend-sales` (พักบิล POS) แล้ว merge เข้า main ✅ **verify 5 BC ครบ 6 ขั้น (product) + sales-bc หลัง merge ครบ 6 ขั้น smoke 10/10 + migrate + drift check 5 BC ไม่มี diff** · merge `53a494d`
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| `products.name_en` ไม่บังคับ | snapshot `product_name_en` ทุกตาราง (quotation/SO/POS/receipt/AP items, low_stocks, expiry_alerts) nullable ตามไปด้วย — เดิม branch เปลี่ยนแค่ต้นทาง สินค้าไม่มีชื่ออังกฤษจะออกเอกสารใดก็ไม่ได้ · `IProductLookupResult.name_en: string \| null` · กฎใหม่ `entities-and-schema.md` § Changing a source column |
+| POS `discount_mode` | infer `per_item` **เฉพาะตอนไม่ส่ง** และมีบรรทัดมีส่วนลด · ส่งมาชัดเจนใช้ตามนั้น (`resolveDiscountMode`) · ข้อยกเว้นเขียนใน `business-documents.md` |
+| quotations `?customer_id=` | alias ของ `?filter=customer_id\|\|$eq\|\|<uuid>` ประกอบใน service |
+| พักบิล (HELD) | ไม่ตัดสต็อก/ไม่เรียก finance/ไม่คิด VAT ตอนพัก · `PUT /pos-sales/:id` sync บรรทัด · `POST /:id/complete` claim เป็น `COMPLETING` ก่อนเรียกข้าม BC (กันออกใบกำกับซ้ำ) ตรวจเงินก่อนทุกอย่าง ลงวันที่ ณ วันปิดบิล · `POST /:id/cancel` · finance ปฏิเสธ → คืนสต็อก + re-key บรรทัด (ConfirmDelivery idempotent แม้ id ที่ reverse แล้ว) |
+| migration | inventory/sales/finance/report (name_en) + sales (HELD/COMPLETING/CANCELLED, `has_pending_stock_cut`) รันบน DB แล้ว — deploy จะข้าม |
+| เครื่องมือ | `pnpm check:branch` + CI รันทุก push ของ feature branch · convention-guard ใหม่ 4 ข้อ · skill `review-branch` · rule `branches-and-commits.md` |
+| Node | server ย้ายเป็น v24.22.1 (PM2 daemon + systemd unit) · `deploy-app.sh`/CI/`.nvmrc` ตาม — ระหว่างสลับ `pm2 update` ค้างทำให้ทุก app ล่ม ~7 นาที (14:14–14:21 UTC) กู้ด้วย `pm2 resurrect` จาก dump ที่สำรองไว้ · **ครั้งหน้าใช้ `pm2 kill` + `pm2 resurrect` แทน `pm2 update`** |
+
+**ยังค้าง** — `create()` ปกติของ POS ยังเก็บ `discount_type/value` นอกโหมด `header` (ขัดกฎ มีมาก่อน) · `sendWithContext` **throw** เมื่อ BC ปลายทางตอบ 4xx/5xx แต่ docblock ของ proxy บอกว่าคืน `null` → `create()` ที่ finance ปฏิเสธหลังตัดสต็อกจะไม่ log · บิลค้าง `COMPLETING` (crash หลังออกใบกำกับ) ยังไม่มี API กู้ · erp-frontend `deploy-app.sh` ยัง default `v24.18.0` (ยังติดตั้งไว้บน server) · `system-admin-bc` (meditech-api) restart วน: box ไม่มี route ไป `10.x` DB/Redis ของมัน — ไม่เกี่ยวกับ Node
+
 ### 2026-10-23 · รีวิว + แก้ branch `feature/purchase-discound-document` แล้ว merge เข้า main ✅ **verify 5 BC ครบ 6 ขั้น + migrate + deploy + ทดสอบบนโดเมน** · `c7e1fae`…`903a171`
 
 | | ของใหม่ / ที่แก้ |
