@@ -169,21 +169,30 @@
             กติกา: <b>ทุก snapshot ของ <span class="mono text-[12px]">_en</span> ที่ไม่บังคับต้อง nullable ด้วย</b> — ครบทั้งคอลัมน์ entity, interface ของ lookup/event payload และ response DTO
             (<span class="mono text-[12px]">string | null</span>) ไม่ใช่แก้แค่ต้นทาง
           </p>
+          <p class="text-[13.5px] mt-3">
+            <b>ลูกค้า / ผู้ขาย (2026-10-26)</b> — <span class="mono text-[12px]">customers.name_en</span> (sales-bc) และ <span class="mono text-[12px]">suppliers.name_en</span> (supplier-bc)
+            <b>ไม่บังคับ</b>ตามกติกาเดียวกัน: ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span> · response <span class="mono text-[12px]">name: { th, en: null }</span> ·
+            ทุกเอกสารที่ snapshot ชื่อคู่ค้า (<span class="mono text-[12px]">customer_name_en</span> / <span class="mono text-[12px]">supplier_name_en</span> / <span class="mono text-[12px]">party_name_en</span>) เก็บ <span class="mono text-[12px]">NULL</span> ตาม ·
+            <b>ไม่มี fallback</b> — ห้ามเอาชื่อไทยมาใส่ช่อง <span class="mono text-[12px]">_en</span> แทน (โค้ดเดิม <span class="mono text-[12px]">customer.name_en ?? customer.name_th</span> ถูกถอดออกแล้ว):
+            ชื่อไทยที่ติดป้ายว่าเป็นอังกฤษคือข้อมูลผิด และ client แยกไม่ออกว่าเป็นชื่อจริงหรือของเติม ·
+            ใบคืนเงิน (<span class="mono text-[12px]">customer_refunds</span>/<span class="mono text-[12px]">supplier_refunds</span>) เดิมเก็บ <span class="mono text-[12px]">''</span> เมื่อหาชื่อไม่เจอ — ตอนนี้เก็บ <span class="mono text-[12px]">null</span> ·
+            แถวของรายงาน aging ลูกหนี้/เจ้าหนี้ก็มี <span class="mono text-[12px]">customer_name_en</span>/<span class="mono text-[12px]">supplier_name_en</span> = <span class="mono text-[12px]">null</span> ได้
+          </p>
           <div class="card overflow-hidden mt-3">
             <table class="d">
               <thead><tr><th>BC</th><th>คอลัมน์ snapshot ที่เป็น nullable</th></tr></thead>
               <tbody>
-                <tr><td>inventory-bc</td><td class="mono text-[12px]">products.name_en (ต้นทาง) · goods_receipt_items.product_name_en</td></tr>
-                <tr><td>supplier-bc</td><td class="mono text-[12px]">purchase_order_items.product_name_en</td></tr>
-                <tr><td>sales-bc</td><td class="mono text-[12px]">quotation_items · sales_order_items · pos_sale_items .product_name_en</td></tr>
-                <tr><td>finance-bc</td><td class="mono text-[12px]">receipt_items · ap_invoice_items .product_name_en</td></tr>
+                <tr><td>inventory-bc</td><td class="mono text-[12px]">products.name_en (ต้นทาง) · goods_receipt_items.product_name_en · goods_receipts.supplier_name_en (snapshot จาก PO)</td></tr>
+                <tr><td>supplier-bc</td><td class="mono text-[12px]">purchase_order_items.product_name_en · suppliers.name_en (ต้นทาง) · purchase_orders.supplier_name_en</td></tr>
+                <tr><td>sales-bc</td><td class="mono text-[12px]">quotation_items · sales_order_items · pos_sale_items .product_name_en · customers.name_en (ต้นทาง) · quotations · sales_orders · delivery_notes · sales_returns · pos_sales .customer_name_en</td></tr>
+                <tr><td>finance-bc</td><td class="mono text-[12px]">receipt_items · ap_invoice_items .product_name_en · receipts · billing_notes · credit_applications · customer_refunds .customer_name_en · payment_entries.party_name_en · ap_invoices · supplier_credit_applications · supplier_refunds .supplier_name_en</td></tr>
                 <tr><td>report-bc</td><td class="mono text-[12px]">low_stocks · expiry_alerts .product_name_en (snapshot จาก event payload)</td></tr>
               </tbody>
             </table>
           </div>
           <p class="text-[13.5px] mt-3">
             <b>ฝั่งพิมพ์</b> — print mapper ส่ง <span class="mono text-[12px]">''</span> แทน <span class="mono text-[12px]">null</span>
-            (<span class="mono text-[12px]">name_en: item.product_name_en ?? ''</span>) เทมเพลตจึงไม่ต้องเช็ค null และไม่พิมพ์คำว่า "null" ออกมา ·
+            (<span class="mono text-[12px]">name_en: item.product_name_en ?? ''</span> · ชื่อคู่ค้าเช่น <span class="mono text-[12px]">customer_name_en: receipt.customer_name_en ?? ''</span>) เทมเพลตจึงไม่ต้องเช็ค null และไม่พิมพ์คำว่า "null" ออกมา — บรรทัดชื่ออังกฤษบนเอกสารพิมพ์เป็นบรรทัดว่าง ·
             ทิศกลับกัน (ทำ <span class="mono text-[12px]">_en</span> ให้บังคับ) ต้อง backfill ทุกสำเนาก่อน ไม่งั้น migration <span class="mono text-[12px]">SET NOT NULL</span> ล้มบนแถวที่มีอยู่
           </p>
         </div>

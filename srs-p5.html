@@ -164,7 +164,7 @@ erDiagram
         string adjustment_reason "86/10 · สาเหตุการออกใบลดหนี้/เพิ่มหนี้ — บังคับกรอกเฉพาะสองประเภทนี้, ถูกบังคับเป็น null สำหรับประเภทอื่น"
         uuid customer_id "ref sales-bc"
         string customer_name_th "snapshot 86/4(2)"
-        string customer_name_en "snapshot"
+        string customer_name_en "snapshot, NULL เมื่อลูกค้าไม่มีชื่ออังกฤษ"
         string customer_tax_id "snapshot · required only for FULL_TAX_INVOICE/INV_TAX_INVOICE"
         string customer_address "snapshot 86/4(3) · null for documents raised before the column existed"
         uuid delivery_note_id "ref sales-bc · claimed link is verified — see RULE AR DELIVERY MATCH"
@@ -382,6 +382,7 @@ erDiagram
 </pre>
           </div>
           <p class="text-[12.5px] mt-3" style="color:var(--muted)"><span class="mono text-[12px]">document_type</span> ค่าที่ใช้ได้ (8 ค่า): <span class="mono text-[12px]">RECEIPT</span> (ใบเสร็จรับเงิน) · <span class="mono text-[12px]">INVOICE</span> (ใบแจ้งหนี้ทั่วไป) · <span class="mono text-[12px]">PROFORMA_INVOICE</span> (ใบแจ้งหนี้ชั่วคราว — สามตัวนี้ไม่มี VAT) · <span class="mono text-[12px]">FULL_TAX_INVOICE</span> (ใบกำกับภาษีเต็มรูป §86/4) · <span class="mono text-[12px]">INV_TAX_INVOICE</span> (ใบแจ้งหนี้/ใบกำกับภาษีรวมกัน) · <span class="mono text-[12px]">ABB_TAX_INVOICE</span> (ใบกำกับภาษีอย่างย่อ §86/6 — VAT รวมในราคา) · <span class="mono text-[12px]">CREDIT_NOTE</span> (ใบลดหนี้) · <span class="mono text-[12px]">DEBIT_NOTE</span> (ใบเพิ่มหนี้ — สองตัวหลัง §86/22 บังคับมี <span class="mono text-[12px]">reference_receipt_id</span>)</p>
+          <p class="text-[12.5px] mt-3" style="color:var(--muted)"><b>ชื่อคู่ค้าภาษาอังกฤษเป็น nullable ทุกเอกสาร (2026-10-26)</b> — <span class="mono text-[12px]">customers.name_en</span> (sales-bc) และ <span class="mono text-[12px]">suppliers.name_en</span> (supplier-bc) ไม่บังคับแล้ว snapshot ฝั่ง finance-bc จึงเป็น <span class="mono text-[12px]">NULL</span> ได้: <span class="mono text-[12px]">receipts.customer_name_en</span> · <span class="mono text-[12px]">billing_notes.customer_name_en</span> · <span class="mono text-[12px]">payment_entries.party_name_en</span> · <span class="mono text-[12px]">ap_invoices.supplier_name_en</span> · <span class="mono text-[12px]">credit_applications.customer_name_en</span> · <span class="mono text-[12px]">customer_refunds.customer_name_en</span> · <span class="mono text-[12px]">supplier_credit_applications.supplier_name_en</span> · <span class="mono text-[12px]">supplier_refunds.supplier_name_en</span> · <b>ไม่มี fallback เป็นชื่อไทย</b> · ใบคืนเงินที่เดิมเก็บ <span class="mono text-[12px]">''</span> เมื่อไม่มีชื่อ ตอนนี้เก็บ <span class="mono text-[12px]">null</span> · แถวรายงาน aging (<span class="mono text-[12px]">receipt-agings</span> / <span class="mono text-[12px]">ap-invoice-agings</span>) มี <span class="mono text-[12px]">customer_name_en</span>/<span class="mono text-[12px]">supplier_name_en</span> = <span class="mono text-[12px]">null</span> ได้ · เอกสารพิมพ์แสดงบรรทัดชื่ออังกฤษเป็นบรรทัดว่าง (print mapper ส่ง <span class="mono text-[12px]">''</span>) — ดู <a href="i18n-guide.html#database" style="color:var(--accent);text-decoration:underline">i18n-guide §02</a></p>
         </div>
 
         <!-- 5.5 Receipt Lifecycle -->

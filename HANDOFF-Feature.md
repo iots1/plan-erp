@@ -220,6 +220,14 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
    ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
+### 2026-10-26 · รีวิว + แก้ `feature/optional-cus-supplier` แล้ว merge เข้า main ✅ **verify sales/supplier/finance/inventory ครบ 6 ขั้น + sales-bc หลัง merge smoke 11/11 + migrate + drift ไม่มี diff** · merge `21aa675`
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| `customers.name_en` / `suppliers.name_en` ไม่บังคับ | branch เดิมใส่ `name_en ?? name_th` แค่ 3 จุด → ลบ fallback ทั้งหมด (response ต้องตรงความจริง `en: null`) และทำ snapshot ทั้ง 14 ตารางให้ nullable — finance-bc 7 ตารางเดิมจะทำให้ลูกค้าไม่มีชื่ออังกฤษออกใบเสร็จไม่ได้ · ใบคืนเงินเลิกเขียน `''` |
+| DTO | field ไม่บังคับใน body DTO = `@IsOptional()` + `T \| null` ไม่ใช้ `?:` (กฎ `api-contract.md` + check `optional-dto-marker`) · DTO บิลพักแก้ตามแล้ว |
+| migration | migration เขียนมือของ branch ยังไม่เคยรัน → ลบ แล้ว generate ใหม่ sales/supplier/finance รันบน DB แล้ว |
+
 ### 2026-10-26 · รีวิว + แก้ `feature/product` และ `feature/suspend-sales` (พักบิล POS) แล้ว merge เข้า main ✅ **verify 5 BC ครบ 6 ขั้น (product) + sales-bc หลัง merge ครบ 6 ขั้น smoke 10/10 + migrate + drift check 5 BC ไม่มี diff** · merge `53a494d`
 
 | | ของใหม่ / ที่แก้ |

@@ -109,8 +109,8 @@
           <div class="card p-6 mb-4">
             <div class="step"><span class="sn">1</span><p class="text-[13.5px]"><b>พักบิล</b> <span class="mono text-[12px]">POST /sales-bc/v1/pos-sales</span> + <span class="mono text-[12px]">"is_held": true</span> → <span class="mono text-[12px]">HELD</span> · ตรวจลูกค้า/สินค้า/สินค้าซ้ำ/variant template/ส่วนลด เหมือนการขายจริงทุกข้อ แต่<b>ไม่มีอะไรออกจาก sales-bc</b>: ไม่ตัดสต็อก ไม่เรียก finance-bc ไม่รับเงิน (<span class="mono text-[12px]">payment_method</span>/<span class="mono text-[12px]">paid_amount</span>/<span class="mono text-[12px]">reference</span> ถูกละเลย) · ยังดึง <span class="mono text-[12px]">pos_number</span> ตอนพัก (เลขภายใน ไม่ใช่เลขตามกฎหมาย ทิ้งได้ไม่เสียอะไร)</p></div>
             <div class="step"><span class="sn">2</span><p class="text-[13.5px]"><b>แก้บิลพัก</b> <span class="mono text-[12px]">PUT /sales-bc/v1/pos-sales/{id}</span> — เฉพาะ <span class="mono text-[12px]">HELD</span> · แก้ได้ <span class="mono text-[12px]">customer_id</span>, <span class="mono text-[12px]">warehouse_id</span>, <span class="mono text-[12px]">document_type</span>, <span class="mono text-[12px]">discount_mode</span>/<span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span>, <span class="mono text-[12px]">remark_th</span>/<span class="mono text-[12px]">remark_en</span>, <span class="mono text-[12px]">items</span> (sync ตาม <span class="mono text-[12px]">product_id</span> บรรทัดเดิมคง id) · ไม่ส่ง = คงค่าเดิม · ไม่ใช่ <span class="mono text-[12px]">HELD</span> หรือ <span class="mono text-[12px]">has_pending_stock_cut = true</span> → <span class="mono text-[12px]">409</span></p></div>
-            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>ปิดบิล</b> <span class="mono text-[12px]">POST /sales-bc/v1/pos-sales/{id}/complete</span> <span class="mono text-[12px]">{ payment_method, paid_amount?, reference?, document_date? }</span> → <span class="mono text-[12px]">HELD → COMPLETING → COMPLETED</span> · สามขั้นเดียวกับการขายปกติ ลำดับเดียวกัน (ตัดสต็อก → ออกใบกำกับ + รับชำระ → commit) ด้วยบรรทัดที่บิลเก็บไว้</p></div>
-            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ยกเลิกบิลพัก</b> <span class="mono text-[12px]">POST /sales-bc/v1/pos-sales/{id}/cancel</span> <span class="mono text-[12px]">{ cancel_reason? }</span> → <span class="mono text-[12px]">CANCELLED</span> · แถว (และ <span class="mono text-[12px]">pos_number</span>) ยังอยู่เป็นหลักฐานว่าตะกร้านี้เคยมี · บิล <span class="mono text-[12px]">COMPLETED</span> ต้องใช้ <span class="mono text-[12px]">void</span> แทน (<span class="mono text-[12px]">409</span>)</p></div>
+            <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>ปิดบิล</b> <span class="mono text-[12px]">POST /sales-bc/v1/pos-sales/{id}/complete</span> <span class="mono text-[12px]">{ payment_method, paid_amount, reference, document_date }</span> (บังคับแค่ <span class="mono text-[12px]">payment_method</span> · สามตัวหลังไม่ส่งหรือส่ง <span class="mono text-[12px]">null</span> ได้) → <span class="mono text-[12px]">HELD → COMPLETING → COMPLETED</span> · สามขั้นเดียวกับการขายปกติ ลำดับเดียวกัน (ตัดสต็อก → ออกใบกำกับ + รับชำระ → commit) ด้วยบรรทัดที่บิลเก็บไว้ · inventory-bc <b>ปฏิเสธ</b>การตัด (ของไม่พอ / งวดสต็อกปิด) → client ได้ status และข้อความของ inventory-bc เอง (เช่น <span class="mono text-[12px]">400</span>/<span class="mono text-[12px]">409</span>) · inventory-bc <b>ไม่ตอบเลย</b>เท่านั้นที่เป็น <span class="mono text-[12px]">503</span> · ทั้งสองกรณีบิลกลับเป็น <span class="mono text-[12px]">HELD</span> ไม่มีอะไรขยับ</p></div>
+            <div class="step"><span class="sn">4</span><p class="text-[13.5px]"><b>ยกเลิกบิลพัก</b> <span class="mono text-[12px]">POST /sales-bc/v1/pos-sales/{id}/cancel</span> <span class="mono text-[12px]">{ cancel_reason }</span> (ไม่บังคับ — ไม่ส่งหรือส่ง <span class="mono text-[12px]">null</span> ได้) → <span class="mono text-[12px]">CANCELLED</span> · แถว (และ <span class="mono text-[12px]">pos_number</span>) ยังอยู่เป็นหลักฐานว่าตะกร้านี้เคยมี · บิล <span class="mono text-[12px]">COMPLETED</span> ต้องใช้ <span class="mono text-[12px]">void</span> แทน (<span class="mono text-[12px]">409</span>)</p></div>
           </div>
           <div class="card overflow-hidden mb-4">
             <table class="d">
@@ -217,7 +217,7 @@ erDiagram
         uuid id PK
         string code
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         string tax_id
         string contact_phone
     }
@@ -225,7 +225,7 @@ erDiagram
         uuid id PK
         uuid supplier_id FK
         string supplier_name_th "copied from suppliers.name_th"
-        string supplier_name_en "copied from suppliers.name_en"
+        string supplier_name_en "copied from suppliers.name_en, NULL เมื่อผู้ขายไม่มีชื่ออังกฤษ"
         string supplier_tax_id "copied from suppliers.tax_id"
         string po_number
         string status "DRAFT_APPROVED_SENT_PARTIAL_RECEIVED_CANCELLED"
@@ -279,7 +279,7 @@ erDiagram
         uuid id PK
         string code
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         string tax_id
         bool is_vat_registered
         string customer_type "company_individual"
@@ -293,7 +293,7 @@ erDiagram
         uuid id PK
         uuid customer_id FK
         string customer_name_th "copied from customers.name_th"
-        string customer_name_en "copied from customers.name_en"
+        string customer_name_en "copied from customers.name_en, NULL เมื่อลูกค้าไม่มีชื่ออังกฤษ"
         string customer_tax_id "copied from customers.tax_id"
         string customer_address "copied from customers.address · printed on the quotation"
         string quotation_number "QT_YYYY_00001"
@@ -512,7 +512,7 @@ erDiagram
     POS_SALES ||--o{ POS_SALE_ITEMS : contains
 </pre>
           </div>
-          <p class="text-[12.5px] mt-4" style="color:var(--muted)"><b>หมายเหตุ ER (อัปเดตให้ตรงโค้ด 2026-08):</b> <span class="mono text-[12px]">INBOUND_SHIPMENTS</span> ถูกถอดออก — ไม่เคย implement และการรับของถูกแทนด้วย <span class="mono text-[12px]">goods_receipts</span> (inventory-bc) + ledger <span class="mono text-[12px]">purchase_order_receipts</span> ที่ใช้ recompute <span class="mono text-[12px]">received_qty</span> · <span class="mono text-[12px]">PACKED_ITEMS</span> ถูกถอดออกเช่นกัน — โค้ดจริง<b>ไม่ denormalize BOM ลงเอกสารฝั่งขาย</b> แต่แตกชุดตอนรันไทม์ที่ inventory-bc (<span class="mono text-[12px]">bundle_items</span> + <span class="mono text-[12px]">explodeDemands()</span>) เหตุผลเต็มอยู่ที่ srs-p3.html §08 D8 · <b>2026-10-26</b> เพิ่ม <span class="mono text-[12px]">POS_SALES</span>/<span class="mono text-[12px]">POS_SALE_ITEMS</span> (สถานะบิลพัก + <span class="mono text-[12px]">has_pending_stock_cut</span>) และ <span class="mono text-[12px]">product_name_en</span> ของทุกบรรทัดเอกสารเป็น nullable ตาม <span class="mono text-[12px]">products.name_en</span> ที่ไม่บังคับแล้ว (srs-p2) · ตารางที่ไม่ได้วาดไว้ในแผนภาพเพราะเป็น infrastructure ล้วน: <span class="mono text-[12px]">purchase_order_number_counters</span> · <span class="mono text-[12px]">quotation_number_counters</span> · <span class="mono text-[12px]">sales_order_number_counters</span> · <span class="mono text-[12px]">delivery_note_number_counters</span> · <span class="mono text-[12px]">pos_sale_number_counters</span> (ทุกตัว extend <span class="mono text-[12px]">DocumentNumberCounterEntity</span> — หนึ่งตารางต่อ BC ต่อประเภทเอกสาร)</p>
+          <p class="text-[12.5px] mt-4" style="color:var(--muted)"><b>หมายเหตุ ER (อัปเดตให้ตรงโค้ด 2026-08):</b> <span class="mono text-[12px]">INBOUND_SHIPMENTS</span> ถูกถอดออก — ไม่เคย implement และการรับของถูกแทนด้วย <span class="mono text-[12px]">goods_receipts</span> (inventory-bc) + ledger <span class="mono text-[12px]">purchase_order_receipts</span> ที่ใช้ recompute <span class="mono text-[12px]">received_qty</span> · <span class="mono text-[12px]">PACKED_ITEMS</span> ถูกถอดออกเช่นกัน — โค้ดจริง<b>ไม่ denormalize BOM ลงเอกสารฝั่งขาย</b> แต่แตกชุดตอนรันไทม์ที่ inventory-bc (<span class="mono text-[12px]">bundle_items</span> + <span class="mono text-[12px]">explodeDemands()</span>) เหตุผลเต็มอยู่ที่ srs-p3.html §08 D8 · <b>2026-10-26</b> เพิ่ม <span class="mono text-[12px]">POS_SALES</span>/<span class="mono text-[12px]">POS_SALE_ITEMS</span> (สถานะบิลพัก + <span class="mono text-[12px]">has_pending_stock_cut</span>) และ <span class="mono text-[12px]">product_name_en</span> ของทุกบรรทัดเอกสารเป็น nullable ตาม <span class="mono text-[12px]">products.name_en</span> ที่ไม่บังคับแล้ว (srs-p2) · วันเดียวกัน <span class="mono text-[12px]">customers.name_en</span> / <span class="mono text-[12px]">suppliers.name_en</span> ก็ไม่บังคับ และ snapshot หัวเอกสาร <span class="mono text-[12px]">customer_name_en</span> ของ quotation · sales order · delivery note · sales return · POS กับ <span class="mono text-[12px]">supplier_name_en</span> ของ PO เป็น nullable ตาม — เก็บ <span class="mono text-[12px]">NULL</span> ตามต้นทาง <b>ไม่เอาชื่อไทยมาใส่แทน</b> (ดู <a href="i18n-guide.html#database" style="color:var(--blueprint);text-decoration:underline">i18n-guide §02</a>) · ตารางที่ไม่ได้วาดไว้ในแผนภาพเพราะเป็น infrastructure ล้วน: <span class="mono text-[12px]">purchase_order_number_counters</span> · <span class="mono text-[12px]">quotation_number_counters</span> · <span class="mono text-[12px]">sales_order_number_counters</span> · <span class="mono text-[12px]">delivery_note_number_counters</span> · <span class="mono text-[12px]">pos_sale_number_counters</span> (ทุกตัว extend <span class="mono text-[12px]">DocumentNumberCounterEntity</span> — หนึ่งตารางต่อ BC ต่อประเภทเอกสาร)</p>
         </div>
 
         <!-- 4.5 Dev Guide -->
@@ -744,7 +744,9 @@ curl -X POST http://localhost:3005/sales-bc/v1/customers \
     "tax_id": "0105558000001", "address": "123 ถนนตัวอย่าง เชียงใหม่",
     "credit_terms": 30, "credit_limit": 500000
   }'</span>
-<span class="c"># -> 201, name = { "th": "...", "en": "..." } (LocalizationInterceptor รวม _th/_en ให้)</span></pre>
+<span class="c"># -> 201, name = { "th": "...", "en": "..." } (LocalizationInterceptor รวม _th/_en ให้)</span>
+<span class="c"># name_en ไม่บังคับ — ไม่ส่ง/ส่ง null = NULL → name = { "th": "...", "en": null }</span>
+<span class="c"># เอกสารที่ออกให้ลูกค้ารายนี้เก็บ customer_name_en = NULL ด้วย (ไม่มี fallback เป็นชื่อไทย)</span></pre>
           </div>
 
           <div class="step"><span class="sn">3</span><p class="text-[13.5px]"><b>ออกใบเสนอราคา</b> — <span class="mono text-[12px]">product_id</span> ต้องเป็นสินค้าจริงจาก inventory-bc ที่ <span class="mono text-[12px]">has_variants=false</span> — <b>bundle เสนอราคาได้แล้ว</b> (M6) โดยตั้ง BOM ไว้ก่อนที่ <span class="mono text-[12px]">POST /inventory-bc/v1/products/{id}/bundle-items</span></p></div>

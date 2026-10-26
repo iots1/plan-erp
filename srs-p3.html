@@ -422,7 +422,7 @@ erDiagram
         uuid po_id "ref supplier-bc"
         string po_number "snapshot — ใบรับที่พิมพ์ต้องอ้างเลขที่ PO ได้เองโดยไม่ยิงข้าม BC"
         string supplier_name_th "snapshot จาก purchase_orders"
-        string supplier_name_en "snapshot"
+        string supplier_name_en "snapshot, NULL เมื่อ PO ไม่มีชื่ออังกฤษของผู้ขาย"
         uuid warehouse_id FK
         string status
     }
