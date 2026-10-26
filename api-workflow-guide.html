@@ -443,7 +443,7 @@ sequenceDiagram
   <span class="s">"expected_date"</span>: <span class="s">"2026-09-05T00:00:00+07:00"</span>,
   <span class="s">"remark_th"</span>: <span class="s">"สั่งล็อตประจำเดือน"</span>,
   <span class="s">"remark_en"</span>: <span class="k">null</span>,
-  <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,   <span class="c">// none | header | per_item — เลือกได้อย่างเดียว</span>
+  <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,   <span class="c">// none | header | per_item | both</span>
   <span class="s">"discount_type"</span>: <span class="s">"amount"</span>,
   <span class="s">"discount_value"</span>: <span class="t">0</span>,
   <span class="s">"items"</span>: [
@@ -453,13 +453,15 @@ sequenceDiagram
 }</pre>
         </div>
         <div class="rulebox mb-8">
-          <div class="rc mb-1">ส่วนลด · เลือกได้โหมดเดียว ห้ามผสม</div>
+          <div class="rc mb-1">ส่วนลด · สี่โหมด · both = ลดรายการแล้วลดท้ายบิล (2026-10-27)</div>
           <p class="text-[13.5px]">
             <span class="mono text-[12px]">discount_mode</span> ตัดสินทั้งใบ —
             <span class="mono text-[12px]">none</span> ไม่มีส่วนลด ·
             <span class="mono text-[12px]">header</span> ลดที่ยอดรวม (ต้องส่ง <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span>) ·
-            <span class="mono text-[12px]">per_item</span> ลดรายบรรทัด · <b>ส่วนลดที่ส่งมาผิดโหมดจะถูกทิ้ง</b> ไม่ error
-            เช่นส่ง <span class="mono text-[12px]">discount</span> รายบรรทัดมาตอน <span class="mono text-[12px]">header</span> — FE ควรซ่อนช่องที่ไม่เกี่ยวไว้เลย ·
+            <span class="mono text-[12px]">per_item</span> ลดรายบรรทัด ·
+            <b><span class="mono text-[12px]">both</span></b> ลดรายบรรทัดก่อน แล้วลดท้ายบิลจาก<b>ยอดหลังหักส่วนลดรายการ</b> (ต้องส่ง <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span>; 1,000 ลดรายการ 200 → 800 · ท้ายบิล 10% = 80 · ยอด 720) — <b>FE ต้องคิด % ท้ายบิลจากยอดหลังลดรายการด้วย</b> ไม่งั้นหน้าจอจะไม่ตรงกับ server ·
+            <b>ส่วนลดที่ส่งมาผิดโหมดจะถูกทิ้ง</b> ไม่ error
+            เช่นส่ง <span class="mono text-[12px]">discount</span> รายบรรทัดมาตอน <span class="mono text-[12px]">header</span> — ถ้าหน้าจอให้กรอกได้ทั้งสองแบบ ให้ส่ง <span class="mono text-[12px]">both</span> ·
             ไม่ส่ง <span class="mono text-[12px]">discount_mode</span> ตอนสร้าง = <span class="mono text-[12px]">none</span> (ตอนแก้ = คงค่าเดิม) — <b>ยกเว้น POS</b> ที่เดาเป็น <span class="mono text-[12px]">per_item</span> เมื่อมีส่วนลดรายบรรทัด (ดู B5)
           </p>
         </div>
@@ -1144,7 +1146,7 @@ sequenceDiagram
             ข้อยกเว้นเดียวของกฎ "ส่วนลด · เลือกได้โหมดเดียว" (A2) และมีเฉพาะ POS (<span class="mono text-[12px]">PosSalesService.resolveDiscountMode</span>):
             <b>ไม่ส่ง <span class="mono text-[12px]">discount_mode</span></b> + มีบรรทัดใดที่ <span class="mono text-[12px]">discount &gt; 0</span> → <span class="mono text-[12px]">per_item</span> ·
             ไม่มีบรรทัดไหนลด → <span class="mono text-[12px]">none</span> · เหตุผล: เครื่อง POS ที่คีย์ลดราคาสินค้าชิ้นหนึ่งแล้วไม่ส่งโหมดมา ตั้งใจให้ลดจริง — ถ้าตีเป็น <span class="mono text-[12px]">none</span> ลูกค้าจะโดนคิดราคาป้ายเต็มเงียบ ๆ<br>
-            <b>ส่งโหมดมาชัดเจน = ใช้ตามนั้นเสมอ</b> — <span class="mono text-[12px]">none</span>/<span class="mono text-[12px]">header</span> ยังทิ้งส่วนลดรายบรรทัดตามกฎ DiscountMode ปกติ (ไม่ถูกยกระดับเป็น <span class="mono text-[12px]">per_item</span>) ·
+            <b>ส่งโหมดมาชัดเจน = ใช้ตามนั้นเสมอ</b> — <span class="mono text-[12px]">none</span>/<span class="mono text-[12px]">header</span> ยังทิ้งส่วนลดรายบรรทัดตามกฎ DiscountMode ปกติ (ไม่ถูกยกระดับเป็น <span class="mono text-[12px]">per_item</span>/<span class="mono text-[12px]">both</span>) · ลดทั้งรายสินค้าและท้ายบิลในบิลเดียว → ส่ง <span class="mono text-[12px]">both</span> ·
             เอกสารอื่นทุกใบไม่ส่งโหมดตอนสร้าง = <span class="mono text-[12px]">none</span> · บิลพัก (B5.1) เดาแบบเดียวกันตอนพัก แต่ <span class="mono text-[12px]">PUT</span> ที่ไม่ส่งโหมด = คงโหมดเดิม
           </p>
         </div>

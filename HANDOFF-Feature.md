@@ -217,6 +217,19 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-10-27 · `discount_mode: both` — ส่วนลดรายสินค้า + ส่วนลดท้ายบิลในเอกสารเดียว (`feature/discount-mode-both`) ✅ **migrate 3 BC + `schema:log` ไม่มี diff + verify sales/supplier/finance/inventory ครบ 6 ขั้น + deploy + smoke `both` 4 ไฟล์บนโดเมน 4/4** · `1c1320a`, merge `ecb143d` (+ `5be81a0` smoke อ่าน DB ผ่าน `eventually`)
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| ที่มา | หน้า POS / ใบเสนอราคาของ frontend รวมส่วนลดสองแบบบนหน้าจอ แต่ส่ง `header` → server ทิ้งส่วนลดรายสินค้า **ลูกค้าจ่ายมากกว่าหน้าจอ** · ผู้ใช้ตัดสิน: ต้องใช้สองแบบพร้อมกันได้ (ความยืดหยุ่นหน้าร้าน) — ทุกเอกสาร ทั้งขายและซื้อ |
+| กฎ | `DiscountMode.BOTH = 'both'`: ลดรายบรรทัดก่อน แล้วลดท้ายบิล (บังคับ `discount_type`/`discount_value`) จาก `sub_total − Σ ส่วนลดรายการ` — % ท้ายบิลไม่ลดซ้ำบนเงินที่ลดไปแล้ว · จำนวนเงินท้ายบิลเกินยอดหลังลดรายการ → 400 · `total = sub_total − total_discount` ยังจริงทุกโหมด |
+| โค้ดกลาง | `appliesLineDiscount()` / `appliesHeaderDiscount()` ใน `document-totals.util.ts` แทนการเทียบ `=== HEADER` / `=== PER_ITEM` ทุกจุด (เทียบตัวเดียว = ทิ้งครึ่งหนึ่งของเอกสาร `both` เงียบ ๆ) · `IDocumentTotals.header_discount` = ส่วนท้ายบิลอย่างเดียว ใช้ปันลงบรรทัดก่อนคิด VAT |
+| VAT | ปันเฉพาะส่วนท้ายบิลตามยอด**หลัง**ลดรายการ — ใบเสร็จเดิมถ่วงด้วย gross (ใน `header` ผลเท่ากัน แต่ใน `both` บรรทัดที่ลดรายการเยอะจะได้ส่วนท้ายบิลเกินสัดส่วน) · ใบแจ้งหนี้ผู้ขาย / ใบเสนอราคาเดิมปัน `total_discount` ทั้งก้อน → ตอนนี้ปัน `header_discount` |
+| พิมพ์ | label `ส่วนลดตามรายการ + ท้ายบิล (10% หลังส่วนลดรายการ)` · ใบรับสินค้าที่พิมพ์: ส่วนลดรายบรรทัดตาม PO + ส่วนท้ายบิลของ PO × (ยอดหลังลดรายการของใบนี้ ÷ ของ PO) |
+| migration | generate sales / supplier / finance — enum 6 ตัว (quotations, sales_orders, pos_sales, purchase_orders, receipts, ap_invoices) เพิ่ม `both` + comment คอลัมน์ · รันบน DB แล้ว · `schema:log` ไม่มี diff · `down()` ล้มถ้ามีแถว `both` (ไม่มี mapping ที่ไม่เสียข้อมูล) |
+| เทสต์ | unit: util (BOTH 7 เคส + predicate), ใบเสร็จ (ปัน VAT ตามยอดหลังลดรายการ 500/400), ใบเสนอราคา, ใบรับสินค้าพิมพ์ · บั๊กที่ unit จับได้ระหว่างทำ: ผลรวมส่วนลดรายการติดลบจากการปัดเศษสร้าง `header_discount` ปลอม → clamp ก่อน · smoke: POS `both` 100 − 10 − 10% = **81** + ใบเสร็จ finance ตรงกัน · PO `both` (400 เมื่อท้ายบิลเกินยอดหลังลดรายการ, PUT % คิดจากบรรทัดที่เก็บไว้) · ใบเสร็จ DRAFT `both` (ปันเฉพาะส่วนท้ายบิล) · ใบรับสินค้าพิมพ์จาก PO `both` รับครึ่งเดียว 1,250 − 237.50 = 1,012.50 · smoke POS เดิมอ่าน `pos_sales.discount_mode` ทันทีหลังสร้าง → ล้ม 1 ใน 5 รอบบนโดเมน (pgpool ส่งไป standby) แก้เป็น `eventually` |
+| ส่งต่อ frontend | `HANDOFF-Next-Steps-2026-10-26.md` §2.1 — ส่ง `both` + คิด % ท้ายบิลจากยอดหลังลดรายการ |
+
 ### 2026-10-26 · ทุกช่อง `*_en` ทั้งระบบไม่บังคับ (`chore/optional-en-columns`) ⏳ **migrate 6 BC + `schema:log` 7 DB ไม่มี diff + verify iam/inventory/supplier/sales ครบ 6 ขั้น · finance/report กำลังรัน · ยังไม่ merge**
 
 | | ของใหม่ / ที่แก้ |

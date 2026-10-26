@@ -171,7 +171,7 @@ erDiagram
         timestamptz document_date "selects the tax rate · Asia/Bangkok"
         timestamptz due_date "document_date + customers.credit_terms · null = no terms"
         decimal sub_total "gross before discount"
-        string discount_mode "none_header_per_item"
+        string discount_mode "none_header_per_item_both"
         string discount_type "percent_amount · header only"
         decimal discount_value "header only"
         decimal total_discount
@@ -211,8 +211,8 @@ erDiagram
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
         int qty
         decimal unit_price
-        string discount_type "per_item mode only"
-        decimal discount "per_item mode only"
+        string discount_type "per_item or both only"
+        decimal discount "per_item or both only"
         decimal header_discount_amount "pro-rata share"
         string vat_treatment "standard_zero_exempt · from inventory-bc"
         decimal vat_rate "0 when zero_rated_exempt or document has no VAT"

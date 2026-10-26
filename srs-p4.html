@@ -234,7 +234,7 @@ erDiagram
         date document_date "defaults to today"
         date expected_date
         decimal sub_total "GROSS before any discount"
-        string discount_mode "none_header_per_item"
+        string discount_mode "none_header_per_item_both"
         string discount_type "percent_amount · header mode only"
         decimal discount_value "header mode only · nullable"
         decimal total_discount "resolved per discount_mode"
@@ -257,8 +257,8 @@ erDiagram
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
         int qty
         decimal unit_cost
-        string discount_type "percent_amount · per_item mode only"
-        decimal discount "per_item mode only"
+        string discount_type "percent_amount · per_item or both only"
+        decimal discount "per_item or both only"
     }
     PURCHASE_ORDER_RECEIPTS {
         uuid id PK
@@ -304,7 +304,7 @@ erDiagram
         uuid price_list_id "ref inventory-bc price_lists.id"
         bool is_vat_included "copied from price_lists.is_vat_included"
         decimal sub_total "GROSS before any discount"
-        string discount_mode "none_header_per_item"
+        string discount_mode "none_header_per_item_both"
         string discount_type "percent_amount · header mode only"
         decimal discount_value "header mode only · nullable"
         decimal total_discount "resolved per discount_mode"
@@ -333,8 +333,8 @@ erDiagram
         string product_name_en "copied from inventory-bc products.name_en, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
         int qty
         decimal unit_price
-        string discount_type "percent_amount · per_item mode only"
-        decimal discount "per_item mode only"
+        string discount_type "percent_amount · per_item or both only"
+        decimal discount "per_item or both only"
         decimal line_total
         string vat_treatment "standard_zero_rated_exempt, from inventory-bc tax_categories"
         decimal vat_rate "0 unless standard-rated"
@@ -453,7 +453,7 @@ erDiagram
         decimal paid_amount "0 until completed"
         decimal change_amount
         decimal sub_total "provisional while HELD"
-        string discount_mode "none_header_per_item"
+        string discount_mode "none_header_per_item_both"
         decimal total_discount "provisional while HELD"
         decimal vat_rate "0 while HELD or COMPLETING = not priced yet"
         decimal net_amount "0 while HELD or COMPLETING"
@@ -472,8 +472,8 @@ erDiagram
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
         int qty
         decimal unit_price "VAT-inclusive under ABB, ex-VAT under FULL"
-        string discount_type "per_item mode only"
-        decimal discount "per_item mode only"
+        string discount_type "per_item or both only"
+        decimal discount "per_item or both only"
         decimal line_total "ex-VAT net from finance-bc · provisional while HELD"
     }
     PRICING_RULES {
@@ -959,7 +959,7 @@ curl -X POST http://localhost:3005/sales-bc/v1/delivery-notes/&lt;dn_id&gt;/subm
 
           <div class="space-y-3">
             <div class="rulebox ok"><div class="rc mb-1">RULE · IVatDocumentHeader — ทุกเอกสารพูดถึง VAT ด้วยรูปแบบเดียวกัน แต่ document_type ของใครของมัน</div><p class="text-[13.5px]">หัวเอกสารทุกใบ (<span class="mono text-[12px]">Receipt</span>, <span class="mono text-[12px]">Quotation</span>, <span class="mono text-[12px]">PurchaseOrder</span>) implement <span class="mono text-[12px]">IVatDocumentHeader&lt;TDocumentType extends string&gt;</span> (<span class="mono text-[12px]">@lib/common/interfaces/vat-document-header.interface.ts</span>) ซึ่งผูกสองฟิลด์เข้าด้วยกันเสมอ: <span class="mono text-[12px]">document_type: TDocumentType</span> และ <span class="mono text-[12px]">is_vat_included: boolean</span> (คอลัมน์หลังนี้ย้ายไปอยู่บน <span class="mono text-[12px]">SubmittableDocumentEntity</span> กลางแล้ว) — <b>document_type แต่ละ BC มี enum เป็นของตัวเอง ไม่แชร์กัน</b> (<span class="mono text-[12px]">ReceiptDocumentType</span> 8 ค่าตามหน้าที่ทางภาษี · <span class="mono text-[12px]">QuotationDocumentType</span> 4 ค่าตามวัตถุประสงค์การเสนอราคา · <span class="mono text-[12px]">PurchaseOrderDocumentType</span> 4 ค่าตามลักษณะสัญญาซื้อ) เหมือนที่ <span class="mono text-[12px]">status</span> ของแต่ละเอกสารเป็น enum แยกกันอยู่แล้ว — สิ่งที่แชร์กันคือ<b>รูปร่างของคอนแทร็กต์</b> (มี document_type คู่กับ is_vat_included เสมอ) ไม่ใช่ตัวค่า enum เอง แต่ละ BC เพียงกำหนด<b>ที่มา</b>ของ <span class="mono text-[12px]">is_vat_included</span> ต่างกัน: Quotation snapshot จาก <span class="mono text-[12px]">price_lists.is_vat_included</span>, Receipt derive จาก <span class="mono text-[12px]">document_type</span> ของตัวเอง (ไม่รับจาก client เลย), PO รับตรงจาก client (ไม่มี price list ให้ snapshot)</p></div>
-            <div class="rulebox ok" id="p4-discount-mode"><div class="rc mb-1">RULE · DISCOUNT MODE — เลือกได้แบบเดียว ไม่ซ้อนกัน</div><p class="text-[13.5px]"><span class="mono text-[12px]">discount_mode</span> เป็นฟิลด์เดียวที่ตัดสินว่าเอกสารใช้กลไกส่วนลดแบบไหน และทั้งสามแบบ<b>ไม่ทับกัน</b> — <span class="mono text-[12px]">none</span> ไม่คำนวณเลย · <span class="mono text-[12px]">header</span> บังคับต้องมี <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span> แล้วคิดกับ <span class="mono text-[12px]">sub_total</span> · <span class="mono text-[12px]">per_item</span> ใช้ส่วนลดของแต่ละบรรทัดแล้วรวมขึ้นหัว · <b>นอกโหมด <span class="mono text-[12px]">per_item</span> ส่วนลดรายบรรทัดที่ client ส่งมาจะถูกทิ้ง</b> และนอกโหมด <span class="mono text-[12px]">header</span> ระบบบังคับ <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span> เป็น <span class="mono text-[12px]">null</span> · ไม่ส่งโหมดตอนสร้าง = <span class="mono text-[12px]">none</span> (ตอนแก้ = คงค่าเดิม) — <b>ยกเว้น POS</b> ที่ไม่ส่งโหมด + มีส่วนลดรายบรรทัด = <span class="mono text-[12px]">per_item</span> (ดู RULE · POS เดา discount_mode ใน §02)</p></div>
+            <div class="rulebox ok" id="p4-discount-mode"><div class="rc mb-1">RULE · DISCOUNT MODE — สี่โหมด · <span class="mono text-[12px]">both</span> = ลดรายการก่อนแล้วลดท้ายบิล (2026-10-27)</div><p class="text-[13.5px]"><span class="mono text-[12px]">discount_mode</span> เป็นฟิลด์เดียวที่ตัดสินว่าเอกสารใช้กลไกส่วนลดแบบไหน — <span class="mono text-[12px]">none</span> ไม่คำนวณเลย · <span class="mono text-[12px]">header</span> บังคับต้องมี <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span> แล้วคิดกับ <span class="mono text-[12px]">sub_total</span> · <span class="mono text-[12px]">per_item</span> ใช้ส่วนลดของแต่ละบรรทัดแล้วรวมขึ้นหัว · <b><span class="mono text-[12px]">both</span> ซ้อนสองชั้นตามลำดับตายตัว</b>: ส่วนลดรายบรรทัดก่อน แล้วส่วนลดท้ายบิล (บังคับ <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span> เหมือน <span class="mono text-[12px]">header</span>) คิดจาก<b>ยอดหลังหักส่วนลดรายการ</b> (<span class="mono text-[12px]">sub_total − Σ ส่วนลดรายการ</span>) ไม่ใช่จากยอดก่อนลด — % ท้ายบิลจึงไม่ลดซ้ำบนเงินที่ลดไปแล้ว (เช่น 1,000 ลดรายการ 200 → 800 · ท้ายบิล 10% = 80 · <span class="mono text-[12px]">total_discount</span> 280) · ส่วนลดท้ายบิลเป็นเงินต้องไม่เกินยอดหลังหักส่วนลดรายการ (เกิน → 400) · <b>นอกโหมด <span class="mono text-[12px]">per_item</span>/<span class="mono text-[12px]">both</span> ส่วนลดรายบรรทัดที่ client ส่งมาจะถูกทิ้ง</b> และนอกโหมด <span class="mono text-[12px]">header</span>/<span class="mono text-[12px]">both</span> ระบบบังคับ <span class="mono text-[12px]">discount_type</span>/<span class="mono text-[12px]">discount_value</span> เป็น <span class="mono text-[12px]">null</span> · คำนวณ VAT: ปันเฉพาะ<b>ส่วนท้ายบิล</b>ลงบรรทัดตามสัดส่วนยอดหลังหักส่วนลดรายการ (ส่วนลดรายการอยู่ใน <span class="mono text-[12px]">line_total</span> แล้ว ไม่ปันซ้ำ) · ไม่ส่งโหมดตอนสร้าง = <span class="mono text-[12px]">none</span> (ตอนแก้ = คงค่าเดิม) — <b>ยกเว้น POS</b> ที่ไม่ส่งโหมด + มีส่วนลดรายบรรทัด = <span class="mono text-[12px]">per_item</span> (ดู RULE · POS เดา discount_mode ใน §02) — ถ้าต้องการลดทั้งสองแบบ POS ต้องส่ง <span class="mono text-[12px]">both</span> มาเอง</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · SUB_TOTAL คือยอดก่อนหักส่วนลดเสมอ</div><p class="text-[13.5px]"><span class="mono text-[12px]">sub_total</span> = ผลรวม <span class="mono text-[12px]">qty × ราคาต่อหน่วย</span> <b>ก่อนหักอะไรทั้งสิ้น</b> ทำให้ <span class="mono text-[12px]">total = sub_total − total_discount</span> เป็นจริงในทุกโหมด และทั้งสองค่าไม่มีทางติดลบ (ส่วนลดเกินยอด → 400 ไม่ใช่ปล่อยให้ติดลบ)</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · แก้ items คือ SYNC ไม่ใช่ลบทิ้งแล้วเขียนใหม่</div><p class="text-[13.5px]">จับคู่บรรทัดเก่า/ใหม่ด้วย <span class="mono text-[12px]">product_id</span> (ใช้เป็นคีย์ได้เพราะห้ามสินค้าซ้ำในใบเดียวอยู่แล้ว) — ส่ง <span class="mono text-[12px]">[001,002,004]</span> ทับของเดิม <span class="mono text-[12px]">[001,002,003]</span> จะ<b>ลบแค่ 003 เพิ่มแค่ 004</b> ส่วน 001/002 แก้ที่แถวเดิม เก็บ <span class="mono text-[12px]">id</span>, <span class="mono text-[12px]">created_at</span>/<span class="mono text-[12px]">created_by</span> และที่สำคัญที่สุดคือ <span class="mono text-[12px]">received_qty</span> ไว้ — ถ้า re-insert ค่านั้นจะถูกรีเซ็ตเป็น 0 ลบประวัติของที่รับเข้าคลังมาแล้ว · อ่านแถวเดิม<b>ในทรานแซกชัน ใต้ row lock ของหัวเอกสาร</b> และเขียนบรรทัดทั้งหมด<b>หลัง</b> validate ผ่านครบ เพื่อให้ request ที่ถูกปฏิเสธไม่ทิ้งบรรทัดค้างครึ่งๆ</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · ราคาต้องอยู่ในกรอบของราคาอ้างอิง</div><p class="text-[13.5px]">ตอน POST/PUT ระบบถาม inventory-bc ว่ามีราคาอ้างอิงใน <span class="mono text-[12px]">item_prices</span> สำหรับสินค้านั้นใน scope นี้ไหม (PO ดูตาม <span class="mono text-[12px]">supplier_id</span>, ใบเสนอราคาดูตาม <span class="mono text-[12px]">price_list_id</span>) — <b>เบี่ยงเบนเกิน ±20% → 400 พร้อมบอกช่วงที่รับได้</b> · <b>ไม่มีราคาอ้างอิงในระบบ → ผ่าน</b> ไม่บล็อก เพราะ <span class="mono text-[12px]">unit_cost</span>/<span class="mono text-[12px]">unit_price</span> เป็นราคาที่ <b>ต่อรองกันจริง</b> ไม่ใช่ราคาตายตัวจากแคตตาล็อก · กันเคสพิมพ์ผิด/ทุจริต โดยไม่ขวางการต่อรองปกติ</p></div>
