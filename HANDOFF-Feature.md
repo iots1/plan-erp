@@ -194,7 +194,6 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 **ค้าง — เรียงตามที่แนะนำ**
 1. ~~แบบฟอร์มพิมพ์ CA / RFD / SCA / SRF~~ ✅ 2026-09-29 (รายการ "พิมพ์ใบตัดเครดิต / ใบคืนเงิน") · ~~หน้า admin~~ ✅ 2026-09-30 (รายการ "หน้า admin ใบตัดเครดิต / ใบคืนเงิน")
 2. ก่อน go-live: ล้างข้อมูลทดสอบ — เลขเอกสารที่ smoke ใช้ทุกรอบ (INV/CN/DN/APINV/APCN/CA/RFD/SCA/SRF/PMT/PO/GRN), `product_sku_counters`, GL ค้าง `DN-2026-00008` (`1140-02 −250 / 5110-00 +250`)
-3. meditech-api: ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ยังไม่ commit (ดูหัวข้อถัดลงไป)
 
 ### 📌 ส่งต่อ session — 2026-09-26 → 27 (ก่อนหน้า)
 
@@ -217,8 +216,6 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 3. ข้อมูลค้างบน dev: GL ของรายการ `DN-2026-00008` เหลือ `1140-02 −250 / 5110-00 +250` (ต้นทุนขายไม่มีการขาย — ก่อนแก้ `bb77b9d`) · journal ปรับปรุง หรือปล่อยไว้
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
-6. meditech-api: issue ที่เปิดไว้จากงานนี้ — meditech-libs #6 (base delete 404 + manager), meditech-api #20 (adopt base), #21 (rule + hook) ·
-   ไฟล์ `review-code/framework-typeorm/2026-09-27-base-operations-single-source-of-truth/` ใน meditech-api **ยังไม่ commit** (ลิงก์หลักฐานใน issue จะเปิดได้หลัง commit)
 
 ### 2026-10-26 · รีวิว + แก้ `feature/optional-cus-supplier` แล้ว merge เข้า main ✅ **verify sales/supplier/finance/inventory ครบ 6 ขั้น + sales-bc หลัง merge smoke 11/11 + migrate + drift ไม่มี diff** · merge `21aa675`
 
@@ -240,7 +237,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | เครื่องมือ | `pnpm check:branch` + CI รันทุก push ของ feature branch · convention-guard ใหม่ 4 ข้อ · skill `review-branch` · rule `branches-and-commits.md` |
 | Node | server ย้ายเป็น v24.22.1 (PM2 daemon + systemd unit) · `deploy-app.sh`/CI/`.nvmrc` ตาม — ระหว่างสลับ `pm2 update` ค้างทำให้ทุก app ล่ม ~7 นาที (14:14–14:21 UTC) กู้ด้วย `pm2 resurrect` จาก dump ที่สำรองไว้ · **ครั้งหน้าใช้ `pm2 kill` + `pm2 resurrect` แทน `pm2 update`** |
 
-**ยังค้าง** — `create()` ปกติของ POS ยังเก็บ `discount_type/value` นอกโหมด `header` (ขัดกฎ มีมาก่อน) · `sendWithContext` **throw** เมื่อ BC ปลายทางตอบ 4xx/5xx แต่ docblock ของ proxy บอกว่าคืน `null` → `create()` ที่ finance ปฏิเสธหลังตัดสต็อกจะไม่ log · บิลค้าง `COMPLETING` (crash หลังออกใบกำกับ) ยังไม่มี API กู้ · erp-frontend `deploy-app.sh` ยัง default `v24.18.0` (ยังติดตั้งไว้บน server) · `system-admin-bc` (meditech-api) restart วน: box ไม่มี route ไป `10.x` DB/Redis ของมัน — ไม่เกี่ยวกับ Node
+**ยังค้าง** — `create()` ปกติของ POS ยังเก็บ `discount_type/value` นอกโหมด `header` (ขัดกฎ มีมาก่อน) · `sendWithContext` **throw** เมื่อ BC ปลายทางตอบ 4xx/5xx แต่ docblock ของ proxy บอกว่าคืน `null` → `create()` ที่ finance ปฏิเสธหลังตัดสต็อกจะไม่ log · บิลค้าง `COMPLETING` (crash หลังออกใบกำกับ) ยังไม่มี API กู้ · erp-frontend `deploy-app.sh` ยัง default `v24.18.0` (ยังติดตั้งไว้บน server)
 
 ### 2026-10-23 · รีวิว + แก้ branch `feature/purchase-discound-document` แล้ว merge เข้า main ✅ **verify 5 BC ครบ 6 ขั้น + migrate + deploy + ทดสอบบนโดเมน** · `c7e1fae`…`903a171`
 
