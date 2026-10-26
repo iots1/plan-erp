@@ -178,15 +178,23 @@
             ใบคืนเงิน (<span class="mono text-[12px]">customer_refunds</span>/<span class="mono text-[12px]">supplier_refunds</span>) เดิมเก็บ <span class="mono text-[12px]">''</span> เมื่อหาชื่อไม่เจอ — ตอนนี้เก็บ <span class="mono text-[12px]">null</span> ·
             แถวของรายงาน aging ลูกหนี้/เจ้าหนี้ก็มี <span class="mono text-[12px]">customer_name_en</span>/<span class="mono text-[12px]">supplier_name_en</span> = <span class="mono text-[12px]">null</span> ได้
           </p>
+          <p class="text-[13.5px] mt-3">
+            <b>ทุกช่อง <span class="mono text-[12px]">_en</span> ทั้งระบบ (2026-10-26)</b> — ไม่มีคอลัมน์ <span class="mono text-[12px]">*_en</span> ตัวไหนบังคับอีกแล้ว: master data ที่เหลือ (กลุ่มสินค้า · หน่วยนับ · คลัง · price list · ประเภทภาษี · กลุ่มลูกค้า/ผู้ขาย ·
+            tax config · ผังบัญชี · ข้อมูลบริษัท/สาขา ทั้งชื่อและที่อยู่ · role · policy · permission catalog · ประเภทเอกสาร · เทมเพลตพิมพ์) เป็น <span class="mono text-[12px]">nullable: true</span> + <span class="mono text-[12px]">string | null</span> ครบ ·
+            body DTO ใช้ <span class="mono text-[12px]">@IsOptional()</span> + <span class="mono text-[12px]">T | null</span> (ไม่มี <span class="mono text-[12px]">?</span>) · constraint <span class="mono text-[12px]">uq_*_name_en</span> คงไว้ — Postgres ถือว่า <span class="mono text-[12px]">NULL</span> ไม่ซ้ำกัน หลายแถวที่ไม่มีชื่ออังกฤษจึงอยู่ร่วมกันได้ ·
+            ข้อความ error ที่เคยอ้าง <span class="mono text-[12px]">uom.name_en</span> ใช้ <span class="mono text-[12px]">name_en ?? name_th</span> (เป็นข้อความถึงคน ไม่ใช่ข้อมูลที่เก็บ) ·
+            บังคับด้วย check <span class="mono text-[12px]">en-column-not-null</span> ใน convention-guard (entity ที่มี <span class="mono text-[12px]">*_en</span> โดยไม่มี <span class="mono text-[12px]">nullable: true</span> ไม่ผ่าน) และกติกาใน <span class="mono text-[12px]">.claude/rules/entities-and-schema.md</span>
+          </p>
           <div class="card overflow-hidden mt-3">
             <table class="d">
-              <thead><tr><th>BC</th><th>คอลัมน์ snapshot ที่เป็น nullable</th></tr></thead>
+              <thead><tr><th>BC</th><th>คอลัมน์ <span class="mono text-[12px]">_en</span> ที่เป็น nullable (ต้นทาง + snapshot)</th></tr></thead>
               <tbody>
-                <tr><td>inventory-bc</td><td class="mono text-[12px]">products.name_en (ต้นทาง) · goods_receipt_items.product_name_en · goods_receipts.supplier_name_en (snapshot จาก PO)</td></tr>
-                <tr><td>supplier-bc</td><td class="mono text-[12px]">purchase_order_items.product_name_en · suppliers.name_en (ต้นทาง) · purchase_orders.supplier_name_en</td></tr>
-                <tr><td>sales-bc</td><td class="mono text-[12px]">quotation_items · sales_order_items · pos_sale_items .product_name_en · customers.name_en (ต้นทาง) · quotations · sales_orders · delivery_notes · sales_returns · pos_sales .customer_name_en</td></tr>
-                <tr><td>finance-bc</td><td class="mono text-[12px]">receipt_items · ap_invoice_items .product_name_en · receipts · billing_notes · credit_applications · customer_refunds .customer_name_en · payment_entries.party_name_en · ap_invoices · supplier_credit_applications · supplier_refunds .supplier_name_en</td></tr>
-                <tr><td>report-bc</td><td class="mono text-[12px]">low_stocks · expiry_alerts .product_name_en (snapshot จาก event payload)</td></tr>
+                <tr><td>inventory-bc</td><td class="mono text-[12px]">products · item_groups · uoms · warehouses · price_lists · tax_categories .name_en (ต้นทาง) · goods_receipt_items.product_name_en · goods_receipts.supplier_name_en (snapshot จาก PO)</td></tr>
+                <tr><td>supplier-bc</td><td class="mono text-[12px]">purchase_order_items.product_name_en · suppliers · supplier_groups .name_en (ต้นทาง) · purchase_orders.supplier_name_en</td></tr>
+                <tr><td>sales-bc</td><td class="mono text-[12px]">quotation_items · sales_order_items · pos_sale_items .product_name_en · customers · customer_groups .name_en (ต้นทาง) · quotations · sales_orders · delivery_notes · sales_returns · pos_sales .customer_name_en</td></tr>
+                <tr><td>finance-bc</td><td class="mono text-[12px]">tax_configs · gl_accounts .name_en · company_profiles · company_branches .name_en/.address_en (ต้นทาง) · receipt_items · ap_invoice_items .product_name_en · receipts · billing_notes · credit_applications · customer_refunds .customer_name_en · payment_entries.party_name_en · ap_invoices · supplier_credit_applications · supplier_refunds .supplier_name_en</td></tr>
+                <tr><td>report-bc</td><td class="mono text-[12px]">low_stocks · expiry_alerts .product_name_en/.warehouse_name_en (snapshot จาก event payload) · document_types · print_templates .name_en (ต้นทาง)</td></tr>
+                <tr><td>iam</td><td class="mono text-[12px]">roles · policies .name_en · permissions.permission_name_en (ต้นทาง)</td></tr>
               </tbody>
             </table>
           </div>

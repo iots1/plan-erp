@@ -217,6 +217,18 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-10-26 · ทุกช่อง `*_en` ทั้งระบบไม่บังคับ (`chore/optional-en-columns`) ⏳ **migrate 6 BC + `schema:log` 7 DB ไม่มี diff + verify iam/inventory/supplier/sales ครบ 6 ขั้น · finance/report กำลังรัน · ยังไม่ merge**
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| คอลัมน์ต้นทาง 17 ช่อง | finance: `tax_configs` · `gl_accounts` `.name_en` · `company_profiles` / `company_branches` `.name_en` + `.address_en` · iam: `roles` · `policies` `.name_en` · `permissions.permission_name_en` · inventory: `item_groups` · `uoms` · `warehouses` · `price_lists` · `tax_categories` `.name_en` · sales/supplier: `customer_groups` / `supplier_groups` `.name_en` · report: `document_types` · `print_templates` `.name_en` + snapshot `warehouse_name_en` ใน `low_stocks` / `expiry_alerts` → `nullable: true` + `string \| null` |
+| DTO / interface | body DTO ทุกตัวที่มี `*_en` = `@IsOptional()` + `T \| null` · interface lookup ข้าม BC (`ICompanyProfileLookupResult`, `IPriceListLookupResult`), contracts role/policy, response DTO, event payload `stock.low` / `expiry.approaching` รับ null · print mapper ส่ง `company_name_en ?? ''` |
+| ไม่มี fallback | profile บริษัทที่สร้างอัตโนมัติครั้งแรกเก็บ `name_en`/`address_en` = `NULL` (เดิม `''`) · permission ที่สร้างมือไม่ส่ง = `NULL` · ข้อความ error ของ UOM ใช้ `name_en ?? name_th` (ข้อความถึงคน ไม่ใช่ข้อมูล) |
+| unique | `uq_*_name_en` (price list, tax category, กลุ่มลูกค้า/ผู้ขาย) คงไว้ — `NULL` หลายแถวไม่ชนกัน · `down()` backfill ไทยอาจชน unique ถ้าชื่อไทยแถวหนึ่งเท่ากับชื่ออังกฤษอีกแถว ต้องแก้มือก่อน rollback |
+| migration | generate 6 BC (`Make<Bc>EnColumnsNullable1793027…`) รันบน DB แล้ว · `schema:log` ครบ 7 database ไม่มี diff |
+| กันพลาด | check `en-column-not-null` ใน convention-guard + กฎใน `entities-and-schema.md` · smoke `*en-optional*.smoke.mjs` 6 BC: สร้าง master ไม่ใส่ชื่ออังกฤษ → DB `NULL` + response `{ th, en: null }` |
+| ส่งต่อ frontend | ฟอร์ม master data ทุกตัวไม่ต้องบังคับชื่ออังกฤษ (ฝั่ง frontend ทำรอไว้แล้ว) |
+
 ### 2026-10-26 · รีวิว + แก้ `feature/optional-cus-supplier` แล้ว merge เข้า main ✅ **verify sales/supplier/finance/inventory ครบ 6 ขั้น + sales-bc หลัง merge smoke 11/11 + migrate + drift ไม่มี diff** · merge `21aa675`
 
 | | ของใหม่ / ที่แก้ |

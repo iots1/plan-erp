@@ -115,7 +115,7 @@
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
                 <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อกลุ่ม (ไทย)</td></tr>
-                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อกลุ่ม (อังกฤษ)</td></tr>
+                <tr><td>name_en</td><td><span style="color:var(--muted)">–</span></td><td>ชื่อกลุ่ม (อังกฤษ) — <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
                 <tr><td>is_group</td><td><span style="color:#15803D">✓</span></td><td>node (true) / leaf (false) — <b>เฉพาะ leaf</b> ที่ผูกสินค้าได้</td></tr>
                 <tr><td>parent_item_group_id</td><td><span style="color:var(--muted)">–</span></td><td>กลุ่มแม่ (null = root)</td></tr>
                 <tr><td>lft · rgt</td><td><span style="color:var(--muted)">sys</span></td><td>ระบบคำนวณเอง (nested-set) ตอน insert/move</td></tr>
@@ -197,7 +197,7 @@
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
                 <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อคลัง (ไทย)</td></tr>
-                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อคลัง (อังกฤษ)</td></tr>
+                <tr><td>name_en</td><td><span style="color:var(--muted)">–</span></td><td>ชื่อคลัง (อังกฤษ) — <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
                 <tr><td>warehouse_type</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">stock</span> | <span class="mono text-[12px]">transit</span> (โอนข้ามสาขา) | <span class="mono text-[12px]">reject</span> (ของเสีย)</td></tr>
                 <tr><td>is_group</td><td><span style="color:#15803D">✓</span></td><td>node/leaf — <b>เฉพาะ leaf</b> ที่เก็บสต็อก/รับสินค้าได้</td></tr>
                 <tr><td>parent_warehouse_id</td><td><span style="color:var(--muted)">–</span></td><td>คลังแม่ (null = root)</td></tr>
@@ -214,7 +214,7 @@
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
                 <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อกลุ่ม (ไทย)</td></tr>
-                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อกลุ่ม (อังกฤษ) — unique</td></tr>
+                <tr><td>name_en</td><td><span style="color:var(--muted)">–</span></td><td>ชื่อกลุ่ม (อังกฤษ) — unique เมื่อระบุ · <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
                 <tr><td>is_active</td><td><span style="color:var(--muted)">–</span></td><td>เปิดใช้งาน (ค่าเริ่มต้น true)</td></tr>
               </tbody>
             </table>
@@ -232,7 +232,7 @@
               <tbody>
                 <tr><td>code</td><td><span style="color:#15803D">✓</span></td><td>รหัสผู้จัดซื้อ (unique)</td></tr>
                 <tr><td>name_th</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ (ไทย)</td></tr>
-                <tr><td>name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ (อังกฤษ)</td></tr>
+                <tr><td>name_en</td><td><span style="color:var(--muted)">–</span></td><td>ชื่อ (อังกฤษ) — <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
                 <tr><td>tax_id</td><td><span style="color:#15803D">✓</span></td><td>เลขประจำตัวผู้เสียภาษี (ใช้ต่อใน finance-bc)</td></tr>
                 <tr><td>is_vat_registered</td><td><span style="color:var(--muted)">–</span></td><td>จดทะเบียน VAT หรือไม่ — ค่าเริ่มต้น true · false = ซื้อจากรายนี้ขอเครดิตภาษีซื้อไม่ได้</td></tr>
                 <tr><td>contact_phone · address</td><td><span style="color:var(--muted)">–</span></td><td>ข้อมูลติดต่อ</td></tr>
@@ -259,7 +259,7 @@
             <table class="d">
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
-                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อรายการราคา — unique ที่ name_en</td></tr>
+                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อรายการราคา — unique ที่ name_en (เมื่อระบุ — <span class="mono text-[12px]">NULL</span> ซ้ำกันได้) · <span class="mono text-[12px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
                 <tr><td>currency</td><td><span style="color:#15803D">✓</span></td><td>สกุลเงินของ<b>ทั้งรายการราคา</b> (ISO 4217 เช่น THB) — <b>เจ้าของสกุลเงินหนึ่งเดียว</b>, ไม่เก็บซ้ำที่ item_prices</td></tr>
                 <tr><td>is_buying · is_selling</td><td><span style="color:#15803D">✓</span></td><td>ทิศทางการใช้งาน — <b>อย่างน้อยหนึ่งต้อง true</b> (DB CHECK)</td></tr>
                 <tr><td>is_vat_included</td><td><span style="color:var(--muted)">–</span></td><td>true = <span class="mono text-[12px]">rate</span> ใน item_prices ของ price list นี้ <b>รวม VAT แล้ว</b> (ราคาหน้าร้าน) · false (ค่าเริ่มต้น) = ยังไม่รวมภาษี (ราคา B2B ทั่วไป) — ถูก Quotation snapshot ไปใช้ตอนออกเอกสาร (ดู <a href="srs-p4.html#p4-shared" style="color:#7C3AED;text-decoration:underline">P4 &sect;07 · IVatDocumentHeader</a>)</td></tr>
@@ -280,7 +280,7 @@
             <table class="d">
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
-                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อประเภทภาษี — unique ที่ name_en</td></tr>
+                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อประเภทภาษี — unique ที่ name_en (เมื่อระบุ — <span class="mono text-[12px]">NULL</span> ซ้ำกันได้) · <span class="mono text-[12px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
                 <tr><td>vat_treatment</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">standard</span> (7%) | <span class="mono text-[12px]">zero_rated</span> (ส่งออก/เขตปลอดอากร มาตรา 80/1) | <span class="mono text-[12px]">exempt</span> (ยกเว้นตามมาตรา 81)</td></tr>
                 <tr><td>rate</td><td><span style="color:#15803D">✓</span></td><td>อัตราภาษี % (0-100) — เก็บแยกจาก vat_treatment เผื่ออัตรามาตรฐานเปลี่ยนในอนาคต</td></tr>
                 <tr><td>legal_reference</td><td><span style="color:var(--muted)">–</span></td><td>อ้างอิงข้อกฎหมาย เช่น "มาตรา 81(1)(ก)" ไว้ตอบผู้ตรวจสอบบัญชี</td></tr>
@@ -1398,7 +1398,7 @@ erDiagram
     ITEM_GROUPS {
         uuid id PK
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         uuid parent_item_group_id FK "self ref tree"
         boolean is_group "node/leaf"
         int lft
@@ -1429,7 +1429,7 @@ erDiagram
         uuid id PK
         string sku UK
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         string type "single/bundle"
         uuid item_group_id FK
         uuid brand_id FK
@@ -1449,7 +1449,7 @@ erDiagram
     WAREHOUSES {
         uuid id PK
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         uuid parent_warehouse_id FK "self ref tree"
         boolean is_group
         string warehouse_type "stock/transit/reject"
@@ -1465,7 +1465,7 @@ erDiagram
     PRICE_LISTS {
         uuid id PK
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         string currency "ISO 4217"
         boolean is_buying
         boolean is_selling
@@ -1475,7 +1475,7 @@ erDiagram
     TAX_CATEGORIES {
         uuid id PK
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         string vat_treatment "standard/zero_rated/exempt"
         decimal rate "percent"
         string legal_reference

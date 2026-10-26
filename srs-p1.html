@@ -169,7 +169,7 @@
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
                 <tr><td>code</td><td><span style="color:#15803D">✓</span></td><td>รหัสบทบาท เช่น <span class="mono text-[12px]">ROLE_WAREHOUSE_MANAGER</span> (unique)</td></tr>
-                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อบทบาท 2 ภาษา</td></tr>
+                <tr><td>name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อบทบาท 2 ภาษา · <span class="mono text-[12px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
                 <tr><td>description</td><td><span style="color:var(--muted)">–</span></td><td>คำอธิบาย</td></tr>
               </tbody>
             </table>
@@ -182,7 +182,7 @@
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
                 <tr><td>policies.code</td><td><span style="color:#15803D">✓</span></td><td>รหัส policy เช่น <span class="mono text-[12px]">POL_WAREHOUSE_GOODS_RECEIPT</span></td></tr>
-                <tr><td>policies.name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ policy 2 ภาษา</td></tr>
+                <tr><td>policies.name_th · name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อ policy 2 ภาษา · <span class="mono text-[12px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
                 <tr><td>policies.is_active</td><td><span style="color:#15803D">✓</span></td><td>เปิด/ปิดใช้งาน</td></tr>
                 <tr><td>policy_statements.effect</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">allow</span> | <span class="mono text-[12px]">deny</span></td></tr>
                 <tr><td>policy_statements.plane</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">ui</span> | <span class="mono text-[12px]">api</span></td></tr>
@@ -201,7 +201,7 @@
                 <tr><td>permission</td><td><span style="color:#15803D">✓</span></td><td>รูป <span class="mono text-[12px]">resource:action</span> เช่น <span class="mono text-[12px]">goods_receipt:submit</span> (unique)</td></tr>
                 <tr><td>resource · action</td><td><span style="color:#15803D">✓</span></td><td>แยกส่วนไว้ query/จัดกลุ่ม</td></tr>
                 <tr><td>plane</td><td><span style="color:#15803D">✓</span></td><td><span class="mono text-[12px]">ui</span> | <span class="mono text-[12px]">api</span></td></tr>
-                <tr><td>permission_name_th · permission_name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อที่แสดงในหน้า Policy Generator (2 ภาษา)</td></tr>
+                <tr><td>permission_name_th · permission_name_en</td><td><span style="color:#15803D">✓</span></td><td>ชื่อที่แสดงในหน้า Policy Generator (2 ภาษา) · <span class="mono text-[12px]">permission_name_en</span> <b>ไม่บังคับ</b> (2026-10-26) · ไม่ส่ง/ส่ง <span class="mono text-[12px]">null</span> = เก็บ <span class="mono text-[12px]">NULL</span></td></tr>
               </tbody>
             </table>
           </div>
@@ -379,14 +379,14 @@ erDiagram
         uuid id PK
         string code UK "ROLE_*"
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         string description
     }
     POLICIES {
         uuid id PK
         string code UK "POL_*"
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         boolean is_active
     }
     POLICY_STATEMENTS {
@@ -420,7 +420,7 @@ erDiagram
         string action
         string plane "ui/api"
         string permission_name_th
-        string permission_name_en
+        string permission_name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
     }
     USERS_ROLES {
         uuid user_id PK_FK

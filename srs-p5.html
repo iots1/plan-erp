@@ -250,7 +250,7 @@ erDiagram
         uuid id PK
         string code UK "VAT7 · WHT3_SERVICE"
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         string tax_type "vat_or_wht"
         decimal rate "percent not fraction"
         timestamptz effective_from "no overlap per code"
@@ -340,7 +340,7 @@ erDiagram
         uuid id PK
         string code UK "unique among non-deleted rows · format not enforced"
         string name_th
-        string name_en
+        string name_en "optional, NULL = ไม่มีชื่ออังกฤษ"
         uuid parent_gl_account_id FK "self-ref · null = root"
         int lft "nested-set · depth capped at 5"
         int rgt "nested-set"
