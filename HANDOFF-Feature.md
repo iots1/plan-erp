@@ -1970,7 +1970,7 @@ permissions resolve ตอน login เท่านั้น ต้องได�
 **ตรวจแล้ว**: 1525/1525 test ผ่าน (จากเดิม 1500 — เพิ่ม test ใหม่ทั้งหมด 25 ไม่มีของเดิมหาย) ·
 eslint 0/0 ทั้ง repo (รวม migration/spec ใหม่ที่ต้อง `--fix` ก่อน) · `nx build finance-bc` /
 `nx serve finance-bc` build+boot จริงผ่าน ไม่มี error ต่อ DB จริงหลัง migrate ·
-**E2E บน production จริง (`erp-api.iotechsoft.com`)**: `GET /fx-revaluations` /
+**E2E บน production จริง (`erp-api.example.com`)**: `GET /fx-revaluations` /
 `GET /finance-settings` / `POST /finance-settings/close-period` ตอบ `401` ตอนไม่ auth (ยืนยัน
 routing/deploy จริง) → login จริงด้วย superadmin → `GET /finance-settings` ได้ `200` ข้อมูลจริง →
 `GET /fx-revaluations` เจอ `403` ตามบั๊กด้านบน → แก้แล้วได้ `200` list ว่างถูกต้อง ·
@@ -2362,7 +2362,7 @@ element id ทั้ง 3 แท็บครบ) และ bundle.js ที่ e
 `migration:run:iam` สำเร็จบน DB จริงแล้ว verify `migration:generate:iam` = `No changes`
 
 **commit `92da11d` + push + deploy สำเร็จแล้ว** · **E2E บน production จริง
-(`erp-api.iotechsoft.com`) ผ่านตั้งแต่รอบแรก** — ต่างจาก P4 #12 ที่เจอ 403 รอบแรกเพราะลืม grant
+(`erp-api.example.com`) ผ่านตั้งแต่รอบแรก** — ต่างจาก P4 #12 ที่เจอ 403 รอบแรกเพราะลืม grant
 migration, รอบนี้เขียน grant migration ไปพร้อมกันตั้งแต่แรกจึงไม่เจอปัญหาเดิมซ้ำ: login จริงด้วย
 superadmin → `GET /role-policy-audit-logs` ได้ `200` พร้อมข้อมูลจริง 10 แถว →
 `GET /user-role-audit-logs` ได้ `200` พร้อมข้อมูลจริง 5 แถว → หน้า
