@@ -217,6 +217,17 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-10-27 · POS: finance-bc ปฏิเสธหลังตัดสต็อก → คืนสต็อกเฉพาะ 4xx + คู่ส่วนลดท้ายบิลนอก header/both เป็น null ✅ **verify sales/finance ครบ 6 ขั้น + deploy (`189a50d`) + smoke POS 5 ไฟล์บนโดเมน 5/5** · `ac71535`, `0a3ea92`, `189a50d`
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| บั๊ก | `sendWithContext` **โยน** 4xx ของปลายทาง ไม่ได้คืน `null` → ใน `PosSalesService.create()` การปฏิเสธของ finance-bc หลังตัดสต็อกหลุดข้ามการตรวจ `null` — ไม่มี log `POS_SALE_FINANCE_FAILED` และสต็อกค้างตัดโดยไม่มีบิล (docblock ของ proxy ทั้งสองบอกผิดว่าคืน `null`) |
+| กับดักที่เจอระหว่างแก้ | แนวแก้ใน HANDOFF ("คืนสต็อกเมื่อ 4xx") **ไม่พอ** — finance ออกใบกำกับกับรับเงินคนละ transaction ถ้ารับเงินล้มด้วย 4xx หลังออกเลขแล้ว การคืนสต็อกจะเหลือใบกำกับที่ลูกค้าถือแต่ของไม่ถูกตัด |
+| สัญญาใหม่ | finance `recordSale`: ทุกความล้มเหลว**หลัง**ได้เลขใบกำกับ → `500` ที่ระบุเลข (log `POS_SALE_PAYMENT_AFTER_ISSUE_FAILED`) · sales `failCounterSaleFinance()`: 4xx → คืนสต็อกหนึ่งครั้ง + ส่ง error ของ finance ต่อ · null/5xx → ไม่คืน + 503 + log |
+| ข้อ 6 | คู่ `discount_type`/`discount_value` ของการขายปกติเป็น `null` นอก `header`/`both` (ใช้ `appliesHeaderDiscount` แบบ `hold()`) |
+| เทสต์ | unit sales +6 · finance spec ใหม่ 4 เคส · smoke ใหม่ `pos-sales-finance-refusal` (FULL ให้ลูกค้า `is_vat_registered=false` → 400, on hand 5 → 5) + `pos-sale-refusal-writes-nothing` (finance ไม่มี receipt/payment) · บนโดเมน 5/5 รวม POS เดิม 3 ไฟล์ |
+| ค้าง | `completeHeld()` ยังคืนสต็อกทุกกรณีรวม timeout/5xx → รวมไว้กับ HANDOFF-Next-Steps §3.2 ข้อ 8 · type error ใน spec (`tsc -p tsconfig.json`) 23 ตัว**มีอยู่ก่อนแล้ว** (ไม่ใช่ 0 อย่างที่ `testing.md` เขียน) — งานนี้ไม่ได้เพิ่ม |
+
 ### 2026-10-27 · `discount_mode: both` — ส่วนลดรายสินค้า + ส่วนลดท้ายบิลในเอกสารเดียว (`feature/discount-mode-both`) ✅ **migrate 3 BC + `schema:log` ไม่มี diff + verify sales/supplier/finance/inventory ครบ 6 ขั้น + deploy + smoke `both` 4 ไฟล์บนโดเมน 4/4** · `1c1320a`, merge `ecb143d` (+ `5be81a0` smoke อ่าน DB ผ่าน `eventually`)
 
 | | ของใหม่ / ที่แก้ |
