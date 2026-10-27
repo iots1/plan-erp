@@ -217,6 +217,16 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-10-27 · บิลพักที่ไม่รู้ว่าออกใบกำกับหรือยัง → ค้าง `COMPLETING` + endpoint กู้บิล `resolve-completion` ✅ **verify sales/finance ครบ 6 ขั้น + permissions:sync (`pos_sale:resolve`)** · HANDOFF-Next-Steps §3.2 ข้อ 8
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| ช่องโหว่ | `compensateFailedCompletion()` คืนสต็อก + คืนบิลเป็น `HELD` **ทุกกรณี** รวม timeout/5xx ที่ใบกำกับอาจออกไปแล้วแต่คำตอบหาย → แคชเชียร์ปิดซ้ำได้**ใบกำกับใบที่สอง** |
+| แก้ | คืนเฉพาะ 4xx (สัญญา finance: 4xx = ยังไม่ได้เขียนอะไร) · null/5xx → ค้าง `COMPLETING` + 503 + log `POS_SALE_COMPLETE_FINANCE_UNKNOWN` |
+| endpoint ใหม่ | `POST /pos-sales/{id}/resolve-completion` `{ receipt_id, payment_method, resolution_reason }` สิทธิ์ `pos_sale:resolve` · มี receipt → อ่านผ่าน RPC `FindRecordedSale` (finance `ReceiptsService.findSettlement`) ตรวจว่าเป็นของบิลนี้แล้ว `COMPLETED` จากตัวเลขใบนั้น (วันที่ = วันที่ใบกำกับ) · ไม่มี → คืนสต็อก + re-key + `HELD` · log `POS_SALE_COMPLETION_RESOLVED` / `_REOPENED` พร้อมเหตุผล |
+| ราคาที่จ่าย | ช่วง finance-bc ล่ม บิลพักที่ปิดไม่ผ่านต้องรอหัวหน้า (ผู้ใช้ตัดสิน 2026-10-27: ใบกำกับซ้ำแก้ยากกว่าบิลค้าง) |
+| ค้าง | grant `pos_sale:resolve` ให้ policy อื่นนอก superadmin — ต้องตัดสินว่าใคร · frontend: หน้าจอกู้บิล + ห้ามปุ่ม "ลองอีกครั้ง" บนบิล COMPLETING |
+
 ### 2026-10-27 · POS: finance-bc ปฏิเสธหลังตัดสต็อก → คืนสต็อกเฉพาะ 4xx + คู่ส่วนลดท้ายบิลนอก header/both เป็น null ✅ **verify sales/finance ครบ 6 ขั้น + deploy (`189a50d`) + smoke POS 5 ไฟล์บนโดเมน 5/5** · `ac71535`, `0a3ea92`, `189a50d`
 
 | | ของใหม่ / ที่แก้ |

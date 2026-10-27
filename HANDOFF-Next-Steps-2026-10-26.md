@@ -100,13 +100,13 @@
 - ✅ UX ชื่ออังกฤษที่ว่าง → §2.3 (ไม่ต้องแก้)
 - ✅ หน้าจอบิลพัก (HELD) → §2.4 (ทำแล้ว)
 
-### 3.2 backend — ข้อ 6–10 (6, 7 ✅ 2026-10-27 · เหลือ 8–10)
+### 3.2 backend — ข้อ 6–10 (6, 7, 8 ✅ 2026-10-27 · เหลือ 9–10)
 
 | # | เรื่อง | ที่ | แนวแก้ |
 |---|---|---|---|
 | 6 | ✅ (`ac71535`) ~~ขาย POS ปกติเก็บ `discount_type`/`discount_value` แม้โหมดไม่ใช่ header~~ | `PosSalesService.create()` | แก้แล้ว: คู่ส่วนลดท้ายบิลเป็น `null` นอก `header`/`both` (ใช้ `appliesHeaderDiscount` — `both` ต้องเก็บไว้) ทั้งที่ส่ง finance-bc และที่บันทึก · unit 2 เคส |
 | 7 | ✅ (`0a3ea92`) ~~finance-bc ปฏิเสธหลังตัดสต็อกใน `create()` → ไม่ log + สต็อกค้างตัด~~ | `PosSalesService.create()` + finance `PosSaleOperationsService` | แก้แล้ว — **ละเอียดกว่าแนวแก้เดิม**: finance ออกใบกำกับกับรับเงินคนละ transaction ถ้ารับเงินล้มด้วย 4xx หลังออกใบกำกับ การ "คืนสต็อกเมื่อ 4xx" จะผิด · จึง (1) finance ห่อทุก error หลังได้เลขเป็น `500` ที่ระบุเลขใบกำกับ (2) sales คืนสต็อกเฉพาะ 4xx แล้วส่ง error ของ finance ต่อ · null/5xx = ไม่คืน + 503 + log · แก้ docblock proxy ทั้งสอง · unit sales 4 เคส + finance spec ใหม่ 4 เคส · smoke `pos-sales-finance-refusal` (FULL ให้ลูกค้าไม่จด VAT → 400, on hand 5 → 5) |
-| 8 | บิลค้าง `COMPLETING` (process ตายหลังออกใบกำกับ) ไม่มีทางกู้ผ่าน API | `PosSalesService` | endpoint สำหรับผู้มีสิทธิ์: ระบุ `receipt_id` ที่ออกไปแล้ว → ดึงตัวเลขจาก finance-bc → ปิดเป็น `COMPLETED` (ไม่ออกใบกำกับซ้ำ) · permission ใหม่ต้องตาม `permissions.md` (grant migration ก่อน deploy) · **รวมงานนี้ด้วย (เจอ 2026-10-27):** `completeHeld()` → `compensateFailedCompletion()` ยังคืนสต็อก + คืนบิลเป็น `HELD` **ทุกกรณี** รวม timeout/5xx ที่ใบกำกับอาจออกแล้ว → ปิดซ้ำได้ใบกำกับใบที่สอง · แนวแก้: คืนเฉพาะ 4xx แบบ `create()` · null/5xx ให้ค้าง `COMPLETING` แล้วกู้ด้วย endpoint ข้อนี้ (ทำแยกไม่ได้ เพราะไม่มี endpoint บิลจะค้างโดยไม่มีทางออก) |
+| 8 | ✅ ~~บิลค้าง `COMPLETING` ไม่มีทางกู้ผ่าน API + `completeHeld()` คืนสต็อกทุกกรณี~~ | `PosSalesService` + finance `PosSaleOperationsService` | แก้แล้ว: (1) `completeHeld()` คืนสต็อก/คืน HELD เฉพาะ 4xx · null/5xx → ค้าง `COMPLETING` + 503 + log `POS_SALE_COMPLETE_FINANCE_UNKNOWN` (2) `POST /pos-sales/{id}/resolve-completion` สิทธิ์ใหม่ `pos_sale:resolve` (superadmin จาก sync · policy อื่น**ยังไม่ได้ให้** — ต้องตัดสินว่าใครได้แล้วทำ grant migration) — มี `receipt_id` → อ่านใบผ่าน RPC ใหม่ `FindRecordedSale` ตรวจ ISSUED/ลูกค้า/ประเภท/สินค้า+จำนวน/ไม่ผูกบิลอื่น/ชำระครบ → `COMPLETED` · ไม่มี → คืนสต็อก + re-key + `HELD` · unit sales +12 · finance +2 · smoke `pos-sales-resolve-completion` (route/permission/409 — `COMPLETING` จริงสร้างผ่าน API ไม่ได้ และ smoke db อ่านอย่างเดียว) · เคสครบใน api-workflow-guide B5.1 `#pos-resolve-completion` + srs-p4 RULE 5 |
 | 9 | Swagger ของ `GET /quotations/:id` โชว์ `customer_id` ที่ไม่ได้ใช้ | `QuotationQueryParamsDTO` ใช้ทั้ง list และ detail | แยก DTO สำหรับ list |
 | 10 | สลิป 80mm: `{{__page}}` ว่าง | `paginator.inline.js` เส้น "ไม่มี band" | เติม `1` แบบเดียวกับ `__pages` |
 

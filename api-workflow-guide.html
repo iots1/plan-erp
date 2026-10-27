@@ -1209,7 +1209,10 @@ stateDiagram-v2
     HELD --> HELD : PUT /pos-sales/id
     HELD --> COMPLETING : POST complete · claim committed
     COMPLETING --> COMPLETED : stock cut + invoice + payment
-    COMPLETING --> HELD : completion failed · bill given back
+    COMPLETING --> HELD : stock refused / finance 4xx · bill given back
+    COMPLETING --> COMPLETING : finance no answer / 5xx · left for a supervisor
+    COMPLETING --> COMPLETED : resolve-completion with receipt_id
+    COMPLETING --> HELD : resolve-completion without receipt · stock returned
     HELD --> CANCELLED : POST cancel
     COMPLETED --> VOIDED : POST void
     COMPLETED --> [*]
@@ -1226,11 +1229,14 @@ stateDiagram-v2
               <tr><td class="mono text-[11.5px]">PUT /sales-bc/v1/pos-sales/{id}</td><td class="mono text-[11px]">pos_sale:create</td><td>ทุกฟิลด์ไม่บังคับ ไม่ส่ง = คงเดิม: <span class="mono text-[11px]">customer_id</span>, <span class="mono text-[11px]">warehouse_id</span>, <span class="mono text-[11px]">document_type</span>, <span class="mono text-[11px]">discount_mode</span>/<span class="mono text-[11px]">discount_type</span>/<span class="mono text-[11px]">discount_value</span>, <span class="mono text-[11px]">remark_th</span>/<span class="mono text-[11px]">remark_en</span>, <span class="mono text-[11px]">items</span></td><td><span class="mono text-[11px]">200</span> · <span class="mono text-[11px]">items</span> ถูก <b>sync ตาม <span class="mono text-[11px]">product_id</span></b> (บรรทัดที่มีทั้งสองฝั่งคง id, ใหม่ = insert, หาย = delete) · ไม่ส่ง <span class="mono text-[11px]">items</span> = คิดยอดบรรทัดเดิมใหม่ตามโหมดส่วนลด · โหมดที่ไม่ใช่ <span class="mono text-[11px]">header</span> ล้าง <span class="mono text-[11px]">discount_type</span>/<span class="mono text-[11px]">discount_value</span> เป็น null · <span class="mono text-[11px]">409</span> ถ้าไม่ใช่ <span class="mono text-[11px]">HELD</span> หรือ <span class="mono text-[11px]">has_pending_stock_cut = true</span></td></tr>
               <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/complete</td><td class="mono text-[11px]">pos_sale:create</td><td><span class="mono text-[11px]">{ payment_method, paid_amount, reference, document_date }</span> — บังคับแค่ <span class="mono text-[11px]">payment_method</span> · สามตัวหลังไม่ส่งหรือส่ง <span class="mono text-[11px]">null</span> ได้</td><td><span class="mono text-[11px]">200</span> → <span class="mono text-[11px]">HELD → COMPLETING → COMPLETED</span> พร้อม <span class="mono text-[11px]">receipt_id</span>/<span class="mono text-[11px]">receipt_number</span> และยอดที่ finance-bc คิด (พิมพ์สลิปต่อด้วย <span class="mono text-[11px]">receipt_id</span> เหมือน B5)</td></tr>
               <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/cancel</td><td class="mono text-[11px]">pos_sale:void</td><td><span class="mono text-[11px]">{ cancel_reason }</span> (ไม่บังคับ — ไม่ส่งหรือส่ง <span class="mono text-[11px]">null</span> ได้ ต่างจาก <span class="mono text-[11px]">void_reason</span> ที่บังคับ)</td><td><span class="mono text-[11px]">200</span> → <b>CANCELLED</b> · แถวและ <span class="mono text-[11px]">pos_number</span> ยังอยู่ · บิล <span class="mono text-[11px]">COMPLETED</span> → <span class="mono text-[11px]">409</span> ให้ใช้ void</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/resolve-completion</td><td class="mono text-[11px]">pos_sale:resolve</td><td><span class="mono text-[11px]">{ receipt_id, payment_method, resolution_reason }</span> — <span class="mono text-[11px]">resolution_reason</span> บังคับ · <span class="mono text-[11px]">payment_method</span> บังคับเมื่อส่ง <span class="mono text-[11px]">receipt_id</span> · เพิ่ม 2026-10-27</td><td>กู้บิลที่ค้าง <span class="mono text-[11px]">COMPLETING</span> (ดูกล่อง "กู้บิลที่ค้าง COMPLETING" ด้านล่าง) · มี <span class="mono text-[11px]">receipt_id</span> → <span class="mono text-[11px]">COMPLETED</span> จากใบนั้น · ไม่มี → คืนสต็อก + <span class="mono text-[11px]">HELD</span> · บิลสถานะอื่น <span class="mono text-[11px]">409</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /sales-bc/v1/pos-sales?filter=status||$eq||HELD&amp;relations=items</td><td class="mono text-[11px]">pos_sale:view</td><td>—</td><td>รายการบิลที่พักไว้ เพื่อเรียกกลับมาปิด</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="text-[12.5px] text-[var(--muted)] mb-4">ใช้สิทธิ์เดิมทั้งหมด (แก้/ปิดบิลพัก = การขาย <span class="mono">pos_sale:create</span> · ยกเลิกบิลพัก = "undo" อีกแบบของหน้าร้าน <span class="mono">pos_sale:void</span>) — ไม่มี grant migration ใหม่</p>
+        <p class="text-[12.5px] text-[var(--muted)] mb-4">แก้/ปิดบิลพัก = การขาย <span class="mono">pos_sale:create</span> · ยกเลิกบิลพัก = "undo" อีกแบบของหน้าร้าน <span class="mono">pos_sale:void</span> ·
+          <b>สิทธิ์ใหม่ <span class="mono">pos_sale:resolve</span></b> (2026-10-27) สำหรับกู้บิล — เป็นงานของหัวหน้า/ผู้ดูแล ไม่ใช่แคชเชียร์: superadmin ได้อัตโนมัติจาก <span class="mono">permissions:sync</span> ·
+          policy อื่นต้องตัดสินใจและทำ grant migration แยก (ยังไม่ได้ให้ใคร)</p>
 
         <div class="code p-5 mb-4">
 <pre><span class="c">// POST /sales-bc/v1/pos-sales — พักบิล</span>
@@ -1285,9 +1291,44 @@ stateDiagram-v2
               <tr><td>เงินไม่พอ</td><td><span class="mono text-[12px]">400</span></td><td><span class="mono text-[12px]">HELD</span> — ยังไม่มี RPC ใดถูกเรียก</td></tr>
               <tr><td>inventory-bc ปฏิเสธการตัด (ของไม่พอ, งวดสต็อกปิด)</td><td>status และข้อความของ inventory-bc เอง (เช่น <span class="mono text-[12px]">400</span>/<span class="mono text-[12px]">409</span>) — <b>ไม่ใช่</b> <span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> — ไม่มีอะไรขยับ (ตัดแบบ all-or-nothing) id บรรทัดเดิม</td></tr>
               <tr><td>inventory-bc ไม่ตอบ</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> — id บรรทัดเดิม</td></tr>
-              <tr><td>finance-bc ปฏิเสธ/ไม่ตอบ หลังตัดสต็อกแล้ว → ระบบคืนสต็อกสำเร็จ<br><span class="text-[12px] text-[var(--muted)]">⚠️ ช่องโหว่ที่รู้แล้ว (2026-10-27): ตอนนี้คืนสต็อกทุกกรณี รวม timeout/5xx ที่ใบกำกับอาจออกไปแล้ว — ต่างจาก B5 ที่คืนเฉพาะ 4xx · รอแก้คู่กับ endpoint กู้บิล <span class="mono">COMPLETING</span> (HANDOFF-Next-Steps §3.2 ข้อ 8)</span></td><td>error ของ finance-bc เอง (เช่นลูกค้าไม่มีเลขผู้เสียภาษีสำหรับ FULL) หรือ <span class="mono text-[12px]">503</span> ถ้าไม่ตอบ</td><td><span class="mono text-[12px]">HELD</span> — <b>ทุกบรรทัดได้ id ใหม่</b> (re-key) · แก้/ปิดซ้ำ/ยกเลิกได้ตามปกติ</td></tr>
-              <tr><td>…และคืนสต็อกก็ไม่ผ่าน</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> + <span class="mono text-[12px]">has_pending_stock_cut = true</span> · id เดิม (การตัดยังมีผล) · ปิดซ้ำ = ใช้การตัดเดิม · ยกเลิก = คืนสต็อก · แก้ = <span class="mono text-[12px]">409</span></td></tr>
-              <tr><td>finance-bc ออกใบกำกับแล้ว แต่เขียนแถวใน sales-bc ไม่ผ่าน / process ตายกลางทาง</td><td>error</td><td>ค้าง <span class="mono text-[12px]">COMPLETING</span> <b>โดยตั้งใจ</b> (ปิดซ้ำอาจได้ใบกำกับใบที่สอง) · log <span class="mono text-[12px]">POS_SALE_COMPLETE_LOCAL_FAILED</span> พร้อมเลขใบกำกับ — ต้องให้คนเขียนแถว <span class="mono text-[12px]">COMPLETED</span> จากใบกำกับนั้น ห้ามปิดบิลซ้ำ</td></tr>
+              <tr><td>finance-bc <b>ปฏิเสธ (4xx)</b> หลังตัดสต็อกแล้ว → ระบบคืนสต็อกสำเร็จ</td><td>error ของ finance-bc เอง (เช่นลูกค้าไม่จด VAT / ไม่มีเลขผู้เสียภาษีสำหรับ FULL)</td><td><span class="mono text-[12px]">HELD</span> — <b>ทุกบรรทัดได้ id ใหม่</b> (re-key) · แก้/ปิดซ้ำ/ยกเลิกได้ตามปกติ</td></tr>
+              <tr><td>finance-bc <b>ไม่ตอบ / timeout / 5xx</b> หลังตัดสต็อกแล้ว <span class="text-[12px] text-[var(--muted)]">(2026-10-27)</span></td><td><span class="mono text-[12px]">503</span> บอกว่าบิลค้าง COMPLETING (ถ้า finance ตอบ 5xx ที่ระบุเลขใบกำกับ ข้อความนั้นอยู่ใน 503 ด้วย)</td><td>ค้าง <span class="mono text-[12px]">COMPLETING</span> <b>โดยตั้งใจ</b> — ใบกำกับอาจออกไปแล้วแต่คำตอบหาย · <b>ไม่คืนสต็อก ไม่คืนบิล</b> (คืนแล้วปิดซ้ำ = ใบกำกับใบที่สอง) · log <span class="mono text-[12px]">POS_SALE_COMPLETE_FINANCE_UNKNOWN</span> · กู้ด้วย <span class="mono text-[12px]">resolve-completion</span></td></tr>
+              <tr><td>…(4xx) และคืนสต็อกก็ไม่ผ่าน</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> + <span class="mono text-[12px]">has_pending_stock_cut = true</span> · id เดิม (การตัดยังมีผล) · ปิดซ้ำ = ใช้การตัดเดิม · ยกเลิก = คืนสต็อก · แก้ = <span class="mono text-[12px]">409</span></td></tr>
+              <tr><td>finance-bc ออกใบกำกับแล้ว แต่เขียนแถวใน sales-bc ไม่ผ่าน / process ตายกลางทาง</td><td>error</td><td>ค้าง <span class="mono text-[12px]">COMPLETING</span> <b>โดยตั้งใจ</b> (ปิดซ้ำอาจได้ใบกำกับใบที่สอง) · log <span class="mono text-[12px]">POS_SALE_COMPLETE_LOCAL_FAILED</span> พร้อม <span class="mono text-[12px]">receipt_id</span> · กู้ด้วย <span class="mono text-[12px]">resolve-completion</span> + <span class="mono text-[12px]">receipt_id</span> นั้น</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4" id="pos-resolve-completion">
+          <div class="rc mb-1">กู้บิลที่ค้าง COMPLETING — <span class="mono">POST /pos-sales/{id}/resolve-completion</span> (2026-10-27)</div>
+          <p class="text-[13.5px]">
+            บิลค้าง <span class="mono text-[12px]">COMPLETING</span> เมื่อระบบ<b>ไม่รู้</b>ว่า finance-bc ออกใบกำกับหรือยัง — ปิดซ้ำไม่ได้ (409) เพราะถ้าออกไปแล้วจะได้ใบที่สอง ·
+            ผู้มีสิทธิ์ <span class="mono text-[12px]">pos_sale:resolve</span> เป็นคนตรวจแล้วบอกระบบ:<br>
+            <b>ขั้นตอนตรวจ</b> — ดูใบกำกับของลูกค้ารายนั้นใน finance-bc (<span class="mono text-[12px]">GET /finance-bc/v1/receipts?filter=customer_id||$eq||…</span> เรียงตามเวลา) หาใบที่ออกช่วงเวลาที่ปิดบิล สินค้า/จำนวนตรงกับบิล ·
+            ถ้าเป็นเคส local write ล้ม log <span class="mono text-[12px]">POS_SALE_COMPLETE_LOCAL_FAILED</span> มี <span class="mono text-[12px]">receipt_id</span> ให้แล้ว ·
+            ถ้า 503 ตอนปิดบิลมีเลขใบกำกับ (finance ตอบ 5xx หลังออกเลข) ใช้เลขนั้น<br>
+            <b>เจอใบกำกับ</b> → ส่ง <span class="mono text-[12px]">receipt_id</span> + <span class="mono text-[12px]">payment_method</span> (วิธีที่ลูกค้าจ่ายจริง) · ถ้าใบนั้นยังค้างชำระ (บันทึกรับเงินล้มหลังออกใบ) ให้บันทึกรับเงินด้วย <span class="mono text-[12px]">POST /payment-entries</span> ก่อน<br>
+            <b>ไม่เจอ</b> → ส่ง <span class="mono text-[12px]">receipt_id: null</span> — ระบบคืนสต็อกที่ตัด (ไม่มีผลกับ id ที่ไม่เคยตัด) ออก id บรรทัดใหม่ แล้วคืนบิลเป็น <span class="mono text-[12px]">HELD</span> ให้แคชเชียร์ปิดใหม่ ·
+            <b>ห้ามเลือกทางนี้ถ้ายังไม่แน่ใจ</b> — ถ้าใบกำกับมีอยู่จริง การปิดใหม่จะออกใบที่สอง<br>
+            <span class="mono text-[12px]">resolution_reason</span> บังคับ และถูกบันทึกลง log (<span class="mono text-[12px]">POS_SALE_COMPLETION_RESOLVED</span> / <span class="mono text-[12px]">POS_SALE_COMPLETION_REOPENED</span>) — เป็นบันทึกเดียวว่าใครตัดสินแทนระบบเพราะอะไร
+          </p>
+        </div>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th>เคส resolve-completion</th><th>client ได้อะไร</th><th>บิลอยู่สถานะไหน</th></tr></thead>
+            <tbody>
+              <tr><td>บิลไม่ใช่ <span class="mono text-[12px]">COMPLETING</span> (HELD, COMPLETED, …)</td><td><span class="mono text-[12px]">409</span></td><td>เดิม (ไม่แตะ)</td></tr>
+              <tr><td>ไม่ส่ง <span class="mono text-[12px]">resolution_reason</span> / <span class="mono text-[12px]">receipt_id</span> ไม่ใช่ uuid</td><td><span class="mono text-[12px]">400001</span></td><td>เดิม</td></tr>
+              <tr><td>ส่ง <span class="mono text-[12px]">receipt_id</span> แต่ไม่ส่ง <span class="mono text-[12px]">payment_method</span></td><td><span class="mono text-[12px]">400</span></td><td><span class="mono text-[12px]">COMPLETING</span> — ยังไม่เรียก finance-bc</td></tr>
+              <tr><td>ใบกำกับถูกต้อง: <span class="mono text-[12px]">ISSUED</span>, ลูกค้าเดียวกัน, ประเภทเอกสารตรง (ABB/FULL), สินค้า+จำนวนครบตรงทุกบรรทัด, ไม่ผูกกับบิลอื่น, ชำระครบ</td><td><span class="mono text-[12px]">200</span></td>
+                <td><span class="mono text-[12px]">COMPLETED</span> ด้วยตัวเลขของใบนั้นทั้งหมด (ยอด, VAT, <span class="mono text-[12px]">line_total</span> ต่อบรรทัด) · <span class="mono text-[12px]">document_date</span> = วันที่ของใบกำกับ · <span class="mono text-[12px]">paid_amount</span> = <span class="mono text-[12px]">total</span>, เงินทอน 0 · <span class="mono text-[12px]">payment_entry_id</span> = ใบรับเงินล่าสุดที่ตัดใบนี้ · <b>ไม่ออกใบใหม่</b></td></tr>
+              <tr><td>ใบกำกับเป็น <span class="mono text-[12px]">DRAFT</span> (ออกไม่สำเร็จ) หรือ <span class="mono text-[12px]">VOID</span></td><td><span class="mono text-[12px]">409</span> — DRAFT ให้ resolve แบบไม่มี receipt_id</td><td><span class="mono text-[12px]">COMPLETING</span></td></tr>
+              <tr><td>ใบกำกับไม่ใช่ของบิลนี้ (ลูกค้า / ประเภท / สินค้าหรือจำนวนไม่ตรง)</td><td><span class="mono text-[12px]">400</span> บอกว่าอะไรไม่ตรง</td><td><span class="mono text-[12px]">COMPLETING</span></td></tr>
+              <tr><td>ใบกำกับผูกกับบิล POS อื่นแล้ว</td><td><span class="mono text-[12px]">409</span> ระบุเลข POS ที่ถือใบนั้น</td><td><span class="mono text-[12px]">COMPLETING</span></td></tr>
+              <tr><td>ใบกำกับยังค้างชำระ</td><td><span class="mono text-[12px]">409</span> — บันทึกรับเงินด้วย <span class="mono text-[12px]">POST /payment-entries</span> ก่อน</td><td><span class="mono text-[12px]">COMPLETING</span></td></tr>
+              <tr><td><span class="mono text-[12px]">receipt_id</span> ไม่มีใน finance-bc</td><td><span class="mono text-[12px]">404</span> ของ finance-bc</td><td><span class="mono text-[12px]">COMPLETING</span></td></tr>
+              <tr><td>finance-bc ไม่ตอบ</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">COMPLETING</span> — ยิงซ้ำได้</td></tr>
+              <tr><td>ไม่ส่ง receipt_id → คืนสต็อกสำเร็จ</td><td><span class="mono text-[12px]">200</span></td><td><span class="mono text-[12px]">HELD</span> · id บรรทัดใหม่ · <span class="mono text-[12px]">has_pending_stock_cut = false</span></td></tr>
+              <tr><td>ไม่ส่ง receipt_id → inventory-bc ไม่ตอบ</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">COMPLETING</span> · id เดิม — ยิงซ้ำได้ (คืนสต็อก idempotent ต่อ id)</td></tr>
             </tbody>
           </table>
         </div>
@@ -1301,12 +1342,13 @@ stateDiagram-v2
           </p>
         </div>
         <div class="rulebox ok mb-8">
-          <div class="rc ok mb-1">FE ต้องรู้ — 5 ข้อ</div>
+          <div class="rc ok mb-1">FE ต้องรู้ — 6 ข้อ</div>
           <p class="text-[13.5px]">
             · <b>สถานะใหม่</b> <span class="mono text-[12px]">HELD</span>, <span class="mono text-[12px]">COMPLETING</span>, <span class="mono text-[12px]">CANCELLED</span> ใน <span class="mono text-[12px]">status</span> — <span class="mono text-[12px]">COMPLETING</span> = กำลังปิดบิล ให้ปิดปุ่มทุกปุ่ม ถ้าค้างนานให้แจ้งผู้ดูแล (อย่ากดปิดซ้ำ)<br>
             · <b>ฟิลด์ใหม่</b> <span class="mono text-[12px]">has_pending_stock_cut</span> ใน response — <span class="mono text-[12px]">true</span> = ซ่อนปุ่มแก้ไข เหลือแค่ "ปิดบิลอีกครั้ง" กับ "ยกเลิก"<br>
             · <b>id บรรทัดของบิลพักเปลี่ยนได้</b> หลังการปิดบิลที่ finance-bc ปฏิเสธ (และคืนสต็อกสำเร็จ) — อย่า cache <span class="mono text-[12px]">items[].id</span> ข้ามการปิดบิลที่ล้ม ให้ <span class="mono text-[12px]">GET /pos-sales/{id}?relations=items</span> ใหม่ (การ <span class="mono text-[12px]">PUT items</span> จับคู่ด้วย <span class="mono text-[12px]">product_id</span> จึงไม่กระทบ)<br>
             · <b>บิลพักมี <span class="mono text-[12px]">payment_method = null</span> และ <span class="mono text-[12px]">receipt_id = null</span></b> — พิมพ์สลิปได้หลัง <span class="mono text-[12px]">COMPLETED</span> เท่านั้น · ยอด VAT ที่เป็น 0 ห้ามแสดงว่า "ไม่มี VAT" · บิล FULL ให้แสดงว่า "+VAT"<br>
+            · <b>บิล <span class="mono text-[12px]">COMPLETING</span> ที่ได้ 503 ตอนปิด</b> (2026-10-27) — <b>ห้ามมีปุ่ม "ลองอีกครั้ง"</b> (ระบบตอบ 409 อยู่แล้ว) ให้แสดง "รอหัวหน้าตรวจบิล" · หน้าจอกู้บิลสำหรับผู้มี <span class="mono text-[12px]">pos_sale:resolve</span> เรียก <span class="mono text-[12px]">resolve-completion</span><br>
             · <b>ของไม่ถูกกันไว้</b> — สินค้าอาจหมดระหว่างพัก แล้วการปิดบิลล้มที่ขั้นตัดสต็อกโดยบิลยัง <span class="mono text-[12px]">HELD</span> (แก้บรรทัดแล้วปิดใหม่ได้)
           </p>
         </div>
