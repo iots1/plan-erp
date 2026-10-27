@@ -1109,10 +1109,16 @@ sequenceDiagram
             <b>ทำไมต้องเรียงแบบนี้</b> — เหตุผลเดียวกับ B3 (ดู docblock ของ <span class="mono text-[12px]">DeliveryNotesService</span>):
             ผลทางกายภาพอยู่<b>นอก</b> BC นี้ จึงต้องสำเร็จก่อน โดยไม่มี transaction ของ sales-bc เปิดค้างไว้ ·
             ขั้นไหนพัง = <b>ขั้นถัดไปไม่เกิด</b> และ client ได้ error กลับ (ไม่ใช่บิลครึ่งใบ) ·
-            ตัดสต็อกสำเร็จแล้วขั้น 2 ล้ม → <span class="mono text-[12px]">503</span> และบิล<b>ไม่ถูกบันทึก</b> ·
-            <span class="mono text-[12px]">source_doc_id</span> (id บรรทัดที่ pre-generate) ตายไปพร้อมคำขอนั้น การยิงซ้ำจึงเป็นบิลใหม่ที่ตัดสต็อกใหม่ —
-            สต็อกที่ตัดค้างต้องคืนด้วยการปรับยอด (D2) ก่อนยิงซ้ำ (ระบบไม่ reverse ให้อัตโนมัติ เพราะการ reverse เองก็เป็น RPC ที่ล้มได้ และ retry เงียบ ๆ เสี่ยงคืนของสองรอบ) ·
-            ต่างจากการปิด<b>บิลพัก</b> (B5.1) ที่ id บรรทัดอยู่ต่อกับบิล จึงคืนสต็อกให้อัตโนมัติได้
+            ตัดสต็อกสำเร็จแล้วขั้น 2 ล้ม → บิล<b>ไม่ถูกบันทึก</b> และผลขึ้นกับว่า finance-bc <b>ออกใบกำกับไปแล้วหรือยัง</b> (2026-10-27):<br>
+            · finance-bc <b>ปฏิเสธด้วย 4xx</b> (เช่น FULL ให้ลูกค้าที่ <span class="mono text-[12px]">is_vat_registered = false</span>) = ยังไม่ได้เขียนอะไร →
+              ระบบ<b>คืนสต็อกที่ตัดให้หนึ่งครั้ง</b> แล้วตอบ status/ข้อความของ finance-bc เอง (ไม่ใช่ 503) — แก้ตามข้อความแล้วยิงใหม่ได้เลย ·
+              ถ้าคืนสต็อกไม่ผ่าน → <span class="mono text-[12px]">503</span> และต้องปรับยอด (D2)<br>
+            · finance-bc <b>ไม่ตอบ</b> (timeout/ล่ม) หรือ<b>ล้มด้วย 5xx</b> = อาจออกใบกำกับไปแล้วแต่คำตอบหาย →
+              ระบบ<b>ไม่คืนสต็อก</b> (คืนแล้วจะเหลือใบกำกับที่ไม่มีของตัด) ตอบ <span class="mono text-[12px]">503</span> และ log <span class="mono text-[12px]">POS_SALE_FINANCE_FAILED</span> ให้คนตรวจ ·
+              ถ้าใบกำกับไม่ได้ออก ให้คืนสต็อกด้วยการปรับยอด (D2) ก่อนยิงซ้ำ — <span class="mono text-[12px]">source_doc_id</span> ตายไปพร้อมคำขอนั้น การยิงซ้ำจึงตัดสต็อกใหม่<br>
+            · สัญญาของ finance-bc: ทุกอย่างที่ล้ม<b>หลัง</b>ได้เลขใบกำกับแล้ว (เช่นบันทึกรับเงินไม่ผ่าน) ตอบเป็น <b>5xx ที่ระบุเลขใบกำกับ</b> เสมอ
+              แม้สาเหตุจริงจะเป็น 4xx — ให้ปิดยอดค้างด้วย <span class="mono text-[12px]">POST /payment-entries</span> ห้ามขายตะกร้าเดิมซ้ำ ·
+            ต่างจากการปิด<b>บิลพัก</b> (B5.1) ที่ id บรรทัดอยู่ต่อกับบิล
           </p>
         </div>
         <div class="rulebox mb-4">
@@ -1279,7 +1285,7 @@ stateDiagram-v2
               <tr><td>เงินไม่พอ</td><td><span class="mono text-[12px]">400</span></td><td><span class="mono text-[12px]">HELD</span> — ยังไม่มี RPC ใดถูกเรียก</td></tr>
               <tr><td>inventory-bc ปฏิเสธการตัด (ของไม่พอ, งวดสต็อกปิด)</td><td>status และข้อความของ inventory-bc เอง (เช่น <span class="mono text-[12px]">400</span>/<span class="mono text-[12px]">409</span>) — <b>ไม่ใช่</b> <span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> — ไม่มีอะไรขยับ (ตัดแบบ all-or-nothing) id บรรทัดเดิม</td></tr>
               <tr><td>inventory-bc ไม่ตอบ</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> — id บรรทัดเดิม</td></tr>
-              <tr><td>finance-bc ปฏิเสธ/ไม่ตอบ หลังตัดสต็อกแล้ว → ระบบคืนสต็อกสำเร็จ</td><td>error ของ finance-bc เอง (เช่นลูกค้าไม่มีเลขผู้เสียภาษีสำหรับ FULL) หรือ <span class="mono text-[12px]">503</span> ถ้าไม่ตอบ</td><td><span class="mono text-[12px]">HELD</span> — <b>ทุกบรรทัดได้ id ใหม่</b> (re-key) · แก้/ปิดซ้ำ/ยกเลิกได้ตามปกติ</td></tr>
+              <tr><td>finance-bc ปฏิเสธ/ไม่ตอบ หลังตัดสต็อกแล้ว → ระบบคืนสต็อกสำเร็จ<br><span class="text-[12px] text-[var(--muted)]">⚠️ ช่องโหว่ที่รู้แล้ว (2026-10-27): ตอนนี้คืนสต็อกทุกกรณี รวม timeout/5xx ที่ใบกำกับอาจออกไปแล้ว — ต่างจาก B5 ที่คืนเฉพาะ 4xx · รอแก้คู่กับ endpoint กู้บิล <span class="mono">COMPLETING</span> (HANDOFF-Next-Steps §3.2 ข้อ 8)</span></td><td>error ของ finance-bc เอง (เช่นลูกค้าไม่มีเลขผู้เสียภาษีสำหรับ FULL) หรือ <span class="mono text-[12px]">503</span> ถ้าไม่ตอบ</td><td><span class="mono text-[12px]">HELD</span> — <b>ทุกบรรทัดได้ id ใหม่</b> (re-key) · แก้/ปิดซ้ำ/ยกเลิกได้ตามปกติ</td></tr>
               <tr><td>…และคืนสต็อกก็ไม่ผ่าน</td><td><span class="mono text-[12px]">503</span></td><td><span class="mono text-[12px]">HELD</span> + <span class="mono text-[12px]">has_pending_stock_cut = true</span> · id เดิม (การตัดยังมีผล) · ปิดซ้ำ = ใช้การตัดเดิม · ยกเลิก = คืนสต็อก · แก้ = <span class="mono text-[12px]">409</span></td></tr>
               <tr><td>finance-bc ออกใบกำกับแล้ว แต่เขียนแถวใน sales-bc ไม่ผ่าน / process ตายกลางทาง</td><td>error</td><td>ค้าง <span class="mono text-[12px]">COMPLETING</span> <b>โดยตั้งใจ</b> (ปิดซ้ำอาจได้ใบกำกับใบที่สอง) · log <span class="mono text-[12px]">POS_SALE_COMPLETE_LOCAL_FAILED</span> พร้อมเลขใบกำกับ — ต้องให้คนเขียนแถว <span class="mono text-[12px]">COMPLETED</span> จากใบกำกับนั้น ห้ามปิดบิลซ้ำ</td></tr>
             </tbody>

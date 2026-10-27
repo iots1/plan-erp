@@ -100,13 +100,13 @@
 - ✅ UX ชื่ออังกฤษที่ว่าง → §2.3 (ไม่ต้องแก้)
 - ✅ หน้าจอบิลพัก (HELD) → §2.4 (ทำแล้ว)
 
-### 3.2 backend — ข้อ 6–10 (1.1 merge แล้ว — เริ่มได้)
+### 3.2 backend — ข้อ 6–10 (6, 7 ✅ 2026-10-27 · เหลือ 8–10)
 
 | # | เรื่อง | ที่ | แนวแก้ |
 |---|---|---|---|
-| 6 | ขาย POS ปกติเก็บ `discount_type`/`discount_value` แม้โหมดไม่ใช่ `header` — ขัดกฎ `business-documents.md` | `PosSalesService.create()` ตอนเรียก `recordSale` และ `createEntity` | ใช้แบบเดียวกับ `hold()`: นอก `header` บังคับเป็น `null` + unit test |
-| 7 | finance-bc **ปฏิเสธ** (4xx) หลังตัดสต็อกแล้วใน `create()` → error หลุดออกไปโดยไม่ log `POS_SALE_FINANCE_FAILED` และสต็อกค้างตัด | `PosSalesService.create()` | `sendWithContext` **throw** เมื่อปลายทางตอบ 4xx/5xx (คืน `null` เฉพาะ transport ล่ม) — ห่อ `try/catch` แบบ `completeHeld()` + แก้ docblock ของ `PosSaleProxyService` / `StockProxyService` ที่บอกว่าคืน `null` |
-| 8 | บิลค้าง `COMPLETING` (process ตายหลังออกใบกำกับ) ไม่มีทางกู้ผ่าน API | `PosSalesService` | endpoint สำหรับผู้มีสิทธิ์: ระบุ `receipt_id` ที่ออกไปแล้ว → ดึงตัวเลขจาก finance-bc → ปิดเป็น `COMPLETED` (ไม่ออกใบกำกับซ้ำ) · permission ใหม่ต้องตาม `permissions.md` (grant migration ก่อน deploy) |
+| 6 | ✅ (`ac71535`) ~~ขาย POS ปกติเก็บ `discount_type`/`discount_value` แม้โหมดไม่ใช่ header~~ | `PosSalesService.create()` | แก้แล้ว: คู่ส่วนลดท้ายบิลเป็น `null` นอก `header`/`both` (ใช้ `appliesHeaderDiscount` — `both` ต้องเก็บไว้) ทั้งที่ส่ง finance-bc และที่บันทึก · unit 2 เคส |
+| 7 | ✅ (`0a3ea92`) ~~finance-bc ปฏิเสธหลังตัดสต็อกใน `create()` → ไม่ log + สต็อกค้างตัด~~ | `PosSalesService.create()` + finance `PosSaleOperationsService` | แก้แล้ว — **ละเอียดกว่าแนวแก้เดิม**: finance ออกใบกำกับกับรับเงินคนละ transaction ถ้ารับเงินล้มด้วย 4xx หลังออกใบกำกับ การ "คืนสต็อกเมื่อ 4xx" จะผิด · จึง (1) finance ห่อทุก error หลังได้เลขเป็น `500` ที่ระบุเลขใบกำกับ (2) sales คืนสต็อกเฉพาะ 4xx แล้วส่ง error ของ finance ต่อ · null/5xx = ไม่คืน + 503 + log · แก้ docblock proxy ทั้งสอง · unit sales 4 เคส + finance spec ใหม่ 4 เคส · smoke `pos-sales-finance-refusal` (FULL ให้ลูกค้าไม่จด VAT → 400, on hand 5 → 5) |
+| 8 | บิลค้าง `COMPLETING` (process ตายหลังออกใบกำกับ) ไม่มีทางกู้ผ่าน API | `PosSalesService` | endpoint สำหรับผู้มีสิทธิ์: ระบุ `receipt_id` ที่ออกไปแล้ว → ดึงตัวเลขจาก finance-bc → ปิดเป็น `COMPLETED` (ไม่ออกใบกำกับซ้ำ) · permission ใหม่ต้องตาม `permissions.md` (grant migration ก่อน deploy) · **รวมงานนี้ด้วย (เจอ 2026-10-27):** `completeHeld()` → `compensateFailedCompletion()` ยังคืนสต็อก + คืนบิลเป็น `HELD` **ทุกกรณี** รวม timeout/5xx ที่ใบกำกับอาจออกแล้ว → ปิดซ้ำได้ใบกำกับใบที่สอง · แนวแก้: คืนเฉพาะ 4xx แบบ `create()` · null/5xx ให้ค้าง `COMPLETING` แล้วกู้ด้วย endpoint ข้อนี้ (ทำแยกไม่ได้ เพราะไม่มี endpoint บิลจะค้างโดยไม่มีทางออก) |
 | 9 | Swagger ของ `GET /quotations/:id` โชว์ `customer_id` ที่ไม่ได้ใช้ | `QuotationQueryParamsDTO` ใช้ทั้ง list และ detail | แยก DTO สำหรับ list |
 | 10 | สลิป 80mm: `{{__page}}` ว่าง | `paginator.inline.js` เส้น "ไม่มี band" | เติม `1` แบบเดียวกับ `__pages` |
 
