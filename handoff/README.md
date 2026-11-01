@@ -37,6 +37,7 @@
 |---|---|---|
 | [`HANDOFF-purchase-discount-document-review.md`](reviews/HANDOFF-purchase-discount-document-review.md) | 2026-10-23 | `feature/purchase-discound-document` |
 | [`HANDOFF-product-suspend-sales-review.md`](reviews/HANDOFF-product-suspend-sales-review.md) | 2026-10-26 | `feature/product`, `feature/suspend-sales`, `feature/optional-cus-supplier` |
+| [`HANDOFF-pos-optional-customer-review.md`](reviews/HANDOFF-pos-optional-customer-review.md) | 2026-11-01 | PR #5 `feature/sales-optional-custumer` |
 
 ## `sessions/` — สรุปท้าย session (ลงวันที่)
 
