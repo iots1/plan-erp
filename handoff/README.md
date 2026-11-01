@@ -33,11 +33,14 @@
 
 เขียนโดย skill `review-branch` (ผู้รีวิวแก้ให้) หรือ `review-pr` (ผู้เขียนแก้เอง) · ชื่อไฟล์ `HANDOFF-<topic>-review.md`
 
+**ตั้งแต่ 2026-11-01 รายละเอียดรีวิวอยู่ใน erp-api (private)** — PR review + issue ติดตาม (label `review`) และ follow-up
+(label `review-followup`) · repo นี้เป็น public จึงเก็บไว้เฉพาะบทเรียน/กฎที่ได้ ไม่มีลำดับ request ที่ทำให้พังหรือ `file:line` ของช่องโหว่
+
 | ไฟล์ | วันที่ | ขอบเขต |
 |---|---|---|
 | [`HANDOFF-purchase-discount-document-review.md`](reviews/HANDOFF-purchase-discount-document-review.md) | 2026-10-23 | `feature/purchase-discound-document` |
 | [`HANDOFF-product-suspend-sales-review.md`](reviews/HANDOFF-product-suspend-sales-review.md) | 2026-10-26 | `feature/product`, `feature/suspend-sales`, `feature/optional-cus-supplier` |
-| [`HANDOFF-pos-optional-customer-review.md`](reviews/HANDOFF-pos-optional-customer-review.md) | 2026-11-01 | PR #5 `feature/sales-optional-custumer` |
+| [`HANDOFF-pos-optional-customer-review.md`](reviews/HANDOFF-pos-optional-customer-review.md) | 2026-11-01 | PR #5 `feature/sales-optional-custumer` — บทเรียนเท่านั้น · checklist: erp-api issue #7 |
 
 ## `sessions/` — สรุปท้าย session (ลงวันที่)
 
@@ -49,7 +52,7 @@
 
 - ฟีเจอร์ใหญ่ที่ต้องวางแผนหลายรอบ → `features/HANDOFF-<Feature-Name>.md`
 - infra / DB / deploy → `infra/`
-- ผลรีวิว → `reviews/HANDOFF-<topic>-review.md`
+- ผลรีวิว → issue ใน erp-api (skill `review-pr`) · ถ้ามีบทเรียนที่ควรเก็บ → `reviews/HANDOFF-<topic>-review.md` แบบสั้น ไม่มีรายละเอียดช่องโหว่
 - สรุปท้าย session → `sessions/HANDOFF-Next-Steps-<YYYY-MM-DD>.md`
 - เพิ่มแถวในตารางของไฟล์นี้ทุกครั้ง · ชื่อไฟล์ต้องไม่ซ้ำกันทั้งโฟลเดอร์ (การอ้างแบบชื่อเปล่าต้องชี้ได้ไฟล์เดียว)
 - ห้ามมีโดเมน / IP / credential จริงของลูกค้า (repo นี้ public — ดู `../CLAUDE.md`)
