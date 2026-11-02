@@ -1040,7 +1040,7 @@ sequenceDiagram
         <div class="code p-5 mb-4">
 <pre><span class="c">// POST /sales-bc/v1/pos-sales</span>
 {
-  <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,         <span class="c">// บังคับ — ลูกค้าทั่วไปหน้าร้านก็ต้องเป็น customer หนึ่งแถว (ดู rulebox)</span>
+  <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,         <span class="c">// optional — ไม่ส่งหรือส่ง null ได้เมื่อ document_type = ABB_TAX_INVOICE (§86/6) · บังคับสำหรับ FULL_TAX_INVOICE (§86/4)</span>
   <span class="s">"warehouse_id"</span>: <span class="s">"9f04…"</span>,        <span class="c">// บังคับ — คลัง/สาขาที่ตัดของออก</span>
   <span class="s">"document_type"</span>: <span class="s">"ABB_TAX_INVOICE"</span>,  <span class="c">// ไม่ส่ง = ABB_TAX_INVOICE · ส่ง FULL_TAX_INVOICE เมื่อลูกค้าขอใบเต็มรูป</span>
   <span class="s">"document_date"</span>: <span class="s">"2026-09-20T10:32:00+07:00"</span>,  <span class="c">// ไม่ส่ง = เวลาปัจจุบัน</span>
@@ -1122,14 +1122,11 @@ sequenceDiagram
           </p>
         </div>
         <div class="rulebox mb-4">
-          <div class="rc mb-1">ไม่มี “ลูกค้าทั่วไป” ฝังในระบบ — ต้องมี customer จริงหนึ่งแถว</div>
+          <div class="rc mb-1">การระบุลูกค้า — ABB_TAX_INVOICE ไม่บังคับ (§86/6) · FULL_TAX_INVOICE บังคับ (§86/4)</div>
           <p class="text-[13.5px]">
-            <span class="mono text-[12px]">customer_id</span> <b>บังคับ</b> ส่ง <span class="mono text-[12px]">null</span> ไม่ได้ —
-            ใบกำกับภาษีทุกใบผูกกับลูกค้า และรายงานลูกหนี้/ยอดขายทั้งระบบนับจากคอลัมน์นั้น ถ้าปล่อยว่างได้
-            จะมีบิลกลุ่มหนึ่งที่หายไปจากทุกรายงานเงียบๆ<br>
-            วิธีที่ตั้งใจให้ทำคือ <b>สร้าง customer หนึ่งแถวชื่อ “ลูกค้าทั่วไป / General Customer”</b> ต่อสาขา แล้วให้เครื่อง POS
-            ยิง id นั้นเป็นค่าเริ่มต้น — ยอดขายหน้าร้านจึงรวมกันอยู่ที่ลูกค้ารายนั้นและยัง drill-down ถึงบิลได้ ·
-            แถวนั้นควรตั้ง <span class="mono text-[12px]">credit_limit = 0</span> ไว้ด้วย
+            <span class="mono text-[12px]">customer_id</span> <b>ไม่บังคับ</b> สำหรับ <span class="mono text-[12px]">ABB_TAX_INVOICE</span> และบิลพัก (<span class="mono text-[12px]">is_held: true</span>) — ส่ง <span class="mono text-[12px]">null</span> หรือไม่ส่งได้ ตาม ม.86/6 ที่ยกเว้นการระบุชื่อผู้ซื้อบนใบกำกับภาษีอย่างย่อ ·
+            ยอดขายกลุ่มที่ไม่ระบุลูกค้าจะถูกจัดกลุ่มแสดงในแถว "ไม่ระบุลูกค้า" บนรายงานลูกหนี้ (Aging) เสมอ เพื่อให้ยอดรวมกระทบยอดกับ GL ลงตัว<br>
+            แต่หากเป็น <b>FULL_TAX_INVOICE</b> (ใบกำกับภาษีเต็มรูป) กฎหมาย ม.86/4 บังคับต้องระบุชื่อ ที่อยู่ และเลขผู้เสียภาษีของผู้ซื้อ — <span class="mono text-[12px]">customer_id</span> จึงยังคง<b>บังคับ</b> และต้องเป็นลูกค้าที่จดทะเบียน VAT (<span class="mono text-[12px]">is_vat_registered = true</span>)
           </p>
         </div>
         <div class="rulebox mb-4">
@@ -1533,7 +1530,7 @@ sequenceDiagram
 <span class="c">// ตัวอย่าง: ใบกำกับ 360.80 · ลูกค้าโอนมา 340.80 · หัก ณ ที่จ่ายไว้ 20.00</span>
 {
   <span class="s">"payment_type"</span>: <span class="s">"RECEIVE"</span>,        <span class="c">// RECEIVE = รับจากลูกค้า · PAY = จ่ายผู้ขาย</span>
-  <span class="s">"party_id"</span>: <span class="s">"57d7…"</span>,             <span class="c">// ลูกค้า (RECEIVE) หรือผู้ขาย (PAY)</span>
+  <span class="s">"party_id"</span>: <span class="s">"57d7…"</span>,             <span class="c">// ลูกค้า (RECEIVE) หรือผู้ขาย (PAY) — RECEIVE ไม่ส่ง/null ได้เมื่อตัดบิล walk-in โดยต้อง allocate เต็มจำนวน (ห้ามมี unallocated_amount) · PAY บังคับเสมอ</span>
   <span class="s">"payment_date"</span>: <span class="s">"2026-08-29T00:00:00+07:00"</span>,
   <span class="s">"payment_method"</span>: <span class="s">"BANK_TRANSFER"</span>,  <span class="c">// CASH | BANK_TRANSFER | CHEQUE | CREDIT_CARD | OTHER</span>
   <span class="s">"reference"</span>: <span class="s">"TRF-88213"</span>,
@@ -1859,7 +1856,9 @@ sequenceDiagram
           <div class="rc mb-1">ยอดที่เห็นตรงกับที่ระบบใช้ตัดสินใจจริง</div>
           <p class="text-[13.5px]">
             คิดสดทุกครั้งจากตัวเลขชุดเดียวกับที่ sales-bc ใช้เช็ควงเงินเครดิต (ดู B2) — ไม่มีคอลัมน์ <span class="mono text-[12px]">outstanding</span> เก็บไว้ให้เพี้ยน ·
-            AR นับเฉพาะเอกสาร <b>ISSUED</b> ต่อใบ = total − ใบลดหนี้ − เครดิตที่ตัดเข้า − ยอดที่ตัดชำระแล้ว (ไม่ติดลบ) · วงเงินเครดิต (B2) = max(0, total − ส่วนของใบลดหนี้ใน credit_available) — เงินรับล่วงหน้าไม่ลดวงเงินที่ใช้ โดยตั้งใจ · AP นับเฉพาะใบ <b>SUBMITTED</b> หักยอดที่จ่ายตัดแล้ว ·
+            AR นับเฉพาะเอกสาร <b>ISSUED</b> ต่อใบ = total − ใบลดหนี้ − เครดิตที่ตัดเข้า − ยอดที่ตัดชำระแล้ว (ไม่ติดลบ) ·
+            สำหรับบิลขายหน้าร้าน (ABB_TAX_INVOICE) ที่ไม่ระบุลูกค้า หากมียอดค้างชำระ จะถูกจัดกลุ่มแสดงในแถว "ไม่ระบุลูกค้า" (UNSPECIFIED_CUSTOMER) เสมอ เพื่อให้ยอดรวม AR ทั้งหมดกระทบยอดกับ GL ลงตัว ไม่มีการข้ามทิ้งเงียบ ๆ ·
+            วงเงินเครดิต (B2) = max(0, total − ส่วนของใบลดหนี้ใน credit_available) — เงินรับล่วงหน้าไม่ลดวงเงินที่ใช้ โดยตั้งใจ · AP นับเฉพาะใบ <b>SUBMITTED</b> หักยอดที่จ่ายตัดแล้ว ·
             ยอดสุทธิ ≤ 0 ไม่แสดง (ลูกค้าที่จ่ายเกินไม่ใช่ลูกหนี้)<br>
             <b>จัดกลุ่มระดับเอกสาร</b> ตาม <span class="mono text-[12px]">due_date</span> ของหัวเอกสาร — ใบที่แบ่งงวด (C5) ต้องดูรายงวดที่
             <span class="mono text-[12px]">GET /receipts/{id}/payment-schedules</span> ซึ่งมี <span class="mono text-[12px]">outstanding</span>/<span class="mono text-[12px]">is_overdue</span> ของแต่ละงวดอยู่แล้ว

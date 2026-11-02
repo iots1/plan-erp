@@ -162,10 +162,10 @@ erDiagram
         string document_type "8 kinds — see below"
         uuid reference_receipt_id FK "self-ref · required for CREDIT_NOTE/DEBIT_NOTE only"
         string adjustment_reason "86/10 · สาเหตุการออกใบลดหนี้/เพิ่มหนี้ — บังคับกรอกเฉพาะสองประเภทนี้, ถูกบังคับเป็น null สำหรับประเภทอื่น"
-        uuid customer_id "ref sales-bc"
-        string customer_name_th "snapshot 86/4(2)"
-        string customer_name_en "snapshot, NULL เมื่อลูกค้าไม่มีชื่ออังกฤษ"
-        string customer_tax_id "snapshot · required only for FULL_TAX_INVOICE/INV_TAX_INVOICE"
+        uuid customer_id "ref sales-bc · nullable สำหรับ ABB_TAX_INVOICE และ RECEIPT (ขายสดหน้าร้าน walk-in)"
+        string customer_name_th "snapshot 86/4(2) · null เมื่อไม่มีลูกค้า"
+        string customer_name_en "snapshot, NULL เมื่อลูกค้าไม่มีชื่ออังกฤษ หรือไม่มีลูกค้า"
+        string customer_tax_id "snapshot · required only for FULL_TAX_INVOICE/INV_TAX_INVOICE · null เมื่อไม่มีลูกค้า"
         string customer_address "snapshot 86/4(3) · null for documents raised before the column existed"
         uuid delivery_note_id "ref sales-bc · claimed link is verified — see RULE AR DELIVERY MATCH"
         timestamptz document_date "selects the tax rate · Asia/Bangkok"
@@ -261,7 +261,7 @@ erDiagram
     PAYMENT_ENTRIES {
         uuid id PK
         string payment_type "receive_or_pay"
-        uuid party_id "customer_or_supplier"
+        uuid party_id "customer_or_supplier · nullable สำหรับ RECEIVE ตัดบิลขายสดหน้าร้านที่ไม่ระบุลูกค้า"
         decimal paid_amount "THB at THIS payment rate"
         decimal wht_amount "withholding · THB at this payment rate"
         decimal allocated_amount "THB · each line at ITS OWN document rate"
@@ -383,6 +383,7 @@ erDiagram
           </div>
           <p class="text-[12.5px] mt-3" style="color:var(--muted)"><span class="mono text-[12px]">document_type</span> ค่าที่ใช้ได้ (8 ค่า): <span class="mono text-[12px]">RECEIPT</span> (ใบเสร็จรับเงิน) · <span class="mono text-[12px]">INVOICE</span> (ใบแจ้งหนี้ทั่วไป) · <span class="mono text-[12px]">PROFORMA_INVOICE</span> (ใบแจ้งหนี้ชั่วคราว — สามตัวนี้ไม่มี VAT) · <span class="mono text-[12px]">FULL_TAX_INVOICE</span> (ใบกำกับภาษีเต็มรูป §86/4) · <span class="mono text-[12px]">INV_TAX_INVOICE</span> (ใบแจ้งหนี้/ใบกำกับภาษีรวมกัน) · <span class="mono text-[12px]">ABB_TAX_INVOICE</span> (ใบกำกับภาษีอย่างย่อ §86/6 — VAT รวมในราคา) · <span class="mono text-[12px]">CREDIT_NOTE</span> (ใบลดหนี้) · <span class="mono text-[12px]">DEBIT_NOTE</span> (ใบเพิ่มหนี้ — สองตัวหลัง §86/22 บังคับมี <span class="mono text-[12px]">reference_receipt_id</span>)</p>
           <p class="text-[12.5px] mt-3" style="color:var(--muted)"><b>ชื่อคู่ค้าภาษาอังกฤษเป็น nullable ทุกเอกสาร (2026-10-26)</b> — <span class="mono text-[12px]">customers.name_en</span> (sales-bc) และ <span class="mono text-[12px]">suppliers.name_en</span> (supplier-bc) ไม่บังคับแล้ว snapshot ฝั่ง finance-bc จึงเป็น <span class="mono text-[12px]">NULL</span> ได้: <span class="mono text-[12px]">receipts.customer_name_en</span> · <span class="mono text-[12px]">billing_notes.customer_name_en</span> · <span class="mono text-[12px]">payment_entries.party_name_en</span> · <span class="mono text-[12px]">ap_invoices.supplier_name_en</span> · <span class="mono text-[12px]">credit_applications.customer_name_en</span> · <span class="mono text-[12px]">customer_refunds.customer_name_en</span> · <span class="mono text-[12px]">supplier_credit_applications.supplier_name_en</span> · <span class="mono text-[12px]">supplier_refunds.supplier_name_en</span> · <b>ไม่มี fallback เป็นชื่อไทย</b> · ใบคืนเงินที่เดิมเก็บ <span class="mono text-[12px]">''</span> เมื่อไม่มีชื่อ ตอนนี้เก็บ <span class="mono text-[12px]">null</span> · แถวรายงาน aging (<span class="mono text-[12px]">receipt-agings</span> / <span class="mono text-[12px]">ap-invoice-agings</span>) มี <span class="mono text-[12px]">customer_name_en</span>/<span class="mono text-[12px]">supplier_name_en</span> = <span class="mono text-[12px]">null</span> ได้ · เอกสารพิมพ์แสดงบรรทัดชื่ออังกฤษเป็นบรรทัดว่าง (print mapper ส่ง <span class="mono text-[12px]">''</span>) — ดู <a href="i18n-guide.html#database" style="color:var(--accent);text-decoration:underline">i18n-guide §02</a></p>
+          <p class="text-[12.5px] mt-3" style="color:var(--muted)"><b>ลูกค้าเป็น nullable สำหรับขายสดหน้าร้านและใบเสร็จ (2026-11)</b> — <span class="mono text-[12px]">receipts.customer_id</span> เป็น nullable ได้เฉพาะประเภท <span class="mono text-[12px]">ABB_TAX_INVOICE</span> และ <span class="mono text-[12px]">RECEIPT</span> (รวมถึงใบลดหนี้/ใบเพิ่มหนี้ที่อ้างอิงใบเสร็จที่ไม่มีลูกค้า) เพื่อรองรับการขายสดหน้าร้านแบบ walk-in · สำหรับ <span class="mono text-[12px]">FULL_TAX_INVOICE</span>, <span class="mono text-[12px]">INV_TAX_INVOICE</span>, <span class="mono text-[12px]">INVOICE</span> บังคับต้องมีลูกค้าเสมอ · ฝั่งการรับชำระ <span class="mono text-[12px]">payment_entries.party_id</span> เป็น <span class="mono text-[12px]">null</span> ได้เฉพาะประเภท <span class="mono text-[12px]">RECEIVE</span> โดยต้องมี allocation ครบเต็มจำนวนตัดบิลที่ไม่มีลูกค้า · รายงาน Aging จัดกลุ่มบิลไม่มีลูกค้าไว้ภายใต้ <span class="mono text-[12px]">UNSPECIFIED_CUSTOMER</span> และไม่อนุญาตนำยอดไปสร้าง Customer Credit Application</p>
         </div>
 
         <!-- 5.5 Receipt Lifecycle -->
@@ -404,11 +405,11 @@ sequenceDiagram
     participant INV as inventory-bc
 
     Note over ACC,INV: สร้างร่าง — implement แล้ว
-    ACC->>FIN: POST /receipts (customer_id, document_type, items[])
+    ACC->>FIN: POST /receipts (customer_id?, document_type, items[])
     Note over ACC,FIN: ไม่มี vat_type/is_vat_included ในคำขอ — derive จาก document_type เสมอ
-    FIN->>SLS: getCustomerById (RPC)
+    FIN->>SLS: getCustomerById (RPC) — ข้ามถ้าไม่มี customer_id (เฉพาะ ABB_TAX_INVOICE/RECEIPT)
     SLS-->>FIN: ชื่อ + tax_id + is_active
-    Note over FIN,SLS: is_active=false → 400 · document_type=FULL_TAX_INVOICE/INV_TAX_INVOICE และไม่มี tax_id → 400 (86/4(2))<br/>ABB_TAX_INVOICE/RECEIPT/INVOICE/PROFORMA_INVOICE ไม่บังคับ tax_id (86/6 หรือไม่ใช่เอกสารภาษี) · sales-bc ล่ม → 503
+    Note over FIN,SLS: customer_id เป็น optional สำหรับ ABB_TAX_INVOICE/RECEIPT<br/>is_active=false → 400 · document_type=FULL_TAX_INVOICE/INV_TAX_INVOICE บังคับ customer_id และ tax_id (86/4(2))<br/>ABB_TAX_INVOICE/RECEIPT/INVOICE/PROFORMA_INVOICE ไม่บังคับ tax_id (86/6 หรือไม่ใช่เอกสารภาษี) · sales-bc ล่ม → 503
     loop ทุก product_id ที่ไม่ซ้ำ — ยิงขนาน
         FIN->>INV: getProductById (RPC) พร้อม tax_category
         INV-->>FIN: sku, ชื่อ, has_variants, vat_treatment
