@@ -222,10 +222,9 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | | ของใหม่ / ที่แก้ |
 |---|---|
 | ช่องโหว่ / ที่มา | บิลขายสดหน้าร้าน walk-in เดิมบังคับต้องเลือกลูกค้า ทำให้ไม่สะท้อนการขายจริงหน้าร้านที่ลูกค้าไม่ประสงค์ระบุตัวตน |
-| sales-bc | `pos_sales.customer_id` เป็น nullable · DTO และ validation อนุญาต nullable เฉพาะ `CASH_SALE` (ออก ABB_TAX_INVOICE) ส่วน `FULL_TAX_INVOICE` บังคับ `customer_id` เสมอ · migration: `1793585739561-MakePosSalesCustomerNullable.ts` |
-| finance-bc | `receipts.customer_id`, `customer_name_th`, `customer_name_en`, `customer_tax_id` เป็น nullable สำหรับ `ABB_TAX_INVOICE` และ `RECEIPT` (รวมถึง CN/DN ที่อ้างอิงบิลไม่มีลูกค้า) · `payment_entries.party_id` nullable สำหรับ `RECEIVE` ที่ตัดบิลไม่มีลูกค้าเต็มจำนวน · aging จัดกลุ่มบิลไม่มีลูกค้าใต้ `UNSPECIFIED_CUSTOMER` · migration: `1793585742802-MakeFinanceCustomerNullable.ts` |
-| report-bc | `sales_summary.customer_id` และ snapshot เป็น nullable · migration: `1793585747619-MakeReportCustomerNullable.ts` |
-| frontend | `packages/core-sales` เพิ่มการ validate บังคับเลือกลูกค้าเมื่อ submit บิลที่ไม่ใช่ cash sales (เช่น full tax invoice) พร้อมแสดง error state และ helper text |
+| sales-bc | `pos_sales.customer_id` เป็น nullable · ไม่ระบุลูกค้าได้เฉพาะ `ABB_TAX_INVOICE` และบิลพัก ส่วน `FULL_TAX_INVOICE` บังคับ `customer_id` เสมอ · migration: `1793603130277-MakePosSalesCustomerNullable.ts` |
+| finance-bc | `receipts.customer_id`, `customer_name_th`, `customer_name_en`, `customer_tax_id` เป็น nullable สำหรับ `ABB_TAX_INVOICE` และ `RECEIPT` (รวมถึง CN/DN ที่อ้างอิงบิลไม่มีลูกค้า) · `payment_entries.party_id` nullable สำหรับ `RECEIVE` ที่ตัดบิลไม่มีลูกค้าเต็มจำนวน · aging รวมบิลไม่มีลูกค้าเป็นแถวเดียว `customer_id: null` (ใบลดหนี้ walk-in ไม่นับเป็น `credit_available`) · migration: `1793585742802-MakeFinanceCustomerNullable.ts` |
+| report-bc | `profit_by_lots.customer_id` เป็น nullable (แถวมาจาก `profit.calculated` ของบิล walk-in) · migration: `1793585747619-MakeReportCustomerNullable.ts` |
 
 ### 2026-10-27 · บิลพักที่ไม่รู้ว่าออกใบกำกับหรือยัง → ค้าง `COMPLETING` + endpoint กู้บิล `resolve-completion` ✅ **verify sales/finance ครบ 6 ขั้น + permissions:sync (`pos_sale:resolve`) + deploy (`9f3c0d0`) + smoke POS 7 ไฟล์บนโดเมน 7/7** · `32658cc`, `dffc2e2`, `9f3c0d0` · HANDOFF-Next-Steps §3.2 ข้อ 8
 
