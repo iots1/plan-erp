@@ -217,7 +217,7 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
-### 2026-11-02 · ขายสดหน้าร้าน (POS) ลูกค้าเป็น nullable ได้ (ABB_TAX_INVOICE / RECEIPT)
+### 2026-11-02 · ขายสดหน้าร้าน (POS) ลูกค้าเป็น nullable ได้ (ABB_TAX_INVOICE / RECEIPT) ✅ **migrate 3 BC + verify sales/finance/report ครบ 6 ขั้น + deploy (`221628f`) + smoke 5 ไฟล์บนโดเมน 5/5** · PR #5 merge `221628f` · smoke POS เลือกสต็อกที่ขายได้จริง `816de21` (#6)
 
 | | ของใหม่ / ที่แก้ |
 |---|---|
@@ -225,6 +225,8 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | sales-bc | `pos_sales.customer_id` เป็น nullable · ไม่ระบุลูกค้าได้เฉพาะ `ABB_TAX_INVOICE` และบิลพัก ส่วน `FULL_TAX_INVOICE` บังคับ `customer_id` เสมอ · migration: `1793603130277-MakePosSalesCustomerNullable.ts` |
 | finance-bc | `receipts.customer_id`, `customer_name_th`, `customer_name_en`, `customer_tax_id` เป็น nullable สำหรับ `ABB_TAX_INVOICE` และ `RECEIPT` (รวมถึง CN/DN ที่อ้างอิงบิลไม่มีลูกค้า) · `payment_entries.party_id` nullable สำหรับ `RECEIVE` ที่ตัดบิลไม่มีลูกค้าเต็มจำนวน · aging รวมบิลไม่มีลูกค้าเป็นแถวเดียว `customer_id: null` (ใบลดหนี้ walk-in ไม่นับเป็น `credit_available`) · migration: `1793585742802-MakeFinanceCustomerNullable.ts` |
 | report-bc | `profit_by_lots.customer_id` เป็น nullable (แถวมาจาก `profit.calculated` ของบิล walk-in) · migration: `1793585747619-MakeReportCustomerNullable.ts` |
+| smoke | sales `pos-sales-customer-optional` · finance `customer-optional` · report `customer-optional` (บิล POS walk-in → `cogs_entries` → `POST /profit-loss-reconciliations` → `profit_by_lots.customer_id` NULL — ขายหน้าร้านได้ `stock.deducted` ก่อนบิล `COMPLETED` จึงต้องให้ reconciliation ตั้งราคา) |
+| ที่เจอระหว่างรีวิว | smoke POS เดิม 7 ตัวได้ 409 "Insufficient stock" — เลือกสินค้าด้วย `total_qty` ที่ยังนับล็อตหมดอายุ (§4 ข้อ 22) · `pnpm verify <bc>` ไม่ lint `libs/database` ทำให้ migration ที่ผิด lint ผ่าน verify แต่ CI แดง (§4 ข้อ 23) · ทั้งสองข้อแก้แล้ว |
 
 ### 2026-10-27 · บิลพักที่ไม่รู้ว่าออกใบกำกับหรือยัง → ค้าง `COMPLETING` + endpoint กู้บิล `resolve-completion` ✅ **verify sales/finance ครบ 6 ขั้น + permissions:sync (`pos_sale:resolve`) + deploy (`9f3c0d0`) + smoke POS 7 ไฟล์บนโดเมน 7/7** · `32658cc`, `dffc2e2`, `9f3c0d0` · HANDOFF-Next-Steps §3.2 ข้อ 8
 
@@ -2585,6 +2587,17 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     ระดับ infra (เช่น `synchronous_commit = remote_apply` + `synchronous_standby_names`) ซึ่งแลกกับ
     latency และความพร้อมใช้งานของการเขียน · smoke ที่ล้มกลางทางเคยทิ้งบิล POS `COMPLETED` (ตัดสต็อก +
     ออกใบกำกับแล้ว) ค้างไว้ — ตอนนี้ `run()` void ทุกบิลที่สร้างใน `finally`
+22. **(จาก 2026-11-02, #6) `total_qty` ของ `/stock-balances` ไม่ใช่ "ขายได้"** — นับ `available_qty` ของ
+    **ทุกล็อตรวมที่หมดอายุแล้ว** (ส่วนนั้นแยกบอกใน `expired_qty`) แต่ `postIssue()` ข้ามล็อตหมดอายุทิ้ง
+    (srs-p3 §06 "RULE · EXPIRY FILTER") · smoke POS 7 ตัวเลือกสินค้าด้วย `total_qty >= n` แล้วไปเจอสินค้าที่ทุกหน่วย
+    หมดอายุ → 409 "Insufficient stock … available 0" แทนสถานะที่ตั้งใจทดสอบ ดูเหมือน regression ของ PR ที่กำลังรีวิว ·
+    **จำนวนที่ขายได้จริง = `total_qty − expired_qty`** — smoke ใช้ `sellableQty(row)` จาก context
+    (`scripts/lib/erp-client.mjs`) · FE ที่แสดง "ขายได้" ต้องลบ `expired_qty` เองเหมือนกัน
+23. **(จาก 2026-11-02, PR #5) `pnpm verify <bc>` เคย lint แค่ตัว BC** — `nx lint <bc>` ไม่ไปถึง `libs/database`
+    แต่ CI รัน `nx affected -t lint` ซึ่งไปถึง · migration ที่ใส่ `public async up` (ผิด
+    `explicit-member-accessibility`) จึงผ่าน verify ทั้ง 3 BC แต่ CI แดง · ตอนนี้ขั้น lint ของ verify รัน
+    `nx run-many -t lint` กับตัว BC **และทุก lib ที่มันพึ่ง** (`@lib/common`, `@lib/config`, `@lib/database`) ตาม
+    `nx graph` · ทดสอบแล้วว่าใส่ `public` กลับเข้าไป lint ของ verify แดง
 
 ---
 

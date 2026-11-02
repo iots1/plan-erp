@@ -2091,6 +2091,8 @@ sequenceDiagram
   <span class="s">"total_qty"</span>: <span class="t">140</span>, <span class="s">"total_value"</span>: <span class="t">41500</span>,
   <span class="s">"lot_count"</span>: <span class="t">2</span>, <span class="s">"expired_qty"</span>: <span class="t">0</span>, <span class="s">"near_expiry_qty"</span>: <span class="t">0</span>
 } } ] }
+<span class="c">// total_qty นับทุกล็อตรวมที่หมดอายุแล้ว (ส่วนนั้นอยู่ใน expired_qty) แต่การขาย/ตัดสต็อกข้ามล็อตหมดอายุ</span>
+<span class="c">// → จำนวนที่ขายได้จริง = total_qty − expired_qty (เลือกสินค้ามาขายด้วยค่านี้ ไม่ใช่ total_qty)</span>
 
 <span class="c">// GET /inventory-bc/v1/stock-ledger-entries?product_id=…&amp;date_from=…&amp;date_to=…</span>
 <span class="c">// balance_before/after = ยอดสะสมของ "ขอบเขต" ที่ถาม (สินค้า×คลัง×ล็อต)</span>
