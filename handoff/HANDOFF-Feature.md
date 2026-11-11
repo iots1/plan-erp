@@ -217,6 +217,16 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-11 · ประวัติการซื้อของลูกค้า — endpoint รวม SO + POS ฝั่ง server (`feature/customer-purchase-history`) ⏳ **typecheck/lint/unit 367/e2e 35/build ผ่าน · smoke ยังไม่ได้รัน** · `9abe2ae`
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| ที่มา | modal รายละเอียดลูกค้าใน erp-frontend ดึง SO/POS อย่างละ 100 แถวแล้วรวมและคำนวณยอดในเบราว์เซอร์ — ช้าและยอดผิดเมื่อบิลเยอะ · ไม่มี endpoint รวมยอดต่อลูกค้า (`report-bc/sales-summaries` เป็นยอดรายวันของทั้งร้าน) |
+| sales-bc | module ใหม่ `customer-purchase-history`: `GET /customers/{id}/purchase-summary` · `/bills` · `/purchased-products` · สิทธิ์ `customer:view` เดิม (ไม่มี grant migration จึงไม่ติดกับดักลำดับ deploy) · ไม่มีตาราง/migration ใหม่ · `SalesOrdersService` + `PosSalesService` เพิ่มเมธอดอ่านเฉพาะกิจ ส่วน facade รวมผล — กฎอยู่ที่ srs-p4 "RULE · ประวัติการซื้อของลูกค้า" |
+| ทดสอบ | unit `customer-purchase-history.service.spec.ts` 15 เคส (รวมหน้า/ตัวกรองกลุ่มสถานะ/หน้าลึกเกินเพดาน/รวมสินค้าสองเอกสาร/ขอบวันตามเวลาธุรกิจ) · smoke `customer-purchase-history.smoke.mjs` เขียนแล้ว (เทียบจำนวนบิลกับตาราง, ค้นเลขที่บิล/SKU, หน้าต่างวัน 2099 ว่าง, 404/400002/401) |
+| ⚠️ ที่ยังไม่ได้ทำ | **`pnpm verify sales-bc` ขั้น smoke ไม่เคยรันผ่าน** — เครื่องที่เขียนไม่มี infra (`.env` ชี้ Postgres `localhost:5432` ที่ไม่ได้เปิด, Redis/RMQ ไม่มี, ไม่มี `ERP_E2E_USERNAME/PASSWORD`) · จึงยังไม่เคยเห็น SQL ดิบ (`COUNT(*) FILTER`, `ARRAY_AGG … ORDER BY`, `EXISTS` ค้นสินค้า) รันบน Postgres จริง · **ก่อน merge/deploy ให้รัน `pnpm verify sales-bc --steps=smoke` บนเครื่องที่มี infra แล้วแก้ผลที่แดงก่อน** |
+| frontend | modal ลูกค้าใน erp-frontend เปลี่ยนไปเรียกสามเส้นนี้แล้ว (แบ่งหน้า + ช่วงวัน) — ใช้งานได้หลัง deploy erp-api เท่านั้น |
+
 ### 2026-11-02 · ขายสดหน้าร้าน (POS) ลูกค้าเป็น nullable ได้ (ABB_TAX_INVOICE / RECEIPT) ✅ **migrate 3 BC + verify sales/finance/report ครบ 6 ขั้น + deploy (`221628f`) + smoke 5 ไฟล์บนโดเมน 5/5** · PR #5 merge `221628f` · smoke POS เลือกสต็อกที่ขายได้จริง `816de21` (#6)
 
 | | ของใหม่ / ที่แก้ |
@@ -2593,11 +2603,17 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     หมดอายุ → 409 "Insufficient stock … available 0" แทนสถานะที่ตั้งใจทดสอบ ดูเหมือน regression ของ PR ที่กำลังรีวิว ·
     **จำนวนที่ขายได้จริง = `total_qty − expired_qty`** — smoke ใช้ `sellableQty(row)` จาก context
     (`scripts/lib/erp-client.mjs`) · FE ที่แสดง "ขายได้" ต้องลบ `expired_qty` เองเหมือนกัน
+    (ยืนยันซ้ำ 2026-11-11: หน้าขายของ erp-frontend เคยโชว์ "ในคลัง: 5" แต่กดขายได้ 409 "available 0" เพราะ 5 หน่วยนั้นอยู่ในล็อตหมดอายุ — FE แก้เป็น `total_qty − expired_qty` แล้ว)
 23. **(จาก 2026-11-02, PR #5) `pnpm verify <bc>` เคย lint แค่ตัว BC** — `nx lint <bc>` ไม่ไปถึง `libs/database`
     แต่ CI รัน `nx affected -t lint` ซึ่งไปถึง · migration ที่ใส่ `public async up` (ผิด
     `explicit-member-accessibility`) จึงผ่าน verify ทั้ง 3 BC แต่ CI แดง · ตอนนี้ขั้น lint ของ verify รัน
     `nx run-many -t lint` กับตัว BC **และทุก lib ที่มันพึ่ง** (`@lib/common`, `@lib/config`, `@lib/database`) ตาม
     `nx graph` · ทดสอบแล้วว่าใส่ `public` กลับเข้าไป lint ของ verify แดง
+24. **(จาก 2026-11-11) `s=` รับ operator แค่ `> >= < <= != ieq cont starts ends in between` และ `filter` ที่เป็นวันต้องส่ง `timezone`** —
+    `s={"so_number":{"$contL":"…"}}` ตอบ 400002 "Invalid search operator" (ใช้ `cont`) · `filter=document_date||$gte||2026-08-28`
+    แบบวันล้วน ถ้าส่ง `timezone=Asia/Bangkok` ด้วย `$gte`/`$lte` จะครอบทั้งวันตามเวลาไทย (ลองบน dev แล้ว) — อย่าประกอบช่วงวันเองจาก client ·
+    `GET /stock-balances` ไม่รับ `filter=` ใช้ query `product_id=` ตรงๆ · ถ้าต้องการช่วงวันแบบ calendar day ที่รับประกันได้ ให้ทำ endpoint
+    ที่ใช้ `businessDayStart/End` เหมือน `/customers/{id}/bills` · (erp-frontend `getSalesOrdersApi` ยังส่ง `$contL` อยู่ — ใช้ไม่ได้จริง)
 
 ---
 

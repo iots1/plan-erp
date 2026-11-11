@@ -2417,7 +2417,7 @@ sequenceDiagram
               <tr><td>sales</td><td class="mono text-[11.5px]">/sales-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า sales_settings ทีละฟิลด์ (ดู C9)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/supplier-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า supplier_settings ทีละฟิลด์ (ดู C9)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/suppliers · /supplier-groups</td><td>ผู้ขาย + กลุ่ม · <span class="mono text-[11.5px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) — ไม่ส่ง/ส่ง <span class="mono text-[11.5px]">null</span> = <span class="mono text-[11.5px]">name: { th, en: null }</span> และ PO / ใบรับของ / เอกสาร finance ที่ snapshot ชื่อเก็บ <span class="mono text-[11.5px]">supplier_name_en = null</span> ตาม (ไม่เอาชื่อไทยมาใส่แทน)</td></tr>
-              <tr><td>sales</td><td class="mono text-[11.5px]">/customers · /customer-groups</td><td>ลูกค้า + กลุ่ม (วงเงินเครดิต · price list เริ่มต้น) · <span class="mono text-[11.5px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) — ไม่ส่ง/ส่ง <span class="mono text-[11.5px]">null</span> = <span class="mono text-[11.5px]">name: { th, en: null }</span> และทุกเอกสารขาย/POS/finance ที่ snapshot ชื่อเก็บ <span class="mono text-[11.5px]">customer_name_en = null</span> ตาม (ไม่เอาชื่อไทยมาใส่แทน)</td></tr>
+              <tr><td>sales</td><td class="mono text-[11.5px]">/customers · /customer-groups</td><td>ลูกค้า + กลุ่ม (วงเงินเครดิต · price list เริ่มต้น) · <span class="mono text-[11.5px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) — ไม่ส่ง/ส่ง <span class="mono text-[11.5px]">null</span> = <span class="mono text-[11.5px]">name: { th, en: null }</span> และทุกเอกสารขาย/POS/finance ที่ snapshot ชื่อเก็บ <span class="mono text-[11.5px]">customer_name_en = null</span> ตาม (ไม่เอาชื่อไทยมาใส่แทน) · <b>ประวัติการซื้อ</b> <span class="mono text-[11.5px]">/customers/{id}/purchase-summary · /bills · /purchased-products</span> (2026-11-11) — รวม SO + POS ฝั่ง server แบ่งหน้า กรองช่วงวัน/กลุ่มสถานะ ค้นเลขที่บิล/SKU/ชื่อสินค้า · ดู srs-p4 "RULE · ประวัติการซื้อของลูกค้า"</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/tax-configs</td><td>อัตรา VAT / หัก ณ ที่จ่าย · <b>ห้ามช่วงวันซ้อนกันใน code เดียว</b></td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/company-profiles</td><td><b>ใหม่ (P0, 2026-09-06) · GET/PATCH เท่านั้น</b> · ชื่อบริษัท/ที่อยู่/เลขผู้เสียภาษี — ใช้ผสมเข้าทุก PDF ที่พิมพ์ผ่าน E3.1 อัตโนมัติ FE ไม่ต้องส่งเอง</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/company-branches</td><td><b>ใหม่ (P0, 2026-09-06)</b> · สาขา (<span class="mono text-[11px]">branch_code='00000'</span> = สำนักงานใหญ่ เซ็ตไว้ให้ตั้งแต่ seed) · CRUD ปกติ, <span class="mono text-[11px]">is_head_office</span> ตั้งได้ทีละสาขาเดียว (ตั้งใหม่แล้วอันเดิมถูกปลดอัตโนมัติ)</td></tr>
@@ -2750,7 +2750,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ · ขายหน้าร้าน <span class="mono text-[13px] text-[var(--muted)]">— 55 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">sales-bc · ลูกค้า · เสนอราคา · ส่งของ · ขายหน้าร้าน <span class="mono text-[13px] text-[var(--muted)]">— 58 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2764,6 +2764,9 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/customers</td><td class="mono text-[11px]">customer:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}</td><td class="mono text-[11px]">customer:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}</td><td class="mono text-[11px]">customer:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}/purchase-summary</td><td class="mono text-[11px]">customer:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}/bills</td><td class="mono text-[11px]">customer:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}/purchased-products</td><td class="mono text-[11px]">customer:view</td></tr>
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/sales-bc/v1/customers/{id}</td><td class="mono text-[11px]">customer:update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes</td><td class="mono text-[11px]">delivery_note:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/sales-bc/v1/delivery-notes</td><td class="mono text-[11px]">delivery_note:create</td></tr>
@@ -2922,7 +2925,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 335 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
+        <p class="mono text-[11.5px] text-[var(--muted)] mt-6">รวม 338 endpoints (ไม่นับ /auth/v1/auth/login · refresh · me · change-password · credentials ที่แสดงไว้ในหัวข้อ 3.2 แล้ว)</p>
       </section>
 
       <!-- ============ CLOSING ============ -->
