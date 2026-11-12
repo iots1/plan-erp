@@ -217,6 +217,18 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-12 · รายงานการจัดซื้อ — endpoint สรุปฝั่งซื้อใน supplier-bc (`feature/purchase-report`) ⏳ **typecheck/lint/unit 160/e2e/build ผ่าน (supplier-bc และ sales-bc) · smoke ยังไม่ได้รัน**
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| ที่มา | erp-frontend ต้องมีหน้า "รายงานการจัดซื้อ" คู่กับรายงานการขาย (KPI + แท็บ) แต่ฝั่งซื้อไม่มี endpoint สรุปเลย — report-bc ยังไม่มี read model ฝั่งซื้อ และหน้ารายการใบสั่งซื้อเป็นหน้าจัดการ ไม่ใช่รายงาน |
+| supplier-bc | module ใหม่ `purchase-report`: `GET /purchase-reports/summary · /periods?group_by=day\|month\|year · /suppliers · /products · /outstanding` · สิทธิ์ `purchase_order:view` เดิม (ไม่มี grant migration จึงไม่ติดกับดักลำดับ deploy) · ไม่มีตาราง/migration ใหม่ · query รวมอยู่ใน `purchase-order/utils/purchase-order-report-queries.util.ts` เรียกจากเมธอดอ่านเฉพาะกิจของ `PurchaseOrdersService` (ตารางหนึ่งเจ้าของ) ส่วน `PurchaseReportService` จัดรูป/เรียง/แบ่งหน้า — กฎอยู่ที่ srs-p6 "RULE · รายงานจัดซื้อคำนวณสดจากใบสั่งซื้อ" |
+| libs/common | ย้าย `resolveBusinessDateWindow` (+ `IDateWindow`) และ `toContainsLikePattern` ขึ้น `libs/common` ตามกฎ Rule of Second Use (sales-bc กับ supplier-bc ใช้ร่วมกัน) · sales-bc ชี้ call site ใหม่ ไม่เปลี่ยนพฤติกรรม · commit แยก `refactor(common)` |
+| ข้อควรรู้ | ใบรับสินค้า/ใบส่งคืนอยู่ inventory-bc แต่ `purchase_order_items.received_qty/returned_qty` ถูก sync ลงใบสั่งซื้อแล้ว จึงไม่ต้องข้าม BC · ยอดรับ/คืน/ค้างรับนับตาม **วันที่ใบสั่งซื้อ** และ **ไม่หักส่วนลดระดับเอกสาร** (มีแต่ `total_amount` ที่เท่ากับ `SUM(total)` ตรงตัว) · ไม่นับ DRAFT/CANCELLED (CANCELLED นับแยกเป็น `cancelled_count`) · `@Type(() => Boolean)` อ่าน `"false"` เป็น true — `is_overdue_only` จึงใช้ `@Transform` และมี unit spec ล็อกไว้ |
+| ทดสอบ | unit `purchase-report.service.spec.ts` (ช่วงวัน/ค้นหา/ปัดเงิน 4 ตำแหน่ง/เรียง/แบ่งหน้า/overdue_days ด้วย fake timer/`is_overdue_only`) + `purchase-report-dto.spec.ts` · smoke `purchase-report.smoke.mjs` เขียนแล้ว (เทียบจำนวนใบ/ยอดรวม/จำนวนผู้จัดจำหน่ายและสินค้ากับตาราง, ผลรวมแต่ละ `group_by` เท่ากับ summary, ใบค้างรับรวมเท่ากับ `outstanding_amount`, หน้าต่างวัน 2099 ว่าง, 400/401) |
+| ⚠️ ที่ยังไม่ได้ทำ | **`pnpm verify supplier-bc` ขั้น smoke ไม่เคยรันผ่าน** — เครื่องที่เขียนไม่มี infra (Docker daemon ไม่รัน, Postgres/Redis/RMQ ปิด) · เห็นแค่ SQL ที่ TypeORM generate ออกมา (`COUNT(*) FILTER`, `ARRAY_AGG … ORDER BY`, `DATE_TRUNC … AT TIME ZONE` + `GROUP BY period`, `GROUP BY doc.id … HAVING`) แต่ไม่เคยเห็นมันรันบน Postgres จริง · **ก่อน merge/deploy ให้รัน `pnpm verify supplier-bc --steps=smoke` บนเครื่องที่มี infra แล้วแก้ผลที่แดงก่อน** |
+| frontend | หน้า `/reports/purchases` ใน erp-frontend ใช้ได้หลัง deploy erp-api เท่านั้น |
+
 ### 2026-11-11 · ประวัติการซื้อของลูกค้า — endpoint รวม SO + POS ฝั่ง server (`feature/customer-purchase-history`) ⏳ **typecheck/lint/unit 367/e2e 35/build ผ่าน · smoke ยังไม่ได้รัน** · `9abe2ae`
 
 | | ของใหม่ / ที่แก้ |
