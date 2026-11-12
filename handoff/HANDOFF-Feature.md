@@ -229,6 +229,15 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | ⚠️ ที่ยังไม่ได้ทำ | **`pnpm verify supplier-bc` ขั้น smoke ไม่เคยรันผ่าน** — เครื่องที่เขียนไม่มี infra (Docker daemon ไม่รัน, Postgres/Redis/RMQ ปิด) · เห็นแค่ SQL ที่ TypeORM generate ออกมา (`COUNT(*) FILTER`, `ARRAY_AGG … ORDER BY`, `DATE_TRUNC … AT TIME ZONE` + `GROUP BY period`, `GROUP BY doc.id … HAVING`) แต่ไม่เคยเห็นมันรันบน Postgres จริง · **ก่อน merge/deploy ให้รัน `pnpm verify supplier-bc --steps=smoke` บนเครื่องที่มี infra แล้วแก้ผลที่แดงก่อน** |
 | frontend | หน้า `/reports/purchases` ใน erp-frontend ใช้ได้หลัง deploy erp-api เท่านั้น |
 
+### 2026-11-12 · แก้ผลทดสอบรายงานจัดซื้อบน dev — `@ResourceType` ระดับ class, ป้ายสินค้า, `is_overdue_only` (`fix/purchase-report-resource-type`, `fix/purchase-report-product-label`) ⏳ **typecheck/lint/unit ผ่าน · smoke ยังไม่ได้รัน**
+
+| หัวข้อ | รายละเอียด |
+|---|---|
+| ที่มา | ทดสอบ `/reports/purchases` บน dev พบ KPI เป็น 0 และแท็บสรุปยอดว่าง — `TransformInterceptor` อ่าน `@ResourceType` จาก **class** เท่านั้น ตัวที่วางไว้ระดับ method ถูกข้าม response จึงไม่มี envelope (ใช้กับ `purchase-reports` และ `customer-purchase-history`) · แก้โดยย้ายเป็น class-level (`purchase-reports`, `customer-purchase-histories`) |
+| ป้ายสินค้า | แท็บตามสินค้าเลือก SKU/ชื่อจากบรรทัดล่าสุดที่ **ไม่เป็น NULL** (บรรทัดเก่าไม่มี snapshot ทำให้แถวว่าง) |
+| `is_overdue_only` | ค่าที่ไม่ใช่ `true`/`false` ตอบ 400 แทนที่จะถือเป็น false เงียบ ๆ |
+| ⚠️ | smoke ยังไม่ได้รัน (ไม่มี infra) — เพิ่ม assertion ป้ายสินค้ากับ 400 ของ `is_overdue_only` แล้ว และเปลี่ยน type ที่คาดใน smoke ทั้ง supplier-bc และ sales-bc |
+
 ### 2026-11-11 · ประวัติการซื้อของลูกค้า — endpoint รวม SO + POS ฝั่ง server (`feature/customer-purchase-history`) ⏳ **typecheck/lint/unit 367/e2e 35/build ผ่าน · smoke ยังไม่ได้รัน** · `9abe2ae`
 
 | | ของใหม่ / ที่แก้ |
