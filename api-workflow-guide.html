@@ -2341,8 +2341,10 @@ sequenceDiagram
           <span class="mono text-[12px]">expiry_alerts</span> จาก <span class="mono text-[12px]">expiry.approaching</span>) แล้วต่อด้วย
           <span class="mono text-[12px]">low_stocks</span> (จาก <span class="mono text-[12px]">stock.low</span> — พบว่ามีอยู่แล้วในโปรดักชันจากสแกนกลางคืนของ
           <span class="mono text-[12px]">ReorderAlertModule</span> ไม่ต้องเพิ่มฝั่ง producer เลย) และ <span class="mono text-[12px]">sales_summaries</span>
-          (rollup รายวัน จาก <span class="mono text-[12px]">invoice.issued</span> ที่เพิ่ม hook ใหม่ใน <span class="mono text-[12px]">ReceiptsService.issue()</span>
-          + <span class="mono text-[12px]">profit.calculated</span> เดิม — ตัดขอบเขต <span class="mono text-[12px]">so.confirmed</span> ออกจากแผนเดิมของ srs-p6.html §03
+          (rollup รายวัน จาก <span class="mono text-[12px]">profit.calculated</span> —
+          <b>แก้ 2026-11-12</b>: เดิมป้อนยอดขายจาก <span class="mono text-[12px]">invoice.issued</span> ที่เพิ่ม hook ใหม่ใน <span class="mono text-[12px]">ReceiptsService.issue()</span>
+          ปัจจุบันยอดขาย (ไม่รวม VAT) กำไร และจำนวนเอกสารมาจาก <span class="mono text-[12px]">profit.calculated</span> ตอนส่งมอบทั้งหมด
+          เพราะต้องอยู่ฐานเดียวกับ COGS (IFRS 15/TFRS 15 · TAS 2) — เหตุผลเต็มที่ srs-p6.html §03 "แก้ไขเพิ่มเติม" — ตัดขอบเขต <span class="mono text-[12px]">so.confirmed</span> ออกจากแผนเดิมของ srs-p6.html §03
           เพราะต้องสร้าง outbox module แรกของ sales-bc ทั้งหมดเพื่อรับรู้รายได้ตอน order commitment ซึ่งไม่ตรงกับที่อื่นในระบบ — ดู
           <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §2/§3)
         </p>
