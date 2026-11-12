@@ -2341,8 +2341,10 @@ sequenceDiagram
           <span class="mono text-[12px]">expiry_alerts</span> จาก <span class="mono text-[12px]">expiry.approaching</span>) แล้วต่อด้วย
           <span class="mono text-[12px]">low_stocks</span> (จาก <span class="mono text-[12px]">stock.low</span> — พบว่ามีอยู่แล้วในโปรดักชันจากสแกนกลางคืนของ
           <span class="mono text-[12px]">ReorderAlertModule</span> ไม่ต้องเพิ่มฝั่ง producer เลย) และ <span class="mono text-[12px]">sales_summaries</span>
-          (rollup รายวัน จาก <span class="mono text-[12px]">invoice.issued</span> ที่เพิ่ม hook ใหม่ใน <span class="mono text-[12px]">ReceiptsService.issue()</span>
-          + <span class="mono text-[12px]">profit.calculated</span> เดิม — ตัดขอบเขต <span class="mono text-[12px]">so.confirmed</span> ออกจากแผนเดิมของ srs-p6.html §03
+          (rollup รายวัน จาก <span class="mono text-[12px]">profit.calculated</span> —
+          <b>แก้ 2026-11-12</b>: เดิมป้อนยอดขายจาก <span class="mono text-[12px]">invoice.issued</span> ที่เพิ่ม hook ใหม่ใน <span class="mono text-[12px]">ReceiptsService.issue()</span>
+          ปัจจุบันยอดขาย (ไม่รวม VAT) กำไร และจำนวนเอกสารมาจาก <span class="mono text-[12px]">profit.calculated</span> ตอนส่งมอบทั้งหมด
+          เพราะต้องอยู่ฐานเดียวกับ COGS (IFRS 15/TFRS 15 · TAS 2) — เหตุผลเต็มที่ srs-p6.html §03 "แก้ไขเพิ่มเติม" — ตัดขอบเขต <span class="mono text-[12px]">so.confirmed</span> ออกจากแผนเดิมของ srs-p6.html §03
           เพราะต้องสร้าง outbox module แรกของ sales-bc ทั้งหมดเพื่อรับรู้รายได้ตอน order commitment ซึ่งไม่ตรงกับที่อื่นในระบบ — ดู
           <span class="mono text-[12px]">HANDOFF-Backlog-Reporting-Print-Tax.md</span> §2/§3)
         </p>
@@ -2416,6 +2418,7 @@ sequenceDiagram
               <tr><td>finance</td><td class="mono text-[11.5px]">/finance-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า finance_settings/tax_configs ทีละฟิลด์ (ดู C9)</td></tr>
               <tr><td>sales</td><td class="mono text-[11.5px]">/sales-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า sales_settings ทีละฟิลด์ (ดู C9)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/supplier-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า supplier_settings ทีละฟิลด์ (ดู C9)</td></tr>
+              <tr><td>supplier</td><td class="mono text-[11.5px]">/purchase-reports/{summary,periods,suppliers,products,outstanding}</td><td><b>GET เท่านั้น</b> · รายงานการจัดซื้อ (2026-11-12) — ยอดซื้อรวม/รายวัน-เดือน-ปี/ตามผู้จัดจำหน่าย/ตามสินค้า/ใบค้างรับ (มี <span class="mono text-[11.5px]">overdue_days</span>) · คำนวณสดจากใบสั่งซื้อฐาน supplier ฐานเดียว กรองช่วงวัน <span class="mono text-[11.5px]">date_from/date_to</span> · ใช้สิทธิ์ <span class="mono text-[11.5px]">purchase_order:view</span> เดิม · resource type <span class="mono text-[11.5px]">purchase-reports</span> (ระดับ class) · ดู srs-p6 "RULE · รายงานจัดซื้อคำนวณสด"</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/suppliers · /supplier-groups</td><td>ผู้ขาย + กลุ่ม · <span class="mono text-[11.5px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) — ไม่ส่ง/ส่ง <span class="mono text-[11.5px]">null</span> = <span class="mono text-[11.5px]">name: { th, en: null }</span> และ PO / ใบรับของ / เอกสาร finance ที่ snapshot ชื่อเก็บ <span class="mono text-[11.5px]">supplier_name_en = null</span> ตาม (ไม่เอาชื่อไทยมาใส่แทน)</td></tr>
               <tr><td>sales</td><td class="mono text-[11.5px]">/customers · /customer-groups</td><td>ลูกค้า + กลุ่ม (วงเงินเครดิต · price list เริ่มต้น) · <span class="mono text-[11.5px]">name_en</span> <b>ไม่บังคับ</b> (2026-10-26) — ไม่ส่ง/ส่ง <span class="mono text-[11.5px]">null</span> = <span class="mono text-[11.5px]">name: { th, en: null }</span> และทุกเอกสารขาย/POS/finance ที่ snapshot ชื่อเก็บ <span class="mono text-[11.5px]">customer_name_en = null</span> ตาม (ไม่เอาชื่อไทยมาใส่แทน) · <b>ประวัติการซื้อ</b> <span class="mono text-[11.5px]">/customers/{id}/purchase-summary · /bills · /purchased-products</span> (2026-11-11) — รวม SO + POS ฝั่ง server แบ่งหน้า กรองช่วงวัน/กลุ่มสถานะ ค้นเลขที่บิล/SKU/ชื่อสินค้า · ดู srs-p4 "RULE · ประวัติการซื้อของลูกค้า"</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/tax-configs</td><td>อัตรา VAT / หัก ณ ที่จ่าย · <b>ห้ามช่วงวันซ้อนกันใน code เดียว</b></td></tr>
@@ -2715,7 +2718,7 @@ sequenceDiagram
             </tbody>
           </table>
         </div>
-        <h3 class="display text-xl mt-10 mb-4">supplier-bc · ผู้ขาย · ใบสั่งซื้อ <span class="mono text-[13px] text-[var(--muted)]">— 27 endpoints</span></h3>
+        <h3 class="display text-xl mt-10 mb-4">supplier-bc · ผู้ขาย · ใบสั่งซื้อ <span class="mono text-[13px] text-[var(--muted)]">— 32 endpoints</span></h3>
         <div class="card overflow-hidden mb-4">
           <table class="d">
             <thead><tr><th style="width:74px">Method</th><th>Path</th><th style="width:230px">สิทธิ์</th></tr></thead>
@@ -2734,6 +2737,11 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments/{attachment_id}</td><td class="mono text-[11px]">purchase_order:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments/{attachment_id}/url</td><td class="mono text-[11px]">purchase_order:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-orders/{purchase_order_id}/attachments/presigned-url</td><td class="mono text-[11px]">purchase_order:update</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-reports/outstanding</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-reports/periods</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-reports/products</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-reports/suppliers</td><td class="mono text-[11px]">purchase_order:view</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/purchase-reports/summary</td><td class="mono text-[11px]">purchase_order:view</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-groups</td><td class="mono text-[11px]">supplier_group:view</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-groups</td><td class="mono text-[11px]">supplier_group:create</td></tr>
               <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/supplier-bc/v1/supplier-groups/{id}</td><td class="mono text-[11px]">supplier_group:update</td></tr>

@@ -204,7 +204,7 @@ finance-bc มี consumer จริงแล้ว — ปัญหาอยู
 
   | Read Model | สร้างจาก event | ใช้ใน Dashboard | สถานะ |
   |---|---|---|---|
-  | `sales_summary` | ~~`so.confirmed` · `invoice.issued`~~ → **`invoice.issued` เท่านั้น** | ยอดขายรายวัน/เดือน | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/sales-summaries` · ตัดขอบเขต `so.confirmed` ออกโดยตัดสินใจร่วมกับผู้ใช้ (ดู §3.5) |
+  | `sales_summary` | ~~`so.confirmed` · `invoice.issued`~~ → ~~`invoice.issued` เท่านั้น~~ → **`profit.calculated` (แก้ 2026-11-12 — ดู §3.5 ท้ายหัวข้อ)** | ยอดขายรายวัน/เดือน | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/sales-summaries` · ตัดขอบเขต `so.confirmed` ออกโดยตัดสินใจร่วมกับผู้ใช้ (ดู §3.5) |
   | `profit_by_lot` | `profit.calculated` | กำไรขั้นต้นต่อล็อต | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/profit-by-lots` |
   | `expiry_alerts` | `expiry.approaching` (เฉพาะตัวนี้พอ — ดูหมายเหตุ) | ล็อตใกล้หมดอายุ | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/expiry-alerts` (bind ผิด transport ตอน deploy เช้าวันเดียวกัน — แก้แล้ว ดู §3.5) |
   | `low_stock` | ~~`stock.deducted` · `stock.low`~~ → **`stock.low` เท่านั้น** | สินค้าใกล้หมด | ✅ **ทำแล้ว 2026-09-05** — `GET /report-bc/v1/low-stocks` · `stock.low` มีอยู่แล้วจริงจากสแกนกลางคืน `ReorderAlertModule` (คนละ mechanism จาก `DomainEvent` enum — ดู §3.5) |
@@ -311,6 +311,12 @@ AppMicroservice.Report.cmd.InventoryEventResources.ExpiryApproaching })` + `IMic
 module ใหม่เพื่อ `so.confirmed` — เหตุผลเดียวกับที่ `credit_limit`/aging ยึดเอกสารที่ออกจริงเสมอ ไม่ใช่
 ตอน order commitment `ReceiptsService.issue()` (finance-bc) เพิ่ม stage event ในทรานแซกชันเดียวกับขึ้น
 เลข/เปลี่ยนสถานะ ยิงทุก `document_type` (ใบเสร็จเงินสดก็นับ ไม่กรองเฉพาะใบกำกับภาษี)
+
+> **⚠️ แก้ไขเพิ่มเติม 2026-11-12 — ข้อสรุปข้างบน ("`invoice.issued` เป็นตัวขับเดียว") ถูกแทนที่แล้ว**
+> **ที่เปลี่ยน**: `sales_summary` ป้อน `total_sales` (ไม่รวม VAT) · `gross_profit` · `order_count` (นับต่อเอกสาร) จาก `profit.calculated` ทั้งหมด · `invoice.issued` ยัง claim แต่ไม่บวกยอด · `profit.calculated` เพิ่ม `document_id`
+> **เหตุผล**: ทดสอบ end-to-end พบว่า DN ที่ส่งแล้วแต่ยังไม่ออกใบเสร็จมีกำไรเข้ารายงานโดยไม่มียอดขาย (ยอดขาย 1,949 / กำไร 1,042.50 แต่กำไรของบิลที่นับจริงคือ 871.50) และ `total_sales` เดิมรวม VAT ขณะที่กำไรไม่รวม — สองค่าใน rollup เดียวกันคนละฐาน
+> **ทำไมเลือกส่งมอบ**: IFRS 15/TFRS 15 รับรู้รายได้ตอนโอนการควบคุมสินค้า + TAS 2 รับรู้ต้นทุนขายพร้อมรายได้ · เหตุผลเดิม (ตรง `credit_limit`/aging) ยังถูกสำหรับลูกหนี้ แต่ไม่ใช่สำหรับยอดขายที่ใช้คู่กับกำไร · "ตัด `so.confirmed` ออก" ยังคงเดิม
+> **ผลกระทบ**: แถวเก่ายังรวม VAT (ไม่ backfill) · ต้อง deploy finance-bc + report-bc คู่กัน — รายละเอียดทั้งหมดที่ `HANDOFF-Feature.md` §2 หัวข้อ 2026-11-12 และ srs-p6.html §03
 
 **migration**: `AddLowStockReadModel`, `AddConsumerNameToProcessedEvents` ×2 (erp_report + erp_finance,
 ฝั่ง finance มี backfill), `AddSalesSummaryReadModel` — รันแล้วบน DB จริงทั้งหมด · permission ใหม่ 2 ตัว

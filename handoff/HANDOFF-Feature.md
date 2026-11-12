@@ -217,6 +217,43 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-12 · `sales_summary` รับรู้ยอดขายตอนส่งมอบ (`profit.calculated`) แทน `invoice.issued` — **แก้ไขเพิ่มเติมจากข้อสรุปเดิมของ 2026-09-05** (`fix/sales-summary-revenue-recognition`) ⏳ **unit ผ่าน (report-bc + finance-bc cogs 68) · eslint ผ่าน · ยังไม่ได้รันบน infra จริง · ยังไม่ merge/deploy**
+
+| | รายละเอียด |
+|---|---|
+| ที่มา | ทดสอบ end-to-end จากฝั่ง erp-frontend (สร้างสินค้า → ซื้อเข้า → ขายทุกประเภทบิล → ดูรายงานขาย) แล้วเทียบตัวเลขรายงานกับบิลจริง |
+| อาการ | ยอดขายรวม 1,949 บาท / 3 บิล แต่กำไรขั้นต้นขึ้น 1,042.50 · กำไรจากบิลที่นับจริงคือ 871.50 · ส่วนต่าง **171 = กำไรของใบส่งของ (DN) ที่ส่งแล้วแต่ยังไม่ออกใบเสร็จ** — DN เข้ากำไรแต่ไม่เข้ายอดขายและไม่นับเป็นบิล · นอกจากนี้ `total_sales` เดิมเป็นยอด**รวม VAT** (ตาม `invoice.issued.total`) ขณะที่กำไรเป็นฐาน**ไม่รวม VAT** |
+| ต้นเหตุ | `sales_summaries` เป็น rollup ที่ป้อนจากสอง event คนละจังหวะ: `total_sales`/`order_count` จาก `invoice.issued` (ตอนออกใบกำกับ/ใบเสร็จ) กับ `gross_profit` จาก `profit.calculated` (ตอนส่งมอบ) — สองค่าในแถวเดียวกันจึงอยู่คนละฐานเวลาและคนละฐานภาษี ข้อสรุปเดิม 2026-09-05 เลือก `invoice.issued` เพื่อให้ตรง `credit_limit`/aging ซึ่งถูกสำหรับลูกหนี้ แต่ไม่ได้คิดถึงว่ายอดขายใน rollup นี้ถูกใช้คู่กับกำไร |
+| หลักการที่ใช้ตัดสิน | รับรู้รายได้เมื่อ**การควบคุมสินค้าโอนให้ลูกค้า** (IFRS 15 / TFRS 15 — สินค้ามีตัวตนคือตอนส่งมอบ) และรับรู้ต้นทุนขายในงวดเดียวกับรายได้ (TAS 2) · ระบบรับรู้ COGS/กำไรตอนส่งมอบอยู่แล้ว จึงย้ายยอดขายมาตอนเดียวกัน · รายได้ไม่รวม VAT เพราะ VAT เป็นภาษีที่เก็บแทนรัฐ · บิล POS ไม่เปลี่ยนเพราะส่งมอบกับออกใบกำกับเป็นขั้นตอนเดียว |
+| finance-bc | `profit.calculated` เพิ่ม `document_id` (= `delivery_note_id` จาก `ISaleRevenueLookupResult`) — เพิ่มฟิลด์อย่างเดียว · เหตุที่ต้องมี: event ถูก stage **ต่อรายการสินค้า** (`sale_id` = `delivery_note_items.id`) จึงนับ "เอกสาร" จาก `sale_id` ไม่ได้ |
+| report-bc | `handleProfitCalculated` เพิ่ม `total_sales` += `total_revenue` (ไม่รวม VAT, ตกกลับไปใช้ผลรวม `lots[].revenue` ถ้า event เก่าไม่มี) + `gross_profit` + `order_count` += 1 ต่อเอกสาร (claim `document:<document_id>` ใน `processed_events` ภายใต้ consumer `sales_summary_document` ในทรานแซกชันเดียวกัน ไม่ต้องมีตารางใหม่) · `handleInvoiceIssued` ยัง claim แต่**ไม่บวกยอดแล้ว** · รวมเป็น `incrementSummary` เดียว (`INSERT … ON CONFLICT (period) DO UPDATE` เพิ่มค่าทับเหมือนเดิม) |
+| migration | `1794000000000-RecogniseSalesSummaryAtDelivery` (erp_report) — เปลี่ยน COMMENT ของ `total_sales`/`order_count` เท่านั้น ไม่แตะข้อมูลหรือโครงสร้าง · `down` คืน COMMENT เดิม |
+| ทดสอบ | `sales-summaries.service.spec.ts` เขียนใหม่ (9): invoice.issued ไม่บวกยอด · event เดียวบวก ยอด/กำไร/1 เอกสาร · สองบรรทัดของเอกสารเดียวนับเป็น 1 · สองเอกสารนับ 2 และสะสมไม่ทับ · event เก่าไม่มี `document_id`/`total_revenue` ตกกลับถูก · claim ซ้ำ no-op · `cogs.service.spec.ts` ล็อก `document_id` ใน payload |
+| ⚠️ ข้อควรระวังตอน deploy | (1) แถวรายวันก่อนวันนี้ยังเป็นยอด**รวม VAT ตามใบเสร็จ** — **ไม่ได้ backfill** เพราะ event เก่าไม่มี `document_id` จึงนับเอกสารย้อนหลังไม่ได้ รายงานที่คร่อมวัน deploy จะมีสองฐานปนกัน (2) DN ที่ประมวลผลไปแล้วก่อน deploy ไม่ถูกนับย้อนหลัง (3) deploy **finance-bc และ report-bc คู่กัน** — report-bc ทน payload เก่าได้แต่นับ `order_count` ไม่ได้จนกว่า finance-bc ส่ง `document_id` (4) **ยังไม่ได้รัน smoke/infra จริง** — ก่อน merge ควรส่ง DN จริงหนึ่งใบแล้วดู `GET /report-bc/v1/sales-summaries` ว่า `total_sales` = ยอดไม่รวม VAT, `order_count` +1, `gross_profit` ไม่ซ้ำ |
+| ⚠️ นโยบาย | นี่คือการเปลี่ยนนโยบายรับรู้ยอดขายของรายงาน (จากเอกสารภาษี → ส่งมอบ) ควรให้ทีมบัญชี/เจ้าของ product รับทราบก่อน merge · เหตุผลเต็มอยู่ที่ srs-p6.html §03 กล่อง "แก้ไขเพิ่มเติม 2026-11-12" |
+| frontend (งานตามมา) | หน้ารายงานขายใน erp-frontend ยังคำนวณการ์ดยอดขายรวม/จำนวนบิลจากบิล POS ในเบราว์เซอร์ (รวม VAT) · ควรเปลี่ยนไปใช้ `total_sales`/`order_count` จาก `GET /report-bc/v1/sales-summaries` หลัง deploy |
+
+### 2026-11-12 · รายงานการจัดซื้อ — endpoint สรุปฝั่งซื้อใน supplier-bc (`feature/purchase-report`) ⏳ **typecheck/lint/unit 160/e2e/build ผ่าน (supplier-bc และ sales-bc) · smoke ยังไม่ได้รัน**
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| ที่มา | erp-frontend ต้องมีหน้า "รายงานการจัดซื้อ" คู่กับรายงานการขาย (KPI + แท็บ) แต่ฝั่งซื้อไม่มี endpoint สรุปเลย — report-bc ยังไม่มี read model ฝั่งซื้อ และหน้ารายการใบสั่งซื้อเป็นหน้าจัดการ ไม่ใช่รายงาน |
+| supplier-bc | module ใหม่ `purchase-report`: `GET /purchase-reports/summary · /periods?group_by=day\|month\|year · /suppliers · /products · /outstanding` · สิทธิ์ `purchase_order:view` เดิม (ไม่มี grant migration จึงไม่ติดกับดักลำดับ deploy) · ไม่มีตาราง/migration ใหม่ · query รวมอยู่ใน `purchase-order/utils/purchase-order-report-queries.util.ts` เรียกจากเมธอดอ่านเฉพาะกิจของ `PurchaseOrdersService` (ตารางหนึ่งเจ้าของ) ส่วน `PurchaseReportService` จัดรูป/เรียง/แบ่งหน้า — กฎอยู่ที่ srs-p6 "RULE · รายงานจัดซื้อคำนวณสดจากใบสั่งซื้อ" |
+| libs/common | ย้าย `resolveBusinessDateWindow` (+ `IDateWindow`) และ `toContainsLikePattern` ขึ้น `libs/common` ตามกฎ Rule of Second Use (sales-bc กับ supplier-bc ใช้ร่วมกัน) · sales-bc ชี้ call site ใหม่ ไม่เปลี่ยนพฤติกรรม · commit แยก `refactor(common)` |
+| ข้อควรรู้ | ใบรับสินค้า/ใบส่งคืนอยู่ inventory-bc แต่ `purchase_order_items.received_qty/returned_qty` ถูก sync ลงใบสั่งซื้อแล้ว จึงไม่ต้องข้าม BC · ยอดรับ/คืน/ค้างรับนับตาม **วันที่ใบสั่งซื้อ** และ **ไม่หักส่วนลดระดับเอกสาร** (มีแต่ `total_amount` ที่เท่ากับ `SUM(total)` ตรงตัว) · ไม่นับ DRAFT/CANCELLED (CANCELLED นับแยกเป็น `cancelled_count`) · `@Type(() => Boolean)` อ่าน `"false"` เป็น true — `is_overdue_only` จึงใช้ `@Transform` และมี unit spec ล็อกไว้ |
+| ทดสอบ | unit `purchase-report.service.spec.ts` (ช่วงวัน/ค้นหา/ปัดเงิน 4 ตำแหน่ง/เรียง/แบ่งหน้า/overdue_days ด้วย fake timer/`is_overdue_only`) + `purchase-report-dto.spec.ts` · smoke `purchase-report.smoke.mjs` เขียนแล้ว (เทียบจำนวนใบ/ยอดรวม/จำนวนผู้จัดจำหน่ายและสินค้ากับตาราง, ผลรวมแต่ละ `group_by` เท่ากับ summary, ใบค้างรับรวมเท่ากับ `outstanding_amount`, หน้าต่างวัน 2099 ว่าง, 400/401) |
+| ⚠️ ที่ยังไม่ได้ทำ | **`pnpm verify supplier-bc` ขั้น smoke ไม่เคยรันผ่าน** — เครื่องที่เขียนไม่มี infra (Docker daemon ไม่รัน, Postgres/Redis/RMQ ปิด) · เห็นแค่ SQL ที่ TypeORM generate ออกมา (`COUNT(*) FILTER`, `ARRAY_AGG … ORDER BY`, `DATE_TRUNC … AT TIME ZONE` + `GROUP BY period`, `GROUP BY doc.id … HAVING`) แต่ไม่เคยเห็นมันรันบน Postgres จริง · **ก่อน merge/deploy ให้รัน `pnpm verify supplier-bc --steps=smoke` บนเครื่องที่มี infra แล้วแก้ผลที่แดงก่อน** |
+| frontend | หน้า `/reports/purchases` ใน erp-frontend ใช้ได้หลัง deploy erp-api เท่านั้น |
+
+### 2026-11-12 · แก้ผลทดสอบรายงานจัดซื้อบน dev — `@ResourceType` ระดับ class, ป้ายสินค้า, `is_overdue_only` (`fix/purchase-report-resource-type`, `fix/purchase-report-product-label`) ⏳ **typecheck/lint/unit ผ่าน · smoke ยังไม่ได้รัน**
+
+| หัวข้อ | รายละเอียด |
+|---|---|
+| ที่มา | ทดสอบ `/reports/purchases` บน dev พบ KPI เป็น 0 และแท็บสรุปยอดว่าง — `TransformInterceptor` อ่าน `@ResourceType` จาก **class** เท่านั้น ตัวที่วางไว้ระดับ method ถูกข้าม response จึงไม่มี envelope (ใช้กับ `purchase-reports` และ `customer-purchase-history`) · แก้โดยย้ายเป็น class-level (`purchase-reports`, `customer-purchase-histories`) |
+| ป้ายสินค้า | แท็บตามสินค้าเลือก SKU/ชื่อจากบรรทัดล่าสุดที่ **ไม่เป็น NULL** (บรรทัดเก่าไม่มี snapshot ทำให้แถวว่าง) |
+| `is_overdue_only` | ค่าที่ไม่ใช่ `true`/`false` ตอบ 400 แทนที่จะถือเป็น false เงียบ ๆ |
+| ⚠️ | smoke ยังไม่ได้รัน (ไม่มี infra) — เพิ่ม assertion ป้ายสินค้ากับ 400 ของ `is_overdue_only` แล้ว และเปลี่ยน type ที่คาดใน smoke ทั้ง supplier-bc และ sales-bc |
+
 ### 2026-11-11 · ประวัติการซื้อของลูกค้า — endpoint รวม SO + POS ฝั่ง server (`feature/customer-purchase-history`) ⏳ **typecheck/lint/unit 367/e2e 35/build ผ่าน · smoke ยังไม่ได้รัน** · `9abe2ae`
 
 | | ของใหม่ / ที่แก้ |
