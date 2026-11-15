@@ -1338,6 +1338,13 @@ stateDiagram-v2
             คืนสต็อกไม่ผ่าน = <span class="mono text-[12px]">503</span> และยิง <span class="mono text-[12px]">/cancel</span> เดิมซ้ำได้จนสำเร็จ (บิล <span class="mono text-[12px]">CANCELLED</span> ที่ยังมี flag รับคำขอนี้ซ้ำ)
           </p>
         </div>
+        <div class="rulebox mb-4" id="pos-error-codes">
+          <div class="rc mb-1">แสดง error ให้แคชเชียร์ — switch ที่ <span class="mono">errors[].code</span> ไม่ใช่ <span class="mono">detail</span> (BE-08)</div>
+          <p class="text-[13.5px]">
+            ทุก error ของ POS มี <span class="mono">code</span> คงที่ + <span class="mono">meta</span> (เช่น <span class="mono">INSUFFICIENT_STOCK</span> → <span class="mono">product_id, warehouse_id, requested, available</span>) · <span class="mono">detail</span> ยังเป็นอังกฤษและเปลี่ยนถ้อยคำได้ ห้ามจับ regex · 409 รหัสซ้ำของสินค้า/ลูกค้า/ผู้ขายมี <span class="mono">source.pointer</span> ชี้ช่อง ·
+            ตารางรหัสทั้งหมดที่ <a href="backend-convention.html#error-codes">backend-convention · ERROR CODE</a>
+          </p>
+        </div>
         <div class="rulebox mb-4" id="pos-idempotency-key">
           <div class="rc mb-1">ยิงซ้ำอย่างปลอดภัย — header <span class="mono">Idempotency-Key</span> บน <span class="mono">POST /pos-sales</span> และ <span class="mono">POST /pos-sales/{id}/complete</span> (BE-01)</div>
           <p class="text-[13.5px]">

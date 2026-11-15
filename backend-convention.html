@@ -431,6 +431,23 @@ is_public: <span class="t">boolean</span>;</pre>
             </tbody>
           </table>
         </div>
+        <div class="rulebox mb-4" id="error-codes"><div class="rc mb-1">ERROR CODE · <span class="mono">errors[].code</span> ที่โปรแกรมอ่านได้ + <span class="mono">errors[].meta</span> (BE-08)</div><p class="text-[13.5px]">throw ด้วย body <span class="mono text-[12px]">{ code, message, meta?, source? }</span> (<span class="mono text-[12px]">ICodedErrorBody</span>) — filter คัดลอก <span class="mono text-[12px]">code</span> / <span class="mono text-[12px]">meta</span> / <span class="mono text-[12px]">source</span> ลง <span class="mono text-[12px]">errors[0]</span> · <span class="mono text-[12px]">detail</span> ยังเป็นประโยคอังกฤษเดิม (<b>ห้าม parse</b> — ให้ switch ที่ <span class="mono text-[12px]">code</span> แล้วแปลไทยฝั่ง client) · ส่งข้าม BC ครบทั้ง <span class="mono text-[12px]">RpcExceptionsFilter</span> และ <span class="mono text-[12px]">MicroserviceClientService</span> · enum <span class="mono text-[12px]">SalesErrorCode</span> ใน <span class="mono text-[12px]">@lib/common</span> — เพิ่มได้ ห้ามเปลี่ยนชื่อ · 409 unique ของ Postgres (<span class="mono text-[12px]">23505</span>) เติม <span class="mono text-[12px]">source.pointer = /data/attributes/&lt;column&gt;</span> เมื่อ key เป็นคอลัมน์เดียว (key ผสมไม่มี pointer — ไม่เดาช่อง) · ครอบคลุมเฉพาะสายการขาย (POS) รอบนี้</p></div>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>code</th><th>HTTP</th><th>meta</th><th>เมื่อไร</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono text-[12px]">INSUFFICIENT_STOCK</span></td><td>409</td><td><span class="mono text-[12px]">product_id, warehouse_id, requested, available</span></td><td>inventory-bc ตัดสต็อกไม่พอ (ส่งข้าม BC ครบ)</td></tr>
+              <tr><td><span class="mono text-[12px]">PAID_AMOUNT_TOO_LOW</span></td><td>400</td><td><span class="mono text-[12px]">total, paid_amount</span></td><td>เงินรับน้อยกว่ายอดบิล — ยังไม่มีอะไรเคลื่อน</td></tr>
+              <tr><td><span class="mono text-[12px]">CUSTOMER_REQUIRED_FOR_FULL_TAX_INVOICE</span></td><td>400</td><td>—</td><td>ใบกำกับเต็มรูปไม่มี customer_id (§86/4)</td></tr>
+              <tr><td><span class="mono text-[12px]">CUSTOMER_INCOMPLETE_FOR_TAX_INVOICE</span></td><td>400</td><td><span class="mono text-[12px]">missing: string[]</span></td><td>ลูกค้าขาดข้อมูลสำหรับใบกำกับ (<span class="mono text-[12px]">tax_id</span> / <span class="mono text-[12px]">is_vat_registered</span>) — finance-bc</td></tr>
+              <tr><td><span class="mono text-[12px]">DUPLICATE_LINE</span></td><td>400</td><td><span class="mono text-[12px]">product_id, uom_id</span></td><td>สินค้าซ้ำในบิล (uom_id เป็น null จนกว่า BE-02 จะมีหน่วยบนบรรทัด POS)</td></tr>
+              <tr><td><span class="mono text-[12px]">POS_SALE_INVALID_STATUS</span></td><td>409</td><td><span class="mono text-[12px]">status, allowed: string[]</span></td><td>สถานะบิลไม่ตรงกับการดำเนินการ (แก้/ปิด/ยกเลิก/void/resolve)</td></tr>
+              <tr><td><span class="mono text-[12px]">POS_SALE_PENDING_STOCK_CUT</span></td><td>409</td><td>—</td><td>บิลพักยังมีสต็อกที่ตัดค้างจากการปิดบิลที่ล้ม — แก้ไม่ได้</td></tr>
+              <tr><td><span class="mono text-[12px]">PERIOD_CLOSED</span></td><td>409</td><td><span class="mono text-[12px]">frozen_upto, document_date</span></td><td>ช่วงสต็อกปิดแล้ว (ISO instant)</td></tr>
+              <tr><td><span class="mono text-[12px]">DOWNSTREAM_UNAVAILABLE</span></td><td>503</td><td><span class="mono text-[12px]">service</span></td><td>BC ปลายทางไม่ตอบ (<span class="mono text-[12px]">inventory-bc</span> / <span class="mono text-[12px]">finance-bc</span>)</td></tr>
+            </tbody>
+          </table>
+        </div>
         <div class="space-y-3">
           <div class="rulebox"><div class="rc mb-1">CONTROLLER · ไม่ catch</div><p class="text-[13.5px]">controller ปล่อย exception ลอยขึ้น <span class="mono text-[12px]">AllExceptionsFilter</span> — catch เฉพาะกรณีต้องเพิ่ม context เฉพาะทาง (เช่น file upload) เท่านั้น</p></div>
           <div class="rulebox"><div class="rc mb-1">NULL CHECK · หลัง query</div><p class="text-[13.5px]">เช็ค <span class="mono text-[12px]">null</span> หลัง DB read เสมอ → <span class="mono text-[12px]">throw new NotFoundException(...)</span> · ห้าม service คืน <span class="mono text-[12px]">null</span></p></div>
