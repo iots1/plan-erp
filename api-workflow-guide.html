@@ -1338,6 +1338,25 @@ stateDiagram-v2
             คืนสต็อกไม่ผ่าน = <span class="mono text-[12px]">503</span> และยิง <span class="mono text-[12px]">/cancel</span> เดิมซ้ำได้จนสำเร็จ (บิล <span class="mono text-[12px]">CANCELLED</span> ที่ยังมี flag รับคำขอนี้ซ้ำ)
           </p>
         </div>
+        <div class="rulebox mb-4" id="pos-idempotency-key">
+          <div class="rc mb-1">ยิงซ้ำอย่างปลอดภัย — header <span class="mono">Idempotency-Key</span> บน <span class="mono">POST /pos-sales</span> และ <span class="mono">POST /pos-sales/{id}/complete</span> (BE-01)</div>
+          <p class="text-[13.5px]">
+            ส่ง UUID หนึ่งค่าต่อ "หนึ่งความตั้งใจขาย" แล้ว<b>ใช้ key เดิมกับ body เดิม</b>ทุกครั้งที่ลองใหม่ (เน็ตหลุด, timeout, ผู้ใช้กดซ้ำ) — สร้าง key ใหม่เมื่อเริ่มบิลใหม่เท่านั้น · ไม่ส่ง header = ทำงานเหมือนเดิม ·
+            ขั้นตอนเบื้องหลังและเหตุผลอยู่ที่ <a href="srs-p4.html#p4-pos-idempotency-key">srs-p4 · RULE Idempotency-Key</a>
+          </p>
+        </div>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th>ส่ง key เดิมซ้ำแล้ว…</th><th>client ได้อะไร</th><th>ทำอะไรต่อ</th></tr></thead>
+            <tbody>
+              <tr><td>คำขอแรกสำเร็จแล้ว (บิล <span class="mono text-[12px]">COMPLETED</span> หรือ <span class="mono text-[12px]">HELD</span>)</td><td><b>บิลเดิม</b> รหัสสถานะเดิม (<span class="mono text-[12px]">201</span> ขาย/พัก · <span class="mono text-[12px]">200</span> ปิดบิลพัก) · ไม่ตัดสต็อก ไม่ออกใบกำกับ ไม่รับเงินซ้ำ</td><td>ใช้ผลนั้นเลย (พิมพ์สลิปด้วย <span class="mono text-[12px]">receipt_id</span> เดิม)</td></tr>
+              <tr><td>คำขอแรกยังทำอยู่ หรือจบโดยไม่รู้ผล (เช่น finance-bc ไม่ตอบ)</td><td><span class="mono text-[12px]">409</span> · <span class="mono text-[12px]">status.code</span> = <span class="mono text-[12px]">409001</span></td><td>รอสักครู่แล้วถามใหม่ด้วย key เดิม · <b>ห้ามเปลี่ยน key</b> เพื่อขายใหม่ — ถ้าค้างนานให้แจ้งผู้ดูแลกู้บิล (<span class="mono text-[12px]">resolve-completion</span>)</td></tr>
+              <tr><td>key เดิมแต่ body / การดำเนินการ / ผู้ใช้ ต่างจากครั้งแรก</td><td><span class="mono text-[12px]">422</span></td><td>เป็นบิลใหม่ → ใช้ key ใหม่</td></tr>
+              <tr><td>คำขอแรกล้มโดยยังไม่มีอะไรเกิด (ตรวจไม่ผ่าน · ของไม่พอ · finance-bc ปฏิเสธแล้วคืนสต็อกสำเร็จ)</td><td>error เดิมของคำขอนั้น — <b>key ถูกคืนให้</b></td><td>แก้สาเหตุแล้วลองใหม่ด้วย key เดิมได้ (body ที่แก้แล้วก็ใช้ key เดิมได้ เพราะไม่มีการจองค้าง)</td></tr>
+              <tr><td>header ไม่ใช่ UUID</td><td><span class="mono text-[12px]">400</span> · <span class="mono text-[12px]">400002</span></td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
         <div class="rulebox ok mb-8">
           <div class="rc ok mb-1">FE ต้องรู้ — 6 ข้อ</div>
           <p class="text-[13.5px]">
