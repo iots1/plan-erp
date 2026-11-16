@@ -1054,7 +1054,9 @@ sequenceDiagram
   <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
   <span class="s">"items"</span>: [
     { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">2</span>, <span class="s">"unit_price"</span>: <span class="t">428</span>,
-      <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> }
+      <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> },   <span class="c">// ไม่ส่ง uom_id = หน่วยฐาน factor 1 (client เก่ายังใช้ได้)</span>
+    { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"uom_id"</span>: <span class="s">"c3d4…"</span>, <span class="s">"qty"</span>: <span class="t">1</span>, <span class="s">"unit_price"</span>: <span class="t">4800</span> }
+                                   <span class="c">// BE-02: สินค้าเดียวกันอีกหน่วย (1 ลัง) — qty/unit_price เป็นของหน่วยนี้ · ห้ามส่ง conversion_factor</span>
   ]
 }
 
@@ -1068,8 +1070,28 @@ sequenceDiagram
   <span class="s">"sub_total"</span>: <span class="t">856</span>, <span class="s">"total_discount"</span>: <span class="t">0</span>,
   <span class="s">"net_amount"</span>: <span class="t">800</span>,               <span class="c">// ถอด VAT ออกจากราคาป้ายแล้ว (ABB = ราคารวมภาษี)</span>
   <span class="s">"vat_amount"</span>: <span class="t">56</span>, <span class="s">"total"</span>: <span class="t">856</span>,
-  <span class="s">"paid_amount"</span>: <span class="t">1000</span>, <span class="s">"change_amount"</span>: <span class="t">144</span>
+  <span class="s">"paid_amount"</span>: <span class="t">1000</span>, <span class="s">"change_amount"</span>: <span class="t">144</span>,
+  <span class="s">"items"</span>: [                          <span class="c">// มีเมื่อขอ ?relations=items หรือในคำตอบของ POST</span>
+    { <span class="s">"id"</span>: <span class="s">"e91a…"</span>, <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>,
+      <span class="s">"uom_id"</span>: <span class="s">"c3d4…"</span>, <span class="s">"uom_name"</span>: { <span class="s">"th"</span>: <span class="s">"ลัง"</span>, <span class="s">"en"</span>: <span class="s">"Case"</span> },
+      <span class="s">"conversion_factor"</span>: <span class="t">12</span>, <span class="s">"stock_qty"</span>: <span class="t">12</span>,   <span class="c">// BE-02 · stock_qty = qty × conversion_factor (หน่วยฐาน ที่ตัดสต็อก)</span>
+      <span class="s">"qty"</span>: <span class="t">1</span>, <span class="s">"unit_price"</span>: <span class="t">4800</span>, <span class="s">"line_total"</span>: <span class="t">4485.98</span> }
+  ]
 }</pre>
+        </div>
+
+        <div class="rulebox mb-4" id="b5-sold-in-unit">
+          <div class="rc mb-1">ขายเป็นหน่วยอื่นที่ไม่ใช่หน่วยฐาน — สินค้าเดียวกันต่างหน่วยอยู่คนละบรรทัด (BE-02, 2026-11-16)</div>
+          <p class="text-[13.5px]">
+            บรรทัดส่ง <span class="mono text-[12px]">uom_id</span> (ไม่บังคับ) ได้ทั้ง <span class="mono text-[12px]">POST /pos-sales</span> และ <span class="mono text-[12px]">PUT /pos-sales/{id}</span> (บิลพัก) — <span class="mono text-[12px]">qty</span> กับ <span class="mono text-[12px]">unit_price</span> เป็นของหน่วยนั้น ("1 ลัง × 4,800") ·
+            <b>ห้ามส่งอัตราแปลง</b>: sales-bc ถาม inventory-bc ครั้งเดียวต่อบิล (<span class="mono text-[12px]">uom_conversion_factors</span> ชนิด <span class="mono text-[12px]">sales</span>) ·
+            ไม่ส่ง <span class="mono text-[12px]">uom_id</span> = หน่วยฐาน factor 1 · หน่วยที่สินค้านั้นไม่มีอัตราแปลงชนิดขาย → <span class="mono text-[12px]">400 UOM_NOT_SELLABLE</span> ·
+            <span class="mono text-[12px]">qty × conversion_factor</span> ไม่เป็นจำนวนเต็ม → <span class="mono text-[12px]">400 UOM_FRACTIONAL_STOCK_QTY</span> ·
+            ห้ามซ้ำคู่ <span class="mono text-[12px]">(product_id, uom_id)</span> (ไม่ส่ง uom_id กับส่งหน่วยฐานตรงๆ ถือว่าหน่วยเดียวกัน) → <span class="mono text-[12px]">400 DUPLICATE_LINE</span> โดย <span class="mono text-[12px]">meta.uom_id</span> คือหน่วยที่ resolve แล้ว<br>
+            ระบบตัดสต็อก <span class="mono text-[12px]">stock_qty</span> ต่อบรรทัด (ผูก id บรรทัด) → void คืนครบทุกบรรทัด · ตรวจสต็อกพอ/ไม่พอรวมทุกบรรทัดของสินค้าเดียวกัน ·
+            ใบกำกับ (<span class="mono text-[12px]">receipt_items</span>) เก็บ <span class="mono text-[12px]">uom_id</span>/<span class="mono text-[12px]">uom_name_th/en</span> · พิมพ์สลิป/A4 ช่อง <span class="mono text-[12px]">row.qty</span> = "1 ลัง" ·
+            บรรทัดของบิลก่อน BE-02 คืน <span class="mono text-[12px]">uom_id: null</span>, <span class="mono text-[12px]">uom_name: { th: null, en: null }</span>, <span class="mono text-[12px]">conversion_factor: 1</span>, <span class="mono text-[12px]">stock_qty = qty</span> (หน่วยฐาน ณ ตอนขาย) · ราคายังเป็นของที่ client ส่ง (ถามราคาตามหน่วยคือ BE-11)
+          </p>
         </div>
 
         <div class="rulebox mb-4">
