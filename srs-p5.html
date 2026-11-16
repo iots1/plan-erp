@@ -94,7 +94,7 @@
               <tbody>
                 <tr><td>document_type</td><td>Receipt</td><td>เลือก 1 ใน 8: RECEIPT · INVOICE · PROFORMA_INVOICE (ไม่มี VAT) · FULL_TAX_INVOICE (§86/4) · INV_TAX_INVOICE · ABB_TAX_INVOICE (§86/6, VAT รวมในราคา) · CREDIT_NOTE · DEBIT_NOTE (§86/22) — ตัดสินพฤติกรรม VAT ทั้งใบ</td></tr>
                 <tr><td>document_number</td><td>Receipt</td><td>เลขที่ต่อเนื่องไม่ข้าม/ไม่ซ้ำ — <b>แยกลำดับต่อ document_type</b> (RCPT-/INV-/ABB- ฯลฯ คนละ counter)</td></tr>
-                <tr><td>is_vat_included</td><td>Receipt</td><td>ราคารวม VAT แล้วหรือยัง — <b>derive จาก document_type เสมอ</b> (true เฉพาะ ABB_TAX_INVOICE หรือสืบทอดจากใบอ้างอิงถ้าเป็น CN/DN) ไม่รับค่าจาก client</td></tr>
+                <tr><td>is_vat_included</td><td>Receipt</td><td>ราคารวม VAT แล้วหรือยัง — <b>derive จาก document_type เสมอ</b> (true เฉพาะ ABB_TAX_INVOICE หรือสืบทอดจากใบอ้างอิงถ้าเป็น CN/DN) ไม่รับค่าจาก client ของ API สาธารณะ — ข้อยกเว้นเดียว: การขายหน้าร้าน (POS) เลือกให้ FULL_TAX_INVOICE คีย์ราคารวม VAT ได้ (BE-05, 2026-11-16)</td></tr>
                 <tr><td>reference_receipt_id</td><td>Receipt (CREDIT_NOTE/DEBIT_NOTE)</td><td>ใบกำกับภาษีที่ปรับปรุง — บังคับมีค่าเฉพาะสองประเภทนี้, ต้องเป็นใบที่ ISSUED แล้วและเคยมี VAT จริง</td></tr>
                 <tr><td>vat_amount</td><td>Receipt</td><td>ภาษีมูลค่าเพิ่มตาม tax_config (0 เสมอเมื่อ document_type ไม่มี VAT — บังคับ ไม่ใช่แค่บังเอิญเป็น 0)</td></tr>
                 <tr><td>unit_cost</td><td>COGS Entry</td><td><b>ต้นทุนจริงของล็อต</b> (จาก event) — ห้ามเฉลี่ย</td></tr>
@@ -167,6 +167,8 @@ erDiagram
         string customer_name_en "snapshot, NULL เมื่อลูกค้าไม่มีชื่ออังกฤษ หรือไม่มีลูกค้า"
         string customer_tax_id "snapshot · required only for FULL_TAX_INVOICE/INV_TAX_INVOICE · null เมื่อไม่มีลูกค้า"
         string customer_address "snapshot 86/4(3) · null for documents raised before the column existed"
+        string customer_branch_type "snapshot · head_office_branch · เฉพาะผู้ซื้อที่จดทะเบียน VAT · null = ไม่พิมพ์ (ประกาศอธิบดีฯ 196)"
+        string customer_branch_code "snapshot · 5 หลัก · มีเมื่อ customer_branch_type = branch"
         uuid delivery_note_id "ref sales-bc · claimed link is verified — see RULE AR DELIVERY MATCH"
         timestamptz document_date "selects the tax rate · Asia/Bangkok"
         timestamptz due_date "document_date + customers.credit_terms · null = no terms"
@@ -409,7 +411,7 @@ sequenceDiagram
     Note over ACC,FIN: ไม่มี vat_type/is_vat_included ในคำขอ — derive จาก document_type เสมอ
     FIN->>SLS: getCustomerById (RPC) — ข้ามถ้าไม่มี customer_id (เฉพาะ ABB_TAX_INVOICE/RECEIPT)
     SLS-->>FIN: ชื่อ + tax_id + is_active
-    Note over FIN,SLS: customer_id เป็น optional สำหรับ ABB_TAX_INVOICE/RECEIPT<br/>is_active=false → 400 · document_type=FULL_TAX_INVOICE/INV_TAX_INVOICE บังคับ customer_id และ tax_id (86/4(2))<br/>ABB_TAX_INVOICE/RECEIPT/INVOICE/PROFORMA_INVOICE ไม่บังคับ tax_id (86/6 หรือไม่ใช่เอกสารภาษี) · sales-bc ล่ม → 503
+    Note over FIN,SLS: customer_id เป็น optional สำหรับ ABB_TAX_INVOICE/RECEIPT<br/>is_active=false → 400 · document_type=FULL_TAX_INVOICE/INV_TAX_INVOICE บังคับ customer_id + ชื่อ + ที่อยู่ทุกราย · ผู้ซื้อที่จดทะเบียน VAT ต้องมี tax_id 13 หลัก (check digit) + สำนักงานใหญ่/สาขา · ไม่จดทะเบียนไม่บังคับ tax_id (86/4, ประกาศอธิบดีฯ 196)<br/>ABB_TAX_INVOICE/RECEIPT/INVOICE/PROFORMA_INVOICE ไม่บังคับ (86/6 หรือไม่ใช่เอกสารภาษี) · sales-bc ล่ม → 503
     loop ทุก product_id ที่ไม่ซ้ำ — ยิงขนาน
         FIN->>INV: getProductById (RPC) พร้อม tax_category
         INV-->>FIN: sku, ชื่อ, has_variants, vat_treatment
@@ -420,7 +422,7 @@ sequenceDiagram
     else document_type มี VAT (FULL_TAX_INVOICE · INV_TAX_INVOICE · ABB_TAX_INVOICE)
         FIN->>CFG: อัตรา VAT + WHT ที่มีผล ณ document_date
         CFG-->>FIN: rate (ไม่มี config → 0%)
-        FIN->>FIN: is_vat_included = (document_type == ABB_TAX_INVOICE) · ปันส่วนลดท้ายบิลลงบรรทัดตามสัดส่วน → คิด VAT ต่อบรรทัด → รวมเป็น 3 ถัง
+        FIN->>FIN: is_vat_included = (document_type == ABB_TAX_INVOICE) หรือค่าที่ POS ระบุให้ FULL_TAX_INVOICE · ปันส่วนลดท้ายบิลลงบรรทัดตามสัดส่วน → คิด VAT ต่อบรรทัด → รวมเป็น 3 ถัง
     end
     FIN->>DB: BEGIN · INSERT receipts + receipt_items · COMMIT
     FIN-->>ACC: 201 · DRAFT · document_number = null
@@ -469,7 +471,7 @@ sequenceDiagram
             <div class="rulebox"><div class="rc mb-1">RULE · EXACT LOT COST</div><p class="text-[13.5px]"><b>COGS = Σ(allocation.qty × allocation.unit_cost)</b> ต้องใช้ <b>unit_cost ที่มากับ event</b> เท่านั้น <b>ห้าม</b>คำนวณเฉลี่ย และห้าม query ราคาปัจจุบันของสินค้า</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · PER-ALLOCATION P&amp;L</div><p class="text-[13.5px]">คำนวณกำไรต่อ allocation แล้วค่อย aggregate — หนึ่ง delivery อาจกินหลายล็อตที่ต้นทุนต่างกัน</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · IMMUTABLE COGS</div><p class="text-[13.5px]">COGS เก็บเป็น snapshot immutable แก้ไขผ่าน <b>adjusting entry</b> เท่านั้น</p></div>
-            <div class="rulebox ok"><div class="rc mb-1">RULE · DOCUMENT TYPE OWNS THE VAT DECISION</div><p class="text-[13.5px]"><span class="mono text-[12px]">is_vat_included</span> <b>derive จาก <span class="mono text-[12px]">document_type</span> เท่านั้น</b> — ไม่มีทางรับค่านี้จาก client ได้เลย (เหมือนกับ <span class="mono text-[12px]">vat_rate</span>/<span class="mono text-[12px]">wht_rate</span> ที่ server-resolve เสมอ) เพื่อกันไม่ให้ client ประกาศภาษีของตัวเอง — ดีไซน์นี้ (<span class="mono text-[12px]">IVatDocumentHeader</span>) ใช้ร่วมกับ Quotation/PO ใน <a href="srs-p4.html#p4-shared" style="color:var(--teal);text-decoration:underline">P4 &sect;07</a> ด้วย</p></div>
+            <div class="rulebox ok"><div class="rc mb-1">RULE · DOCUMENT TYPE OWNS THE VAT DECISION</div><p class="text-[13.5px]"><span class="mono text-[12px]">is_vat_included</span> <b>derive จาก <span class="mono text-[12px]">document_type</span> เท่านั้น</b> — ไม่มีทางรับค่านี้จาก client ได้เลย (เหมือนกับ <span class="mono text-[12px]">vat_rate</span>/<span class="mono text-[12px]">wht_rate</span> ที่ server-resolve เสมอ) เพื่อกันไม่ให้ client ประกาศภาษีของตัวเอง · <b>ข้อยกเว้นเดียว (BE-05, 2026-11-16):</b> การขายหน้าร้านเลือก <span class="mono text-[12px]">is_vat_included</span> ของ <span class="mono text-[12px]">FULL_TAX_INVOICE</span> ได้ (ค่าเริ่มต้น true — ป้ายราคารวม VAT ยอดจ่ายเท่าเดิม ใบแยกมูลค่ากับ VAT) ผ่านช่องทางภายใน <span class="mono text-[12px]">createForCounterSale()</span> ไม่ใช่ <span class="mono text-[12px]">POST /receipts</span> · ABB ต้อง true เสมอ — ดีไซน์นี้ (<span class="mono text-[12px]">IVatDocumentHeader</span>) ใช้ร่วมกับ Quotation/PO ใน <a href="srs-p4.html#p4-shared" style="color:var(--teal);text-decoration:underline">P4 &sect;07</a> ด้วย</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · GAPLESS NUMBERING — แยกต่อ document_type</div><p class="text-[13.5px]">เลขที่เอกสารต้อง gapless &amp; transaction-safe (row lock ต่อปี) กันเลขซ้ำ/ข้าม — <b>counter แยกต่างหากต่อ <span class="mono text-[12px]">document_type</span></b> เพราะเป็นเอกสารคนละใบตามกฎหมาย: ใบเสร็จเลข 1 กับใบกำกับภาษีเลข 1 ในปีเดียวกันไม่ใช่การชนกัน</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · DECIMAL &amp; ROUNDING</div><p class="text-[13.5px]">ใช้ <span class="mono text-[12px]">decimal(18,4)</span> หรือ integer สตางค์ · ปัดเศษตามกฎภาษี · ห้าม float</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · IDEMPOTENT CONSUMER</div><p class="text-[13.5px]">consumer ของ <span class="mono text-[12px]">stock.deducted</span> ต้อง idempotent (processed_events) กันการสร้าง COGS ซ้ำ</p></div>
