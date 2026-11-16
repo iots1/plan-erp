@@ -1043,6 +1043,7 @@ sequenceDiagram
   <span class="s">"customer_id"</span>: <span class="s">"57d7…"</span>,         <span class="c">// optional — ไม่ส่งหรือส่ง null ได้เมื่อ document_type = ABB_TAX_INVOICE (§86/6) · บังคับสำหรับ FULL_TAX_INVOICE (§86/4)</span>
   <span class="s">"warehouse_id"</span>: <span class="s">"9f04…"</span>,        <span class="c">// บังคับ — คลัง/สาขาที่ตัดของออก</span>
   <span class="s">"document_type"</span>: <span class="s">"ABB_TAX_INVOICE"</span>,  <span class="c">// ไม่ส่ง = ABB_TAX_INVOICE · ส่ง FULL_TAX_INVOICE เมื่อลูกค้าขอใบเต็มรูป</span>
+  <span class="s">"is_vat_included"</span>: <span class="k">true</span>,        <span class="c">// ไม่ส่ง = true · ราคาที่คีย์รวม VAT แล้วหรือไม่ · ABB ต้อง true · FULL ส่ง false = ราคาก่อน VAT</span>
   <span class="s">"document_date"</span>: <span class="s">"2026-09-20T10:32:00+07:00"</span>,  <span class="c">// ไม่ส่ง = เวลาปัจจุบัน</span>
   <span class="s">"payment_method"</span>: <span class="s">"CASH"</span>,     <span class="c">// CASH | BANK_TRANSFER | CREDIT_CARD | QR_PROMPTPAY | OTHER</span>
   <span class="s">"paid_amount"</span>: <span class="t">1000</span>,             <span class="c">// เงินที่ลูกค้ายื่นให้ — ไม่ส่ง = พอดี total (บัตร/QR) · ต้อง &gt;= total</span>
@@ -1087,14 +1088,13 @@ sequenceDiagram
             (ใบกำกับภาษีอย่างย่อ §86/6) เพราะนั่นคือเอกสารที่หน้าร้านออกให้ผู้บริโภค 99% ของบิล ·
             ลูกค้าขอใบเต็มรูป (นิติบุคคลเอาไปเคลม) → ส่ง <span class="mono text-[12px]">"document_type": "FULL_TAX_INVOICE"</span> ในคำขอเดียวกันนั้น
             <b>ไม่มี endpoint แปลงย้อนหลัง</b><br>
-            สองแบบนี้<b>คิดภาษีคนละทิศ</b> และ FE ต้องรู้เพราะราคาที่คีย์เข้ามาคนละความหมาย:<br>
-            · <b>ABB</b> — <span class="mono text-[12px]">unit_price</span> คือ<b>ราคาป้าย รวม VAT แล้ว</b> ระบบ<b>ถอด</b> VAT ออกมา
-            (<span class="mono text-[12px]">is_vat_included = true</span>) · <span class="mono text-[12px]">total</span> = ผลรวมราคาป้ายพอดี ไม่มีอะไรบวกเพิ่ม ·
-            ไม่ต้องมี <span class="mono text-[12px]">tax_id</span> ผู้ซื้อ และออกให้ลูกค้าที่ไม่ได้จด VAT ได้<br>
-            · <b>FULL</b> — <span class="mono text-[12px]">unit_price</span> คือ<b>ราคาก่อน VAT</b> ระบบ<b>บวก</b> VAT ทับ ·
-            <span class="mono text-[12px]">total</span> จึง<b>สูงกว่า</b>ผลรวมที่คีย์ · §86/4(2) บังคับให้ลูกค้าต้องมี
-            <span class="mono text-[12px]">tax_id</span> + ที่อยู่ และต้องเป็นลูกค้าที่
-            <span class="mono text-[12px]">is_vat_registered = true</span> — ไม่ครบ ระบบปฏิเสธ <span class="mono text-[12px]">400</span> ตั้งแต่ก่อนตัดสต็อก<br>
+            ราคาที่คีย์ <b>รวม VAT แล้วเป็นค่าเริ่มต้นทั้งสองชนิด</b> (BE-05, 2026-11-16): <span class="mono text-[12px]">unit_price</span> คือ<b>ราคาป้าย</b> ระบบ<b>ถอด</b> VAT ออกมา
+            (<span class="mono text-[12px]">is_vat_included = true</span>) · <span class="mono text-[12px]">total</span> = ผลรวมราคาป้ายพอดี ลูกค้าจ่ายเท่าเดิมไม่ว่าจะขอใบย่อหรือใบเต็ม — ป้าย 107 → มูลค่า 100 · VAT 7 · รวม 107<br>
+            · <b>ABB</b> — <span class="mono text-[12px]">is_vat_included</span> ต้องเป็น <span class="mono text-[12px]">true</span> เสมอ (§86/6) ส่ง <span class="mono text-[12px]">false</span> ถูกปฏิเสธ <span class="mono text-[12px]">400</span> · ไม่ต้องมีข้อมูลผู้ซื้อ<br>
+            · <b>FULL</b> — ส่ง <span class="mono text-[12px]">"is_vat_included": false</span> ได้ถ้าจะคีย์ราคา<b>ก่อน VAT</b> แล้วให้ระบบ<b>บวก</b> VAT ทับ (<span class="mono text-[12px]">total</span> จึงสูงกว่าที่คีย์) ·
+            กฎผู้ซื้อ (ประกาศอธิบดีฯ ฉบับที่ 196): <b>ทุกราย</b>ต้องมีชื่อ + ที่อยู่ · เฉพาะผู้ซื้อที่<b>จดทะเบียน VAT</b> (<span class="mono text-[12px]">is_vat_registered = true</span>) ต้องมี
+            <span class="mono text-[12px]">tax_id</span> 13 หลักที่ check digit ถูก และ <span class="mono text-[12px]">branch_type</span> (สาขาต้องมี <span class="mono text-[12px]">branch_code</span> 5 หลัก) — บุคคลธรรมดาหรือผู้ไม่จดทะเบียนไม่ต้องมีเลขผู้เสียภาษีและสาขา ·
+            ไม่ครบ ระบบปฏิเสธ <span class="mono text-[12px]">400</span> <span class="mono text-[12px]">CUSTOMER_INCOMPLETE_FOR_TAX_INVOICE</span> + <span class="mono text-[12px]">meta.missing[]</span> (บอกทุกช่องที่ขาดในครั้งเดียว) ตั้งแต่ก่อนตัดสต็อก<br>
             หน้าจอ POS จึงควรถาม “ต้องการใบกำกับเต็มรูปไหม” <b>ก่อน</b>กดจบบิล แล้วบังคับเลือกลูกค้าจริงแทนลูกค้าทั่วไป ไม่ใช่ถามหลังจ่ายเงินแล้ว
           </p>
         </div>
@@ -1110,7 +1110,7 @@ sequenceDiagram
             ผลทางกายภาพอยู่<b>นอก</b> BC นี้ จึงต้องสำเร็จก่อน โดยไม่มี transaction ของ sales-bc เปิดค้างไว้ ·
             ขั้นไหนพัง = <b>ขั้นถัดไปไม่เกิด</b> และ client ได้ error กลับ (ไม่ใช่บิลครึ่งใบ) ·
             ตัดสต็อกสำเร็จแล้วขั้น 2 ล้ม → บิล<b>ไม่ถูกบันทึก</b> และผลขึ้นกับว่า finance-bc <b>ออกใบกำกับไปแล้วหรือยัง</b> (2026-10-27):<br>
-            · finance-bc <b>ปฏิเสธด้วย 4xx</b> (เช่น FULL ให้ลูกค้าที่ <span class="mono text-[12px]">is_vat_registered = false</span>) = ยังไม่ได้เขียนอะไร →
+            · finance-bc <b>ปฏิเสธด้วย 4xx</b> (เช่น FULL ให้ลูกค้าที่จดทะเบียน VAT แต่ไม่มีที่อยู่) = ยังไม่ได้เขียนอะไร →
               ระบบ<b>คืนสต็อกที่ตัดให้หนึ่งครั้ง</b> แล้วตอบ status/ข้อความของ finance-bc เอง (ไม่ใช่ 503) — แก้ตามข้อความแล้วยิงใหม่ได้เลย ·
               ถ้าคืนสต็อกไม่ผ่าน → <span class="mono text-[12px]">503</span> และต้องปรับยอด (D2)<br>
             · finance-bc <b>ไม่ตอบ</b> (timeout/ล่ม) หรือ<b>ล้มด้วย 5xx</b> = อาจออกใบกำกับไปแล้วแต่คำตอบหาย →
@@ -1126,7 +1126,7 @@ sequenceDiagram
           <p class="text-[13.5px]">
             <span class="mono text-[12px]">customer_id</span> <b>ไม่บังคับ</b> สำหรับ <span class="mono text-[12px]">ABB_TAX_INVOICE</span> และบิลพัก (<span class="mono text-[12px]">is_held: true</span>) — ส่ง <span class="mono text-[12px]">null</span> หรือไม่ส่งได้ ตาม ม.86/6 ที่ยกเว้นการระบุชื่อผู้ซื้อบนใบกำกับภาษีอย่างย่อ ·
             ยอดขายกลุ่มที่ไม่ระบุลูกค้าจะถูกจัดกลุ่มแสดงในแถว "ไม่ระบุลูกค้า" บนรายงานลูกหนี้ (Aging) เสมอ เพื่อให้ยอดรวมกระทบยอดกับ GL ลงตัว<br>
-            แต่หากเป็น <b>FULL_TAX_INVOICE</b> (ใบกำกับภาษีเต็มรูป) กฎหมาย ม.86/4 บังคับต้องระบุชื่อ ที่อยู่ และเลขผู้เสียภาษีของผู้ซื้อ — <span class="mono text-[12px]">customer_id</span> จึงยังคง<b>บังคับ</b> และต้องเป็นลูกค้าที่จดทะเบียน VAT (<span class="mono text-[12px]">is_vat_registered = true</span>)
+            แต่หากเป็น <b>FULL_TAX_INVOICE</b> (ใบกำกับภาษีเต็มรูป) กฎหมาย ม.86/4 บังคับต้องระบุชื่อและที่อยู่ของผู้ซื้อ — <span class="mono text-[12px]">customer_id</span> จึงยังคง<b>บังคับ</b> · ลูกค้าไม่จำเป็นต้องจดทะเบียน VAT: บุคคลธรรมดาขอใบเต็มรูปได้ด้วยชื่อ + ที่อยู่ (เลขผู้เสียภาษีไม่บังคับ) · ผู้ซื้อที่จดทะเบียน VAT ต้องมีเลข 13 หลักและสำนักงานใหญ่/สาขาด้วย
           </p>
         </div>
         <div class="rulebox mb-4">
@@ -1414,8 +1414,8 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">RECEIPT</td><td>ใบเสร็จรับเงิน</td><td>ไม่มี</td><td>หลักฐานว่าได้รับเงินแล้ว</td></tr>
               <tr><td class="mono text-[11.5px]">INVOICE</td><td>ใบแจ้งหนี้</td><td>ไม่มี</td><td>เรียกเก็บเงิน (ยังไม่ถึงจุดเสียภาษี)</td></tr>
               <tr><td class="mono text-[11.5px]">PROFORMA_INVOICE</td><td>ใบแจ้งหนี้ชั่วคราว</td><td>ไม่มี</td><td>ประมาณการ · <b>ไม่ลงบัญชีเลย</b></td></tr>
-              <tr><td class="mono text-[11.5px]">FULL_TAX_INVOICE</td><td>ใบกำกับภาษีเต็มรูป</td><td>บวกเพิ่ม</td><td>ต้องมีเลขผู้เสียภาษีของลูกค้า</td></tr>
-              <tr><td class="mono text-[11.5px]">INV_TAX_INVOICE</td><td>ใบแจ้งหนี้/ใบกำกับภาษี</td><td>บวกเพิ่ม</td><td>เอกสารรวม · ต้องมีเลขผู้เสียภาษี</td></tr>
+              <tr><td class="mono text-[11.5px]">FULL_TAX_INVOICE</td><td>ใบกำกับภาษีเต็มรูป</td><td>แยกมูลค่า/VAT</td><td>ผู้ซื้อต้องมีชื่อ + ที่อยู่ · ถ้าจดทะเบียน VAT ต้องมีเลข 13 หลัก + สำนักงานใหญ่/สาขา</td></tr>
+              <tr><td class="mono text-[11.5px]">INV_TAX_INVOICE</td><td>ใบแจ้งหนี้/ใบกำกับภาษี</td><td>บวกเพิ่ม</td><td>เอกสารรวม · กฎผู้ซื้อเดียวกับ FULL_TAX_INVOICE</td></tr>
               <tr><td class="mono text-[11.5px]">ABB_TAX_INVOICE</td><td>ใบกำกับภาษีอย่างย่อ</td><td><b>รวมในราคาแล้ว</b></td><td>ค้าปลีก · ไม่ต้องมีเลขผู้เสียภาษี</td></tr>
               <tr><td class="mono text-[11.5px]">CREDIT_NOTE</td><td>ใบลดหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span> · <b>ยอดรวม ≤ ยอดที่ใบต้นทางยังยืนอยู่</b> = total + ใบเพิ่มหนี้ ISSUED − ใบลดหนี้ ISSUED อื่น (409 ตอนสร้าง/แก้ และตรวจซ้ำตอน issue · 2026-09-27) · <b>ยอดค้างของใบต้นทางหักใบลดหนี้ ISSUED แล้ว</b> — รับชำระได้ไม่เกินยอดสุทธิ (400) และใบวางบิลเรียกเก็บยอดสุทธิ · ฝั่งซื้อเหมือนกัน: จ่ายชำระใบแจ้งหนี้ผู้ขายได้ไม่เกิน total − ใบลดหนี้ผู้ขาย SUBMITTED − ที่จ่ายแล้ว</td></tr>
               <tr><td class="mono text-[11.5px]">DEBIT_NOTE</td><td>ใบเพิ่มหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span></td></tr>
@@ -1459,15 +1459,15 @@ sequenceDiagram
 <span class="c">// และ 3 ถังภาษี: total_standard_vat_price / total_zero_vat_price / total_exempt_vat_price</span></pre>
         </div>
         <div class="rulebox mb-4">
-          <div class="rc mb-1">ลูกค้าไม่ได้จด VAT ออกใบกำกับเต็มรูปให้ไม่ได้ (2026-08-31)</div>
+          <div class="rc mb-1">กฎผู้ซื้อของใบกำกับเต็มรูป — ไม่ได้จด VAT ก็ขอได้ (แก้ 2026-11-16, BE-05; เดิม 2026-08-31 ปฏิเสธทุกรายที่ไม่ได้จด)</div>
           <p class="text-[13.5px]">
-            <span class="mono text-[12px]">customers.is_vat_registered</span> เขียน comment ไว้ว่า "ออกใบกำกับภาษีให้รายนี้ไม่ได้" แต่<b>ไม่มีอะไรบังคับ</b> ·
-            ตอนนี้ <span class="mono text-[12px]">FULL_TAX_INVOICE</span>/<span class="mono text-[12px]">INV_TAX_INVOICE</span> ถูกปฏิเสธด้วย
-            <span class="mono text-[12px]">400</span> ถ้าลูกค้าไม่ได้จด VAT<br>
-            <b>ยกเว้น 2 กลุ่มโดยเจตนา</b>: <span class="mono text-[12px]">ABB_TAX_INVOICE</span> (§86/6) ยังออกได้ เพราะใบกำกับอย่างย่อมีไว้สำหรับหน้าร้านที่ผู้ซื้อมักเป็นผู้บริโภคนอกระบบ VAT
-            — ถ้าบล็อกด้วยจะเหลือทางออกเป็น "ไม่มีเอกสารภาษีให้เลย" · และใบลดหนี้/เพิ่มหนี้ (§86/22) ยังออกได้ เพราะเป็นการปรับปรุงเอกสารที่ออกและตรวจไปแล้ว
-            การห้ามแก้เพราะสถานะลูกค้าถูกปิดทีหลังจะทำให้ใบเดิมค้างโดยไม่มีทางปรับ<br>
-            <b>ค่า default เป็น true</b> จึงมีผลเฉพาะรายที่ตั้งใจบันทึกไว้ว่าไม่ได้จด · ทางแก้ที่ error บอก: ออก <span class="mono text-[12px]">ABB_TAX_INVOICE</span>/<span class="mono text-[12px]">RECEIPT</span> แทน หรือแก้ข้อมูลลูกค้าก่อน
+            ข้อ 2026-08-31 บล็อกใบเต็มรูปให้ลูกค้า <span class="mono text-[12px]">is_vat_registered = false</span> ทุกราย ซึ่ง<b>เข้มกว่ากฎหมาย</b> — บุคคลธรรมดาขอใบเต็มรูปไม่ได้เลย ·
+            ตอนนี้ <span class="mono text-[12px]">FULL_TAX_INVOICE</span>/<span class="mono text-[12px]">INV_TAX_INVOICE</span> (ทั้ง POS และ <span class="mono text-[12px]">POST /receipts</span>) ตรวจตามประเภทผู้ซื้อ:<br>
+            · <b>ทุกราย</b> — ชื่อ + ที่อยู่ ไม่ครบ <span class="mono text-[12px]">400</span> <span class="mono text-[12px]">CUSTOMER_INCOMPLETE_FOR_TAX_INVOICE</span> + <span class="mono text-[12px]">meta.missing</span><br>
+            · <b>จดทะเบียน VAT</b> — เลข 13 หลักที่ผ่าน check digit + <span class="mono text-[12px]">customers.branch_type</span> (<span class="mono text-[12px]">head_office</span> | <span class="mono text-[12px]">branch</span> · สาขาต้องมี <span class="mono text-[12px]">branch_code</span> 5 หลัก) ค่าเดิมของลูกค้าที่มีอยู่ = <span class="mono text-[12px]">head_office</span> · snapshot ลง <span class="mono text-[12px]">receipts.customer_branch_type</span>/<span class="mono text-[12px]">customer_branch_code</span> ตอนออกใบ<br>
+            · <b>ไม่จดทะเบียน</b> — เลขผู้เสียภาษีและสาขาไม่บังคับ มีก็พิมพ์ (ข้อหารือ กค 0702/8755)<br>
+            <b>ยกเว้นเหมือนเดิม</b>: <span class="mono text-[12px]">ABB_TAX_INVOICE</span> (§86/6) และใบลดหนี้/เพิ่มหนี้ (§86/22 — ตรวจตามประเภทของใบที่อ้างอิง) · <span class="mono text-[12px]">is_vat_registered</span> ที่ sales-bc ไม่ส่งมายังอ่านเป็น "จดทะเบียน" (ใช้กฎเข้มกว่า)<br>
+            ผู้ขายพิมพ์ "สำนักงานใหญ่" ทุกใบ (ตอนนี้เอกสารยังไม่ผูกกับสาขาที่ออก จึงใช้สำนักงานใหญ่เป็นข้อจำกัด) · ใบเต็มรูปแสดง มูลค่าก่อน VAT / VAT / รวม แยกบรรทัด
           </p>
         </div>
         <div class="rulebox mb-4">
