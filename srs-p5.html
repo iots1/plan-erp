@@ -140,8 +140,8 @@
               <thead><tr><th>Event</th><th>Producer</th><th>Consumers</th></tr></thead>
               <tbody>
                 <tr><td>stock.deducted</td><td>inventory-bc</td><td><b>finance-bc</b> → สร้าง COGS/P&amp;L</td></tr>
-                <tr><td>invoice.issued</td><td>finance-bc</td><td>report-bc (ยอดขาย/ภาษี)</td></tr>
-                <tr><td>profit.calculated</td><td>finance-bc</td><td>report-bc (กำไรต่อล็อต)</td></tr>
+                <tr><td>invoice.issued</td><td>finance-bc</td><td>report-bc (claim เพื่อกัน redelivery — <b>ไม่บวก</b> sales_summary แล้วตั้งแต่ 2026-11-12 ยอดขายรับรู้ตอนส่งมอบ ดู srs-p6.html §03)</td></tr>
+                <tr><td>profit.calculated</td><td>finance-bc</td><td>report-bc (กำไรต่อล็อต · ยอดขาย/กำไร/จำนวนเอกสารรายวัน) <span class="text-[12px]">— payload เพิ่ม <span class="mono">document_id</span> (= delivery_note_id) เมื่อ 2026-11-12 เพื่อนับเอกสารได้ ดู srs-p6.html §03 "แก้ไขเพิ่มเติม"</span></td></tr>
               </tbody>
             </table>
           </div>

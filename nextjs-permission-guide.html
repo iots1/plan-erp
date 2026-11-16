@@ -167,6 +167,14 @@ sequenceDiagram
         </div>
         <p class="text-[13px] mb-4" style="color:var(--ink-soft)">schema เต็ม: <span class="mono text-[12px]">libs/database/src/scripts/ui-permissions-manifest.schema.ts</span> — 1 page เก็บ component ย่อยไว้ข้างในได้หลายตัว</p>
 
+        <div class="card overflow-hidden mb-4">
+          <div class="p-4 text-[13px]" style="color:var(--ink-soft)"><b>Catalog จริงของ <span class="mono text-[12px]">apps/frontend-web</span></b> — หนึ่งสิทธิ์ต่อหนึ่งหน้าจอ route ที่เป็น alias ของ container เดียวกันใช้สิทธิ์ร่วมกัน ปุ่มของ POS ซ่อนในหน้าที่มันอยู่ (resource ของ component สืบจากหน้าแม่) ชื่อ UI ขึ้นต้น <span class="mono text-[12px]">page:</span>/<span class="mono text-[12px]">component:</span> เสมอ จึงไม่ชนกับสิทธิ์ API (<span class="mono text-[12px]">pos_sale:void</span>)</div>
+          <table class="d">
+            <thead><tr><th style="width:260px">permission</th><th style="width:300px">route</th><th>หมายเหตุ</th></tr></thead>
+            <tbody><tr><td class="mono text-[12px]">page:view_dashboard</td><td class="mono text-[12px]">/</td><td>หน้าแดชบอร์ด</td></tr><tr><td class="mono text-[12px]">page:view_customers</td><td class="mono text-[12px]">/customers</td><td>ลูกค้า</td></tr><tr><td class="mono text-[12px]">page:view_suppliers</td><td class="mono text-[12px]">/purchasers</td><td>ผู้ขาย</td></tr><tr><td class="mono text-[12px]">page:view_products</td><td class="mono text-[12px]">/products</td><td>สินค้า</td></tr><tr><td class="mono text-[12px]">page:view_product_groups</td><td class="mono text-[12px]">/product-groups</td><td>สินค้าชุด</td></tr><tr><td class="mono text-[12px]">page:view_item_groups</td><td class="mono text-[12px]">/item-groups, /settings/item-groups</td><td>กลุ่มสินค้า</td></tr><tr><td class="mono text-[12px]">page:view_purchase_orders</td><td class="mono text-[12px]">/purchasing, /purchasing/create, /purchasing/orders</td><td>ใบสั่งซื้อ (สร้างและรายการ)</td></tr><tr><td class="mono text-[12px]">page:view_goods_receipts</td><td class="mono text-[12px]">/purchasing/goods-receipts</td><td>รับสินค้า</td></tr><tr><td class="mono text-[12px]">page:view_pos</td><td class="mono text-[12px]">/sales, /sales/create</td><td>หน้าขาย POS · component: btn_pos_hold, btn_pos_edit_price, btn_pos_discount</td></tr><tr><td class="mono text-[12px]">page:view_pos_bills</td><td class="mono text-[12px]">/sales/pos-bills</td><td>รายการบิล POS · component: btn_pos_void, btn_pos_resolve, btn_pos_return, btn_pos_convert_tax_invoice</td></tr><tr><td class="mono text-[12px]">page:view_quotations</td><td class="mono text-[12px]">/sales/quotations</td><td>ใบเสนอราคา</td></tr><tr><td class="mono text-[12px]">page:view_sales_orders</td><td class="mono text-[12px]">/sales/orders</td><td>ใบสั่งขาย</td></tr><tr><td class="mono text-[12px]">page:view_delivery_notes</td><td class="mono text-[12px]">/sales/delivery-notes</td><td>ใบส่งของ</td></tr><tr><td class="mono text-[12px]">page:view_reports</td><td class="mono text-[12px]">/reports, /reports/sales</td><td>รายงานขาย · component: btn_export_reports</td></tr><tr><td class="mono text-[12px]">page:view_purchase_report</td><td class="mono text-[12px]">/reports/purchases</td><td>รายงานจัดซื้อ</td></tr><tr><td class="mono text-[12px]">page:view_sales_settings</td><td class="mono text-[12px]">/settings, /settings/sales</td><td>ตั้งค่าการขาย</td></tr><tr><td class="mono text-[12px]">page:view_shop_settings</td><td class="mono text-[12px]">/settings/shop</td><td>ตั้งค่าร้านค้า</td></tr></tbody>
+          </table>
+        </div>
+
         <div class="card p-5">
           <div class="mono text-[11px] mb-2" style="color:#2563EB">รันที่ backend repo</div>
           <div class="code p-3"><pre><span class="c"># หลัง commit/merge manifest แล้ว รันที่ erp-api repo</span>
@@ -243,7 +251,9 @@ npm run permissions:sync</pre></div>
   <span class="s">"permissions"</span>: [<span class="s">"page:view_reports"</span>, <span class="c">/* … */</span>],
   <span class="s">"jti"</span>: <span class="s">"1756b2eb-…"</span>
 }
-<span class="c">// นี่คือแหล่งสิทธิ์ที่ถูกต้องหนึ่งเดียว — ห้าม decode JWT เอง</span></pre>
+<span class="c">// นี่คือแหล่งสิทธิ์ที่ถูกต้องหนึ่งเดียว — ห้าม decode JWT เอง</span>
+<span class="c">// permissions[] รวมทั้งสิทธิ์ API (เช่น "pos_sale:void") และสิทธิ์ UI ("page:view_pos",</span>
+<span class="c">// "component:btn_pos_void") ใน list เดียว — เช็คด้วย includes() ได้เลย ไม่มีฟิลด์แยก plane</span></pre>
             </div>
           </div>
         </div>
