@@ -209,6 +209,7 @@ npm run permissions:sync</pre></div>
           </div>
         </div>
         <div class="rulebox ok mt-5"><div class="rc mb-1">สรุปสั้น ๆ</div><p class="text-[13.5px]">"ประกาศ permission" (Step 1) ≠ "อนุญาตให้ใครใช้" (Step 2) — สองงานนี้แยกกันเสมอ และ Step 2 เป็นงานของ Security Admin ไม่ใช่ dev</p></div>
+        <div class="rulebox mt-5"><div class="rc mb-1">ค่าตั้งต้นของ catalog หน้าบ้าน (BE-10)</div><p class="text-[13.5px]">migration <span class="mono text-[12px]">GrantFrontendUiPermissionsMirroringApiGrants</span> ให้สิทธิ์ UI แก่ policy ที่ <b>ถือสิทธิ์ API ของหน้า/ปุ่มนั้นอยู่แล้ว</b> เช่น policy ที่มี <span class="mono text-[12px]">pos_sale:void</span> ได้ <span class="mono text-[12px]">component:btn_pos_void</span>, ที่มี <span class="mono text-[12px]">customer:view</span> ได้ <span class="mono text-[12px]">page:view_customers</span> — เฉพาะ allow ที่ไม่มีเงื่อนไข และไม่มี deny ของสิทธิ์ API เดียวกัน; super admin ได้จาก <span class="mono text-[12px]">permissions:sync</span> เอง ไม่ใช่ migration นี้ UI จึงไม่เคยกว้างกว่า API ส่วนที่ไม่มีสิทธิ์ API คู่กัน (<span class="mono text-[12px]">page:view_product_groups</span>, <span class="mono text-[12px]">component:btn_pos_convert_tax_invoice</span>) ยังไม่ถูก grant อัตโนมัติ — Security Admin แนบเองใน Policy Generator ผู้ใช้ที่ login อยู่ต้อง login ใหม่ (หรือรอ session sync) จึงเห็นสิทธิ์ใหม่ใน <span class="mono text-[12px]">/auth/me</span></p></div>
       </section>
 
       <div class="rule my-14"></div>
