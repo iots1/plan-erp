@@ -2336,6 +2336,20 @@ sequenceDiagram
             ค่าเริ่มต้นของร้านเก็บที่ <span class="mono text-[12px]">sales_settings.default_receipt_format</span> — FE อ่านแล้วส่งเป็น <span class="mono text-[12px]">format</span> เอง backend ไม่เดาให้
           </p>
         </div>
+        <div class="rulebox mb-4" id="pos-line-vat">
+          <div class="rc mb-1">VAT รายบรรทัดบนบิล POS + backfill บิลเก่า (BE-09a · 2026-11-17)</div>
+          <p class="text-[13.5px]">
+            ทุก response ของ <span class="mono text-[12px]">/pos-sales</span> มี <span class="mono text-[12px]">items[].vat_treatment</span>, <span class="mono text-[12px]">items[].vat_amount</span> และ <span class="mono text-[12px]">items[].line_total_incl_vat</span> (= <span class="mono text-[12px]">line_total + vat_amount</span>) คัดลอกจากใบกำกับของ finance-bc ตอนปิดบิล ·
+            ผลรวมทั้งบิลเท่ากับ <span class="mono text-[12px]">vat_amount</span> / <span class="mono text-[12px]">total</span> ของหัวบิลพอดี · ยังไม่คิดราคา (HELD) หรือบิลเก่าที่ยังไม่ backfill = <span class="mono text-[12px]">null</span> ·
+            RPC <span class="mono text-[12px]">RecordSale</span> / <span class="mono text-[12px]">FindRecordedSale</span> คืน <span class="mono text-[12px]">lines[].vat_treatment</span> + <span class="mono text-[12px]">lines[].vat_amount</span> เพิ่ม (optional — deploy ฝั่งใดก่อนก็ได้)
+          </p>
+          <p class="text-[13.5px]">
+            <b><span class="mono text-[12px]">POST /sales-bc/v1/pos-sale-line-vat-backfills</span></b> <span class="mono text-[12px]">{ limit?: 1–500 (100) }</span> · สิทธิ์ <span class="mono text-[12px]">pos_sale:backfill_line_vat</span> ·
+            หยิบบิล <span class="mono text-[12px]">COMPLETED</span>/<span class="mono text-[12px]">VOIDED</span> ที่มีบรรทัด <span class="mono text-[12px]">vat_amount IS NULL</span> เก่าสุดก่อน แล้วอ่านใบกำกับทีละใบ →
+            <span class="mono text-[12px]">201 { scanned, updated_bills, updated_lines, skipped[{ pos_sale_id, pos_number, reason }], remaining }</span> · เรียกซ้ำจน <span class="mono text-[12px]">remaining</span> = 0 ·
+            <span class="mono text-[12px]">reason</span>: <span class="mono text-[12px]">FINANCE_UNAVAILABLE</span> (รอบหน้าลองใหม่เอง) · <span class="mono text-[12px]">FINANCE_NO_LINE_VAT</span> (finance-bc ยังเป็นรุ่นเก่า) · <span class="mono text-[12px]">LINE_NOT_ON_RECEIPT</span> · <span class="mono text-[12px]">NET_MISMATCH</span> · <span class="mono text-[12px]">TOTAL_MISMATCH</span> — สามตัวหลังต้องตรวจด้วยคน ระบบไม่แก้ยอดให้
+          </p>
+        </div>
         <div class="rulebox mb-4">
           <div class="rc mb-1">ส่วน "ชำระโดย" บนใบของบิล POS — สลิปและ A4 (BE-12b · 2026-11-16)</div>
           <p class="text-[13.5px]">

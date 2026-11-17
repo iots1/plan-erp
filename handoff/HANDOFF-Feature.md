@@ -217,6 +217,17 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-17 · VAT รายบรรทัดบนบิล POS + backfill (BE-09a, `feature/pos-line-vat` จาก main) ⏳ **verify static sales-bc/finance-bc ผ่าน · smoke `pos-line-vat` ผ่านบน local (backfill 219 บิล ข้าม 0) · ยังไม่ commit/merge/deploy**
+
+| | รายละเอียด |
+|---|---|
+| ทำไม | ฐานของรายงานขาย BE-09: ยอดหลักบนจอคือยอด**รวม VAT** (เงินที่ลูกค้าจ่าย ตรงกับ `pos_sale_payments.applied_amount`) แต่ `pos_sale_items` เดิมมีแค่ `line_total` ก่อน VAT · ปันส่วน VAT จากหัวบิลลงบรรทัดผิด เพราะสินค้ายกเว้น VAT จะได้ VAT ไปด้วย (ผู้ใช้ตัดสิน 2026-11-17 ให้เก็บแยกคอลัมน์) |
+| schema | `pos_sale_items.vat_treatment` / `vat_amount` / `line_total_incl_vat` (nullable) · migration `AddPosSaleItemLineVat` |
+| contract | `IRecordPosSaleLineResult` + `IRecordedPosSaleLine` เพิ่ม `vat_treatment?`, `vat_amount?` (optional → ลำดับ deploy สลับได้ ฝั่งเก่าทำให้คอลัมน์เป็น `null` ไม่เดา) · finance-bc `PosSaleOperationsService` map จาก `receipt_items` |
+| backfill | `POST /sales-bc/v1/pos-sale-line-vat-backfills` (สิทธิ์ใหม่ `pos_sale:backfill_line_vat` — super admin ได้จาก `permissions:sync` · role อื่นต้องมี grant migration ใน deploy ถัดไป) · ไม่ใช่ script เพราะ repo ไม่มี script ที่เรียก RPC ข้าม BC แบบอย่างคือ `POST /profit-loss-reconciliations` · ตรวจ Σ ต่อบิลกับ `total` ก่อนเขียน ไม่ตรง = ข้ามและรายงาน |
+| หลัง deploy | deploy finance-bc + sales-bc → `permissions:sync` → เรียก backfill ซ้ำจน `remaining` = 0 · ดู `skipped` ที่ไม่ใช่ `FINANCE_UNAVAILABLE` ด้วยคน |
+| ข้อสังเกตนอกขอบเขต | ม.78(1) ประมวลรัษฎากร: ความรับผิด VAT ของการขายเกิดเมื่อส่งมอบ (หรือก่อนนั้นถ้ารับเงิน/โอนกรรมสิทธิ์/ออกใบกำกับก่อน) และต้องออกใบกำกับทันที · ยังไม่ได้ตรวจว่าใบกำกับขายเชื่อใน finance-bc ลงวันที่วันส่งของหรือวันที่ออกทีหลัง — ถ้าเป็นอย่างหลังขัดกฎหมาย (จดไว้ท้ายใบ BE-09) |
+
 ### 2026-11-16 · สลิป/A4 ของบิล POS แสดงทุกวิธีชำระและเงินทอน (BE-12b, `feature/pos-print-split-payment` ต่อจาก BE-12) ⏳ **verify static sales-bc/finance-bc ผ่าน · smoke `pos-print-split-payment` ผ่านขั้น RPC แต่แดงที่ report-bc (local ไม่มี `document_types`/MinIO) · ยังไม่ commit/merge/deploy**
 
 | | รายละเอียด |
