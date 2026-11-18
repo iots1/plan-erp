@@ -207,7 +207,7 @@
 
           <h4 class="font-semibold mt-8 mb-3 text-[15px]">Edge Cases · กรณีขอบเขต</h4>
           <div class="grid sm:grid-cols-2 gap-4">
-            <div class="edge"><div class="tag mb-1">สต็อกไม่พอตอน SO</div><p class="text-[13px]">ตอน confirm SO ตรวจแล้วสต็อกไม่พอ → <b>เตือน</b> และตาม policy: อนุญาต backorder หรือ block. <b>ไม่ตัดสต็อก</b>จนกว่าจะออกใบส่งของ</p></div>
+            <div class="edge"><div class="tag mb-1">สต็อกไม่พอตอน SO</div><p class="text-[13px]">ตอน confirm SO ตรวจแล้วสต็อกไม่พอ → <b>เตือน</b> และตาม policy: อนุญาต backorder หรือ block. <b>ไม่ตัดสต็อก</b>จนกว่าจะออกใบส่งของ · policy คือ <span class="mono text-[12px]">stock_settings.allow_negative_stock</span> (BE-15): ปิด = block · เปิด = ยืนยันได้ แล้วใบส่งของขายเกินคงเหลือได้ (&sect;08 D2)</p></div>
             <div class="edge"><div class="tag mb-1">Quotation หมดอายุ</div><p class="text-[13px]">หาก <span class="mono text-[12px]">valid_until</span> ผ่านไปแล้ว ห้ามแปลงเป็น SO ต้องต่ออายุหรือออกใบใหม่</p></div>
             <div class="edge"><div class="tag mb-1">ราคาพิเศษ</div><p class="text-[13px]">รองรับราคาพิเศษ 1/2/3 ตามช่วงวันที่ (เริ่ม–ถึง) — ระบบเลือกราคาที่มีผลอัตโนมัติ</p></div>
             <div class="edge"><div class="tag mb-1">รับของไม่ครบ PO</div><p class="text-[13px]">รับได้บางส่วน → PO สถานะ PARTIAL รอรับส่วนที่เหลือ ไม่ปิด PO อัตโนมัติ</p></div>
@@ -1089,6 +1089,7 @@ curl -X POST http://localhost:3005/sales-bc/v1/delivery-notes/&lt;dn_id&gt;/subm
           <!-- ===== D2 · Block not backorder ===== -->
           <div class="part-label mb-4"><span class="mono text-[12px]" style="color:var(--signal)">D2</span><h4 class="font-semibold text-[16px]">สต็อกไม่พอตอนยืนยัน SO — บล็อกทั้งใบ ไม่ backorder บางส่วน</h4></div>
           <div class="card p-6 mb-4">
+            <div class="rulebox ok mb-4"><div class="rc ok mb-1">อัปเดต 2026-11-18 · BE-15 — toggle มีแล้ว</div><p class="text-[13.5px]">เมื่อเปิด <span class="mono text-[12px]">stock_settings.allow_negative_stock</span> inventory-bc ตอบ <span class="mono text-[12px]">is_backorder_allowed: true</span> ใน <span class="mono text-[12px]">CheckAvailability</span> และ <span class="mono text-[12px]">assertAvailable()</span> <b>ไม่บล็อก</b>บรรทัดที่ของไม่พอ (ยังเป็น all-or-nothing แบบเดิม ไม่มี backorder บางส่วนระดับ SO) · ของถูกตัดที่ใบส่งของ: ส่วนที่ขาดลงล็อตค้างตัดของ inventory-bc (srs-p3 &sect;08 D10) · POS ใช้กลไกเดียวกัน (ตัดผ่าน <span class="mono text-[12px]">ConfirmDelivery</span>) · ปิด = 409 เหมือนเดิม · ตารางด้านล่างคือเหตุผลตอนที่ยังไม่มี toggle</p></div>
             <p class="text-[13.5px] mb-3"><b style="color:var(--ink)">ตัดสินใจ:</b> ถ้าบรรทัดใดบรรทัดหนึ่งของใบเสนอราคามี <span class="mono text-[12px]">available_qty</span> น้อยกว่าที่ขอ <span class="mono text-[12px]">assertAvailable()</span> โยน <span class="mono text-[12px]">409 ConflictException</span> ทั้งใบทันที — ไม่มีการยืนยันบางส่วนแล้วปล่อยส่วนที่เหลือเป็น backorder</p>
             <table class="d">
               <thead><tr><th style="width:26%">ทางเลือก</th><th>ผลที่ตามมา</th></tr></thead>

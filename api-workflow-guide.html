@@ -2182,14 +2182,41 @@ sequenceDiagram
           <table class="d">
             <thead><tr><th>Endpoint</th><th>สิทธิ์</th><th>ใช้ทำอะไร</th></tr></thead>
             <tbody>
-              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-balances</td><td class="mono text-[11px]">stock_balance:view</td><td>ยอดคงเหลือ + มูลค่าคงคลัง · <span class="mono">group_by=product|product_warehouse|lot</span></td></tr>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-balances</td><td class="mono text-[11px]">stock_balance:view</td><td>ยอดคงเหลือ + มูลค่าคงคลัง · <span class="mono">group_by=product|product_warehouse|lot</span> · <b>ติดลบได้</b> เมื่อขายเกินคงเหลือ (BE-15) — แถวที่ยอดรวมเป็น 0 เท่านั้นที่ถูกซ่อน</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-ledger-entries</td><td class="mono text-[11px]">stock_ledger:view</td><td>ไล่การเคลื่อนไหวพร้อมยอดสะสม · <b>ต้องส่ง <span class="mono">product_id</span></b> · แต่ละแถวมี <span class="mono">source_doc_type</span> + <span class="mono">source_doc_number</span> (เลข GRN/DN/POS — 2026-10-23)</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/expiry-alerts</td><td class="mono text-[11px]">expiry_alert:view</td><td>ล็อตใกล้/เลยหมดอายุ · <span class="mono">within_days</span> ปรับได้</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/reorder-alerts</td><td class="mono text-[11px]">reorder_alert:view</td><td>สินค้าที่ต่ำกว่าจุดสั่งซื้อ · เรียงจากขาดมากไปน้อย</td></tr>
-              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/lots</td><td class="mono text-[11px]">lot:view</td><td>ล็อตดิบ ไม่รวมยอด</td></tr>
+              <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/lots</td><td class="mono text-[11px]">lot:view</td><td>ล็อตดิบ ไม่รวมยอด · <span class="mono">is_backorder: true</span> = ล็อตค้างตัด (BE-15): <span class="mono">lot_number = BACKORDER</span>, ยอด ≤ 0, ต้นทุน 0, ปรับยอด/โอน/คืนผู้ขายไม่ได้</td></tr>
               <tr><td class="mono text-[11.5px]">GET /inventory-bc/v1/stock-movements</td><td class="mono text-[11px]">stock_movement:view</td><td>รายการเคลื่อนไหวดิบ</td></tr>
             </tbody>
           </table>
+        </div>
+        <h3 id="negative-stock-sale" class="display text-xl mt-10 mb-4">E1.1 · ขายติดลบ (POS + ใบส่งของ) <span class="mono text-[13px] text-[var(--muted)]">— เพิ่ม 2026-11-18 (BE-15)</span></h3>
+        <p class="text-[13.5px] text-[var(--ink-soft)] mb-4 leading-relaxed">
+          เปิดด้วย <span class="mono text-[12px]">PUT /inventory-bc/v1/stock-settings</span> → <span class="mono text-[12px]">allow_negative_stock: true</span> (ค่าเริ่มต้นปิด · ไม่มี endpoint ใหม่ · ไม่มี permission ใหม่) ·
+          มีผลกับ <b><span class="mono text-[12px]">POST /sales-bc/v1/pos-sales</span></b> และ <b><span class="mono text-[12px]">POST /sales-bc/v1/delivery-notes/:id/submit</span></b> เท่านั้น — เบิก/โอน/คืนผู้ขาย/ปรับยอด ยังตอบ 409 <span class="mono text-[12px]">INSUFFICIENT_STOCK</span> เมื่อของไม่พอ ·
+          และ <span class="mono text-[12px]">POST /sales-bc/v1/quotations/:id/convert-to-sales-order</span> ไม่บล็อกบรรทัดที่ของไม่พอ (ของยังถูกตัดที่ใบส่งของ)
+        </p>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th style="width:28%">เกิดอะไร</th><th>ผลในระบบ</th></tr></thead>
+            <tbody>
+              <tr><td>ขายเกินคงเหลือ</td><td>ล็อตจริงถูกตัดจนหมดก่อน (FIFO/FEFO) ส่วนที่ขาดลง <b>ล็อตค้างตัด</b> 1 ล็อตต่อสินค้า×คลัง · <span class="mono text-[12px]">/stock-balances</span> และ <span class="mono text-[12px]">POST /inventory-bc/v1/sellable-items/resolve</span> (<span class="mono text-[12px]">available_stock_qty</span>, <span class="mono text-[12px]">stock_by_warehouse</span>) <b>ติดลบได้</b> · บิล/ใบส่งของสำเร็จตามปกติ ออกใบกำกับปกติ</td></tr>
+              <tr><td>ต้นทุนของส่วนที่ขาด</td><td>ยังไม่รู้ — รายงานขาย (<span class="mono text-[12px]">GET /sales-bc/v1/sales-reports/summary</span>) นับบรรทัดนั้นใน <span class="mono text-[12px]">uncosted_line_count</span> และไม่รวมกำไรของบรรทัดนั้นจนกว่าจะรับของเข้า</td></tr>
+              <tr><td>รับของเข้า (GRN · stock entry รับเข้า · โอนเข้า)</td><td>ล็อตใหม่หักล้างล็อตค้างตัด<b>ก่อน</b> — ยอดที่เหลือของล็อตใหม่จึงน้อยกว่าที่รับ · บิลที่ขายก่อนได้ต้นทุนก่อน · ต้นทุนถูกลงย้อนให้บรรทัดขายอัตโนมัติ (<span class="mono text-[12px]">uncosted_line_count</span> ลดลงเอง) · GRN/stock entry ที่ล็อตถูกนำไปหักล้างแล้วยกเลิกไม่ได้</td></tr>
+              <tr><td>ยกเลิกบิล POS / ใบส่งของ</td><td>ส่วนที่ยังค้างคืนเข้าล็อตค้างตัด · ส่วนที่หักล้างแล้วคืนเข้าล็อตจริงที่นำมาหักล้าง</td></tr>
+              <tr><td>รับคืนสินค้า (sales return)</td><td>คืนได้เฉพาะส่วนที่ได้ต้นทุนแล้ว — ส่วนที่ยังค้างคืนไม่ได้จนกว่าของจะเข้า (409 เกินจำนวนที่คืนได้)</td></tr>
+              <tr><td>ปิดสวิตช์</td><td>ขายเกินได้ 409 <span class="mono text-[12px]">INSUFFICIENT_STOCK</span> + <span class="mono text-[12px]">meta.available</span> เหมือนเดิม (BE-08) · ล็อตค้างตัดที่มีอยู่ยังถูกหักล้างตอนรับเข้าตามปกติ</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox ok mb-8">
+          <div class="rc ok mb-1">FE ต้องรู้ (FE-22)</div>
+          <p class="text-[13.5px]">
+            · อ่านสวิตช์จาก <span class="mono text-[12px]">GET /inventory-bc/v1/stock-settings</span> → <span class="mono text-[12px]">allow_negative_stock</span> แล้วอย่าบล็อกหน้าขายเมื่อเปิด · แสดงคำเตือนตอนเปิดสวิตช์ในหน้าตั้งค่า<br>
+            · ยอดคงเหลือ/ยอดขายได้ <b>เป็นเลขลบได้</b> — อย่าใช้ <span class="mono text-[12px]">Math.max(0, …)</span> ซ่อน · <span class="mono text-[12px]">available_uom_qty</span> ของ resolve เป็น floor ของเลขลบ (−2.5 → −3)<br>
+            · ล็อตที่ <span class="mono text-[12px]">is_backorder: true</span> อย่าให้เลือกในใบปรับยอด/โอน/คืนผู้ขาย (server ปฏิเสธ 400/409)
+          </p>
         </div>
         <div class="code p-5 mb-4">
 <pre><span class="c">// GET /inventory-bc/v1/stock-balances?group_by=lot&amp;warehouse_id=…&amp;search=RICE</span>
@@ -2547,7 +2574,7 @@ sequenceDiagram
               <tr><td>inventory</td><td class="mono text-[11.5px]">/item-suppliers · /tax-categories · /products/{id}/bundle-items</td><td>ผู้ขายต่อสินค้า · ประเภทภาษีต่อสินค้า · สินค้าชุด (BOM ของชุด)</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/products/{id}/reorder-levels · /products/{id}/variant-barcodes</td><td>จุดสั่งซื้อซ้ำ · บาร์โค้ด</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/purchase-returns</td><td>ส่งคืนสินค้าให้ผู้ขาย (ดู A4 ด้านบน) — submittable, ไม่ใช่ CRUD ตรง</td></tr>
-              <tr><td>inventory</td><td class="mono text-[11.5px]">/stock-settings</td><td><b>GET/PUT เท่านั้น</b> · FIFO/FEFO · วันแจ้งเตือนหมดอายุ · % รับเกิน · <b>เพดานอนุมัติใบปรับยอด</b></td></tr>
+              <tr><td>inventory</td><td class="mono text-[11.5px]">/stock-settings</td><td><b>GET/PUT เท่านั้น</b> · FIFO/FEFO · วันแจ้งเตือนหมดอายุ · % รับเกิน · <b>เพดานอนุมัติใบปรับยอด</b> · <b><span class="mono">allow_negative_stock</span></b> = ขาย POS/ส่งของเกินคงเหลือได้ (BE-15 · ดู E1.1)</td></tr>
               <tr><td>sales</td><td class="mono text-[11.5px]">/sales-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบเสนอราคา (%) · <span class="mono text-[11.5px]">default_receipt_format</span> <span class="mono text-[11.5px]">slip|a4</span> (2026-10-23)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/supplier-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบสั่งซื้อ (%)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/finance-settings</td><td><b>GET/PATCH</b> · กรอบราคาใบตั้งหนี้ (%) — <span class="mono text-[11px]">ledger_frozen_upto</span> แก้ที่นี่ไม่ได้ ต้องผ่าน close-period (ดู C6)</td></tr>
