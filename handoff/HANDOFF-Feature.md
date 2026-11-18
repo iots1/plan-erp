@@ -217,6 +217,18 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-17 · รายงานการขายสรุปที่ server (BE-09, `feature/pos-sales-report` ต่อจาก BE-09a) ⏳ **verify static sales-bc/finance-bc/supplier-bc ผ่าน · smoke `sales-reports` (ขาย+void 1 บิล), `sale-line-profit`, `purchase-report` ผ่านบน local · ยังไม่ commit/merge/deploy**
+
+| | รายละเอียด |
+|---|---|
+| ตัดสินใจ (ผู้ใช้ 2026-11-17) | ทำใน sales-bc · `channel` ไม่ส่ง = POS ล้วน · ยอดหลัก = **รวม VAT** · ขายเชื่อนับ ณ วันส่งของ รวม VAT (ม.78(1)) · ไม่รับ `timezone` |
+| endpoint | `GET /sales-bc/v1/sales-reports/{summary,periods,products,customers,staff,payment-methods}` · สิทธิ์ใหม่ `sales_report:view` · กติกาเต็ม srs-p6 `#p6-sales-report` |
+| ข้าม BC | finance-bc RPC ใหม่ `financeBc.profitLoss.sumBySaleLines` (≤1,000 id/ครั้ง) + index `idx_profit_loss_records_sale_id` (migration `AddProfitLossRecordSaleIdIndex`) · iam `iam.users.find-by-id` (มีอยู่แล้ว) สำหรับชื่อผู้ขาย |
+| refactor | `sortRows`/`paginate` ของรายงานจัดซื้อย้ายไป `libs/common/src/utils/report-rows.util.ts` (Rule of Second Use) — หน้าว่างตอบ `total_pages: 1` แทน 0 (ตาม `buildPagination`) |
+| หลัง deploy | ต้อง deploy **หลัง BE-09a** และรัน backfill ของ BE-09a ให้ครบก่อน (ไม่งั้นรายสินค้ามี `vat_unknown_line_count`) · finance-bc ก่อนหรือพร้อม sales-bc (ไม่งั้นต้นทุนเป็น `null`) · `permissions:sync` · role อื่นนอก super admin ต้องมี grant migration ของ `sales_report:view` ใน deploy ถัดไป · แจ้ง FE-19 |
+| ข้อสังเกตนอกขอบเขต | `DeliveryNotesService.findSaleRevenue` ใช้ `sales_order_items.line_total / qty` เป็นรายได้ ซึ่ง**ยังไม่หักส่วนลดท้ายบิล** และถ้าใบสั่งขายตั้งราคารวม VAT ก็**ยังไม่ถอด VAT** → `profit_loss_records.revenue/gross_profit` ของขายเชื่ออาจผิด · รายงานนี้เลี่ยงโดยใช้เฉพาะ `cogs` แล้วคิดกำไรจาก `vat_base` เอง · smoke `purchase-report` อ่าน `supplier_name_th` ทั้งที่ interceptor รวมเป็น `supplier_name { th, en }` แล้ว — แก้ในงานนี้ |
+| local | ฐาน local ไม่มีบิล POS COMPLETED (smoke เก่า void หมด) และ event ตัดสต็อกแทบไม่ถึง finance-bc (มี `profit_loss_records` 2 แถว) — ต้นทุนจริงตรวจได้ผ่านใบส่งของ 1 ใบเท่านั้น |
+
 ### 2026-11-17 · VAT รายบรรทัดบนบิล POS + backfill (BE-09a, `feature/pos-line-vat` จาก main) ⏳ **verify static sales-bc/finance-bc ผ่าน · smoke `pos-line-vat` ผ่านบน local (backfill 219 บิล ข้าม 0) · ยังไม่ commit/merge/deploy**
 
 | | รายละเอียด |
