@@ -217,6 +217,30 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-18 · ใบแรกของบิล POS ไม่ขาดส่วน "ชำระโดย" อีก — print ถาม sales-bc ซ้ำเมื่อได้ "ไม่มีบิล" (BE-12b ภาคต่อ, `fix/pos-first-print-payment-lines` จาก main) ⏳ **`pnpm verify sales-bc` (smoke 26/26) และ `pnpm verify finance-bc` (smoke 25/25) ผ่านครบ 6 ขั้นบนเครื่อง local · ยังไม่เคยรันกับ pgpool จริง · ยังไม่ merge/deploy**
+
+| | รายละเอียด |
+|---|---|
+| อาการ | รัน `pos-print-split-payment` บน env ที่ deploy แล้ว: สลิป ABB ครบสองวิธีชำระ แต่ **A4 ฉบับแรก** หลัง convert (BE-06) ได้ `payment_lines: []` · พิมพ์ซ้ำภายหลังครบ — ฉบับแรกคือต้นฉบับที่ให้ลูกค้า แก้ด้วยสำเนาไม่ได้ |
+| สาเหตุ (ยืนยันจากโค้ด + config ได้แค่นี้) | `findPaymentsByReceipt` คืน `pos_sale_id: null` ได้ก็ต่อเมื่อ query ไม่เจอแถวที่ `receipt_id` **หรือ** `previous_receipt_id` เท่ากับ id ที่ถาม — บิลที่ convert commit แล้วจะเป็นแบบนี้ได้ก็ต่อเมื่ออ่านเห็นแถว**ก่อน** UPDATE ของ convert (ไม่มีทางอื่นในโค้ดที่ทำให้บิลหลุด query) · และ `install-pgpool.sh` ตั้ง `load_balance_mode = on` + `statement_level_load_balance = off` (เลือก backend ต่อ session) + `disable_load_balance_on_write = 'always'` (ปักหมุดเฉพาะ session ที่เคย write) → connection ของ sales-bc ที่ไม่เคย write หรือเพิ่งเปิดใหม่ตกไป async standby ที่ยัง replay ไม่ถึงได้ — กลไกเดียวกับ Known Gap 21 · **ยังไม่ได้พิสูจน์ว่าครั้งนั้นตกที่ standby จริง** (ไม่มี log/pgpool node log ในเครื่องพัฒนา) — log ใหม่ด้านล่างคือหลักฐานจาก production |
+| ทางที่เลือก | **ก** (retry ฝั่ง finance-bc) · ไม่เลือก ข (`/*NO LOAD BALANCE*/` ใน sales-bc): `install-pgpool.sh` ไม่ตั้ง `allow_sql_comments` ซึ่ง `HANDOFF-Infra-Durability-Replication` ระบุว่าต้องเปิดคู่กับคอมเมนต์ → เป็นการแก้ config ของ pgpool ทั้ง 3 node และต้องพิสูจน์กับ pgpool ที่ deploy จริงว่าตีความ query ที่ TypeORM สร้าง ซึ่งทำจากเครื่องพัฒนาไม่ได้ |
+| โค้ด | `ReceiptsService.findPosPaymentsForPrint`: ประเภท POS-issuable ที่ได้ `pos_sale_id: null` ถูกถามซ้ำอีก `POS_PAYMENTS_LOOKUP_RETRIES` (3) ครั้ง ห่าง `POS_PAYMENTS_LOOKUP_RETRY_DELAY_MS` (200 ms) → รอสูงสุด ~600 ms แล้วเชื่อคำตอบสุดท้าย · lag ที่วัดไว้ใน Known Gap 21 คือ ~4 ms จึงเหลือ headroom มาก · ใบที่ระบุ `delivery_note_id` (counter sale ไม่มีทางมี) ถามครั้งเดียว ไม่รอ · `null` จาก transport = 503 ทันที (`sendWithContext` retry ให้แล้ว) · ครอบทั้งสลิปหลังขายและ A4 หลัง convert |
+| log | `POS_PAYMENTS_LOOKUP_RECOVERED` (warn — ครั้งแรกไม่เห็นบิล ครั้งถัดไปเห็น = ยืนยัน read-after-write lag) · `POS_PAYMENTS_LOOKUP_NO_BILL` (ถามจนหมดรอบยังไม่เห็น: **warn + 503** เมื่อ `is_conversion: true`, info เมื่อเป็นใบอื่น) · ถ้าเจอ warn ตัวนี้ แปลว่า lag ยาวกว่า ~600 ms หรือสาเหตุอื่น ต้องตามต่อ |
+| หมดรอบแล้วยังไม่เห็นบิล | **ใบที่ `replaces_receipt_id` ไม่ null (ออกจากการ convert ของ POS เท่านั้น → พิสูจน์ได้ว่าเป็นของ counter sale) = 503 ไม่พิมพ์** ตามหลัก "Refuse what does not add up" (ผู้ใช้เลือก 2026-11-18) — ต้นฉบับที่ขาดส่วนชำระแก้ด้วยสำเนาไม่ได้ ผู้ใช้กดพิมพ์ใหม่ได้ · ใบ ABB/FULL อื่นที่ไม่มี `delivery_note_id` (เช่นสร้างผ่าน `/receipts` ตรง ๆ) ยังพิมพ์โดยไม่มีส่วนชำระ แต่รอ ~600 ms ต่อการพิมพ์ 1 ครั้ง · ผลข้างเคียงที่ยอมรับ: ถ้าแถว `pos_sales` ของใบที่ convert ถูกลบจริง ๆ ใบนั้นจะพิมพ์ไม่ได้ถาวร (บิล POS ไม่ถูกลบ ใช้ void) |
+| ผล smoke local (2026-11-18) | `pos-print-split-payment` ผ่านทั้งสลิป (เงินสด 1,000 + บัตร 300 · รับเงิน 1,300 · เงินทอน 500) และ **A4 หลัง convert** · local ไม่มี pgpool จึงพิสูจน์ได้แค่ว่า retry ไม่ทำให้เส้นทางเดิมพัง ไม่ได้พิสูจน์ว่าแก้ lag จริง — ต้องดู log `POS_PAYMENTS_LOOKUP_RECOVERED` บน env ที่ deploy · finance-bc เคยล้ม 3 ตัวเพราะข้อมูล local: `en-names-optional` (company profile มี `tax_id` ว่าง → PATCH คืนค่าเดิมไม่ผ่าน validation → ตั้ง `tax_id` ปลอมใน DB local), `receipt-slip-print` + `receipt-void-guard` (ต้องมี ABB ที่ ISSUED ค้างและมี payment ถืออยู่ แต่ POS smoke void ทุกบิล → สร้าง ABB ฝั่ง finance-bc ล้วนพร้อม payment ที่ submit แล้วทิ้งไว้) · **อย่าทิ้งบิล POS ที่ไม่ void ไว้เป็นข้อมูลตั้งต้น** — `sales-reports.smoke` เทียบ Σ `/products` กับ `/summary` แล้วแดงเมื่อมีทั้งบรรทัดที่มีต้นทุนและไม่มีต้นทุนปนกัน |
+| ตั้ง smoke บนเครื่อง local ให้พิมพ์ได้ (กับดักที่เจอ) | (1) `erp_report` ว่างเปล่า (`document_types`/`print_templates` = 0 แถว) → ทุก print ตอบ 404 `DocumentType with code '…' not found` — seed ผ่าน `POST /report-bc/v1/print-templates` + `/document-types` จากไฟล์ใน `apps/report-bc/src/modules/print-template/assets/templates/` ตาม `_README.md` (ไม่มี seeder) (2) ต้องมี MinIO + Gotenberg + bucket `erp-storage`: `docker compose up -d erp-gotenberg` ได้ แต่ image `minio/minio` ดึงจาก Docker Hub ไม่ได้ในเครื่องนี้ (pull access denied) — ใช้ S3-compatible ตัวอื่นแทนได้เฉพาะ local (3) `psql` อยู่ที่ `/opt/homebrew/opt/libpq/bin` ไม่อยู่ใน PATH → smoke ล้มทั้งชุดด้วย `spawnSync psql ENOENT` (4) `--keep-alive` ทิ้ง service บางตัวที่ตายแล้ว — เปิดเองก่อน seed แล้วปิดให้หมดก่อนรัน verify อีกครั้ง ไม่งั้นพอร์ตชน (5) `documents-print` เคยแดงครั้งเดียวด้วย 500 "Channel closed" (RMQ) แล้วผ่านเมื่อรันซ้ำ |
+| test | unit (`receipts.service.spec.ts`, fake timers): เจอที่ครั้งที่ 3 → พิมพ์พร้อมส่วนชำระ · เจอที่ครั้งที่ 2 → หยุดถาม · หน่วงตาม delay จริง · ไม่เจอเลยแม้แต่ครั้งเดียว = ถาม 1+3 ครั้งแล้วพิมพ์ไม่มีส่วนชำระ และไม่เหลือ timer · มี `delivery_note_id` = ถามครั้งเดียว · transport null กลางทาง = 503 ไม่พิมพ์ · ใบที่ convert มาแล้วไม่เห็นบิลทุกครั้ง = 503 ถาม 1+3 ครั้ง ไม่พิมพ์ · ตั้ง retries = 0 แล้ว 4 เคสแดง · smoke finance-bc `receipt-slip-print`: ABB ที่ไม่มีบิล POS ต้องพิมพ์ได้โดยไม่มีส่วนชำระและไม่ค้าง (วัด ~2 s รวม render) ส่วน ABB ที่มีบิล POS ต้องมี tenders · smoke `pos-print-split-payment`: อ่าน `receipt_id` ใหม่จาก response ของ convert แทนอ่าน `pos_sales` ตรง ๆ และรอ `document_prints` ด้วย `eventually()` (เดิมอ่านทันทีหลัง write ข้าม service = แดงเป็นช่วง ๆ บน cluster ที่มี standby) |
+
+### 2026-11-17 · รายได้ขายเชื่อใน P&L ใช้ `vat_base` แทน `line_total` (BE-13, `fix/delivery-sale-revenue` จาก main) ⏳ **verify static sales-bc ผ่าน (typecheck/lint/unit/e2e/build) · smoke `delivery-sale-revenue` ผ่านบน local (ส่ง 1 จาก 2 หน่วย ลดท้ายบิล 10%: revenue 239.85 = `vat_base` 479.7 ÷ 2 · สูตรเก่าจะได้ 266.5) · ยังไม่ commit/merge/deploy**
+
+| | รายละเอียด |
+|---|---|
+| สาเหตุ | `DeliveryNotesService.findSaleRevenue()` คิดราคาสุทธิต่อหน่วยจาก `sales_order_items.line_total / qty` ซึ่งคือ `qty × unit_price − ส่วนลดรายบรรทัด` เท่านั้น → **ไม่หักส่วนลดท้ายบิล** (ถูกปันส่วนลงบรรทัดตอนคิด VAT แล้วเก็บที่ `vat_base`) และ **ไม่ถอด VAT** เมื่อใบสั่งขายตั้งราคารวม VAT |
+| แก้ | ใช้ `vat_base / qty` (ก่อน VAT หลังหักส่วนลดทั้งสองชั้น · Σ `vat_base` = `net_amount` ของหัวเอกสาร) · สูตรเดียวกับรายงานขาย BE-09 · ไม่แตะ `line_total` (พิมพ์/แก้เอกสารใช้ความหมายเดิม) · ไม่แตะ GL (ลงบัญชีด้วยต้นทุน) |
+| **ข้อมูลเก่าไม่ได้ซ่อม** (ตัดสิน 2026-11-17) | `finance-bc.profit_loss_records.revenue/gross_profit`, `report-bc.profit_by_lots`, `report-bc.sales_summaries.total_sales/gross_profit` ของขายเชื่อ**ก่อนวันที่ deploy** ที่มีส่วนลดท้ายบิลหรือราคารวม VAT **อาจผิด** (รายได้สูงเกินจริง) — เอกสารที่ไม่มีส่วนลดท้ายบิลและตั้งราคาไม่รวม VAT ถูกอยู่แล้ว (`line_total = vat_base`) · **ห้ามส่ง `profit.calculated` ซ้ำเพื่อ "แก้"** — consumer บวกเพิ่ม ยอดจะซ้อน · POS และรายงาน `/sales-reports` ไม่กระทบ |
+| ทดสอบ | smoke `apps/sales-bc/test/smoke/delivery-sale-revenue.smoke.mjs` (ตัดสต็อกจริง 1 หน่วยต่อรอบ — ยกเลิกใบส่งของ/ใบสั่งขายคืนให้แล้ว แต่แถว `profit_loss_records` และเลข DN/SO-2026-00011, 00012 ค้างบน local · อ่าน `profit_loss_records` ผ่าน `dbFor('finance-bc')`) · unit 5 กรณีใน `delivery-notes.service.spec.ts` (ไม่มีส่วนลดท้ายบิล+ไม่รวม VAT ผลเท่าเดิม · มีส่วนลดท้ายบิล · ราคารวม VAT · qty สั่ง = 0 · ไม่พบบรรทัด) |
+| ถึงทีม BE-14 | ใบกำกับอัตโนมัติตอนส่งของต้องใช้ `vat_base` เหมือนกัน — สามตัวเลข (P&L, ใบกำกับ, รายงานขาย) ต้องตรงกัน |
+
 ### 2026-11-17 · รายงานการขายสรุปที่ server (BE-09, `feature/pos-sales-report` ต่อจาก BE-09a) ⏳ **verify static sales-bc/finance-bc/supplier-bc ผ่าน · smoke `sales-reports` (ขาย+void 1 บิล), `sale-line-profit`, `purchase-report` ผ่านบน local · ยังไม่ commit/merge/deploy**
 
 | | รายละเอียด |
@@ -2680,6 +2704,10 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     ระดับ infra (เช่น `synchronous_commit = remote_apply` + `synchronous_standby_names`) ซึ่งแลกกับ
     latency และความพร้อมใช้งานของการเขียน · smoke ที่ล้มกลางทางเคยทิ้งบิล POS `COMPLETED` (ตัดสต็อก +
     ออกใบกำกับแล้ว) ค้างไว้ — ตอนนี้ `run()` void ทุกบิลที่สร้างใน `finally`
+    **ผลกระทบจริงบน production (2026-11-18, BE-12b ภาคต่อ):** ใบ A4 ฉบับแรกหลัง convert ออกโดยไม่มีส่วน "ชำระโดย" —
+    RPC `salesBc.posSale.findPaymentsByReceipt` ของ sales-bc อ่านผ่าน connection ที่ตกไป standby จึงคืน `pos_sale_id: null`
+    แล้ว finance-bc ตีความว่าไม่ใช่บิลหน้าร้าน · แก้ที่ finance-bc: ถามซ้ำ (3 ครั้ง ห่าง 200 ms) ก่อนเชื่อ "ไม่มีบิล" —
+    ดูรายการ BE-12b ภาคต่อ ใน §1 และข้อ 25 ด้านล่าง
 22. **(จาก 2026-11-02, #6) `total_qty` ของ `/stock-balances` ไม่ใช่ "ขายได้"** — นับ `available_qty` ของ
     **ทุกล็อตรวมที่หมดอายุแล้ว** (ส่วนนั้นแยกบอกใน `expired_qty`) แต่ `postIssue()` ข้ามล็อตหมดอายุทิ้ง
     (srs-p3 §06 "RULE · EXPIRY FILTER") · smoke POS 7 ตัวเลือกสินค้าด้วย `total_qty >= n` แล้วไปเจอสินค้าที่ทุกหน่วย
@@ -2697,6 +2725,13 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     แบบวันล้วน ถ้าส่ง `timezone=Asia/Bangkok` ด้วย `$gte`/`$lte` จะครอบทั้งวันตามเวลาไทย (ลองบน dev แล้ว) — อย่าประกอบช่วงวันเองจาก client ·
     `GET /stock-balances` ไม่รับ `filter=` ใช้ query `product_id=` ตรงๆ · ถ้าต้องการช่วงวันแบบ calendar day ที่รับประกันได้ ให้ทำ endpoint
     ที่ใช้ `businessDayStart/End` เหมือน `/customers/{id}/bills` · (erp-frontend `getSalesOrdersApi` ยังส่ง `$contL` อยู่ — ใช้ไม่ได้จริง)
+25. **(จาก 2026-11-18, BE-12b ภาคต่อ) คำตอบ "ไม่มี" จาก RPC ที่อ่านแถวที่เพิ่งถูกเขียนไม่ใช่ "ไม่ใช่ของฉัน"** —
+    ผู้เรียกที่ตีความ `null`/"ไม่พบ" ของการอ่านข้าม service เป็นคำตัดสินจะพลาดเมื่ออ่านชนช่วง replication lag (Known Gap 21) ·
+    ตัวอย่างจริง: finance-bc อ่านว่า receipt ไม่ใช่บิล POS แล้วพิมพ์ต้นฉบับโดยไม่มีส่วนชำระ · ทางที่ทำได้โดยไม่แตะ infra:
+    ถามซ้ำแบบจำกัดรอบก่อนเชื่อคำตอบ "ไม่มี" **เฉพาะเมื่อข้อมูลฝั่งตัวเองยังบอกไม่ได้ว่าใช่หรือไม่** (ที่นี่ `delivery_note_id`
+    พิสูจน์ได้ว่าไม่ใช่ counter sale จึงไม่รอ) · `sendWithContext` retry เรื่อง transport ให้อยู่แล้ว — retry นี้เป็นอีกเรื่อง
+    (คำตอบที่ถูกต้องแต่เก่า) · ถ้าต้องการรับประกันจริงต้องเป็นระดับ infra (`allow_sql_comments = on` + `/*NO LOAD BALANCE*/`
+    หรือ `load_balance_mode = off`) ตาม `HANDOFF-Infra-Durability-Replication`
 
 ---
 
