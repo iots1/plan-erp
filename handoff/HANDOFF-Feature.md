@@ -217,6 +217,29 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-16 · สลิป/A4 ของบิล POS แสดงทุกวิธีชำระและเงินทอน (BE-12b, `feature/pos-print-split-payment` ต่อจาก BE-12) ⏳ **verify static sales-bc/finance-bc ผ่าน · smoke `pos-print-split-payment` ผ่านขั้น RPC แต่แดงที่ report-bc (local ไม่มี `document_types`/MinIO) · ยังไม่ commit/merge/deploy**
+
+| | รายละเอียด |
+|---|---|
+| ตัดสินใจ | ข้อมูลมาจาก sales-bc ตอนพิมพ์ (ผู้ใช้เลือก 2026-11-16) ไม่เพิ่ม `payment_entries.tendered_amount` — finance-bc ไม่รู้เงินที่ยื่น/เงินทอน/พร้อมเพย์ และเงินสดที่เป็นเงินทอนล้วนไม่มี payment entry |
+| RPC | `salesBc.posSale.findPaymentsByReceipt` (`PosSaleEventsController` ใหม่ใน sales-bc) ค้น `pos_sales.receipt_id` **หรือ** `previous_receipt_id` · สัญญา `libs/common/src/interfaces/pos-sale-payments-lookup.interface.ts` · finance-bc ยิงเฉพาะ `ABB_TAX_INVOICE`/`FULL_TAX_INVOICE` (`POS_ISSUABLE_RECEIPT_DOCUMENT_TYPES`) · ไม่ตอบ = 503 ไม่พิมพ์ · **deploy sales-bc ก่อนหรือพร้อม finance-bc** ไม่งั้นพิมพ์ใบ ABB/FULL ได้ 503 ทุกใบ |
+| params | `payment_heading_th/_en`, `payment_lines[]`, `payment_totals[]`, `paid_amount`, `change_amount` (`toPrintParams(receipt, posPayments)`) — ใบที่ไม่ใช่ POS ได้ค่าว่างทั้งหมด |
+| แม่แบบ | `receipt-slip.html` + `receipt-tax-invoice.html` เพิ่มส่วน "ชำระโดย" — **ต้องอัปโหลดผ่าน `PATCH /print-templates/:id` หลัง deploy** (แถว `receipt_slip`, `receipt_abb_tax_invoice`, `receipt_full_tax_invoice`; ถ้าลูกค้าแก้แม่แบบเอง ให้ใส่ส่วนนี้เข้าไปแทนการทับ) · render-check ด้วย headless Chrome + paginator จริงแล้ว (POS: สองบรรทัด + เงินทอน 500 · ไม่ใช่ POS: ไม่มีอะไรโผล่) |
+| กับดักที่เจอ | ใบงานเดิมบอกว่า engine `banded` วนได้แค่ `D.items` — **ไม่จริง**: `<template data-repeat="key">` วน array ไหนก็ได้ในทุก band (และในสลิปที่ไม่มี band) แต่ซ้อน template กันไม่ได้ (regex non-greedy) |
+| ตรวจหลัง deploy | smoke `apps/sales-bc/test/smoke/pos-print-split-payment.smoke.mjs` (needs inventory/finance/report): บิล 800 จ่ายเงินสด 1,000 + บัตร 300 → สลิปมีสองบรรทัด รับเงิน 1,300.00 เงินทอน 500.00 · แปลงเป็นใบเต็มรูปแล้ว A4 ของใบใหม่ยังแสดงเหมือนเดิม — local ยืนยันได้แค่ว่า RPC ไปกลับจริง (log ทั้งสองฝั่ง) ส่วน `document_prints.params` ตรวจได้บน env ที่มี print pipeline เท่านั้น |
+
+### 2026-11-16 · POS จ่ายหลายวิธีในบิลเดียว (BE-12, `feature/pos-split-payment`) ⏳ **verify sales-bc/finance-bc ครบ 6 ขั้น (smoke `pos-sales-split-payment` ผ่านบนเครื่อง local) · ยังไม่ commit/merge/deploy**
+
+| | รายละเอียด |
+|---|---|
+| ขาเข้า | `payments: [{ method, amount, reference? }]` 1–10 รายการ บน `POST /pos-sales`, `/complete`, `/resolve-completion` · แบบเดิม `payment_method + paid_amount + reference` ยังรับ = รายการเดียว · ส่งทั้งสองแบบ = 400 |
+| กติกาเงิน | `splitPosTenders()` (`@lib/common`, ใช้ทั้ง sales-bc และ finance-bc): ผลรวม ≥ ยอดบิล (`PAID_AMOUNT_TOO_LOW`) · ผลรวมที่ไม่ใช่เงินสด ≤ ยอดบิล (`NON_CASH_OVERPAYMENT` ใหม่) · เงินทอนหักจากเงินสดรายการท้ายสุด → `applied_amount` ต่อรายการ รวมเท่ายอดใบกำกับพอดี |
+| finance-bc | `recordSale` ตรวจชุดการชำระกับยอดจริงของ draft **ก่อนออกเลข** แล้ว issue + ใบรับชำระทุกใบใน**ธุรกรรมเดียว** (`PaymentEntriesService.create/submit` รับ `outerManager` + `resolveParty` ทำก่อนเปิดธุรกรรม) — 4xx จากฝั่งรับชำระจึงแปลว่าไม่ได้ออกอะไรจริง (เดิม rewrap เป็น 5xx) · `VoidSale` รับ `payment_entry_ids[]` · `FindRecordedSale` คืน `payment_entries[]` · ยังรับคำขอแบบเดิม (ไม่มี `payments`) → **deploy finance-bc ก่อน sales-bc** |
+| schema | `pos_sale_payments` ใหม่ (migration generate `1794838728535-AddPosSalePayments`) + `pos_sales.payment_method` enum เพิ่ม `MIXED` · data backfill `1794838753697-BackfillPosSalePayments` (บิล COMPLETED/VOIDED เดิมได้ 1 แถว) |
+| เปลี่ยนพฤติกรรม | ใบเต็มรูปที่คีย์ราคาไม่รวม VAT แล้วเงินที่รับไม่ถึงยอดหลังบวก VAT: เดิมบันทึกว่าจ่ายพอดี (`Math.max`) → ตอนนี้ 400 ก่อนออกเลข และคืนสต็อก · บัตร/โอนที่ส่ง `paid_amount` เกินยอด: เดิมได้เงินทอน → ตอนนี้ 400 `NON_CASH_OVERPAYMENT` |
+| permission | ไม่มีใหม่ (ใช้ `pos_sale:create` / `pos_sale:resolve` / `pos_sale:void` เดิม) |
+| ยังไม่ทำ | สลิป/A4 แสดงรายการชำระ/เงินทอน → ทำในใบงาน **BE-12b** (หัวข้อถัดขึ้นไป — ใช้ RPC ถาม sales-bc ไม่ได้เพิ่ม `tendered_amount`) · รายงานตามวิธีชำระอ่าน `applied_amount` ใน BE-09 |
+
 ### 2026-11-12 · `sales_summary` รับรู้ยอดขายตอนส่งมอบ (`profit.calculated`) แทน `invoice.issued` — **แก้ไขเพิ่มเติมจากข้อสรุปเดิมของ 2026-09-05** (`fix/sales-summary-revenue-recognition`) ⏳ **unit ผ่าน (report-bc + finance-bc cogs 68) · eslint ผ่าน · ยังไม่ได้รันบน infra จริง · ยังไม่ merge/deploy**
 
 | | รายละเอียด |

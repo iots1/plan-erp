@@ -1008,12 +1008,12 @@ sequenceDiagram
   participant SAL as sales-bc
   participant INV as inventory-bc
   participant FIN as finance-bc
-  C->>SAL: POST /pos-sales (items[], payment_method, paid_amount)
+  C->>SAL: POST /pos-sales (items[], payments[])
   SAL->>INV: ตัดสต็อก FIFO/FEFO (ConfirmDelivery)
   Note over SAL,INV: ผลทางกายภาพเกิดก่อนเสมอ
   SAL->>FIN: posSale.recordSale
-  FIN->>FIN: สร้าง + issue ใบกำกับภาษี (ABB/FULL)
-  FIN->>FIN: สร้าง + submit ใบรับชำระ ตัดยอดใบกำกับเต็มจำนวน
+  FIN->>FIN: สร้าง draft ใบกำกับ → ตรวจ payments กับยอดจริง (ไม่ผ่าน = 400 ไม่ออกเลข)
+  FIN->>FIN: ธุรกรรมเดียว: issue ใบกำกับ (ABB/FULL) + ใบรับชำระหนึ่งใบต่อรายการ รวมเท่ายอดใบกำกับ
   FIN-->>SAL: receipt_number + ยอดภาษีที่คำนวณแล้ว
   SAL->>SAL: commit แถว pos_sales = COMPLETED
   SAL-->>C: 201 + เลขใบกำกับ + เงินทอน
@@ -1027,9 +1027,9 @@ sequenceDiagram
             <tbody>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /inventory-bc/v1/barcodes/lookup?barcode=…</td><td class="mono text-[11px]">barcode:lookup</td><td>ยิงบาร์โค้ด → ได้ <span class="mono text-[11px]">product_id</span> (มีอยู่แล้ว ไม่ใช่ของใหม่)</td></tr>
               <tr><td class="mono">1</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:create</td><td><b>ตัดสต็อก + ออกใบกำกับภาษี + รับชำระ</b> ครบในคำขอเดียว · ได้เลข <span class="mono text-[11px]">POS-{ปี}-{ลำดับ}</span> และเลขใบกำกับกลับมาพร้อมกัน</td></tr>
-              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{receipt_id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์สลิป — ใช้ <span class="mono text-[11px]">receipt_id</span> ที่ขั้น 1 ตอบกลับมา (ไม่มี <span class="mono text-[11px]">/pos-sales/{id}/print</span> แยก) · ส่ง <span class="mono text-[11px]">"format": "slip"</span> เพื่อพิมพ์สลิปความร้อน 80mm (ค่าเริ่มต้นของร้านอ่านจาก <span class="mono text-[11px]">GET /sales-settings</span> → <span class="mono text-[11px]">default_receipt_format</span>) ดู E3.1</td></tr>
-              <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /sales-bc/v1/pos-sales?relations=items</td><td class="mono text-[11px]">pos_sale:view</td><td>ดูรายการขายของกะ/สาขา</td></tr>
-              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/void</td><td class="mono text-[11px]">pos_sale:void</td><td>ยกเลิกบิล — คืนสต็อก + ยกเลิกใบรับชำระ + void ใบกำกับ</td></tr>
+              <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /finance-bc/v1/receipts/{receipt_id}/print</td><td class="mono text-[11px]">receipt:print</td><td>พิมพ์สลิป — ใช้ <span class="mono text-[11px]">receipt_id</span> ที่ขั้น 1 ตอบกลับมา (ไม่มี <span class="mono text-[11px]">/pos-sales/{id}/print</span> แยก) · ส่ง <span class="mono text-[11px]">"format": "slip"</span> เพื่อพิมพ์สลิปความร้อน 80mm (ค่าเริ่มต้นของร้านอ่านจาก <span class="mono text-[11px]">GET /sales-settings</span> → <span class="mono text-[11px]">default_receipt_format</span>) ดู E3.1 · ใบพิมพ์มีส่วน "ชำระโดย" ทุกวิธีชำระ + เงินทอนให้เอง FE ไม่ต้องส่งอะไรเพิ่ม (BE-12b)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">GET /sales-bc/v1/pos-sales?relations=items,payments</td><td class="mono text-[11px]">pos_sale:view</td><td>ดูรายการขายของกะ/สาขา · <span class="mono text-[11px]">payments</span> คืนเมื่อขอใน relations (GET รายใบคืนเสมอ)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/void</td><td class="mono text-[11px]">pos_sale:void</td><td>ยกเลิกบิล — คืนสต็อก + ยกเลิกใบรับชำระ<b>ทุกใบ</b> + void ใบกำกับ</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/convert-to-full-tax-invoice</td><td class="mono text-[11px]">pos_sale:convert_tax_invoice</td><td>เปลี่ยนใบกำกับย่อของบิลที่ขายแล้วเป็นใบเต็มรูป body <span class="mono text-[11px]">{ customer_id, reason? }</span> — void ใบย่อ + ออกใบเต็มรูปยอดเท่าเดิม + ย้ายการรับชำระ ในธุรกรรมเดียว <b>ไม่ขยับสต็อก</b> · ยิงซ้ำลูกค้าเดิม 200 · 400 ผู้ซื้อไม่ครบ · 409 มีใบลดหนี้/ใบวางบิลอ้างอยู่ หรือเป็นใบเต็มรูปแล้ว</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales <span class="text-[var(--muted)]">+ "is_held": true</span></td><td class="mono text-[11px]">pos_sale:create</td><td><b>พักบิล</b> → <span class="mono text-[11px]">HELD</span> · ไม่ตัดสต็อก ไม่ออกใบกำกับ ไม่รับเงิน (ดู B5.1)</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">PUT /sales-bc/v1/pos-sales/{id}</td><td class="mono text-[11px]">pos_sale:create</td><td>แก้บิลพัก — เฉพาะ <span class="mono text-[11px]">HELD</span></td></tr>
@@ -1046,9 +1046,10 @@ sequenceDiagram
   <span class="s">"document_type"</span>: <span class="s">"ABB_TAX_INVOICE"</span>,  <span class="c">// ไม่ส่ง = ABB_TAX_INVOICE · ส่ง FULL_TAX_INVOICE เมื่อลูกค้าขอใบเต็มรูป</span>
   <span class="s">"is_vat_included"</span>: <span class="k">true</span>,        <span class="c">// ไม่ส่ง = true · ราคาที่คีย์รวม VAT แล้วหรือไม่ · ABB ต้อง true · FULL ส่ง false = ราคาก่อน VAT</span>
   <span class="s">"document_date"</span>: <span class="s">"2026-09-20T10:32:00+07:00"</span>,  <span class="c">// ไม่ส่ง = เวลาปัจจุบัน</span>
-  <span class="s">"payment_method"</span>: <span class="s">"CASH"</span>,     <span class="c">// CASH | BANK_TRANSFER | CREDIT_CARD | QR_PROMPTPAY | OTHER</span>
-  <span class="s">"paid_amount"</span>: <span class="t">1000</span>,             <span class="c">// เงินที่ลูกค้ายื่นให้ — ไม่ส่ง = พอดี total (บัตร/QR) · ต้อง &gt;= total</span>
-  <span class="s">"reference"</span>: <span class="s">"APPROVAL-8842"</span>,   <span class="c">// เลข slip / approval code — ไม่บังคับ</span>
+  <span class="s">"payments"</span>: [                    <span class="c">// BE-12 · 1–10 รายการ ตามลำดับที่รับ · วิธีเดียวกันซ้ำได้</span>
+    { <span class="s">"method"</span>: <span class="s">"CASH"</span>, <span class="s">"amount"</span>: <span class="t">500</span> },    <span class="c">// CASH | BANK_TRANSFER | CREDIT_CARD | QR_PROMPTPAY | OTHER</span>
+    { <span class="s">"method"</span>: <span class="s">"CREDIT_CARD"</span>, <span class="s">"amount"</span>: <span class="t">400</span>, <span class="s">"reference"</span>: <span class="s">"APPROVAL-8842"</span> }
+  ],                                    <span class="c">// แบบเดิมยังรับ: payment_method + paid_amount + reference = รายการเดียว (ส่งทั้งสองแบบ = 400)</span>
   <span class="s">"discount_mode"</span>: <span class="s">"per_item"</span>,   <span class="c">// ไม่ส่ง = per_item ถ้ามีบรรทัด discount &gt; 0 มิฉะนั้น none (เฉพาะ POS — ดู rulebox ส่วนลด)</span>
   <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount_value"</span>: <span class="t">0</span>,
   <span class="s">"remark_th"</span>: <span class="k">null</span>, <span class="s">"remark_en"</span>: <span class="k">null</span>,
@@ -1068,7 +1069,12 @@ sequenceDiagram
   <span class="s">"sub_total"</span>: <span class="t">856</span>, <span class="s">"total_discount"</span>: <span class="t">0</span>,
   <span class="s">"net_amount"</span>: <span class="t">800</span>,               <span class="c">// ถอด VAT ออกจากราคาป้ายแล้ว (ABB = ราคารวมภาษี)</span>
   <span class="s">"vat_amount"</span>: <span class="t">56</span>, <span class="s">"total"</span>: <span class="t">856</span>,
-  <span class="s">"paid_amount"</span>: <span class="t">1000</span>, <span class="s">"change_amount"</span>: <span class="t">144</span>
+  <span class="s">"payment_method"</span>: <span class="s">"MIXED"</span>,      <span class="c">// วิธีเดียว = วิธีนั้น · หลายวิธี = MIXED (ขาออกเท่านั้น)</span>
+  <span class="s">"paid_amount"</span>: <span class="t">900</span>, <span class="s">"change_amount"</span>: <span class="t">44</span>,
+  <span class="s">"payments"</span>: [                    <span class="c">// เรียงตาม seq · GET รายใบคืนเสมอ · รายการบิลคืนเมื่อ relations=payments</span>
+    { <span class="s">"seq"</span>: <span class="t">1</span>, <span class="s">"method"</span>: <span class="s">"CASH"</span>, <span class="s">"amount"</span>: <span class="t">500</span>, <span class="s">"applied_amount"</span>: <span class="t">456</span>, <span class="s">"reference"</span>: <span class="k">null</span>, <span class="s">"payment_entry_id"</span>: <span class="s">"77be…"</span> },
+    { <span class="s">"seq"</span>: <span class="t">2</span>, <span class="s">"method"</span>: <span class="s">"CREDIT_CARD"</span>, <span class="s">"amount"</span>: <span class="t">400</span>, <span class="s">"applied_amount"</span>: <span class="t">400</span>, <span class="s">"reference"</span>: <span class="s">"APPROVAL-8842"</span>, <span class="s">"payment_entry_id"</span>: <span class="s">"91c2…"</span> }
+  ]                                     <span class="c">// Σ applied_amount = total เสมอ · เงินทอนหักจากเงินสดรายการท้ายสุด</span>
 }</pre>
         </div>
 
@@ -1157,18 +1163,30 @@ sequenceDiagram
         <div class="rulebox mb-4">
           <div class="rc mb-1">เงินทอนเป็นเรื่องของลิ้นชัก ไม่ใช่เรื่องของบัญชี</div>
           <p class="text-[13.5px]">
-            <span class="mono text-[12px]">paid_amount</span> คือเงินที่ลูกค้า<b>ยื่นให้</b> และ
+            <span class="mono text-[12px]">paid_amount</span> คือเงินที่ลูกค้า<b>ยื่นให้รวมทุกวิธี</b> และ
             <span class="mono text-[12px]">change_amount</span> = <span class="mono text-[12px]">paid_amount − total</span> —
             ทั้งคู่เก็บไว้บนแถว <span class="mono text-[12px]">pos_sales</span> เพื่อกระทบยอดลิ้นชักตอนปิดกะ ·
-            <b>ใบรับชำระที่ finance-bc บันทึกเท่ากับ <span class="mono text-[12px]">total</span> เสมอ</b> ไม่ใช่ยอดที่ยื่นมา
+            <b>ใบรับชำระที่ finance-bc บันทึกรวมกันเท่ากับ <span class="mono text-[12px]">total</span> เสมอ</b> ไม่ใช่ยอดที่ยื่นมา (หนึ่งใบต่อรายการชำระ ที่ <span class="mono text-[12px]">applied_amount</span>)
             (เงินทอนไม่ใช่รายได้ และไม่ได้ตัดหนี้อะไร) · ไม่ส่ง <span class="mono text-[12px]">paid_amount</span> มาเลย = ถือว่าจ่ายพอดี (ใช้กับบัตร/QR)<br>
             <b>เงินไม่พอถูกปฏิเสธ <span class="mono text-[12px]">400</span> ตั้งแต่ก่อนตัดสต็อก</b> — ต้องเช็คก่อน ไม่ใช่หลัง เพราะถ้าเช็คทีหลัง
             แคชเชียร์ที่พิมพ์ <span class="mono text-[12px]">1</span> แทน <span class="mono text-[12px]">1000</span> จะโดนตัดสต็อกและ<b>ออกเลขใบกำกับไปแล้ว</b>
             ก่อนที่ระบบจะปฏิเสธ เหลือใบกำกับลอยที่ถอนเลขคืนไม่ได้<br>
             ยอดที่เอามาเทียบคือ<b>ผลรวมราคาหลังหักส่วนลด</b> ซึ่งคิดที่ sales-bc เองได้ · สำหรับ <b>ABB</b> นี่คือยอดจริงเป๊ะ (VAT อยู่ในราคาแล้ว) ·
             สำหรับ <b>FULL</b> เป็นเพียง<b>ขั้นต่ำ</b> เพราะ VAT ยังไม่ถูกบวก และ sales-bc ไม่รู้อัตรา/ประเภทภาษีของแต่ละบรรทัด —
-            ถ้าจ่ายผ่านขั้นต่ำแต่ไม่ถึงยอดจริง ระบบจะบันทึก <span class="mono text-[12px]">paid_amount</span> เท่ากับ
-            <span class="mono text-[12px]">total</span> (ใบรับชำระตัดเต็มจำนวนไปแล้ว จะบันทึกว่ารับเงินน้อยกว่านั้นไม่ได้)
+            ถ้าจ่ายผ่านขั้นต่ำแต่ไม่ถึงยอดจริง <b>finance-bc ปฏิเสธ 400 <span class="mono text-[12px]">PAID_AMOUNT_TOO_LOW</span> ก่อนออกเลขใบกำกับ</b> และ sales-bc คืนสต็อก (BE-12 — เดิมบันทึกว่าจ่ายพอดียอด ซึ่งผิดกฎ "ปฏิเสธสิ่งที่ไม่ลงตัว")
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">จ่ายหลายวิธีในบิลเดียว — ส่งทั้งชุดตอนปิดขาย (BE-12, 2026-11-16)</div>
+          <p class="text-[13.5px]">
+            หน้าจอสะสมรายการชำระใน modal แล้วส่ง <span class="mono text-[12px]">payments</span> ทั้งชุดใน <span class="mono text-[12px]">POST /pos-sales</span> หรือ <span class="mono text-[12px]">POST /pos-sales/{id}/complete</span> — server <b>ไม่เก็บการชำระบางส่วน</b>ของบิลที่ยังไม่ปิด<br>
+            กติกา (ตรวจก่อนตัดสต็อก และ finance-bc ตรวจซ้ำกับยอดจริงก่อนออกเลข): ทุก <span class="mono text-[12px]">amount</span> &gt; 0 ทศนิยม ≤ 2 ·
+            ผลรวม ≥ ยอดบิล มิฉะนั้น <span class="mono text-[12px]">400 PAID_AMOUNT_TOO_LOW</span> <span class="mono text-[12px]">{ total, paid_amount }</span> ·
+            ผลรวมที่<b>ไม่ใช่เงินสด</b> ≤ ยอดบิล มิฉะนั้น <span class="mono text-[12px]">400 NON_CASH_OVERPAYMENT</span> <span class="mono text-[12px]">{ total, non_cash_amount }</span> (บัตร/โอน/QR ทอนไม่ได้) ·
+            เงินทอน = ผลรวม − ยอดบิล หักจากเงินสดรายการท้ายสุดก่อน<br>
+            ตัวอย่าง (บิล 800): เงินสด 500 + โอน 300 → applied 500/300 ทอน 0 · เงินสด 1000 + บัตร 300 → applied 500/300 ทอน 500 · บัตร 900 → 400 · เงินสด 500 + QR 200 → 400<br>
+            finance-bc ออกใบกำกับและใบรับชำระทุกใบใน<b>ธุรกรรมเดียว</b> (ล้มใบไหน rollback เลขใบกำกับด้วย) · รายการที่ <span class="mono text-[12px]">applied_amount = 0</span> ไม่มีใบรับชำระ (<span class="mono text-[12px]">payment_entry_id = null</span>) ·
+            void ยกเลิกใบรับชำระ<b>ทุกใบ</b>ของบิล · รายงานยอดตามวิธีชำระต้องรวม <span class="mono text-[12px]">applied_amount</span> ไม่ใช่ <span class="mono text-[12px]">amount</span>
           </p>
         </div>
         <div class="rulebox ok mb-8">
@@ -1223,11 +1241,11 @@ stateDiagram-v2
           <table class="d">
             <thead><tr><th>Method · Endpoint</th><th>สิทธิ์</th><th>รับอะไร</th><th>ผลที่เกิด</th></tr></thead>
             <tbody>
-              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:create</td><td>body เดียวกับ B5 + <span class="mono text-[11px]">"is_held": true</span> · <span class="mono text-[11px]">payment_method</span>/<span class="mono text-[11px]">paid_amount</span>/<span class="mono text-[11px]">reference</span> <b>ถูกละเลย</b> (ไม่บังคับ)</td><td><span class="mono text-[11px]">201</span> → <b>HELD</b> · ตรวจลูกค้า/สินค้า/สินค้าซ้ำ/variant template/ส่วนลด เหมือนขายจริง (ส่วนลดหัวบิลผิด = <span class="mono text-[11px]">400</span> ตั้งแต่ตอนพัก) · ได้ <span class="mono text-[11px]">pos_number</span> ทันที</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales</td><td class="mono text-[11px]">pos_sale:create</td><td>body เดียวกับ B5 + <span class="mono text-[11px]">"is_held": true</span> · <span class="mono text-[11px]">payments</span>/<span class="mono text-[11px]">payment_method</span>/<span class="mono text-[11px]">paid_amount</span>/<span class="mono text-[11px]">reference</span> <b>ถูกละเลย</b> (ไม่บังคับ)</td><td><span class="mono text-[11px]">201</span> → <b>HELD</b> · ตรวจลูกค้า/สินค้า/สินค้าซ้ำ/variant template/ส่วนลด เหมือนขายจริง (ส่วนลดหัวบิลผิด = <span class="mono text-[11px]">400</span> ตั้งแต่ตอนพัก) · ได้ <span class="mono text-[11px]">pos_number</span> ทันที</td></tr>
               <tr><td class="mono text-[11.5px]">PUT /sales-bc/v1/pos-sales/{id}</td><td class="mono text-[11px]">pos_sale:create</td><td>ทุกฟิลด์ไม่บังคับ ไม่ส่ง = คงเดิม: <span class="mono text-[11px]">customer_id</span>, <span class="mono text-[11px]">warehouse_id</span>, <span class="mono text-[11px]">document_type</span>, <span class="mono text-[11px]">discount_mode</span>/<span class="mono text-[11px]">discount_type</span>/<span class="mono text-[11px]">discount_value</span>, <span class="mono text-[11px]">remark_th</span>/<span class="mono text-[11px]">remark_en</span>, <span class="mono text-[11px]">items</span></td><td><span class="mono text-[11px]">200</span> · <span class="mono text-[11px]">items</span> ถูก <b>sync ตาม <span class="mono text-[11px]">product_id</span></b> (บรรทัดที่มีทั้งสองฝั่งคง id, ใหม่ = insert, หาย = delete) · ไม่ส่ง <span class="mono text-[11px]">items</span> = คิดยอดบรรทัดเดิมใหม่ตามโหมดส่วนลด · โหมดที่ไม่ใช่ <span class="mono text-[11px]">header</span> ล้าง <span class="mono text-[11px]">discount_type</span>/<span class="mono text-[11px]">discount_value</span> เป็น null · <span class="mono text-[11px]">409</span> ถ้าไม่ใช่ <span class="mono text-[11px]">HELD</span> หรือ <span class="mono text-[11px]">has_pending_stock_cut = true</span></td></tr>
-              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/complete</td><td class="mono text-[11px]">pos_sale:create</td><td><span class="mono text-[11px]">{ payment_method, paid_amount, reference, document_date }</span> — บังคับแค่ <span class="mono text-[11px]">payment_method</span> · สามตัวหลังไม่ส่งหรือส่ง <span class="mono text-[11px]">null</span> ได้</td><td><span class="mono text-[11px]">200</span> → <span class="mono text-[11px]">HELD → COMPLETING → COMPLETED</span> พร้อม <span class="mono text-[11px]">receipt_id</span>/<span class="mono text-[11px]">receipt_number</span> และยอดที่ finance-bc คิด (พิมพ์สลิปต่อด้วย <span class="mono text-[11px]">receipt_id</span> เหมือน B5)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/complete</td><td class="mono text-[11px]">pos_sale:create</td><td><span class="mono text-[11px]">{ payments, document_date }</span> หรือแบบเดิม <span class="mono text-[11px]">{ payment_method, paid_amount, reference, document_date }</span> — บังคับ <span class="mono text-[11px]">payments</span> หรือ <span class="mono text-[11px]">payment_method</span> อย่างใดอย่างหนึ่ง (ทั้งสอง = 400) · กติกาเดียวกับ B5</td><td><span class="mono text-[11px]">200</span> → <span class="mono text-[11px]">HELD → COMPLETING → COMPLETED</span> พร้อม <span class="mono text-[11px]">receipt_id</span>/<span class="mono text-[11px]">receipt_number</span> และยอดที่ finance-bc คิด (พิมพ์สลิปต่อด้วย <span class="mono text-[11px]">receipt_id</span> เหมือน B5)</td></tr>
               <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/cancel</td><td class="mono text-[11px]">pos_sale:void</td><td><span class="mono text-[11px]">{ cancel_reason }</span> (ไม่บังคับ — ไม่ส่งหรือส่ง <span class="mono text-[11px]">null</span> ได้ ต่างจาก <span class="mono text-[11px]">void_reason</span> ที่บังคับ)</td><td><span class="mono text-[11px]">200</span> → <b>CANCELLED</b> · แถวและ <span class="mono text-[11px]">pos_number</span> ยังอยู่ · บิล <span class="mono text-[11px]">COMPLETED</span> → <span class="mono text-[11px]">409</span> ให้ใช้ void</td></tr>
-              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/resolve-completion</td><td class="mono text-[11px]">pos_sale:resolve</td><td><span class="mono text-[11px]">{ receipt_id, payment_method, resolution_reason }</span> — <span class="mono text-[11px]">resolution_reason</span> บังคับ · <span class="mono text-[11px]">payment_method</span> บังคับเมื่อส่ง <span class="mono text-[11px]">receipt_id</span> · เพิ่ม 2026-10-27</td><td>กู้บิลที่ค้าง <span class="mono text-[11px]">COMPLETING</span> (ดูกล่อง "กู้บิลที่ค้าง COMPLETING" ด้านล่าง) · มี <span class="mono text-[11px]">receipt_id</span> → <span class="mono text-[11px]">COMPLETED</span> จากใบนั้น · ไม่มี → คืนสต็อก + <span class="mono text-[11px]">HELD</span> · บิลสถานะอื่น <span class="mono text-[11px]">409</span></td></tr>
+              <tr><td class="mono text-[11.5px]">POST /sales-bc/v1/pos-sales/{id}/resolve-completion</td><td class="mono text-[11px]">pos_sale:resolve</td><td><span class="mono text-[11px]">{ receipt_id, payments | payment_method, resolution_reason }</span> — <span class="mono text-[11px]">resolution_reason</span> บังคับ · <span class="mono text-[11px]">payments</span> หรือ <span class="mono text-[11px]">payment_method</span> บังคับเมื่อส่ง <span class="mono text-[11px]">receipt_id</span> · เพิ่ม 2026-10-27 · payments BE-12</td><td>กู้บิลที่ค้าง <span class="mono text-[11px]">COMPLETING</span> (ดูกล่อง "กู้บิลที่ค้าง COMPLETING" ด้านล่าง) · มี <span class="mono text-[11px]">receipt_id</span> → <span class="mono text-[11px]">COMPLETED</span> จากใบนั้น · ไม่มี → คืนสต็อก + <span class="mono text-[11px]">HELD</span> · บิลสถานะอื่น <span class="mono text-[11px]">409</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /sales-bc/v1/pos-sales?filter=status||$eq||HELD&amp;relations=items</td><td class="mono text-[11px]">pos_sale:view</td><td>—</td><td>รายการบิลที่พักไว้ เพื่อเรียกกลับมาปิด</td></tr>
             </tbody>
           </table>
@@ -1256,7 +1274,8 @@ stateDiagram-v2
 }
 
 <span class="c">// POST /sales-bc/v1/pos-sales/{id}/complete</span>
-{ <span class="s">"payment_method"</span>: <span class="s">"CASH"</span>, <span class="s">"paid_amount"</span>: <span class="t">1000</span> }   <span class="c">// document_date ไม่ส่ง = ตอนนี้ (วันที่ใบกำกับ)</span></pre>
+{ <span class="s">"payments"</span>: [{ <span class="s">"method"</span>: <span class="s">"CASH"</span>, <span class="s">"amount"</span>: <span class="t">600</span> }, { <span class="s">"method"</span>: <span class="s">"QR_PROMPTPAY"</span>, <span class="s">"amount"</span>: <span class="t">256</span> }] }   <span class="c">// document_date ไม่ส่ง = ตอนนี้ (วันที่ใบกำกับ)</span>
+<span class="c">// แบบเดิมยังรับ: { "payment_method": "CASH", "paid_amount": 1000 }</span></pre>
         </div>
 
         <div class="rulebox mb-4">
@@ -1304,7 +1323,7 @@ stateDiagram-v2
             <b>ขั้นตอนตรวจ</b> — ดูใบกำกับของลูกค้ารายนั้นใน finance-bc (<span class="mono text-[12px]">GET /finance-bc/v1/receipts?filter=customer_id||$eq||…</span> เรียงตามเวลา) หาใบที่ออกช่วงเวลาที่ปิดบิล สินค้า/จำนวนตรงกับบิล ·
             ถ้าเป็นเคส local write ล้ม log <span class="mono text-[12px]">POS_SALE_COMPLETE_LOCAL_FAILED</span> มี <span class="mono text-[12px]">receipt_id</span> ให้แล้ว ·
             ถ้า 503 ตอนปิดบิลมีเลขใบกำกับ (finance ตอบ 5xx หลังออกเลข) ใช้เลขนั้น<br>
-            <b>เจอใบกำกับ</b> → ส่ง <span class="mono text-[12px]">receipt_id</span> + <span class="mono text-[12px]">payment_method</span> (วิธีที่ลูกค้าจ่ายจริง) · ถ้าใบนั้นยังค้างชำระ (บันทึกรับเงินล้มหลังออกใบ) ให้บันทึกรับเงินด้วย <span class="mono text-[12px]">POST /payment-entries</span> ก่อน<br>
+            <b>เจอใบกำกับ</b> → ส่ง <span class="mono text-[12px]">receipt_id</span> + <span class="mono text-[12px]">payments</span> (หรือ <span class="mono text-[12px]">payment_method</span> แบบเดิม — วิธีที่ลูกค้าจ่ายจริง) · รายการที่ตัดยอดต้องจับคู่กับใบรับชำระที่ finance-bc มีของใบนั้นได้ครบทุกใบด้วยยอด (จำนวนใบและยอดตรงกัน) ไม่ตรงตอบ <span class="mono text-[12px]">409</span> · ถ้าใบนั้นยังค้างชำระ (บันทึกรับเงินล้มหลังออกใบ) ให้บันทึกรับเงินด้วย <span class="mono text-[12px]">POST /payment-entries</span> ก่อน<br>
             <b>ไม่เจอ</b> → ส่ง <span class="mono text-[12px]">receipt_id: null</span> — ระบบคืนสต็อกที่ตัด (ไม่มีผลกับ id ที่ไม่เคยตัด) ออก id บรรทัดใหม่ แล้วคืนบิลเป็น <span class="mono text-[12px]">HELD</span> ให้แคชเชียร์ปิดใหม่ ·
             <b>ห้ามเลือกทางนี้ถ้ายังไม่แน่ใจ</b> — ถ้าใบกำกับมีอยู่จริง การปิดใหม่จะออกใบที่สอง<br>
             <span class="mono text-[12px]">resolution_reason</span> บังคับ และถูกบันทึกลง log (<span class="mono text-[12px]">POS_SALE_COMPLETION_RESOLVED</span> / <span class="mono text-[12px]">POS_SALE_COMPLETION_REOPENED</span>) — เป็นบันทึกเดียวว่าใครตัดสินแทนระบบเพราะอะไร
@@ -1316,9 +1335,9 @@ stateDiagram-v2
             <tbody>
               <tr><td>บิลไม่ใช่ <span class="mono text-[12px]">COMPLETING</span> (HELD, COMPLETED, …)</td><td><span class="mono text-[12px]">409</span></td><td>เดิม (ไม่แตะ)</td></tr>
               <tr><td>ไม่ส่ง <span class="mono text-[12px]">resolution_reason</span> / <span class="mono text-[12px]">receipt_id</span> ไม่ใช่ uuid</td><td><span class="mono text-[12px]">400001</span></td><td>เดิม</td></tr>
-              <tr><td>ส่ง <span class="mono text-[12px]">receipt_id</span> แต่ไม่ส่ง <span class="mono text-[12px]">payment_method</span></td><td><span class="mono text-[12px]">400</span></td><td><span class="mono text-[12px]">COMPLETING</span> — ยังไม่เรียก finance-bc</td></tr>
+              <tr><td>ส่ง <span class="mono text-[12px]">receipt_id</span> แต่ไม่ส่งทั้ง <span class="mono text-[12px]">payments</span> และ <span class="mono text-[12px]">payment_method</span> (หรือส่งทั้งสอง)</td><td><span class="mono text-[12px]">400</span></td><td><span class="mono text-[12px]">COMPLETING</span> — ยังไม่เรียก finance-bc</td></tr>
               <tr><td>ใบกำกับถูกต้อง: <span class="mono text-[12px]">ISSUED</span>, ลูกค้าเดียวกัน, ประเภทเอกสารตรง (ABB/FULL), สินค้า+จำนวนครบตรงทุกบรรทัด, ไม่ผูกกับบิลอื่น, ชำระครบ</td><td><span class="mono text-[12px]">200</span></td>
-                <td><span class="mono text-[12px]">COMPLETED</span> ด้วยตัวเลขของใบนั้นทั้งหมด (ยอด, VAT, <span class="mono text-[12px]">line_total</span> ต่อบรรทัด) · <span class="mono text-[12px]">document_date</span> = วันที่ของใบกำกับ · <span class="mono text-[12px]">paid_amount</span> = <span class="mono text-[12px]">total</span>, เงินทอน 0 · <span class="mono text-[12px]">payment_entry_id</span> = ใบรับเงินล่าสุดที่ตัดใบนี้ · <b>ไม่ออกใบใหม่</b></td></tr>
+                <td><span class="mono text-[12px]">COMPLETED</span> ด้วยตัวเลขของใบนั้นทั้งหมด (ยอด, VAT, <span class="mono text-[12px]">line_total</span> ต่อบรรทัด) · <span class="mono text-[12px]">document_date</span> = วันที่ของใบกำกับ · <span class="mono text-[12px]">paid_amount</span>/เงินทอน ตามรายการที่ส่ง · <span class="mono text-[12px]">pos_sale_payments</span> หนึ่งแถวต่อรายการ ผูกกับใบรับชำระที่จับคู่ได้ · <span class="mono text-[12px]">payment_entry_id</span> = ใบแรก · <b>ไม่ออกใบใหม่</b></td></tr>
               <tr><td>ใบกำกับเป็น <span class="mono text-[12px]">DRAFT</span> (ออกไม่สำเร็จ) หรือ <span class="mono text-[12px]">VOID</span></td><td><span class="mono text-[12px]">409</span> — DRAFT ให้ resolve แบบไม่มี receipt_id</td><td><span class="mono text-[12px]">COMPLETING</span></td></tr>
               <tr><td>ใบกำกับไม่ใช่ของบิลนี้ (ลูกค้า / ประเภท / สินค้าหรือจำนวนไม่ตรง)</td><td><span class="mono text-[12px]">400</span> บอกว่าอะไรไม่ตรง</td><td><span class="mono text-[12px]">COMPLETING</span></td></tr>
               <tr><td>ใบกำกับผูกกับบิล POS อื่นแล้ว</td><td><span class="mono text-[12px]">409</span> ระบุเลข POS ที่ถือใบนั้น</td><td><span class="mono text-[12px]">COMPLETING</span></td></tr>
@@ -2240,7 +2259,7 @@ sequenceDiagram
           </p>
         </div>
 
-        <h3 class="display text-xl mt-10 mb-4">E3.1 · พิมพ์ใบเสนอราคา / ใบเสร็จ-ใบกำกับภาษี <span class="mono text-[13px] text-[var(--muted)]">— ใหม่ 2026-09-06 (P0-P2 ของ HANDOFF-Document-Print-Pipeline.md)</span></h3>
+        <h3 class="display text-xl mt-10 mb-4" id="e3-1">E3.1 · พิมพ์ใบเสนอราคา / ใบเสร็จ-ใบกำกับภาษี <span class="mono text-[13px] text-[var(--muted)]">— ใหม่ 2026-09-06 (P0-P2 ของ HANDOFF-Document-Print-Pipeline.md)</span></h3>
         <p class="text-[var(--ink-soft)] text-[14.5px] max-w-3xl mb-5 leading-[1.85]">
           2 เอกสารแรกของระบบนี้ที่พิมพ์เป็น PDF จริงได้ผ่าน endpoint เดียวจบ — FE <b>ไม่ต้องประกอบ params เอง</b>
           และไม่ต้องรู้จัก <span class="mono text-[12px]">print_templates</span>/<span class="mono text-[12px]">document_types</span>
@@ -2315,6 +2334,18 @@ sequenceDiagram
             <b><span class="mono text-[12px]">receipt_slip</span> ไม่ได้สร้างด้วย migration</b> — ต้องลงทะเบียน template + document type ในแต่ละ environment ก่อน
             (ดู <span class="mono text-[12px]">apps/report-bc/…/assets/templates/_README.md</span>) ไม่งั้นพิมพ์สลิปได้ 404 ·
             ค่าเริ่มต้นของร้านเก็บที่ <span class="mono text-[12px]">sales_settings.default_receipt_format</span> — FE อ่านแล้วส่งเป็น <span class="mono text-[12px]">format</span> เอง backend ไม่เดาให้
+          </p>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ส่วน "ชำระโดย" บนใบของบิล POS — สลิปและ A4 (BE-12b · 2026-11-16)</div>
+          <p class="text-[13.5px]">
+            ก่อนพิมพ์ <span class="mono text-[12px]">ABB_TAX_INVOICE</span> / <span class="mono text-[12px]">FULL_TAX_INVOICE</span> finance-bc ยิง <span class="mono text-[12px]" style="color:var(--accent)">TCP</span> <span class="mono text-[12px]">salesBc.posSale.findPaymentsByReceipt</span> <span class="mono text-[12px]">{ receipt_id }</span> → <span class="mono text-[12px]">{ pos_sale_id, pos_number, tenders[{ seq, method, amount, applied_amount, reference }], paid_amount, change_amount }</span> (ค้นด้วย <span class="mono text-[12px]">receipt_id</span> หรือ <span class="mono text-[12px]">previous_receipt_id</span> — ใบที่แปลงตาม BE-06 ยังได้การชำระเดิม) ·
+            ใบไม่ใช่ของ POS → <span class="mono text-[12px]">pos_sale_id: null</span> · sales-bc ไม่ตอบ → <b>503</b> และไม่พิมพ์ · ประเภทอื่นไม่ยิง RPC นี้เลย ·
+            param ใหม่ (format แล้วทั้งหมด): <span class="mono text-[12px]">payment_heading_th/_en</span> ("ชำระโดย" / "Paid by" หรือ <span class="mono text-[12px]">''</span>),
+            <span class="mono text-[12px]">payment_lines[]</span> <span class="mono text-[12px]">{ method_th, method_en, reference, amount, label_th, label_en, line_th, line_en }</span> — <span class="mono text-[12px]">amount</span> คือเงินที่ยื่น, <span class="mono text-[12px]">label_th</span> = "บัตรเครดิต (APPROVAL-8842)", <span class="mono text-[12px]">line_th</span> = "บัตรเครดิต 300.00 (APPROVAL-8842)" · QR แสดง "พร้อมเพย์",
+            <span class="mono text-[12px]">payment_totals[]</span> = "รับเงิน" + "เงินทอน" (<span class="mono text-[12px]">{ label_th, label_en, amount }</span>), <span class="mono text-[12px]">paid_amount</span>, <span class="mono text-[12px]">change_amount</span> — ใบที่ไม่ใช่ POS ได้ <span class="mono text-[12px]">[]</span> / <span class="mono text-[12px]">''</span> ทั้งหมด ·
+            engine ไม่มีเงื่อนไข แต่ <span class="mono text-[12px]">&lt;template data-repeat="key"&gt;</span> วน array ไหนก็ได้ในทุก band (ไม่ใช่แค่ <span class="mono text-[12px]">items</span>) — ซ้อนกันไม่ได้ · หัวข้อว่างซ่อนด้วย CSS <span class="mono text-[12px]">.pay-heading:empty</span> ·
+            <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — ต้นฉบับ <span class="mono text-[12px]">receipt-slip.html</span> / <span class="mono text-[12px]">receipt-tax-invoice.html</span> ต้องอัปโหลดผ่าน <span class="mono text-[12px]">PATCH /report-bc/v1/print-templates/{id}</span> หลัง deploy (ดู <span class="mono text-[12px]">_README.md</span>) · ถ้าลูกค้าแก้แม่แบบไว้เอง ให้ใส่ส่วนนี้เข้าไปในของลูกค้า ไม่ทับ
           </p>
         </div>
         <div class="rulebox mb-4">
