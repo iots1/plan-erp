@@ -189,7 +189,7 @@ flowchart LR
               <tr><td class="mono">A5</td><td>ตั้งหนี้ผู้ขาย (3-way match)</td><td>AR / AP Clerk</td><td>AP Invoice · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">B1</td><td>เสนอราคา</td><td>Sales Rep</td><td>Quotation · DRAFT→SENT→APPROVED</td></tr>
               <tr><td class="mono">B2</td><td>แปลงเป็นใบสั่งขาย</td><td>Sales Rep · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>SO · <b>PENDING_APPROVAL</b>→CONFIRMED→PARTIAL→CLOSED</td></tr>
-              <tr><td class="mono">B3</td><td>ส่งของ</td><td>Warehouse Staff · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>DN · DRAFT→<b>PENDING_APPROVAL</b>→SUBMITTED→CANCELLED</td></tr>
+              <tr><td class="mono">B3</td><td>ส่งของ</td><td>Warehouse Staff · <b>Sales Manager</b> (อนุมัติวงเงิน)</td><td>DN · DRAFT→<b>PENDING_APPROVAL</b>→<b>INVOICING</b>→SUBMITTED→CANCELLED · submit = ออกใบกำกับ (BE-14)</td></tr>
               <tr><td class="mono">B4</td><td>รับคืนสินค้าจากลูกค้า</td><td>Warehouse Staff</td><td>SRN · DRAFT→SUBMITTED→CANCELLED</td></tr>
               <tr><td class="mono">B5</td><td><b>ขายหน้าร้าน (POS)</b></td><td>Cashier / พนักงานหน้าร้าน</td><td>POS Sale · <b>COMPLETED</b>→VOIDED (ไม่มี DRAFT) · บิลพัก: <b>HELD</b>→COMPLETING→COMPLETED · HELD→CANCELLED</td></tr>
               <tr><td class="mono">C1</td><td>ออกใบกำกับภาษี/ใบเสร็จ</td><td>Accountant</td><td>Receipt · DRAFT→ISSUED→VOID</td></tr>
@@ -859,9 +859,10 @@ sequenceDiagram
             <tbody>
               <tr><td class="mono">1</td><td class="mono text-[11.5px]">GET /sales-bc/v1/sales-orders?relations=items</td><td class="mono text-[11px]">sales_order:view</td><td>หาบรรทัดที่ยังส่งไม่ครบ</td></tr>
               <tr><td class="mono">2</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes</td><td class="mono text-[11px]">delivery_note:create</td><td><b>DRAFT</b> · ยังไม่ตัดสต็อก</td></tr>
-              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/submit</td><td class="mono text-[11px]">delivery_note:submit</td><td><b>ตัดสต็อก FIFO/FEFO + บวก delivered_qty + ยิง COGS</b> — หรือ <b>PENDING_APPROVAL</b> ถ้าลูกค้าเกินวงเงิน (ยังไม่ตัดสต็อก)</td></tr>
-              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/approve</td><td class="mono text-[11px]">delivery_note:approve</td><td>ปลดใบที่ติด PENDING_APPROVAL เพราะเกินวงเงิน แล้วตัดสต็อก</td></tr>
-              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/cancel</td><td class="mono text-[11px]">delivery_note:cancel</td><td>คืนสต็อกเข้าล็อตเดิม + กลับรายการ COGS</td></tr>
+              <tr><td class="mono">3</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/submit</td><td class="mono text-[11px]">delivery_note:submit</td><td><b>ตัดสต็อก FIFO/FEFO + ออกใบกำกับภาษีเต็มรูป (BE-14) + บวก delivered_qty + ยิง COGS</b> — หรือ <b>PENDING_APPROVAL</b> ถ้าลูกค้าเกินวงเงิน (ยังไม่ตัดสต็อก)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/approve</td><td class="mono text-[11px]">delivery_note:approve</td><td>ปลดใบที่ติด PENDING_APPROVAL เพราะเกินวงเงิน แล้วตัดสต็อก + ออกใบกำกับ (เหมือน submit)</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/resume-invoicing</td><td class="mono text-[11px]">delivery_note:submit</td><td>ทำต่อใบที่ค้าง <b>INVOICING</b> (BE-14) — ไม่ออกใบซ้ำ</td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /sales-bc/v1/delivery-notes/{id}/cancel</td><td class="mono text-[11px]">delivery_note:cancel</td><td>void ใบกำกับของใบนี้ก่อน (BE-14) แล้วคืนสต็อกเข้าล็อตเดิม + กลับรายการ COGS</td></tr>
             </tbody>
           </table>
         </div>
@@ -877,6 +878,47 @@ sequenceDiagram
   ]
 }</pre>
         </div>
+        <div class="rulebox mb-4" id="b3-tax-invoice">
+          <div class="rc mb-1">ส่งของ = ออกใบกำกับภาษีเต็มรูป ในคำขอเดียว (BE-14 · 2026-11-18)</div>
+          <p class="text-[13.5px]">
+            ม.78(1) — ความรับผิด VAT ของสินค้าเกิดเมื่อส่งมอบ จึงออกใบกำกับตอน submit/approve เลย ไม่ต้องสร้างใบกำกับเองทีหลัง ·
+            <span class="mono text-[12px]">document_date</span> ถูกเขียนทับเป็นเวลาที่กด (ร่างที่ลงวันที่ไว้ก่อนไม่ย้อนวันใบกำกับ) ·
+            ราคามาจากใบสั่งขาย client ส่งราคาเองไม่ได้ · ส่งหลายเที่ยว ผลรวมใบกำกับ = ยอดใบสั่งขายพอดี (เที่ยวที่ส่งครบรับเศษ) ·
+            กติกาเต็ม <a href="srs-p4.html#p4-delivery-tax-invoice" style="color:var(--blueprint);text-decoration:underline">srs-p4 RULE · ส่งของ = ออกใบกำกับภาษี</a>
+          </p>
+        </div>
+        <div class="code p-5 mb-4">
+<pre><span class="c">// 200 · POST /sales-bc/v1/delivery-notes/{id}/submit (และ /approve, /resume-invoicing)</span>
+{
+  <span class="s">"status"</span>: <span class="s">"SUBMITTED"</span>,
+  <span class="s">"document_date"</span>: <span class="s">"2026-11-18T03:12:45.000Z"</span>,   <span class="c">// เวลาที่ submit = วันที่ใบกำกับ</span>
+  <span class="s">"receipt_id"</span>: <span class="s">"5b1c…"</span>,                          <span class="c">// GET /finance-bc/v1/receipts/{receipt_id} · พิมพ์ด้วย POST …/receipts/{id}/print</span>
+  <span class="s">"receipt_number"</span>: <span class="s">"INV-2026-00042"</span>,
+  <span class="s">"items"</span>: [
+    { <span class="s">"id"</span>: <span class="s">"e2df…"</span>, <span class="s">"qty"</span>: <span class="t">3</span>, <span class="s">"vat_base"</span>: <span class="t">810</span>, <span class="s">"vat_amount"</span>: <span class="t">56.7</span> }   <span class="c">// ยอดที่ปันให้เที่ยวนี้</span>
+  ]
+}</pre>
+        </div>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th>สถานการณ์</th><th>คำตอบ</th><th>สถานะใบหลังจากนั้น · ต้องทำอะไร</th></tr></thead>
+            <tbody>
+              <tr><td>ข้อมูลผู้ซื้อไม่ครบ (ชื่อ ที่อยู่ · จด VAT = เลขผู้เสียภาษี 13 หลัก + สาขา)</td><td class="mono text-[11.5px]">400 CUSTOMER_INCOMPLETE_FOR_TAX_INVOICE<br>meta.missing</td><td>ไม่มีอะไรเกิดขึ้น (ตรวจก่อนเช็กวงเงินและก่อนตัดสต็อก) · แก้ข้อมูลลูกค้าแล้ว submit ใหม่</td></tr>
+              <tr><td>มีคำขออื่นกำลัง submit/approve ใบเดียวกัน</td><td class="mono text-[11.5px]">409 DELIVERY_NOTE_INVOICING</td><td>INVOICING · รอแล้ว reload ถ้าค้างนานใช้ resume-invoicing</td></tr>
+              <tr><td>finance-bc ปฏิเสธใบกำกับ</td><td class="mono text-[11.5px]">error ของ finance-bc (4xx)</td><td>คืนสต็อกแล้ว ใบกลับสถานะเดิม (DRAFT หรือ PENDING_APPROVAL) · แก้สาเหตุแล้ว submit ใหม่</td></tr>
+              <tr><td>finance-bc ไม่ตอบ / 5xx · หรือบันทึกฝั่ง sales-bc ล้มหลังออกใบ</td><td class="mono text-[11.5px]">503 DELIVERY_NOTE_INVOICE_UNKNOWN</td><td><b>INVOICING — ห้าม submit ซ้ำ</b> · <span class="mono text-[12px]">POST …/resume-invoicing</span> (ได้ใบเดิมถ้าออกแล้ว ออกใหม่ถ้ายัง)</td></tr>
+              <tr><td>ยอดที่ปันแยก VAT ไม่ลงตัว (บั๊ก)</td><td class="mono text-[11.5px]">400 DELIVERY_NOTE_INVOICE_LINE_INVALID</td><td>คืนสต็อกแล้ว ใบกลับสถานะเดิม · แจ้งทีม backend</td></tr>
+              <tr><td><span class="mono text-[12px]">POST /finance-bc/v1/receipts</span> อ้างใบส่งของที่มีใบกำกับอัตโนมัติแล้ว</td><td class="mono text-[11.5px]">409 DELIVERY_NOTE_ALREADY_INVOICED</td><td>ใช้ใบที่ออกตอนส่งของ (<span class="mono text-[12px]">receipt_number</span> บนใบส่งของ)</td></tr>
+              <tr><td>ยกเลิกใบส่งของที่ใบกำกับมีรับชำระ/ใบวางบิล/ใบลดหนี้</td><td class="mono text-[11.5px]">409 จาก finance-bc</td><td>ไม่มีอะไรเปลี่ยน · ยกเลิกเอกสารเหล่านั้นก่อน</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[13.5px] mb-4" style="color:var(--ink-soft)">
+          พิมพ์เอกสารรวมด้วยใบกำกับ: <span class="mono text-[12px]">POST /finance-bc/v1/receipts/{receipt_id}/print</span> — หัวเรื่อง "ใบส่งของ / ใบกำกับภาษี"
+          และบรรทัด "อ้างอิงใบส่งของ / Delivery note: DN-…" (param <span class="mono text-[12px]">delivery_note_line</span> — ต้องอัปโหลดแม่แบบ <span class="mono text-[12px]">receipt-tax-invoice.html</span> ใหม่หลัง deploy) ·
+          ใบส่งของเดิม (<span class="mono text-[12px]">POST …/delivery-notes/{id}/print</span>) ยังพิมพ์ได้และไม่มีตัวเงินเหมือนเดิม ·
+          ฟิลด์ใหม่บนใบกำกับ: <span class="mono text-[12px]">is_issued_on_delivery</span>, <span class="mono text-[12px]">delivery_note_number</span>
+        </p>
         <div class="rulebox mb-4">
           <div class="rc mb-1">สต็อกไม่พอ = ไม่ตัดเลยแม้แต่ชิ้นเดียว</div>
           <p class="text-[13.5px]">
