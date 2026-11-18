@@ -217,6 +217,16 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-17 · รายได้ขายเชื่อใน P&L ใช้ `vat_base` แทน `line_total` (BE-13, `fix/delivery-sale-revenue` จาก main) ⏳ **verify static sales-bc ผ่าน (typecheck/lint/unit/e2e/build) · smoke `delivery-sale-revenue` ผ่านบน local (ส่ง 1 จาก 2 หน่วย ลดท้ายบิล 10%: revenue 239.85 = `vat_base` 479.7 ÷ 2 · สูตรเก่าจะได้ 266.5) · ยังไม่ commit/merge/deploy**
+
+| | รายละเอียด |
+|---|---|
+| สาเหตุ | `DeliveryNotesService.findSaleRevenue()` คิดราคาสุทธิต่อหน่วยจาก `sales_order_items.line_total / qty` ซึ่งคือ `qty × unit_price − ส่วนลดรายบรรทัด` เท่านั้น → **ไม่หักส่วนลดท้ายบิล** (ถูกปันส่วนลงบรรทัดตอนคิด VAT แล้วเก็บที่ `vat_base`) และ **ไม่ถอด VAT** เมื่อใบสั่งขายตั้งราคารวม VAT |
+| แก้ | ใช้ `vat_base / qty` (ก่อน VAT หลังหักส่วนลดทั้งสองชั้น · Σ `vat_base` = `net_amount` ของหัวเอกสาร) · สูตรเดียวกับรายงานขาย BE-09 · ไม่แตะ `line_total` (พิมพ์/แก้เอกสารใช้ความหมายเดิม) · ไม่แตะ GL (ลงบัญชีด้วยต้นทุน) |
+| **ข้อมูลเก่าไม่ได้ซ่อม** (ตัดสิน 2026-11-17) | `finance-bc.profit_loss_records.revenue/gross_profit`, `report-bc.profit_by_lots`, `report-bc.sales_summaries.total_sales/gross_profit` ของขายเชื่อ**ก่อนวันที่ deploy** ที่มีส่วนลดท้ายบิลหรือราคารวม VAT **อาจผิด** (รายได้สูงเกินจริง) — เอกสารที่ไม่มีส่วนลดท้ายบิลและตั้งราคาไม่รวม VAT ถูกอยู่แล้ว (`line_total = vat_base`) · **ห้ามส่ง `profit.calculated` ซ้ำเพื่อ "แก้"** — consumer บวกเพิ่ม ยอดจะซ้อน · POS และรายงาน `/sales-reports` ไม่กระทบ |
+| ทดสอบ | smoke `apps/sales-bc/test/smoke/delivery-sale-revenue.smoke.mjs` (ตัดสต็อกจริง 1 หน่วยต่อรอบ — ยกเลิกใบส่งของ/ใบสั่งขายคืนให้แล้ว แต่แถว `profit_loss_records` และเลข DN/SO-2026-00011, 00012 ค้างบน local · อ่าน `profit_loss_records` ผ่าน `dbFor('finance-bc')`) · unit 5 กรณีใน `delivery-notes.service.spec.ts` (ไม่มีส่วนลดท้ายบิล+ไม่รวม VAT ผลเท่าเดิม · มีส่วนลดท้ายบิล · ราคารวม VAT · qty สั่ง = 0 · ไม่พบบรรทัด) |
+| ถึงทีม BE-14 | ใบกำกับอัตโนมัติตอนส่งของต้องใช้ `vat_base` เหมือนกัน — สามตัวเลข (P&L, ใบกำกับ, รายงานขาย) ต้องตรงกัน |
+
 ### 2026-11-17 · รายงานการขายสรุปที่ server (BE-09, `feature/pos-sales-report` ต่อจาก BE-09a) ⏳ **verify static sales-bc/finance-bc/supplier-bc ผ่าน · smoke `sales-reports` (ขาย+void 1 บิล), `sale-line-profit`, `purchase-report` ผ่านบน local · ยังไม่ commit/merge/deploy**
 
 | | รายละเอียด |
