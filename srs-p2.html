@@ -102,7 +102,7 @@
               <thead><tr><th>Field</th><th style="width:70px">จำเป็น</th><th>คำอธิบาย</th></tr></thead>
               <tbody>
                 <tr><td>name</td><td><span style="color:#15803D">✓</span></td><td>ชื่อหน่วย (ชิ้น · กล่อง · กก. · ลิตร)</td></tr>
-                <tr><td>is_whole_number</td><td><span style="color:#15803D">✓</span></td><td>หน่วยนับเป็นจำนวนเต็มเท่านั้นหรือไม่ (เช่น "ชิ้น" = true) — คุมการปัดเศษตอนแปลงหน่วย</td></tr>
+                <tr><td>is_whole_number</td><td><span style="color:#15803D">✓</span></td><td>หน่วยนับเป็นจำนวนเต็มเท่านั้นหรือไม่ (เช่น "ชิ้น" = true) — คุมการปัดเศษตอนแปลงหน่วย · false (กก. · เมตร) = จำนวนสต็อก/ในเอกสารของสินค้าที่ใช้หน่วยนี้เป็น stock UOM มีทศนิยมได้ไม่เกิน 4 ตำแหน่ง (ทุกคอลัมน์จำนวนเป็น <span class="mono text-[12px]">numeric(18,4)</span> ตั้งแต่ 2026-11-17)</td></tr>
               </tbody>
             </table>
             <div class="edge mt-4" style="background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.22)"><div class="tag mb-1" style="color:#7C3AED">ส่งต่อ inventory</div><p class="text-[13px]">เป็น <span class="mono text-[12px]">stock_uom</span> ของสินค้า · แนะนำ <b>seed ~200+ หน่วยมาตรฐาน</b> ไว้ล่วงหน้า</p></div>
@@ -705,7 +705,7 @@ erDiagram
         uuid id PK
         uuid bundle_product_id FK "CASCADE"
         uuid component_product_id FK "RESTRICT"
-        int quantity "ต่อ 1 ชุด (หน่วยสต็อกของสินค้าย่อย)"
+        decimal quantity "ต่อ 1 ชุด (หน่วยสต็อกของสินค้าย่อย)"
     }
     UOM_CONVERSION_FACTORS {
         uuid id PK
@@ -1460,7 +1460,7 @@ erDiagram
         uuid id PK
         uuid product_id FK
         uuid warehouse_id FK
-        int alert_qty
+        decimal alert_qty
     }
     PRICE_LISTS {
         uuid id PK
@@ -1551,7 +1551,7 @@ erDiagram
             <div class="rulebox ok"><div class="rc mb-1">RULE · NESTED-SET TREE — leaf enforcement implement แล้ว 2026-09-04</div><p class="text-[13.5px]"><span class="mono text-[12px]">item_groups</span> และ <span class="mono text-[12px]">warehouses</span> เป็น tree (<span class="mono text-[12px]">lft/rgt</span>) — rebuild ใน transaction ตอน insert/move · <b>เฉพาะ leaf</b> (<span class="mono text-[12px]">is_group=false</span>) ผูกสินค้า/เก็บสต็อกได้ — ฝั่ง warehouse บังคับมาก่อนแล้วที่หลายจุด (GRN/Stock Adjustment) ฝั่ง <span class="mono text-[12px]">products.item_group_id</span> เพิ่งบังคับจริงที่ <span class="mono text-[12px]">ProductsService.assertValidReferences()</span> (create/update ทั้งคู่)</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · STOCK UOM IMMUTABLE — implement แล้ว 2026-09-04</div><p class="text-[13.5px]"><span class="mono text-[12px]">stock_uom_id</span> ห้ามแก้ทันทีที่มี stock movement แรก (application guard — ไม่ใช่ DB trigger: <span class="mono text-[12px]">ProductsService.update()</span> เช็คก่อนผ่าน <span class="mono text-[12px]">ProductStockGuardService.existsForProduct()</span>) กัน available_qty ในอดีตตีความหน่วยผิด</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · TEMPLATE NOT TRANSACTABLE</div><p class="text-[13.5px]">สินค้า <span class="mono text-[12px]">has_variants=true</span> ต้องถูกปฏิเสธเมื่อใช้ใน GR/PO/SO ตรง — อนุญาตเฉพาะ variant ที่ generate จาก attribute</p></div>
-            <div class="rulebox"><div class="rc mb-1">RULE · CONVERSION ROUND CHECK</div><p class="text-[13.5px]">ถ้า stock UOM <span class="mono text-[12px]">is_whole_number=true</span> ต้องตรวจว่า qty × conversion_factor เป็นจำนวนเต็ม มิฉะนั้น reject</p></div>
+            <div class="rulebox"><div class="rc mb-1">RULE · CONVERSION ROUND CHECK</div><p class="text-[13.5px]">ถ้า stock UOM <span class="mono text-[12px]">is_whole_number=true</span> ต้องตรวจว่า qty × conversion_factor เป็นจำนวนเต็ม มิฉะนั้น reject · stock UOM อื่นรับผลได้ไม่เกิน 4 ตำแหน่ง — เกินกว่านั้น reject ไม่ปัด (srs-p3 · CONVERSION ROUND CHECK)</p></div>
             <div class="rulebox"><div class="rc mb-1">RULE · UNIQUE KEYS</div><p class="text-[13.5px]"><span class="mono text-[12px]">uq_products_sku</span> · <span class="mono text-[12px]">uq_suppliers_code</span> — บังคับ unique ระดับ DB · UOM seed ~200+ รายการเป็น master ตั้งต้น</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · UUID CROSS-BC + EVENTS</div><p class="text-[13.5px]"><span class="mono text-[12px]">supplier_id</span> (supplier-bc) และ <span class="mono text-[12px]">context_ref</span> (storage-bc) อ้างด้วย UUID ห้าม FK ข้าม DB · การแก้ master ยิง <span class="mono text-[12px]">item.updated</span> — <span class="mono text-[12px]">implement แล้ว 2026-09-04</span>: <span class="mono text-[12px]">ProductsService.update()</span> ยิงเมื่อ name/หมวด/ยี่ห้อเปลี่ยนจริง แต่ <b>route ให้ report-bc เท่านั้น</b> ตอนนี้ — sales-bc/supplier-bc ยังไม่มี <span class="mono text-[12px]">@EventPattern</span> รับ ถ้า route ให้จะโดน RMQ nack ทิ้งเงียบ ๆ ตลอดไป (ดู srs-p3.html §04 และ backlog handoff)</p></div>
             <div class="rulebox ok"><div class="rc mb-1">RULE · SUPPLIER_ID VALIDATION (ไม่มี FK)</div><p class="text-[13.5px]">ก่อนบันทึก <span class="mono text-[12px]">item_prices.supplier_id</span> / <span class="mono text-[12px]">item_suppliers.supplier_id</span> ต้องเรียก supplier-bc ผ่าน <span class="mono text-[12px]">sendWithContext</span> (no-throw) เพื่อยืนยันว่ามีจริง — <span class="mono text-[12px]">null</span> กลับมา → throw <span class="mono text-[12px]">BadRequestException</span> เอง เพราะไม่มี FK ที่จะให้ Postgres จับ 23503 ให้</p></div>

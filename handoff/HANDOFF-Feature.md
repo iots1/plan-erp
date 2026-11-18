@@ -231,6 +231,18 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 | ตั้ง smoke บนเครื่อง local ให้พิมพ์ได้ (กับดักที่เจอ) | (1) `erp_report` ว่างเปล่า (`document_types`/`print_templates` = 0 แถว) → ทุก print ตอบ 404 `DocumentType with code '…' not found` — seed ผ่าน `POST /report-bc/v1/print-templates` + `/document-types` จากไฟล์ใน `apps/report-bc/src/modules/print-template/assets/templates/` ตาม `_README.md` (ไม่มี seeder) (2) ต้องมี MinIO + Gotenberg + bucket `erp-storage`: `docker compose up -d erp-gotenberg` ได้ แต่ image `minio/minio` ดึงจาก Docker Hub ไม่ได้ในเครื่องนี้ (pull access denied) — ใช้ S3-compatible ตัวอื่นแทนได้เฉพาะ local (3) `psql` อยู่ที่ `/opt/homebrew/opt/libpq/bin` ไม่อยู่ใน PATH → smoke ล้มทั้งชุดด้วย `spawnSync psql ENOENT` (4) `--keep-alive` ทิ้ง service บางตัวที่ตายแล้ว — เปิดเองก่อน seed แล้วปิดให้หมดก่อนรัน verify อีกครั้ง ไม่งั้นพอร์ตชน (5) `documents-print` เคยแดงครั้งเดียวด้วย 500 "Channel closed" (RMQ) แล้วผ่านเมื่อรันซ้ำ |
 | test | unit (`receipts.service.spec.ts`, fake timers): เจอที่ครั้งที่ 3 → พิมพ์พร้อมส่วนชำระ · เจอที่ครั้งที่ 2 → หยุดถาม · หน่วงตาม delay จริง · ไม่เจอเลยแม้แต่ครั้งเดียว = ถาม 1+3 ครั้งแล้วพิมพ์ไม่มีส่วนชำระ และไม่เหลือ timer · มี `delivery_note_id` = ถามครั้งเดียว · transport null กลางทาง = 503 ไม่พิมพ์ · ใบที่ convert มาแล้วไม่เห็นบิลทุกครั้ง = 503 ถาม 1+3 ครั้ง ไม่พิมพ์ · ตั้ง retries = 0 แล้ว 4 เคสแดง · smoke finance-bc `receipt-slip-print`: ABB ที่ไม่มีบิล POS ต้องพิมพ์ได้โดยไม่มีส่วนชำระและไม่ค้าง (วัด ~2 s รวม render) ส่วน ABB ที่มีบิล POS ต้องมี tenders · smoke `pos-print-split-payment`: อ่าน `receipt_id` ใหม่จาก response ของ convert แทนอ่าน `pos_sales` ตรง ๆ และรอ `document_prints` ด้วย `eventually()` (เดิมอ่านทันทีหลัง write ข้าม service = แดงเป็นช่วง ๆ บน cluster ที่มี standby) |
 
+### 2026-11-17 · จำนวน (qty) เป็นทศนิยม 4 ตำแหน่งทั้งระบบ — ตาม `is_whole_number` ของหน่วยสต็อก ⏳ **push ขึ้น main 2026-11-18 (บน main หลัง PR #37) — deploy + migrate 5 BC พร้อมกัน · verify typecheck/lint/unit/e2e/build ครบ 5 BC · ยังไม่ smoke**
+
+| | ของใหม่ / ที่แก้ |
+|---|---|
+| ที่มา | นำเข้าข้อมูลสินค้าจากระบบเดิมของลูกค้า: 49 รายการคงเหลือเป็นทศนิยม (เชือก/ถุงเพาะชำ/ตาข่ายขายเป็น กก., PE เป็นเมตร) แต่ทุกคอลัมน์จำนวนเป็น `int` · ยา/ปุ๋ยที่แบ่งขายก็ไม่ลงตัวแม้ใช้หน่วยเล็กสุด · SRS เขียนไว้แต่แรกว่าหน่วยที่ `is_whole_number=false` ใช้ทศนิยมได้ (srs-p3 CONVERSION ROUND CHECK) โค้ดเคย "เข้มกว่า SRS" เพราะคอลัมน์เป็น int |
+| schema | ~35 คอลัมน์ `int` → `numeric(18,4)` + `NumericTransformer`: `DocumentLineItemEntity.qty` (ทุก line item) · inventory `lots.received_qty/available_qty`, `stock_movements.qty/qty_after_transaction`, allocations, `delivery_issues`, `sales_return_receipts`, `stock_adjustment_items.counted/system_qty`, `bundle_items.quantity`, `reorder_levels.alert_qty`, `pricing_rules.min_qty` · sales `sales_order_items.delivered/returned_qty`, `pos_sale_items.stock_qty` · supplier `purchase_order_items.received/returned_qty`, `purchase_order_receipts/returns.qty` · finance `cogs_entries.qty` · report `expiry_alerts`, `low_stocks`, `profit_by_lots` · migration `DecimalQuantities` ใน `erp_inventory/1794899726374`, `erp_sales/1794899732226`, `erp_supplier/1794899746261`, `erp_finance/1794899750036`, `erp_report/1794899759175` |
+| กฎ | `@lib/common/utils/quantity.util.ts`: `roundQty()` (4 ตำแหน่ง คู่กับ `roundMoney()`) · `assertQtyForUom()` / `isValidQtyForUom()` — หน่วย whole-number รับเฉพาะจำนวนเต็ม หน่วยอื่น ≤ 4 ตำแหน่ง (เกิน → 400 ไม่ปัด) · `isStockUomWholeNumber(lookup)` · DTO `qty` ทุกตัว `@IsInt()` → `@IsNumber({ maxDecimalPlaces: 4 })` |
+| ใครตรวจ | inventory: `ProductsService.assertQtyFitsStockUom()` / `isStockUomWholeNumber()` — stock entry, stock adjustment, delivery issue (DN + POS, ตรวจทุก demand หลังแตกชุดก่อนเปิด transaction), bundle component, GR/PR conversion · POS (BE-02 ขายเป็นหน่วยอื่น): กฎตัดสินที่ `stock_qty = qty × conversion_factor` ไม่ใช่ `qty` ที่ขาย — ครึ่งลังของสินค้าชิ้นที่ได้ 6 ชิ้นขายได้ · ไม่ลงตัว/เกิน 4 ตำแหน่ง → 400 `UOM_FRACTIONAL_STOCK_QTY` · sellable-items: `available_uom_qty` ของหน่วยสต็อกเองไม่ปัดลง (19.25 กก.) หน่วยอื่นยังนับเฉพาะแพ็กเต็ม · อีก BC อ่าน `stock_uom` ที่ `GetProductById` RPC ส่งมาเพิ่ม (`IProductLookupResult.stock_uom`) — quotation, PO, POS, receipt, AP invoice · lookup ที่ไม่มี `stock_uom` (inventory-bc รุ่นเก่า) ถือเป็น whole-number |
+| เลขคณิต | ทุกจุดที่บวก/ลบจำนวนผ่าน `roundQty()` — FIFO `postIssue`, `postAdjustment` (ปัดทั้ง target และ delta), transfer/return, ยอดค้างส่ง/ค้างคืน/ค้างตั้งหนี้, COGS, ชุด (`explodeDemands`, จำนวนชุดที่ขายได้) · raw query ที่อ่านคอลัมน์ qty ตรงๆ แปลง `Number()` (driver คืน numeric เป็น string — reorder-levels, stock-ledger, expiring lots) |
+| test | unit ใหม่: `quantity.util.spec`, posting (FIFO 0.1+0.2 ไม่เหลือเศษ), GR/stock entry/PR/delivery/adjustment/bundle, POS/quotation/PO/receipt · smoke `apps/inventory-bc/test/smoke/decimal-quantities.smoke.mjs` (รับ 19.5 กก. → ตัด 0.25 → lot 19.25 · ชิ้น 1.5 → 400 · 1.23456 → 400) — **ยังไม่ได้รัน** ต้องรอ migrate |
+| ยังค้าง | (1) migrate 5 BC + deploy โค้ด**พร้อมกัน** — โค้ดที่ deploy อยู่อ่านคอลัมน์ qty โดยไม่มี transformer หลัง migrate จะได้ string `"5.0000"` (`+ 1` กลายเป็นต่อ string) (2) รัน smoke ทั้ง 5 BC หลัง migrate (3) `pnpm run seed -- --dry-run` หลัง migrate (seeder ใส่จำนวนเต็มอยู่แล้ว numeric รับได้) |
+
 ### 2026-11-17 · รายได้ขายเชื่อใน P&L ใช้ `vat_base` แทน `line_total` (BE-13, `fix/delivery-sale-revenue` จาก main) ⏳ **verify static sales-bc ผ่าน (typecheck/lint/unit/e2e/build) · smoke `delivery-sale-revenue` ผ่านบน local (ส่ง 1 จาก 2 หน่วย ลดท้ายบิล 10%: revenue 239.85 = `vat_base` 479.7 ÷ 2 · สูตรเก่าจะได้ 266.5) · ยังไม่ commit/merge/deploy**
 
 | | รายละเอียด |
@@ -2738,6 +2750,17 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     พิสูจน์ได้ว่าไม่ใช่ counter sale จึงไม่รอ) · `sendWithContext` retry เรื่อง transport ให้อยู่แล้ว — retry นี้เป็นอีกเรื่อง
     (คำตอบที่ถูกต้องแต่เก่า) · ถ้าต้องการรับประกันจริงต้องเป็นระดับ infra (`allow_sql_comments = on` + `/*NO LOAD BALANCE*/`
     หรือ `load_balance_mode = off`) ตาม `HANDOFF-Infra-Durability-Replication`
+26. **(จาก 2026-11-17) `migration:generate` เปลี่ยน type คอลัมน์ = DROP + ADD — ข้อมูลหายทั้งคอลัมน์** —
+    TypeORM สร้างคอลัมน์ใหม่เมื่อ type เปลี่ยน (`int` → `numeric(18,4)` ได้ `DROP COLUMN "qty"` + `ADD "qty"
+    numeric(18,4) NOT NULL`) · บนตารางที่มีแถว `ADD … NOT NULL` ล้มทันที ถ้าผ่านได้จำนวนทุกแถวหาย · ข้อยกเว้นที่ผู้ใช้
+    อนุมัติ: เก็บไฟล์ที่ generate ไว้แต่แทนคู่ DROP/ADD ด้วย `ALTER COLUMN … TYPE … USING`, `down()` ตรวจก่อนว่าไม่มีค่า
+    ทศนิยม (int ← numeric ปัดเงียบ) — ดู `DecimalQuantities` ทั้ง 5 BC
+27. **(จาก 2026-11-17) DB กลางคือ dev = prod — generate แล้วได้ statement ของงานอื่นติดมา** — generator diff entity กับ
+    schema สดของ DB กลาง ไม่ใช่กับไฟล์ migration: (ก) migration ของ branch ที่ยังไม่ merge ที่รันบน DB กลางไปแล้วทำให้ได้
+    `DROP COLUMN` ของคนอื่น (เจอตอนแรกกับคอลัมน์ของ `feature/pos-sale-item-uom` ก่อนมันถูก merge) (ข) entity ที่ระบุ
+    `enumName` เองถูกอ่านว่าเปลี่ยนทุกครั้ง ได้ rebuild enum แบบ no-op (`customers_branch_type_enum`,
+    `receipts_customer_branch_type_enum`) · `migration:show` บอก "ไม่มีค้าง" ทั้งที่ diff ไม่ว่าง · **อ่าน SQL ทุกบรรทัด**
+    แล้วตัด statement ที่ไม่ใช่ของงานตัวเองออก (ห้ามรันไฟล์ที่ generate มาตรงๆ บน DB กลาง)
 
 ---
 

@@ -400,8 +400,8 @@ erDiagram
         uuid warehouse_id FK
         string lot_number
         decimal import_cost "unit cost"
-        int received_qty
-        int available_qty "CHECK gte 0"
+        decimal received_qty
+        decimal available_qty "CHECK gte 0"
         date expiry_date
         uuid supplier_id "ref supplier-bc"
         timestamp received_at
@@ -410,7 +410,7 @@ erDiagram
         uuid id PK
         uuid lot_id FK
         string type "RECEIPT_ISSUE_ADJUST"
-        int qty
+        decimal qty
         decimal unit_cost "snapshot"
         string source_doc_type "GOODS_RECEIPT DELIVERY POS_SALE ..."
         uuid source_doc_id "ref sales_or_grn"
@@ -434,14 +434,14 @@ erDiagram
         string product_name_th "snapshot — ใบที่เซ็นรับแล้วต้องไม่เปลี่ยนตามชื่อที่แก้ทีหลัง"
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
         uuid lot_id FK
-        int qty
+        decimal qty
         decimal import_cost
     }
     BUNDLE_ITEMS {
         uuid id PK
         uuid bundle_product_id FK "the type=bundle product, CASCADE"
         uuid component_product_id FK "must be type=single, RESTRICT"
-        int quantity "per one set, in the component stock UOM"
+        decimal quantity "per one set, in the component stock UOM"
     }
     STOCK_ADJUSTMENTS {
         uuid id PK
@@ -462,9 +462,9 @@ erDiagram
         uuid adjustment_id FK
         uuid lot_id FK
         uuid product_id "denormalized from lot"
-        int counted_qty "client-supplied"
-        int system_qty "server snapshot at submit"
-        int qty "signed delta = counted - system"
+        decimal counted_qty "client-supplied"
+        decimal system_qty "server snapshot at submit"
+        decimal qty "signed delta = counted - system"
     }
     STOCK_ENTRIES {
         uuid id PK
@@ -481,7 +481,7 @@ erDiagram
         uuid product_id FK
         uuid source_lot_id FK
         uuid target_lot_id FK
-        int qty
+        decimal qty
         decimal unit_cost "carried"
     }
     SALES_RETURN_RECEIPTS {
@@ -490,7 +490,7 @@ erDiagram
         uuid dn_item_id "sales-bc delivery_note_items.id — what the return is matched against"
         uuid product_id FK
         uuid warehouse_id FK
-        int qty
+        decimal qty
         decimal total_cost "at the cost the original ISSUE booked"
         timestamptz reversed_at "null = still in effect"
     }
@@ -498,7 +498,7 @@ erDiagram
         uuid id PK
         uuid receipt_id FK
         uuid lot_id FK "always a lot the original delivery issued from"
-        int qty
+        decimal qty
         decimal unit_cost "copied from the original ISSUE movement"
     }
     STOCK_SETTINGS {
@@ -514,7 +514,7 @@ erDiagram
         uuid id PK
         uuid product_id FK
         uuid warehouse_id "reorder point is per warehouse, not per product"
-        int alert_qty "breached = stock.low, nightly at 02:00 Asia/Bangkok"
+        decimal alert_qty "breached = stock.low, nightly at 02:00 Asia/Bangkok"
     }
     PRICE_LISTS {
         uuid id PK
@@ -777,7 +777,7 @@ sequenceDiagram
 <span class="k">export class</span> <span class="t">CreateGoodsReceiptItemDTO</span> {
   <span class="d">@IsUUID()</span>  product_id: <span class="t">string</span>;      <span class="c">// ห้ามเป็น has_variants=true (template)</span>
   <span class="d">@IsUUID()</span>  warehouse_id: <span class="t">string</span>;    <span class="c">// คลังปลายทาง — leaf เท่านั้น</span>
-  <span class="d">@IsInt()</span> <span class="d">@Min(1)</span>  received_qty: <span class="t">number</span>;   <span class="c">// จำนวนในหน่วยที่กรอก</span>
+  <span class="d">@IsNumber({ maxDecimalPlaces: 4 })</span> <span class="d">@IsPositive()</span>  qty: <span class="t">number</span>;   <span class="c">// จำนวนในหน่วยที่กรอก — ทศนิยมได้ถ้าหน่วยไม่ใช่ is_whole_number</span>
   <span class="d">@IsUUID()</span> <span class="d">@IsOptional()</span>  uom_id?: <span class="t">string</span>;   <span class="c">// หน่วยที่กรอก → แปลงเป็น stock_uom</span>
   <span class="d">@IsNumber()</span> <span class="d">@Min(0)</span>  import_cost: <span class="t">number</span>;   <span class="c">// ต้นทุน/หน่วยของล็อตนี้</span>
   <span class="d">@IsString()</span> <span class="d">@IsNotEmpty()</span>  lot_number: <span class="t">string</span>;  <span class="c">// string ธรรมดา ไม่ใช่ i18n</span>
@@ -925,8 +925,8 @@ sequenceDiagram
             <div class="edge"><div class="tag mb-1">Variant template</div><p class="text-[13px]"><span class="mono text-[12px]">product.has_variants=true</span> → reject <span class="mono text-[12px]">product.is_template_cannot_transact</span> ต้องเลือก variant ที่ generate ไว้</p></div>
             <div class="edge"><div class="tag mb-1">Over-receipt vs PO</div><p class="text-[13px]">(received + รับไปแล้ว) เทียบ <span class="mono text-[12px]">ordered × (1 + over_receipt_allowance)</span> · เกิน → <span class="mono text-[12px]">422 over_receipt.exceeded</span></p></div>
             <div class="edge"><div class="tag mb-1">Frozen period</div><p class="text-[13px]"><b>implement แล้ว 2026-08-30</b> (ก่อนหน้านี้มีแค่คอลัมน์ ไม่เคยตรวจจริง) — <span class="mono text-[12px]">document_date ≤ stock_frozen_upto</span> → <b>409</b> (ConflictException, ไม่ใช่ 422 ตามที่ร่างไว้เดิม — ให้ตรงกับ pattern ปฏิเสธ state ที่เอกสาร submittable ทุกใบใช้อยู่แล้ว เช่น PO/GRN "cannot move from X to Y") · เช็คที่ <span class="mono text-[12px]">StockSettingsService.assertPeriodOpen()</span> เรียกจาก submit()/confirmDelivery() ของทั้ง 5 เอกสารที่ขยับสต็อก (GRN, Stock Adjustment, Stock Entry, Purchase Return, Delivery) ไม่ใช่ generic <span class="mono text-[12px]">assertNotFrozen()</span> ตัวเดียวตามร่างเดิม เพราะ <span class="mono text-[12px]">stock_movements</span> ไม่มีคอลัมน์ posting date เป็นของตัวเอง (ดู entity docblock) — ต้องเช็คที่เอกสารต้นทาง ก่อนเรียก <span class="mono text-[12px]">StockPostingService</span> เสมอ</p></div>
-            <div class="edge"><div class="tag mb-1">Negative / zero</div><p class="text-[13px]"><span class="mono text-[12px]">received_qty ≥ 1</span> · <span class="mono text-[12px]">import_cost ≥ 0</span> · DB CHECK <span class="mono text-[12px]">available_qty ≥ 0</span></p></div>
-            <div class="edge"><div class="tag mb-1">UOM rounding</div><p class="text-[13px]">ถ้า stock UOM <span class="mono text-[12px]">is_whole_number</span> แล้วแปลงได้เศษ → <span class="mono text-[12px]">422 uom.non_integer_conversion</span></p></div>
+            <div class="edge"><div class="tag mb-1">Negative / zero</div><p class="text-[13px]"><span class="mono text-[12px]">qty &gt; 0</span> (ทศนิยม ≤ 4 ตำแหน่ง) · <span class="mono text-[12px]">import_cost ≥ 0</span> · DB CHECK <span class="mono text-[12px]">available_qty ≥ 0</span></p></div>
+            <div class="edge"><div class="tag mb-1">UOM rounding</div><p class="text-[13px]">ถ้า stock UOM <span class="mono text-[12px]">is_whole_number</span> แล้วแปลงได้เศษ หรือหน่วยอื่นแปลงแล้วเกิน 4 ตำแหน่ง → <b>400</b> (BadRequestException — ร่างเดิมเขียน 422 <span class="mono text-[12px]">uom.non_integer_conversion</span>)</p></div>
             <div class="edge"><div class="tag mb-1">Cancel หลังถูกตัด</div><p class="text-[13px]">ถ้า <span class="mono text-[12px]">available_qty &lt; received_qty</span> → block cancel ให้ไปทำ Stock Adjustment แทน</p></div>
           </div>
           <div class="edge mb-10" style="background:rgba(14,124,134,.06);border-color:rgba(14,124,134,.22)"><div class="tag mb-1" style="color:var(--accent)">Group warehouse / expiry ในอดีต</div><p class="text-[13px]">ปฏิเสธคลังที่ <span class="mono text-[12px]">is_group=true</span> (ต้องรับเข้า leaf) · ล็อตที่ <span class="mono text-[12px]">expiry &lt; today</span> รับได้ (เช่น clearance) แต่จะถูกข้ามอัตโนมัติตอน FEFO picking</p></div>
@@ -1019,9 +1019,9 @@ sequenceDiagram
           </div>
           <div class="grid lg:grid-cols-2 gap-6 mb-9">
             <div class="card p-6">
-              <div class="mono text-[11px] mb-3" style="color:var(--signal)">CONVERSION ROUND CHECK · เข้มกว่าที่ SRS เขียน</div>
-              <p class="text-[13.5px] mb-2">SRS เขียนว่า “ต้องลงตัวถ้า <span class="mono text-[12px]">is_whole_number</span>” แต่โค้ดจริง <b>บังคับให้ลงตัวเสมอ</b> ไม่สนว่า UOM ตั้งค่าไว้ยังไง</p>
-              <p class="text-[13.5px]">เพราะทุกคอลัมน์จำนวนสต็อกในระบบนี้เป็น <span class="mono text-[12px]">int</span> ทั้งหมด (<span class="mono text-[12px]">DocumentLineItemEntity.qty</span>, <span class="mono text-[12px]">lots.received_qty</span>, <span class="mono text-[12px]">lots.available_qty</span>) — ถ้าแปลงแล้วได้ 3.75 มันไม่มีที่เก็บ และจะถูก <b>ตัดทิ้งเงียบๆ</b> เป็น 3 ซึ่งคือสต็อกหายไป 0.75 หน่วยโดยไม่มี movement รองรับ</p>
+              <div class="mono text-[11px] mb-3" style="color:var(--signal)">CONVERSION ROUND CHECK · ตาม stock UOM (2026-11-17)</div>
+              <p class="text-[13.5px] mb-2">จำนวนสต็อกและจำนวนในเอกสารทุกคอลัมน์เป็น <span class="mono text-[12px]">numeric(18,4)</span> (เดิม <span class="mono text-[12px]">int</span> — migration <span class="mono text-[12px]">DecimalQuantities</span> ทั้ง 5 BC) จึงทำตามที่ SRS เขียนได้ตรงๆ: stock UOM ที่ <span class="mono text-[12px]">is_whole_number=true</span> (ชิ้น) ผลแปลงต้องเป็นจำนวนเต็ม · หน่วยอื่น (กก., เมตร) มีทศนิยมได้ <b>ไม่เกิน 4 ตำแหน่ง</b></p>
+              <p class="text-[13.5px]">ผลที่ต้องใช้เกิน 4 ตำแหน่ง (เช่น 1 × 0.12345) ถูก <b>reject</b> ไม่ใช่ปัด — การปัดคือการบันทึกสต็อกที่ไม่ได้เข้ามาจริง · กฎเดียวกันใช้กับทุกเอกสาร (stock entry, adjustment, delivery/POS, bundle, PO, quotation, receipt, AP invoice) ผ่าน <span class="mono text-[12px]">assertQtyForUom()</span> ใน <span class="mono text-[12px]">@lib/common</span> · ทุกจุดที่บวก/ลบจำนวน (FIFO, คืนของ, ยอดค้างส่ง) ผ่าน <span class="mono text-[12px]">roundQty()</span> ก่อนเทียบหรือบันทึก กันเศษ float แบบ 0.1+0.2</p>
             </div>
             <div class="card p-6">
               <div class="mono text-[11px] mb-3" style="color:var(--signal)">เฉพาะ factor ฝั่ง purchase</div>

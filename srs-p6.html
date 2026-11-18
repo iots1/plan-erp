@@ -162,15 +162,15 @@ erDiagram
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
         date expiry_date
         int days_left
-        int available_qty
+        decimal available_qty
     }
     LOW_STOCK {
         uuid product_id PK "ref inventory-bc"
         string product_sku "snapshot from the event"
         string product_name_th "snapshot from the event"
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
-        int available_qty
-        int alert_qty
+        decimal available_qty
+        decimal alert_qty
     }
     CUSTOMER_BY_PROVINCE {
         string province PK

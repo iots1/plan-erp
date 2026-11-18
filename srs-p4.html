@@ -298,12 +298,12 @@ erDiagram
     PURCHASE_ORDER_ITEMS {
         uuid id PK
         uuid po_id FK
-        int received_qty "recomputed from PURCHASE_ORDER_RECEIPTS ledger, never incremented in place"
+        decimal received_qty "recomputed from PURCHASE_ORDER_RECEIPTS ledger, never incremented in place"
         uuid product_id "ref inventory-bc"
         string product_sku "snapshot ณ เวลาสั่งซื้อ · null สำหรับใบก่อนมีคอลัมน์นี้"
         string product_name_th "snapshot — ใบสั่งซื้อที่พิมพ์ต้องแสดงสิ่งที่สั่งตามที่ตกลง"
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
-        int qty
+        decimal qty
         decimal unit_cost
         string discount_type "percent_amount · per_item or both only"
         decimal discount "per_item or both only"
@@ -314,7 +314,7 @@ erDiagram
         uuid po_item_id FK
         uuid grn_id "ref inventory-bc goods_receipts.id — cross-BC, no FK"
         uuid grn_item_id "ref inventory-bc goods_receipt_items.id — UNIQUE, the idempotency key"
-        int qty "stock UOM, already converted by inventory-bc"
+        decimal qty "stock UOM, already converted by inventory-bc"
         timestamp reversed_at "set when the GRN is cancelled · null = still counts"
     }
     CUSTOMER_GROUPS {
@@ -381,7 +381,7 @@ erDiagram
         string product_sku "copied from inventory-bc products.sku"
         string product_name_th "copied from inventory-bc products.name_th"
         string product_name_en "copied from inventory-bc products.name_en, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
-        int qty
+        decimal qty
         decimal unit_price
         string discount_type "percent_amount · per_item or both only"
         decimal discount "per_item or both only"
@@ -410,9 +410,9 @@ erDiagram
         uuid product_id "ref inventory-bc"
         string product_name_th "copied from quotation_items"
         string product_name_en "copied from quotation_items, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
-        int qty
-        int delivered_qty "bumped by DeliveryNotesService.submit()/cancel()"
-        int returned_qty "bumped by SalesReturnsService — status uses the net"
+        decimal qty
+        decimal delivered_qty "bumped by DeliveryNotesService.submit()/cancel()"
+        decimal returned_qty "bumped by SalesReturnsService — status uses the net"
         decimal unit_price
         decimal discount
         string vat_treatment "copied from quotation_items"
@@ -436,7 +436,7 @@ erDiagram
         uuid dn_id FK
         uuid so_item_id FK "which SO line this fulfils"
         uuid product_id "ref inventory-bc, copied from so_item_id"
-        int qty "finance-bc bills against this via receipt_items.dn_item_id"
+        decimal qty "finance-bc bills against this via receipt_items.dn_item_id"
     }
     SALES_RETURNS {
         uuid id PK
@@ -455,7 +455,7 @@ erDiagram
         uuid dn_item_id FK "the only reference the client chooses"
         uuid so_item_id FK "copied — drives sales_order_items.returned_qty"
         uuid product_id "copied from the delivered line"
-        int qty "<= delivered qty minus what earlier returns took"
+        decimal qty "<= delivered qty minus what earlier returns took"
         decimal unit_price "snapshot for the credit note · not for stock valuation"
         decimal line_total
     }
@@ -464,7 +464,7 @@ erDiagram
         uuid source_doc_id "ref sales-bc delivery_note_items.id, UNIQUE, cross-BC no FK"
         uuid product_id FK
         uuid warehouse_id FK
-        int qty
+        decimal qty
         decimal total_cost "from postIssue().total_cost"
         timestamp reversed_at "null = still in effect"
     }
@@ -532,7 +532,7 @@ erDiagram
         string product_sku "snapshot"
         string product_name_th "snapshot"
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
-        int qty
+        decimal qty
         decimal unit_price "VAT-inclusive under ABB, ex-VAT under FULL"
         string discount_type "per_item or both only"
         decimal discount "per_item or both only"
@@ -543,7 +543,7 @@ erDiagram
         string apply_on "ITEM_ITEM_GROUP_BRAND"
         uuid target_id "polymorphic per apply_on, no single FK"
         uuid customer_id "nullable, ref sales-bc customers.id cross-BC"
-        int min_qty "default 1"
+        decimal min_qty "default 1"
         timestamp valid_from "nullable"
         timestamp valid_upto "nullable"
         string value_type "RATE_or_DISCOUNT_PERCENT"

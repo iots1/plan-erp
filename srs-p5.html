@@ -211,7 +211,7 @@ erDiagram
         string product_sku "snapshot 86/4(5)"
         string product_name_th "snapshot 86/4(5)"
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
-        int qty
+        decimal qty
         decimal unit_price
         string discount_type "per_item or both only"
         decimal discount "per_item or both only"
@@ -225,7 +225,7 @@ erDiagram
         uuid id PK
         uuid sale_id "ref sales-bc"
         uuid lot_id "ref inventory-bc"
-        int qty
+        decimal qty
         decimal unit_cost "lot exact"
         decimal cogs
     }
@@ -327,7 +327,7 @@ erDiagram
         string product_sku "snapshot"
         string product_name_th "snapshot"
         string product_name_en "snapshot, NULL เมื่อสินค้าไม่มีชื่ออังกฤษ"
-        int qty "<= un-invoiced qty of the GRN line"
+        decimal qty "<= un-invoiced qty of the GRN line"
         decimal unit_cost "within 20pct of import_cost"
         decimal line_total "EX-VAT"
     }

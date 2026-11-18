@@ -955,7 +955,7 @@ sequenceDiagram
             ไม่ใช่ล็อตที่ FIFO เลือก และไม่ใช่ต้นทุนล็อตวันนี้ — ของที่กลับมา<b>คือของที่ออกไป</b> ถ้าเข้าล็อตอื่นหรือตีราคาใหม่
             มูลค่าคงคลังจะเพี้ยนและของที่คืนจะถูกบันทึกด้วยต้นทุนที่ไม่มีใครจ่าย (เหตุผลเดียวกับที่ A4 บังคับล็อตจากใบรับสินค้า) ·
             inventory-bc อ่านล็อตจากรายการ <span class="mono text-[12px]">ISSUE</span> ที่ใบส่งของเขียนไว้ · ถ้าบรรทัดนั้นตัดจากหลายล็อต
-            จะเติมกลับ<b>ตามลำดับที่เคยหยิบไป</b> ไม่ใช่เฉลี่ยตามสัดส่วน (จำนวนเป็นจำนวนเต็ม เฉลี่ยแล้วได้เศษ) ·
+            จะเติมกลับ<b>ตามลำดับที่เคยหยิบไป</b> ไม่ใช่เฉลี่ยตามสัดส่วน (เฉลี่ยแล้วได้เศษเกิน 4 ตำแหน่ง และกระจายเศษกลับเข้าล็อตที่ไม่ได้หยิบไปจริง) ·
             สินค้าชุด (bundle) ถูกแตกเป็นสินค้าย่อยก่อนหาล็อต เหมือนตอนส่งของ
           </p>
         </div>
@@ -3042,13 +3042,14 @@ sequenceDiagram
       <!-- ============ CLOSING ============ -->
       <section class="section pt-10 pb-20">
         <div class="rulebox">
-          <div class="rc ok mb-1">สรุปสิ่งที่ FE ต้องยึด 5 ข้อ</div>
+          <div class="rc ok mb-1">สรุปสิ่งที่ FE ต้องยึด 6 ข้อ</div>
           <p class="text-[13.5px] leading-[1.9]">
             <b>1.</b> ทุกเอกสารเริ่มที่ <span class="mono text-[12px]">DRAFT</span> · แก้/ลบได้เฉพาะตอนนั้น — ซ่อนปุ่มแก้ไขทันทีที่สถานะเปลี่ยน<br>
             <b>2.</b> วันที่ส่งเป็น ISO 8601 <b>เต็มรูปแบบพร้อม offset</b> เสมอ (<span class="mono text-[12px]">2026-08-29T00:00:00+07:00</span>) — ส่ง <span class="mono text-[12px]">2026-08-29</span> เปล่า ๆ จะไม่ผ่าน<br>
             <b>3.</b> i18n รับกลับเป็น <span class="mono text-[12px]">name: { th, en }</span> เสมอ · ส่งเข้าใช้ <span class="mono text-[12px]">name_th</span>/<span class="mono text-[12px]">name_en</span> หรือส่ง object ชุดเดิมกลับไปก็ได้ (อย่าส่งทั้งคู่)<br>
             <b>4.</b> อย่าให้ผู้ใช้กรอก VAT · ต้นทุน · ราคาอ้างอิงเอง — backend คำนวณและตรวจให้หมดแล้ว<br>
-            <b>5.</b> งานข้ามระบบ (ตัดยอด PO · COGS · กำไร) เป็น <b>eventual</b> ใช้เวลาไม่กี่วินาที — ตอบ 200 แล้วให้รีเฟรชทีหลัง อย่า block ผู้ใช้
+            <b>5.</b> งานข้ามระบบ (ตัดยอด PO · COGS · กำไร) เป็น <b>eventual</b> ใช้เวลาไม่กี่วินาที — ตอบ 200 แล้วให้รีเฟรชทีหลัง อย่า block ผู้ใช้<br>
+            <b>6.</b> จำนวน (<span class="mono text-[12px]">qty</span> ทุกเอกสาร · <span class="mono text-[12px]">counted_qty</span> · <span class="mono text-[12px]">quantity</span> ของชุด) เป็นทศนิยมได้ <b>ไม่เกิน 4 ตำแหน่ง</b> เมื่อหน่วยสต็อกของสินค้า <span class="mono text-[12px]">is_whole_number = false</span> (กก. · เมตร) · หน่วยจำนวนเต็ม (ชิ้น) ส่ง 1.5 จะได้ <b>400</b> "must be a whole number" — ให้ช่องกรอกอ่าน <span class="mono text-[12px]">stock_uom.is_whole_number</span> จาก <span class="mono text-[12px]">GET /products/:id?relations=stock_uom</span> แล้วล็อก step เอง · ค่าที่ตอบกลับเป็น number (19.25) ไม่ใช่ string
           </p>
         </div>
         <p class="text-[var(--ink-soft)] text-[14px] mt-8 leading-[1.9]">
