@@ -131,4 +131,6 @@ the returned value into a **JSON:API** envelope (without the decorator, raw data
 - Database-per-context; **reference across BCs by UUID only** — no cross-DB foreign keys.
 - Transactional documents are **submittable** (`DRAFT → SUBMITTED → CANCELLED`); stock/ledger
   posts on submit, reverses on cancel. Emit domain events **after commit** via an outbox;
-  consumers must be idempotent. `available_qty` carries a DB `CHECK (… >= 0)`.
+  consumers must be idempotent. `available_qty` carries a DB `CHECK (… >= 0)` on every real lot;
+  the one exception is the per product × warehouse backorder lot (`is_backorder`, `<= 0`), which
+  only a POS sale or delivery note may draw when `allow_negative_stock` is on (srs-p3 §08 D10).
