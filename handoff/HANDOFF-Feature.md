@@ -217,6 +217,20 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-19 · VAT ในใบสั่งซื้อ / ใบรับสินค้า / ใบคืนสินค้า — เก็บค่า + พิมพ์ (BE-19, `feat/be-19-purchase-vat` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้น supplier-bc · inventory-bc · report-bc บน local**
+
+| | รายละเอียด |
+|---|---|
+| ทำไม | requirement 2026-11-18 ข้อ 8 — ผู้ใช้ต้องการเห็น VAT ในใบพิมพ์และหน้าจอจัดซื้อ (กลับข้อตัดสินใจเดิม "PO ไม่มีภาษี") · ตัดสิน 2026-11-19: `total` คงความหมายเดิม + คอลัมน์ใหม่ · backfill แบบ endpoint (BE-09a) · finance-bc ไม่ตอบตอนสร้าง/แก้ = 0% |
+| supplier-bc | PO บรรทัด `vat_treatment/vat_rate/vat_base/vat_amount/line_total_incl_vat` · หัวใบ `vat_rate/net_amount/total_*_vat_price/vat_amount/total_incl_vat` + `raw_*` (ทั้งหมด nullable = ยังไม่ backfill) · `TaxConfigsProxyService` ใหม่ (RPC `ResolveEffectiveRate`) · `applyPurchaseOrderVat()` ใช้ `vat.util.ts` ชุดเดียวกับใบเสนอราคา · update คิดใหม่ทุกครั้ง เขียนเฉพาะบรรทัดที่ VAT เปลี่ยน · `POST /purchase-order-vat-backfills` (`purchase_order:backfill_vat`) · รายงานจัดซื้อเพิ่ม `net_amount/vat_amount` (ใบยังไม่ backfill: net = total, VAT 0) |
+| inventory-bc | ใบรับ/ใบคืน บรรทัด + หัวใบ (ไม่มี raw) · ใบรับปันจากบรรทัด PO ตามจำนวนที่รับ + snapshot `is_vat_included` (คอลัมน์ที่สืบทอดมาแต่เดิมไม่ได้ใช้) · ใบคืนปันจากบรรทัดใบรับ · `POST /purchase-vat-backfills` (`purchase_vat:backfill`) ทำใบรับก่อนแล้วใบคืน |
+| libs/common | `IPurchaseVatLine`, `IPurchaseVatHeader`, `toPurchaseVatPrintParams()` (แถวสรุป + หมายเหตุ "ไม่ใช่ภาษีซื้อ" — ใช้ร่วมสามใบ) |
+| report-bc | แม่แบบ `purchase-order.html` / `goods-receipt.html` / `purchase-return.html`: ยอดก่อนภาษี / VAT / รวมทั้งสิ้น + `vat_note_th/en` · `_README.md` อัปเดต |
+| migration / สิทธิ์ | `erp_supplier` `AddPurchaseOrderVat` · `erp_inventory` `AddPurchaseDocumentVat` (generate จาก entity, เพิ่มคอลัมน์ nullable ล้วน) · สิทธิ์ใหม่ 2 ตัว superadmin ได้จาก `permissions:sync` (ไม่มี grant migration) |
+| test | supplier-bc unit +11 (VAT ตอนสร้าง/ราคารวม VAT/exempt/0%, backfill 4 กรณี, print 2) · inventory-bc unit +8 (prorate util, backfill ใบรับ 4 + ใบคืน 2) · smoke ใหม่ `supplier-bc/purchase-order-vat` (สร้าง → PUT is_vat_included → พิมพ์ → รายงาน → backfill) · `inventory-bc/goods-receipt-vat` (PO → ใบรับ DRAFT ครึ่งหนึ่ง → VAT ครึ่งหนึ่ง → พิมพ์ → backfill) |
+| trap ที่จ่ายไป | smoke เทียบตัวเลขบนใบพิมพ์ (ปัด 2 ตำแหน่ง) ด้วยค่าคลาด 4 ตำแหน่งแล้วแดง — ตัวเลขที่ format แล้วต้องเทียบด้วยค่าคลาด 0.005 · harness ของ unit test PO ต้องประกาศ mock ใหม่ในชนิด harness ด้วย ไม่งั้น `tsc -p tsconfig.json` ฟ้อง (verify ไม่ตรวจ spec) |
+| หลัง deploy | 1) `POST /supplier-bc/v1/purchase-order-vat-backfills` จน `remaining = 0` · 2) `POST /inventory-bc/v1/purchase-vat-backfills` จนทั้งสองฝั่ง `remaining = 0` · 3) อัปโหลดแม่แบบสามไฟล์ด้วย `PUT /print-templates/:id` · 4) grant สิทธิ์ backfill ให้ role อื่นถ้าต้องการ (รอบ deploy ถัดไป) · แจ้ง FE-27 |
+
 ### 2026-11-19 · วันเวลาที่ทำรายการ + ผู้ทำรายการ บนใบพิมพ์ทุกใบ (BE-17, `feat/be-17-print-issued-at-by` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้นทั้ง 5 BC บน local (report-bc · sales-bc · finance-bc · inventory-bc · supplier-bc) · smoke ใหม่พิมพ์จริง 15/18 ประเภท (3 ประเภทไม่มีแถวบน local)**
 
 | | รายละเอียด |
