@@ -425,6 +425,10 @@ erDiagram
         string supplier_name_en "snapshot, NULL เมื่อ PO ไม่มีชื่ออังกฤษของผู้ขาย"
         uuid warehouse_id FK
         string status
+        bool is_vat_included "BE-19 · snapshot from the PO"
+        decimal net_amount "BE-19 · sum of line vat_base · NULL = ยังไม่ backfill"
+        decimal vat_amount "BE-19 · displayed estimate, not input tax"
+        decimal total_incl_vat "BE-19"
     }
     GOODS_RECEIPT_ITEMS {
         uuid id PK
@@ -436,6 +440,9 @@ erDiagram
         uuid lot_id FK
         decimal qty
         decimal import_cost
+        string vat_treatment "BE-19 · copied from the PO line"
+        decimal vat_base "BE-19 · PO line vat_base × qty ÷ po qty"
+        decimal vat_amount "BE-19 · pro-rated the same way"
     }
     BUNDLE_ITEMS {
         uuid id PK

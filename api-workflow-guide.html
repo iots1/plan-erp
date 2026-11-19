@@ -429,6 +429,8 @@ sequenceDiagram
               <tr><td class="mono">5</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders/{id}/approve</td><td class="mono text-[11px]">purchase_order:approve</td><td>DRAFT → <b>APPROVED</b></td></tr>
               <tr><td class="mono">6</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders/{id}/send</td><td class="mono text-[11px]">purchase_order:send</td><td>APPROVED → <b>SENT</b> · เริ่มรับของได้</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders/{id}/cancel</td><td class="mono text-[11px]">purchase_order:cancel</td><td>ยกเลิกได้จนถึง PARTIAL · <b>RECEIVED ยกเลิกไม่ได้</b></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-order-vat-backfills</td><td class="mono text-[11px]">purchase_order:backfill_vat</td><td>BE-19 · เติม VAT ให้ใบสั่งซื้อเก่า ครั้งละ <span class="mono">limit</span> ใบ (1–500, ค่าเริ่มต้น 100) เรียกซ้ำจน <span class="mono">remaining = 0</span></td></tr>
+              <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /inventory-bc/v1/purchase-vat-backfills</td><td class="mono text-[11px]">purchase_vat:backfill</td><td>BE-19 · เติม VAT ใบรับสินค้า แล้วใบคืนสินค้า · <b>รันหลังฝั่ง supplier-bc เสร็จ</b> · ตอบ <span class="mono">goods_receipts</span> / <span class="mono">purchase_returns</span> แยกกัน</td></tr>
               <tr><td class="mono">—</td><td class="mono text-[11.5px]">POST /supplier-bc/v1/purchase-orders/{id}/attachments/presigned-url</td><td class="mono text-[11px]">purchase_order:update</td><td>ขอ URL แนบไฟล์ (ดูหัวข้อ 3.5 ในคู่มือรูปภาพ)</td></tr>
             </tbody>
           </table>
@@ -451,6 +453,18 @@ sequenceDiagram
       <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> }
   ]
 }</pre>
+        </div>
+        <div class="rulebox mb-6" id="purchase-vat">
+          <div class="rc mb-1">VAT ในใบสั่งซื้อ / ใบรับ / ใบคืน (BE-19 · 2026-11-19) — response มีตัวเลขเพิ่ม request ไม่เปลี่ยน</div>
+          <p class="text-[13.5px]">
+            ใบสั่งซื้อ (create / update / GET) มีหัวใบ <span class="mono text-[12px]">vat_rate</span>, <span class="mono text-[12px]">net_amount</span>, <span class="mono text-[12px]">total_standard_vat_price</span> / <span class="mono text-[12px]">total_zero_vat_price</span> / <span class="mono text-[12px]">total_exempt_vat_price</span>, <span class="mono text-[12px]">vat_amount</span>, <span class="mono text-[12px]">total_incl_vat</span> (+ <span class="mono text-[12px]">raw_*</span> ในสกุลที่สั่ง) และบรรทัด <span class="mono text-[12px]">vat_treatment</span>, <span class="mono text-[12px]">vat_rate</span>, <span class="mono text-[12px]">vat_base</span>, <span class="mono text-[12px]">vat_amount</span>, <span class="mono text-[12px]">line_total_incl_vat</span> ·
+            <b><span class="mono text-[12px]">total</span> ยังเป็นยอดก่อน VAT เหมือนเดิม</b> — FE แสดงยอดรวม VAT จาก <span class="mono text-[12px]">total_incl_vat</span> ·
+            server คิดเองจากอัตราใน finance-bc + ประเภทภาษีสินค้า ส่ง <span class="mono text-[12px]">vat_*</span> มาใน body จะถูกตัดทิ้ง (whitelist) · client ส่งแค่ <span class="mono text-[12px]">is_vat_included</span> ตามเดิม ·
+            ใบรับสินค้า / ใบคืนสินค้า (GET) มีชุดเดียวกัน (ไม่มี <span class="mono text-[12px]">raw_*</span>) + <span class="mono text-[12px]">is_vat_included</span> ที่คัดลอกจาก PO ·
+            <b><span class="mono text-[12px]">null</span> = ใบก่อน BE-19 ที่ยังไม่ backfill</b> ไม่ใช่ 0 — FE ควรแสดง "-" · ตัวเลขทั้งหมด<b>เพื่อแสดง ไม่ใช่ภาษีซื้อ</b> (ภาษีซื้อมาจาก AP invoice ตามใบกำกับของผู้ขาย) ·
+            รายงานจัดซื้อ (<span class="mono text-[12px]">/purchase-reports/summary|periods|suppliers|products</span>) เพิ่ม <span class="mono text-[12px]">net_amount</span> / <span class="mono text-[12px]">vat_amount</span> คู่ <span class="mono text-[12px]">total_amount</span> ·
+            ใบพิมพ์ทั้งสามใช้แม่แบบใหม่ — <b>อัปโหลด <span class="mono text-[12px]">purchase-order.html</span>, <span class="mono text-[12px]">goods-receipt.html</span>, <span class="mono text-[12px]">purchase-return.html</span> ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy</b> (แถวที่ยังเป็นแม่แบบเก่าจะไม่แสดงแถว VAT)
+          </p>
         </div>
         <div class="rulebox mb-8">
           <div class="rc mb-1">ส่วนลด · สี่โหมด · both = ลดรายการแล้วลดท้ายบิล (2026-10-27)</div>
