@@ -2814,6 +2814,13 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     และ uniqueness `(event_id, consumer_name)` เป็น **unique INDEX** ไม่ใช่ constraint — ตรวจด้วย `pg_index` ไม่ใช่ `pg_constraint`
     · smoke ที่รอ `profit.calculated` จากบิล POS ต้องเรียก `POST /finance-bc/v1/profit-loss-reconciliations` เอง: `stock.deducted`
     ถึง finance-bc ก่อนบิล COMPLETED → COGS ลงโดยไม่มีรายได้และไม่ stage event จนกว่ามีรอบ reconcile
+29. **(จาก 2026-11-19) `@Type(() => Boolean)` ทำให้ `?flag=false` กลายเป็น `true` — แล้วยังผ่าน `@IsBoolean()`** —
+    สตริงที่ไม่ว่างเป็น truthy ทุกตัว (`Boolean('false') === true`) · `is_zero_balance_included` ของ
+    `GET /income-statements` และ `GET /balance-sheets` เป็นแบบนี้มาตั้งแต่ 2026-09-19: ส่ง `false` ได้บัญชียอด 0 กลับมาเหมือนส่ง `true`
+    · `strict-boolean-expressions` มองไม่เห็นเพราะ argument ของ call ไม่ใช่ boolean context → ตอนนี้ `eslint.config.mjs` แบน
+    `@Type(() => Boolean)` / `Boolean(x)` / `!!x` ด้วย `no-restricted-syntax` และเปิด `eqeqeq: 'always'` (ไม่ยกเว้น `== null`
+    — ของเก่ามีแค่ 14 จุด แก้หมดแล้ว) · DTO ใช้ `@Transform(toBoolean)` · เขียน `x != null` ใหม่เป็น `x !== null`
+    **ไม่ใช่การแก้** — ปล่อย `undefined` ผ่าน · กฎเต็ม: `.claude/rules/naming-and-code-style.md`
 
 ---
 
