@@ -217,6 +217,20 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-19 · POS ขายเชื่อ: ตัดสต็อกทันที ใบกำกับเต็มรูป ตั้งลูกหนี้ (BE-16, `feat/be-16-pos-credit-sale` จาก main) ✅ **`pnpm verify sales-bc` + `pnpm verify finance-bc` ผ่านครบ 6 ขั้นบน local (smoke sales-bc 30/30 · finance-bc 28/28)**
+
+| | รายละเอียด |
+|---|---|
+| ทำไม | requirement 2026-11-18 ข้อ 3 · ผู้ใช้ตัดสิน: ขายเชื่อ = วิธีชำระ `CREDIT` ของหน้า POS (2026-11-18) · ผสมกับวิธีอื่นได้เพื่อรับมัดจำ · วงเงินให้ตั้งค่า off/warn/block โดย warn = ถามก่อนแล้วยืนยัน · สิทธิ์ API ใหม่ (2026-11-19) |
+| libs/common | `splitPosTenders` รู้จัก `is_credit`: CREDIT ≤ 1, ยอด = total − มัดจำ, มัดจำ < total, ไม่มีเงินทอน, `credit_amount` ในผล · error code ใหม่ 5 ตัว (`CREDIT_TENDER_INVALID`, `CREDIT_SALE_REQUIRES_FULL_TAX_INVOICE`, `CREDIT_SALE_FORBIDDEN`, `CREDIT_LIMIT_EXCEEDED`, `POS_SALE_INVOICE_STILL_COLLECTED`) · RPC ใหม่ `financeBc.posSale.findVoidBlockers` |
+| sales-bc | `PosPaymentMethod.CREDIT` · `PosSaleCreditService` (สิทธิ์ `pos_sale:credit_sale` จาก session, ลูกค้า + FULL_TAX_INVOICE, วงเงินผ่าน `SalesOrdersService.describeCustomerCredit` ใหม่) ตรวจก่อนจอง Idempotency-Key/ก่อนตัดสต็อก · `GET /pos-sale-credit-checks` (ประกาศสิทธิ์ใหม่ให้ `permissions:sync` เห็น) · `pos_sales.credit_amount` + snapshot วงเงิน 3 คอลัมน์ · `sales_settings.pos_credit_limit_enforcement` (default warn) · void ถาม finance-bc ก่อนคืนของ · resolve-completion ยอมยอดค้าง = ยอด CREDIT · UI manifest `component:btn_pos_credit_sale` |
+| finance-bc | `recordSale`: CREDIT ไม่ออก payment entry (มัดจำออกตามปกติ) + บังคับ FULL_TAX_INVOICE/ลูกค้า · `ReceiptsService.findVoidBlockers` (แยก `findCollectingHolders` ออกจาก `assertNothingStillCollects` ไม่เปลี่ยนพฤติกรรม void) · ใบพิมพ์ของบิลที่มี CREDIT ใช้หัว "ใบแจ้งหนี้ / ใบกำกับภาษี" + ป้าย "ค้างชำระ (ขายเชื่อ)" |
+| migration | `erp_sales` `PosCreditSale` (enum CREDIT 2 ตัว + 4 คอลัมน์ pos_sales + 1 คอลัมน์ settings · ตัดบรรทัด `customers_branch_type_enum` ที่ generator พ่วงมา — drift เดิมของเครื่อง) · finance-bc ไม่มี migration |
+| สิทธิ์ | ใหม่ `pos_sale:credit_sale` (api) + `component:btn_pos_credit_sale` (ui) · super admin ได้จาก sync เอง · **ยังไม่มี grant migration ให้ role อื่น** — ตาม trap ใน permissions.md ต้องรอ deploy ที่ sync สร้างแถวแคตตาล็อกก่อน แล้วค่อยส่ง grant migration รอบถัดไป |
+| test | unit sales-bc +15 (ขายเชื่อทั้งบิล/มัดจำ, ไม่มีสิทธิ์, ABB, มัดจำครบยอด, warn → ยืนยัน + snapshot + key ไม่ถูกจอง, block, off, บิลจ่ายครบไม่แตะกติกา, void ติดรับชำระ/503/ผ่าน/บิลปกติไม่ถาม, ปิดบิลพัก) · libs/common +8 · finance-bc +7 (recordSale credit 3, findVoidBlockers 2, print 2) · smoke ใหม่ `pos-credit-sale` (refusal 3 แบบ, credit check, warn 409 → ยืนยัน, มัดจำ 50 + เชื่อ 150 ตรวจถึง payment_entries, รายงาน CREDIT แยก, A4 หัวใบแจ้งหนี้, void) |
+| หลัง deploy | (1) migrate `erp_sales` (2) `permissions:sync` (3) grant `pos_sale:credit_sale` + ปุ่มให้ role ที่ร้านกำหนดด้วย migration รอบถัดไป (4) ตั้ง `pos_credit_limit_enforcement` ถ้าไม่ใช้ warn (5) แจ้ง FE-23 — api-workflow-guide B5.2 |
+| ข้อสังเกต | smoke `delivery-note-submit-guard` แดงหนึ่งรอบบน local เพราะสุ่มได้สินค้าหน่วยจำนวนเต็มแล้วส่ง qty 1.5 (ไม่เกี่ยวกับ BE-16 รอบถัดไปผ่าน) · บิลจ่ายครบ (ไม่มี CREDIT) ยังไม่ถาม `findVoidBlockers` ก่อน void — ใบย่อที่ถูกใบลดหนี้/ใบวางบิลอ้างยังคืนของก่อนแล้วค่อยติด 409 จาก finance-bc เหมือนเดิม |
+
 ### 2026-11-18 · ขายติดลบได้ (POS + ใบส่งของ) เมื่อเปิด `allow_negative_stock` — ล็อตค้างตัด (BE-15, `feat/be-15-negative-stock-sale` จาก main) ⏳ **verify inventory-bc ครบ 6 ขั้น (smoke 15/17 — 2 ตัวแดงเพราะข้อมูล local ไม่เกี่ยวกับ BE-15) · finance-bc/sales-bc ดูผลในใบงาน BE-15 · ยังไม่ deploy**
 
 | | รายละเอียด |

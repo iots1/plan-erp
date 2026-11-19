@@ -1459,6 +1459,33 @@ stateDiagram-v2
             · <b>ของไม่ถูกกันไว้</b> — สินค้าอาจหมดระหว่างพัก แล้วการปิดบิลล้มที่ขั้นตัดสต็อกโดยบิลยัง <span class="mono text-[12px]">HELD</span> (แก้บรรทัดแล้วปิดใหม่ได้)
           </p>
         </div>
+
+        <h3 id="pos-credit-sale" class="display text-xl mt-10 mb-4">B5.2 · ขายเชื่อที่ POS (Credit sale) <span class="mono text-[13px] text-[var(--muted)]">— Cashier · เพิ่ม 2026-11-19 (BE-16 · สำหรับ FE-23)</span></h3>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">ส่ง <span class="mono text-[12px]">CREDIT</span> เป็นรายการชำระ — ทั้งบิล หรือมัดจำ + ที่เหลือเชื่อ</div>
+          <p class="text-[13.5px]">
+            กติกาเต็มอยู่ที่ <a href="srs-p4.html#p4-pos-credit-sale">srs-p4 · ขายเชื่อที่ POS</a> · ต้องมีสิทธิ์ <span class="mono text-[12px]">pos_sale:credit_sale</span> (ซ่อนปุ่มด้วย <span class="mono text-[12px]">component:btn_pos_credit_sale</span>) · บิลต้องมี <span class="mono text-[12px]">customer_id</span> และ <span class="mono text-[12px]">document_type: "FULL_TAX_INVOICE"</span>
+          </p>
+        </div>
+        <div class="card overflow-hidden mb-4">
+          <table class="d">
+            <thead><tr><th>ขั้น</th><th>คำขอ</th><th>ผล</th></tr></thead>
+            <tbody>
+              <tr><td>1 · ดูยอดก่อนขาย (ไม่บังคับ)</td><td><span class="mono text-[12px]">GET /sales-bc/v1/pos-sale-credit-checks?customer_id={id}&amp;amount={ยอดที่จะเชื่อ}</span></td><td><span class="mono text-[12px]">credit_limit</span> (0 = ไม่ตั้ง), <span class="mono text-[12px]">credit_exposure</span> (null = finance-bc ไม่ตอบ), <span class="mono text-[12px]">projected_exposure</span>, <span class="mono text-[12px]">is_within_limit</span>, <span class="mono text-[12px]">enforcement</span>, <span class="mono text-[12px]">requires_acknowledgement</span> (warn + เกิน), <span class="mono text-[12px]">is_blocked</span> (block + เกิน) · 403 = ผู้ใช้ไม่มีสิทธิ์ขายเชื่อ</td></tr>
+              <tr><td>2 · ขาย</td><td><span class="mono text-[12px]">POST /sales-bc/v1/pos-sales</span> <span class="mono text-[12px]">{ customer_id, document_type: "FULL_TAX_INVOICE", payments: [{ method: "CASH", amount: 300 }, { method: "CREDIT" }], items }</span> (ทั้งบิล = <span class="mono text-[12px]">[{ method: "CREDIT" }]</span>) · ปิดบิลพักใช้ body เดียวกันกับ <span class="mono text-[12px]">POST /pos-sales/{id}/complete</span></td><td><span class="mono text-[12px]">201</span> · <span class="mono text-[12px]">paid_amount</span> = มัดจำ (0 ถ้าเชื่อทั้งบิล), <span class="mono text-[12px]">credit_amount</span> = ยอดค้าง, <span class="mono text-[12px]">change_amount = 0</span>, <span class="mono text-[12px]">payment_method</span> = <span class="mono text-[12px]">CREDIT</span> หรือ <span class="mono text-[12px]">MIXED</span>, <span class="mono text-[12px]">payments[]</span> มีแถว <span class="mono text-[12px]">CREDIT</span> (<span class="mono text-[12px]">payment_entry_id: null</span>), <span class="mono text-[12px]">receipt_id</span> = ใบกำกับเต็มรูป</td></tr>
+              <tr><td>2a · เกินวงเงิน</td><td>—</td><td><span class="mono text-[12px]">409 CREDIT_LIMIT_EXCEEDED</span> · <span class="mono text-[12px]">meta: { enforcement, credit_limit, credit_exposure, credit_amount, projected_exposure, can_acknowledge }</span> · ยังไม่ตัดสต็อก · <span class="mono text-[12px]">can_acknowledge: true</span> → ถามแคชเชียร์แล้ว<b>ส่ง body เดิมซ้ำ</b>พร้อม <span class="mono text-[12px]">is_credit_limit_acknowledged: true</span> (Idempotency-Key เดิมได้) · <span class="mono text-[12px]">false</span> (block) → ขายเชื่อไม่ได้ ให้รับเงินแทน</td></tr>
+              <tr><td>3 · พิมพ์</td><td><span class="mono text-[12px]">POST /finance-bc/v1/receipts/{receipt_id}/print</span> <span class="mono text-[12px]">{ format: "a4" }</span></td><td>หัว "ใบแจ้งหนี้ / ใบกำกับภาษี" · ชำระโดย: มัดจำ + "ค้างชำระ (ขายเชื่อ)" · "รับเงิน" = มัดจำ</td></tr>
+              <tr><td>4 · รับชำระภายหลัง</td><td><span class="mono text-[12px]">POST /finance-bc/v1/payment-entries</span> ตัดกับ <span class="mono text-[12px]">receipt_id</span> (C4)</td><td>ยอดค้างบนใบลด · <span class="mono text-[12px]">pos_sales.credit_amount</span> คงค่าตอนขาย</td></tr>
+              <tr><td>5 · void</td><td><span class="mono text-[12px]">POST /sales-bc/v1/pos-sales/{id}/void</span></td><td>คืนของ + ยกเลิกมัดจำ + void ใบกำกับ (ลูกหนี้หาย) · ใบถูกเก็บเงิน/วางบิล/ลดหนี้ไปแล้ว → <span class="mono text-[12px]">409 POS_SALE_INVOICE_STILL_COLLECTED</span> <span class="mono text-[12px]">meta.holders</span> ไม่มีอะไรขยับ</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox mb-4">
+          <div class="rc mb-1">error ที่หน้าจอต้องแปล</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">CREDIT_TENDER_INVALID</span> (400 · <span class="mono text-[12px]">meta.reason</span>: CREDIT ซ้ำ / มัดจำครบยอดแล้ว / ยอด CREDIT ไม่เท่ายอดที่เหลือ) · <span class="mono text-[12px]">CREDIT_SALE_REQUIRES_FULL_TAX_INVOICE</span> (400) · <span class="mono text-[12px]">CREDIT_SALE_FORBIDDEN</span> (403) · <span class="mono text-[12px]">CREDIT_LIMIT_EXCEEDED</span> (409) · <span class="mono text-[12px]">POS_SALE_INVOICE_STILL_COLLECTED</span> (409) · รายงาน <span class="mono text-[12px]">GET /sales-reports/payment-methods</span> มีแถว <span class="mono text-[12px]">CREDIT</span> แยก — ยอดนับลิ้นชักให้อ่านเฉพาะ <span class="mono text-[12px]">CASH</span> · ตั้งค่าที่ <span class="mono text-[12px]">PUT /sales-settings</span> <span class="mono text-[12px]">{ pos_credit_limit_enforcement: "off" | "warn" | "block" }</span>
+          </p>
+        </div>
       </section>
 
       <!-- ============ 06 FLOW C ============ -->
