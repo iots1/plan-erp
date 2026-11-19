@@ -2395,8 +2395,9 @@ sequenceDiagram
   participant STO as storage-bc
   U->>SAL: POST /quotations/{id}/print หรือ /receipts/{id}/print
   SAL->>SAL: โหลดเอกสาร + items ของตัวเอง → ประกอบ params
-  SAL->>REP: RPC report.printDocument (document_type_code, params, idempotency_key?)
+  SAL->>REP: RPC report.printDocument (document_type_code, params, issued_at, issued_by, idempotency_key?)
   REP->>REP: หา print_templates จาก document_types.code
+  REP->>REP: ถาม iam ชื่อผู้ทำรายการ (issued_by = created_by) — cache 5 นาที · ไม่ตอบ = ชื่อว่าง
   REP->>FIN: RPC ขอ company profile (ชื่อ/ที่อยู่/เลขผู้เสียภาษี) — cache 5 นาที
   REP->>REP: render HTML → Gotenberg → PDF
   REP->>STO: อัปโหลด PDF + ขอ presigned URL (1 ชม.)
@@ -2454,6 +2455,17 @@ sequenceDiagram
             ค่าเริ่มต้นของร้านเก็บที่ <span class="mono text-[12px]">sales_settings.default_receipt_format</span> — FE อ่านแล้วส่งเป็น <span class="mono text-[12px]">format</span> เอง backend ไม่เดาให้
           </p>
         </div>
+        <div class="rulebox mb-4" id="print-issued-caption">
+          <div class="rc mb-1">วันเวลาที่ทำรายการ + ผู้ทำรายการ บนใบพิมพ์ทุกใบ (BE-17 · 2026-11-19)</div>
+          <p class="text-[13.5px]">
+            ทุก endpoint <span class="mono text-[12px]">POST …/{id}/print</span> ของเอกสารซื้อขาย (sales-bc, supplier-bc, inventory-bc, finance-bc) — <b>body และ response ไม่เปลี่ยน FE ไม่ต้องส่งอะไรเพิ่ม</b> ·
+            PDF มีบรรทัด "วันเวลาที่ทำรายการ / Issued at 18/11/2569 14:35 · ผู้ทำรายการ / Issued by สมชาย ใจดี" ใต้ท้ายกระดาษทุกหน้า (สลิป: หนึ่งบรรทัดก่อน "ขอบคุณที่ใช้บริการ") ·
+            เวลา = <span class="mono text-[12px]">created_at</span> ของเอกสาร ตาม <span class="mono text-[12px]">TIMEZONE</span> ของ server · <span class="mono text-[12px]">locale: "th"</span> (ค่าเริ่มต้น) = ปี พ.ศ., <span class="mono text-[12px]">"en"</span> = ค.ศ. ·
+            ชื่อ = <span class="mono text-[12px]">full_name</span> ของ <span class="mono text-[12px]">created_by</span> จาก iam ณ เวลาพิมพ์ (ไม่มี → username → ว่าง) ·
+            snapshot อยู่ใน <span class="mono text-[12px]">document_prints.params.issued_at_display</span> / <span class="mono text-[12px]">issued_by_name</span> ·
+            <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — อัปโหลดต้นฉบับทั้ง 15 ไฟล์ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy (แถวที่ลูกค้าแก้เองให้ใส่บรรทัดนี้เข้าไปแทนการทับ — ดู <span class="mono text-[12px]">_README.md</span>)
+          </p>
+        </div>
         <div class="rulebox mb-4" id="pos-line-vat">
           <div class="rc mb-1">VAT รายบรรทัดบนบิล POS + backfill บิลเก่า (BE-09a · 2026-11-17)</div>
           <p class="text-[13.5px]">
@@ -2477,7 +2489,7 @@ sequenceDiagram
             <span class="mono text-[12px]">payment_lines[]</span> <span class="mono text-[12px]">{ method_th, method_en, reference, amount, label_th, label_en, line_th, line_en }</span> — <span class="mono text-[12px]">amount</span> คือเงินที่ยื่น, <span class="mono text-[12px]">label_th</span> = "บัตรเครดิต (APPROVAL-8842)", <span class="mono text-[12px]">line_th</span> = "บัตรเครดิต 300.00 (APPROVAL-8842)" · QR แสดง "พร้อมเพย์",
             <span class="mono text-[12px]">payment_totals[]</span> = "รับเงิน" + "เงินทอน" (<span class="mono text-[12px]">{ label_th, label_en, amount }</span>), <span class="mono text-[12px]">paid_amount</span>, <span class="mono text-[12px]">change_amount</span> — ใบที่ไม่ใช่ POS ได้ <span class="mono text-[12px]">[]</span> / <span class="mono text-[12px]">''</span> ทั้งหมด ·
             engine ไม่มีเงื่อนไข แต่ <span class="mono text-[12px]">&lt;template data-repeat="key"&gt;</span> วน array ไหนก็ได้ในทุก band (ไม่ใช่แค่ <span class="mono text-[12px]">items</span>) — ซ้อนกันไม่ได้ · หัวข้อว่างซ่อนด้วย CSS <span class="mono text-[12px]">.pay-heading:empty</span> ·
-            <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — ต้นฉบับ <span class="mono text-[12px]">receipt-slip.html</span> / <span class="mono text-[12px]">receipt-tax-invoice.html</span> ต้องอัปโหลดผ่าน <span class="mono text-[12px]">PATCH /report-bc/v1/print-templates/{id}</span> หลัง deploy (ดู <span class="mono text-[12px]">_README.md</span>) · ถ้าลูกค้าแก้แม่แบบไว้เอง ให้ใส่ส่วนนี้เข้าไปในของลูกค้า ไม่ทับ
+            <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — ต้นฉบับ <span class="mono text-[12px]">receipt-slip.html</span> / <span class="mono text-[12px]">receipt-tax-invoice.html</span> ต้องอัปโหลดผ่าน <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy (ดู <span class="mono text-[12px]">_README.md</span>) · ถ้าลูกค้าแก้แม่แบบไว้เอง ให้ใส่ส่วนนี้เข้าไปในของลูกค้า ไม่ทับ
           </p>
         </div>
         <div class="rulebox mb-4">

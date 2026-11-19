@@ -217,6 +217,19 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-19 · วันเวลาที่ทำรายการ + ผู้ทำรายการ บนใบพิมพ์ทุกใบ (BE-17, `feat/be-17-print-issued-at-by` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้นทั้ง 5 BC บน local (report-bc · sales-bc · finance-bc · inventory-bc · supplier-bc) · smoke ใหม่พิมพ์จริง 15/18 ประเภท (3 ประเภทไม่มีแถวบน local)**
+
+| | รายละเอียด |
+|---|---|
+| ทำไม | requirement 2026-11-18 ข้อ 5, 6 · ผู้ใช้ตัดสิน 2026-11-19: ใช้ `created_at`/`created_by` ทุกใบ · ประกอบที่ report-bc จุดเดียว · รวมใบสำคัญรับ/จ่าย ใบวางบิล เอกสารเครดิต · รูปแบบ `DD/MM/YYYY HH:mm` ตาม env `TIMEZONE` ปี พ.ศ. เมื่อ locale th (PDF สร้างที่ server FE แปลงไม่ได้) |
+| libs/common | `IPrintDocumentRequest.issued_at` / `issued_by` (optional) · `formatBusinessDateTime(value, locale)` ใน `business-date.util.ts` |
+| report-bc | `UsersProxyService` (iam `FindById`, cache 5 นาที, ไม่ throw: `full_name` → `username` → `''`) · `DocumentPrintsService` ถามชื่อ**ก่อน**เปิด transaction แล้ว merge `issued_at_display` / `issued_by_name` เป็นคีย์ของ server (BC ส่งทับไม่ได้) · แม่แบบ 15 ไฟล์: A4 บรรทัด `.ftr-issued` ใต้ท้ายกระดาษทั้งสอง page-footer band · สลิปหนึ่งบรรทัดก่อน "ขอบคุณ" |
+| BC ที่พิมพ์ | 15 จุดเรียก `printDocument` ส่ง `issued_at: x.created_at, issued_by: x.created_by` (sales 4 · supplier 1 · inventory 2 · finance 8) · ไม่ส่ง: งบการเงิน, ภ.พ.30, ทวิ 50 (ช่องว่าง) |
+| migration / สิทธิ์ | ไม่มี · body/response ของ endpoint พิมพ์ไม่เปลี่ยน |
+| test | libs/common +3 · report-bc +4 (พ.ศ./ค.ศ., ไม่ส่งไม่ถาม iam, BC ปลอมชื่อไม่ได้) · sales/finance/supplier ตรวจ payload `issued_at/issued_by` · smoke ใหม่ `report-bc/print-issued-caption` พิมพ์แถวล่าสุดของทุกประเภทผ่าน endpoint จริงแล้วเทียบ `document_prints.params` กับชื่อใน `erp_iam` · render-check PDF จริง (ใบเสนอราคา A4, สลิป, ใบสั่งซื้อ) |
+| trap ที่จ่ายไป | **route แก้แม่แบบคือ `PUT /print-templates/:id` ไม่ใช่ `PATCH`** — `_README.md` และ api-workflow-guide (BE-12b) เขียน PATCH ซึ่งตอบ 404 (แก้แล้ว) · แม่แบบ `receipt-tax-invoice` บน local ยังเป็นรุ่นก่อน BE-14 (ไม่เคยอัปโหลด) — ก่อนทับให้เทียบกับต้นฉบับทุกรุ่นใน git ไม่ใช่แค่รุ่นล่าสุด · smoke `supplier-name-en-nullable` ใช้ `unit_cost: 100` ตายตัวจนแดงเมื่อ PO ล่าสุดเป็นสินค้าราคาอื่น — เปลี่ยนเป็นราคาของบรรทัดที่คัดลอกมา |
+| หลัง deploy | อัปโหลดแม่แบบ 15 ไฟล์ (30 แถว `print_templates`) ด้วย `PUT` — แทนเฉพาะแถวที่ตรงกับต้นฉบับรุ่นใดรุ่นหนึ่งใน git · แถวที่ลูกค้าแก้เองให้ใส่บรรทัดเข้าไปแทนการทับ |
+
 ### 2026-11-19 · POS ขายเชื่อ: ตัดสต็อกทันที ใบกำกับเต็มรูป ตั้งลูกหนี้ (BE-16, `feat/be-16-pos-credit-sale` จาก main) ✅ **`pnpm verify sales-bc` + `pnpm verify finance-bc` ผ่านครบ 6 ขั้นบน local (smoke sales-bc 30/30 · finance-bc 28/28)**
 
 | | รายละเอียด |
