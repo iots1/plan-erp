@@ -2422,6 +2422,7 @@ sequenceDiagram
 <pre><span class="c">// POST /finance-bc/v1/receipts/{id}/print — body ว่างได้ ({}), ทุกฟิลด์ไม่บังคับ</span>
 {
   <span class="s">"locale"</span>: <span class="s">"th"</span>,                                          <span class="c">// "th" | "en" — ไม่ระบุ = "th"</span>
+  <span class="s">"timezone"</span>: <span class="s">"Asia/Bangkok"</span>,                              <span class="c">// IANA ของเครื่องผู้พิมพ์ (BE-17) — ไม่ระบุ = TIMEZONE ของ server · ชื่อผิด = 400</span>
   <span class="s">"idempotency_key"</span>: <span class="s">"b6e6c6b0-6b3e-4b3e-8b3e-6b3e4b3e8b3e"</span>,  <span class="c">// กันกดพิมพ์ซ้ำ (แนะนำให้ FE สุ่ม UUID ต่อการกดปุ่ม 1 ครั้ง)</span>
   <span class="s">"print_reason"</span>: <span class="k">null</span>,                                    <span class="c">// ใช้เมื่อพิมพ์ใบแทน (ยังไม่บังคับกรอกในเวอร์ชันนี้)</span>
   <span class="s">"format"</span>: <span class="s">"slip"</span>                                       <span class="c">// "slip" (80mm) | "a4" — ไม่ระบุ = "a4" · slip ได้เฉพาะ RECEIPT/ABB_TAX_INVOICE ไม่งั้น 400</span>
@@ -2458,9 +2459,9 @@ sequenceDiagram
         <div class="rulebox mb-4" id="print-issued-caption">
           <div class="rc mb-1">วันเวลาที่ทำรายการ + ผู้ทำรายการ บนใบพิมพ์ทุกใบ (BE-17 · 2026-11-19)</div>
           <p class="text-[13.5px]">
-            ทุก endpoint <span class="mono text-[12px]">POST …/{id}/print</span> ของเอกสารซื้อขาย (sales-bc, supplier-bc, inventory-bc, finance-bc) — <b>body และ response ไม่เปลี่ยน FE ไม่ต้องส่งอะไรเพิ่ม</b> ·
+            ทุก endpoint <span class="mono text-[12px]">POST …/{id}/print</span> ของเอกสารซื้อขาย (sales-bc, supplier-bc, inventory-bc, finance-bc) รับฟิลด์ใหม่ <span class="mono text-[12px]">timezone</span> (optional, IANA เช่น <span class="mono text-[12px]">"Asia/Bangkok"</span>) — <b>FE ควรส่ง <span class="mono text-[12px]">Intl.DateTimeFormat().resolvedOptions().timeZone</span> ทุกครั้ง</b> · ไม่ใช่ชื่อ IANA = <b>400</b> · response ไม่เปลี่ยน ·
             PDF มีบรรทัด "วันเวลาที่ทำรายการ / Issued at 18/11/2569 14:35 · ผู้ทำรายการ / Issued by สมชาย ใจดี" ใต้ท้ายกระดาษทุกหน้า (สลิป: หนึ่งบรรทัดก่อน "ขอบคุณที่ใช้บริการ") ·
-            เวลา = <span class="mono text-[12px]">created_at</span> ของเอกสาร ตาม <span class="mono text-[12px]">TIMEZONE</span> ของ server · <span class="mono text-[12px]">locale: "th"</span> (ค่าเริ่มต้น) = ปี พ.ศ., <span class="mono text-[12px]">"en"</span> = ค.ศ. ·
+            เวลา = <span class="mono text-[12px]">created_at</span> ของเอกสาร ตาม <span class="mono text-[12px]">timezone</span> ที่ส่งมา (ไม่ส่ง = <span class="mono text-[12px]">TIMEZONE</span> ของ server) · <span class="mono text-[12px]">locale: "th"</span> (ค่าเริ่มต้น) = ปี พ.ศ., <span class="mono text-[12px]">"en"</span> = ค.ศ. ·
             ชื่อ = <span class="mono text-[12px]">full_name</span> ของ <span class="mono text-[12px]">created_by</span> จาก iam ณ เวลาพิมพ์ (ไม่มี → username → ว่าง) ·
             snapshot อยู่ใน <span class="mono text-[12px]">document_prints.params.issued_at_display</span> / <span class="mono text-[12px]">issued_by_name</span> ·
             <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — อัปโหลดต้นฉบับทั้ง 15 ไฟล์ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy (แถวที่ลูกค้าแก้เองให้ใส่บรรทัดนี้เข้าไปแทนการทับ — ดู <span class="mono text-[12px]">_README.md</span>)
