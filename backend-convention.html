@@ -447,6 +447,11 @@ is_public: <span class="t">boolean</span>;</pre>
               <tr><td><span class="mono text-[12px]">POS_SALE_PENDING_STOCK_CUT</span></td><td>409</td><td>—</td><td>บิลพักยังมีสต็อกที่ตัดค้างจากการปิดบิลที่ล้ม — แก้ไม่ได้</td></tr>
               <tr><td><span class="mono text-[12px]">PERIOD_CLOSED</span></td><td>409</td><td><span class="mono text-[12px]">frozen_upto, document_date</span></td><td>ช่วงสต็อกปิดแล้ว (ISO instant)</td></tr>
               <tr><td><span class="mono text-[12px]">DOWNSTREAM_UNAVAILABLE</span></td><td>503</td><td><span class="mono text-[12px]">service</span></td><td>BC ปลายทางไม่ตอบ (<span class="mono text-[12px]">inventory-bc</span> / <span class="mono text-[12px]">finance-bc</span>)</td></tr>
+              <tr><td><span class="mono text-[12px]">CREDIT_TENDER_INVALID</span></td><td>400</td><td><span class="mono text-[12px]">reason, total?, deposit?, credit_amount?</span></td><td>รายการ CREDIT ของบิล POS ไม่ใช่ยอดคงเหลือหนึ่งก้อน — CREDIT ซ้ำ / มัดจำครบยอด / ยอดไม่ตรง (BE-16)</td></tr>
+              <tr><td><span class="mono text-[12px]">CREDIT_SALE_REQUIRES_FULL_TAX_INVOICE</span></td><td>400</td><td><span class="mono text-[12px]">document_type, customer_id</span></td><td>ขายเชื่อโดยไม่มีลูกค้าหรือไม่ใช่ใบกำกับเต็มรูป (BE-16)</td></tr>
+              <tr><td><span class="mono text-[12px]">CREDIT_SALE_FORBIDDEN</span></td><td>403</td><td><span class="mono text-[12px]">permission</span></td><td>ผู้ใช้ไม่มี <span class="mono text-[12px]">pos_sale:credit_sale</span> (BE-16)</td></tr>
+              <tr><td><span class="mono text-[12px]">CREDIT_LIMIT_EXCEEDED</span></td><td>409</td><td><span class="mono text-[12px]">enforcement, credit_limit, credit_exposure, credit_amount, projected_exposure, can_acknowledge</span></td><td>ขายเชื่อเกินวงเงิน ยังไม่มีอะไรขยับ — warn ส่งซ้ำพร้อม <span class="mono text-[12px]">is_credit_limit_acknowledged</span> ได้ (BE-16)</td></tr>
+              <tr><td><span class="mono text-[12px]">POS_SALE_INVOICE_STILL_COLLECTED</span></td><td>409</td><td><span class="mono text-[12px]">receipt_number, holders[]</span></td><td>void บิลขายเชื่อที่ใบกำกับมีรับชำระ/ใบวางบิล/ใบลดหนี้อ้างอยู่ — ยังไม่คืนของ (BE-16)</td></tr>
             </tbody>
           </table>
         </div>
