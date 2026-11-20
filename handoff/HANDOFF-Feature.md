@@ -217,6 +217,20 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-20 · คอลัมน์สินค้าเสีย/ไม่เสียภาษี + สรุปยอดสองกลุ่ม ในใบพิมพ์ (BE-20, `feat/be-20-print-vat-column` จาก main)
+
+| | รายละเอียด |
+|---|---|
+| ทำไม | requirement 2026-11-18 ข้อ 9, 10 · ตัดสิน 2026-11-20: สรุป **2 บรรทัด** (DB เก็บ 3 ถังเหมือนเดิม) · คอลัมน์ `7%` / `0%` / `ยกเว้น` · ใบส่งของคอลัมน์อย่างเดียว · ใบรับคืนเก็บ VAT ครบ · รายงานขายส่งยอดสองกลุ่มด้วย |
+| libs/common | `vat-group-print.util.ts` — `toVatLabelPrintParams()` (อัตราจาก snapshot ของบรรทัด, standard อัตรา 0 = ว่าง) + `toVatGroupPrintParams()` (ถังใด null = `-`) · ย้าย `prorateVatLine` / `summarizeProratedVat` (เดิม `summarizePurchaseVat`) จาก inventory-bc มา `prorated-vat.util.ts` เพราะ sales-bc ใช้ด้วย |
+| sales-bc | `pos_sales` ถังสามช่อง (ผลรวม `line_total` ตาม `vat_treatment` ที่ finance-bc คืน · null ระหว่าง HELD/COMPLETING) เขียนตอน create / complete / resolve และตอน line-VAT backfill · `sales_returns`/`sales_return_items` VAT เพื่อแสดง ปันจาก `delivery_note_items` · รายงานขาย `taxable_amount`/`non_taxable_amount` บน summary/periods/customers/staff · mapper ใบเสนอราคา/ใบสั่งขาย/ใบส่งของ/ใบรับคืน |
+| finance-bc · supplier-bc · inventory-bc | mapper ใบเสร็จ (ทุกแบบรวม slip), AP invoice, ใบสั่งซื้อ, ใบรับสินค้า, ใบคืนสินค้า ส่ง `row.vat_label` + `taxable_amount`/`non_taxable_amount` (ไม่มี schema ใหม่ — ถังมีอยู่แล้ว) |
+| report-bc | แม่แบบ 11 ไฟล์ A4 เพิ่มคอลัมน์ `.c-vat` (ใบส่งของคอลัมน์อย่างเดียว) + 2 แถวสรุป · `receipt-slip.html` 2 แถวสรุป · `_README.md` อัปเดต |
+| migration | `erp_sales` `SalesVatBuckets` — generate จาก entity (ตัด noise `customers_branch_type_enum` ของเครื่องนี้ออก) + backfill ข้อมูลในไฟล์เดียวกัน (SQL ข้อมูลล้วน อ่านแค่ตารางใน `erp_sales`): ใบรับคืนจากใบส่งของ, `pos_sales` จากบรรทัด · local: บิล POS 1,102 ใบได้ถัง ผลรวมเท่ากับ `net_amount` พอดี · ไม่มี permission ใหม่ |
+| test | libs/common +9 (label/group) · sales-bc +8 (ถัง POS 3, ใบรับคืนปัน VAT 2, รายงาน 1, print 4 ไฟล์) · finance/supplier/inventory print spec อัปเดต · smoke ใหม่ `sales-bc/sales-vat-groups` (SO → ส่งของ → ใบกำกับ → ใบรับคืน DRAFT → พิมพ์ทุกใบ → รายงาน → ถัง POS) · เติม assertion ใน print smoke เดิม 5 ไฟล์ |
+| trap ที่จ่ายไป | `"0%"` บน standard ของใบที่ไม่คิด VAT อ่านเป็นอัตราศูนย์ (ม.80/1) ทั้งที่ไม่ใช่ → พิมพ์ว่าง · ใบรับคืนบน DB local อ้างใบส่งของก่อน BE-09 ทั้งหมด (ไม่มี `vat_base`) → ได้ null ถูกต้อง smoke ต้องสร้างใบส่งของเอง |
+| หลัง deploy | 1) migration `erp_sales` รันเอง (backfill อยู่ในตัว) · 2) บิล POS ที่ยังไม่มี VAT รายบรรทัด: `POST /sales-bc/v1/pos-sale-line-vat-backfills` จน `remaining = 0` (เติมถังหัวบิลให้ด้วย) · 3) อัปโหลดแม่แบบ 12 ไฟล์ด้วย `PUT /print-templates/:id` (ดู `_README.md` ก่อนทับแถวที่ลูกค้าแก้) · 4) ถ้าจะแสดงยอดสองกลุ่มในหน้ารายงานขาย ต้องเปิดใบ frontend |
+
 ### 2026-11-19 · VAT ในใบสั่งซื้อ / ใบรับสินค้า / ใบคืนสินค้า — เก็บค่า + พิมพ์ (BE-19, `feat/be-19-purchase-vat` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้น supplier-bc · inventory-bc · report-bc บน local**
 
 | | รายละเอียด |
