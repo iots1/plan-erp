@@ -466,6 +466,17 @@ sequenceDiagram
             ใบพิมพ์ทั้งสามใช้แม่แบบใหม่ — <b>อัปโหลด <span class="mono text-[12px]">purchase-order.html</span>, <span class="mono text-[12px]">goods-receipt.html</span>, <span class="mono text-[12px]">purchase-return.html</span> ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy</b> (แถวที่ยังเป็นแม่แบบเก่าจะไม่แสดงแถว VAT)
           </p>
         </div>
+        <div class="rulebox mb-6" id="vat-groups">
+          <div class="rc mb-1">ยอดสินค้าเสีย / ไม่เสียภาษี (BE-20 · 2026-11-20) — response มีตัวเลขเพิ่ม request ไม่เปลี่ยน</div>
+          <p class="text-[13.5px]">
+            บิล POS (<span class="mono text-[12px]">GET /sales-bc/v1/pos-sales</span>, create / complete) มีหัวบิล <span class="mono text-[12px]">total_standard_vat_price</span> / <span class="mono text-[12px]">total_zero_vat_price</span> / <span class="mono text-[12px]">total_exempt_vat_price</span> (ยอดก่อน VAT · <b><span class="mono text-[12px]">null</span> = HELD/COMPLETING หรือบิลเก่าที่บรรทัดยังไม่มี VAT</b>) ·
+            ใบรับคืน (<span class="mono text-[12px]">/sales-bc/v1/sales-returns</span>) มีหัวใบ <span class="mono text-[12px]">vat_rate</span>, <span class="mono text-[12px]">net_amount</span>, ถังสามช่อง, <span class="mono text-[12px]">vat_amount</span>, <span class="mono text-[12px]">total_incl_vat</span> และบรรทัด <span class="mono text-[12px]">vat_treatment</span>, <span class="mono text-[12px]">vat_rate</span>, <span class="mono text-[12px]">vat_base</span>, <span class="mono text-[12px]">vat_amount</span>, <span class="mono text-[12px]">line_total_incl_vat</span> — ปันจากใบส่งของตามจำนวนที่คืน <b>เพื่อแสดง</b> (ยอดคืนเงินจริงคือใบลดหนี้) · <span class="mono text-[12px]">total</span> ไม่เปลี่ยน ·
+            "ยอดสินค้าไม่เสียภาษี" = <span class="mono text-[12px]">total_zero_vat_price</span> + <span class="mono text-[12px]">total_exempt_vat_price</span> (DB เก็บแยกเพราะเป็นคนละช่อง ภ.พ.30) ·
+            รายงานขาย <span class="mono text-[12px]">/sales-reports/summary|periods|customers|staff</span> เพิ่ม <span class="mono text-[12px]">taxable_amount</span> / <span class="mono text-[12px]">non_taxable_amount</span> (ก่อน VAT) — ถ้าทุกบรรทัดรู้ประเภทแล้วจะรวมเท่ากับ <span class="mono text-[12px]">net_amount</span> · ยังไม่มีใบ frontend ที่ใช้ค่านี้ ·
+            ใบพิมพ์: บรรทัดมี <span class="mono text-[12px]">row.vat_label</span> ("7%" / "0%" / "ยกเว้น") ทุกใบที่มีตารางสินค้ายกเว้น slip · ส่วนสรุปมี <span class="mono text-[12px]">taxable_amount</span> / <span class="mono text-[12px]">non_taxable_amount</span> ทุกใบที่มีเงินรวม slip (ใบส่งของมีแค่คอลัมน์) ·
+            <b>อัปโหลดแม่แบบ 12 ไฟล์ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy</b> (แถวที่ยังเป็นแม่แบบเก่าจะไม่แสดงคอลัมน์/แถวใหม่ — ไฟล์อยู่ใน <span class="mono text-[12px]">apps/report-bc/.../assets/templates/_README.md</span>)
+          </p>
+        </div>
         <div class="rulebox mb-8">
           <div class="rc mb-1">ส่วนลด · สี่โหมด · both = ลดรายการแล้วลดท้ายบิล (2026-10-27)</div>
           <p class="text-[13.5px]">
