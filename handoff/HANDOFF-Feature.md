@@ -217,6 +217,18 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-20 · หมายเหตุท้ายใบ ตั้งค่าได้ต่อประเภทเอกสาร (BE-21, `feat/be-21-document-footer-note` จาก main) ✅ **`pnpm verify report-bc` ครบ 6 ขั้นบน local**
+
+| | รายละเอียด |
+|---|---|
+| ทำไม | requirement 2026-11-18 ข้อ 13 — หมายเหตุหลายบรรทัด เลือกได้ว่าใบไหนแสดงอันไหน · ตัดสิน 2026-11-20: **ทางเลือก ก.** ตารางหมายเหตุ + ตารางเชื่อมหลายต่อหลาย (ไม่ใช่คอลัมน์บน `document_types`) |
+| report-bc | โมดูลใหม่ `document-footer-note`: `document_footer_notes` (`name`, `content_th/en`, `is_active`) + `document_type_footer_notes` (`sort_order`) · CRUD `/footer-notes` · `GET`/`PUT /document-types/:id/footer-notes` (แทนทั้งชุด, hard delete ลิงก์เก่าแบบ `payment_schedules`) · `DocumentPrintsService` ใส่ `footer_note` เอง (server ทับค่าที่ผู้เรียกส่ง) ตามภาษา — en ไม่มีใช้ไทย · หมายเหตุ inactive/ลบแล้วไม่พิมพ์ |
+| แม่แบบ | 15 ไฟล์ (ทุกใบที่มีบรรทัด BE-17 รวม slip) แถบ `.doc-footer-note` `white-space: pre-line` + `:empty` ซ่อน · A4 ใน summary band เหนือช่องลงนาม · slip เหนือ issued-line · ชื่อ class ไม่ใช่ `.footer-note` เพราะ slip ใช้ชื่อนั้นกับ "ขอบคุณที่ใช้บริการ" อยู่แล้ว · `_README.md` อัปเดต |
+| migration / สิทธิ์ | `erp_report` `AddDocumentFooterNotes` (generate จาก entity สร้าง 2 ตาราง + FK + partial unique) · สิทธิ์ใหม่ `document_footer_note:create|read|update|delete|assign` + UI `page:view_document_footer_note_settings` · superadmin ได้จาก `permissions:sync` · **ไม่มี grant migration รอบนี้** (กฎ deploy-order: ship สิทธิ์ก่อน grant รอบถัดไป) |
+| test | report-bc unit ใหม่ 8 (compose ลำดับ/ภาษา/inactive, replace/400/404) + print 3 · **`apps/report-bc/jest.config.js` เดิมไม่รัน `test/unit/**` เลย** (regex แค่ `src/`) — แก้ให้เหมือน BC อื่น (+ stub `@scalar` + `@apps/*`) ทำให้ spec เดิม 5 ไฟล์ที่ไม่เคยรันได้รันและผ่าน · smoke ใหม่ `report-bc/document-footer-notes` (สร้าง 2 หมายเหตุ → PUT ผูกกับประเภทของใบเสนอราคา → พิมพ์ใบเสนอราคา/ใบสั่งขาย/en/inactive → คืนค่าเดิม) · ทดลอง render PDF ผ่าน Gotenberg: ขึ้นบรรทัดถูก `<b>` พิมพ์เป็นตัวอักษร |
+| trap ที่จ่ายไป | heredoc python ที่มีภาษาไทยยาวพัง "Non-UTF-8" — เขียนไฟล์ด้วย Write แล้ว `python3 -I` · report-bc unit "ผ่าน" มาตลอดเพราะรันแค่ 1 suite |
+| หลัง deploy | 1) migration `erp_report` รันเอง · 2) อัปโหลดแม่แบบ 15 ไฟล์ด้วย `PUT /print-templates/:id` (ดู `_README.md` ก่อนทับแถวที่ลูกค้าแก้) · 3) grant สิทธิ์ `document_footer_note:*` + หน้า UI ให้ role อื่นด้วย migration ในรอบ deploy ถัดไป · แจ้ง FE-30 |
+
 ### 2026-11-20 · คอลัมน์สินค้าเสีย/ไม่เสียภาษี + สรุปยอดสองกลุ่ม ในใบพิมพ์ (BE-20, `feat/be-20-print-vat-column` จาก main)
 
 | | รายละเอียด |

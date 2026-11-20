@@ -2492,6 +2492,15 @@ sequenceDiagram
             <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — อัปโหลดต้นฉบับทั้ง 15 ไฟล์ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy (แถวที่ลูกค้าแก้เองให้ใส่บรรทัดนี้เข้าไปแทนการทับ — ดู <span class="mono text-[12px]">_README.md</span>)
           </p>
         </div>
+        <div class="rulebox mb-4" id="footer-notes">
+          <div class="rc mb-1">หมายเหตุท้ายใบ ตั้งค่าได้ต่อประเภทเอกสาร (BE-21 · 2026-11-20)</div>
+          <p class="text-[13.5px]">
+            <b>สร้างหมายเหตุ</b> <span class="mono text-[12px]">POST /report-bc/v1/footer-notes</span> <span class="mono text-[12px]">{ name, content_th, content_en?, is_active? }</span> — <span class="mono text-[12px]">content_*</span> เป็นข้อความล้วน ขึ้นบรรทัดด้วย <span class="mono text-[12px]">\n</span> ได้ (ยาวสุด 2,000 ตัวอักษร) · response มี <span class="mono text-[12px]">content: { th, en }</span> · ดูว่าผูกกับใบไหนด้วย <span class="mono text-[12px]">?relations=document_type_links.document_type</span> ·
+            <b>ผูกกับประเภทเอกสาร</b> <span class="mono text-[12px]">PUT /report-bc/v1/document-types/{id}/footer-notes</span> <span class="mono text-[12px]">{ footer_note_ids: [...] }</span> — แทนที่ทั้งชุด ลำดับในอาร์เรย์ = ลำดับที่พิมพ์ · <span class="mono text-[12px]">[]</span> = เลิกพิมพ์ · id ที่ไม่มี/ถูกลบ → 400 และไม่เปลี่ยนอะไร · <span class="mono text-[12px]">GET</span> path เดียวกันคืนชุดปัจจุบัน (แต่ละแถวมี <span class="mono text-[12px]">footer_note</span> ฝังมา) ·
+            <b>ตอนพิมพ์</b> ไม่ต้องส่งอะไรเพิ่ม — report-bc ใส่ <span class="mono text-[12px]">footer_note</span> เองตามประเภทเอกสาร (หมายเหตุที่ <span class="mono text-[12px]">is_active = false</span> หรือถูกลบไม่พิมพ์ · ใบ <span class="mono text-[12px]">locale: "en"</span> ใช้ <span class="mono text-[12px]">content_en</span> ถ้ามี ไม่มีใช้ภาษาไทย) · snapshot อยู่ใน <span class="mono text-[12px]">document_prints.params.footer_note</span> ·
+            <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — อัปโหลดต้นฉบับ 15 ไฟล์ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy (ดู <span class="mono text-[12px]">_README.md</span> ก่อนทับแถวที่ลูกค้าแก้)
+          </p>
+        </div>
         <div class="rulebox mb-4" id="pos-line-vat">
           <div class="rc mb-1">VAT รายบรรทัดบนบิล POS + backfill บิลเก่า (BE-09a · 2026-11-17)</div>
           <p class="text-[13.5px]">
@@ -2545,6 +2554,8 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">POST /report-bc/v1/print-templates/{id}/render</td><td class="mono text-[11px]">report:print_template_render</td><td><b>สร้าง PDF</b> จาก <span class="mono text-[12px]">params</span> ที่ผู้เรียกส่งมาเอง</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/document-types</td><td class="mono text-[11px]">report:document_type_read</td><td>ประเภทเอกสาร + รูปแบบเลขรัน — ครบทั้ง 25 เอกสารในระบบแล้ว (2026-09-06)</td></tr>
               <tr><td class="mono text-[11.5px]">POST /report-bc/v1/document-types/{id}/running-number/next</td><td class="mono text-[11px]">report:document_type_running_number_generate</td><td>ขอเลขรันถัดไป</td></tr>
+              <tr><td class="mono text-[11.5px]">GET|POST /report-bc/v1/footer-notes</td><td class="mono text-[11px]">document_footer_note:read|create</td><td>หมายเหตุท้ายใบ (BE-21) — ดูกล่อง <a href="#footer-notes" style="color:var(--blueprint);text-decoration:underline">หมายเหตุท้ายใบ</a></td></tr>
+              <tr><td class="mono text-[11.5px]">PUT /report-bc/v1/document-types/{id}/footer-notes</td><td class="mono text-[11px]">document_footer_note:assign</td><td>กำหนดหมายเหตุที่ประเภทเอกสารนี้พิมพ์ ทั้งชุด ตามลำดับ</td></tr>
               <tr><td class="mono text-[11.5px]">GET /report-bc/v1/print-template-histories</td><td class="mono text-[11px]">report:print_template_history_read</td><td>ประวัติเวอร์ชันเทมเพลต</td></tr>
             </tbody>
           </table>
@@ -3158,6 +3169,13 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}</td><td class="mono text-[11px]">report:document_type_update</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}/running-number</td><td class="mono text-[11px]">report:document_type_running_number_read</td></tr>
               <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}/running-number/next</td><td class="mono text-[11px]">report:document_type_running_number_generate</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}/footer-notes</td><td class="mono text-[11px]">document_footer_note:read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/report-bc/v1/document-types/{id}/footer-notes</td><td class="mono text-[11px]">document_footer_note:assign</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/footer-notes</td><td class="mono text-[11px]">document_footer_note:read</td></tr>
+              <tr><td class="mono text-[11.5px]">POST</td><td class="mono text-[11.5px]">/report-bc/v1/footer-notes</td><td class="mono text-[11px]">document_footer_note:create</td></tr>
+              <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/footer-notes/{id}</td><td class="mono text-[11px]">document_footer_note:read</td></tr>
+              <tr><td class="mono text-[11.5px]">PUT</td><td class="mono text-[11.5px]">/report-bc/v1/footer-notes/{id}</td><td class="mono text-[11px]">document_footer_note:update</td></tr>
+              <tr><td class="mono text-[11.5px]">DELETE</td><td class="mono text-[11.5px]">/report-bc/v1/footer-notes/{id}</td><td class="mono text-[11px]">document_footer_note:delete</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/print-template-histories</td><td class="mono text-[11px]">report:print_template_history_read</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/print-template-histories/{id}</td><td class="mono text-[11px]">report:print_template_history_read</td></tr>
               <tr><td class="mono text-[11.5px]">GET</td><td class="mono text-[11.5px]">/report-bc/v1/print-templates</td><td class="mono text-[11px]">report:print_template_read</td></tr>
