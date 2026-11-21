@@ -821,7 +821,7 @@ sequenceDiagram
           <h5 class="font-semibold mb-3 text-[14px]" style="color:var(--ink)">B.4 · Base Entity — audit + soft-delete (ทุกตารางสืบทอด)</h5>
           <p class="text-[13px] mb-3" style="color:var(--ink-soft)">ทุก entity ในทุก BC <b>สืบทอด <span class="mono text-[12px]">BaseEntity</span></b> จึงได้ <span class="mono text-[12px]">id</span> + audit (<span class="mono text-[12px]">created_at/by · updated_at/by</span>) + soft-delete (<span class="mono text-[12px]">is_deleted · deleted_reason · deleted_at · deleted_by</span>) โดยไม่ต้องประกาศซ้ำ — คอลัมน์ทั้งหมดเป็น snake_case</p>
           <pre class="code p-4 mb-4"><span class="k">export abstract class</span> <span class="t">BaseEntity</span> <span class="k">implements</span> <span class="t">ITimestamp</span> {
-  <span class="d">@PrimaryGeneratedColumn</span>(<span class="s">'uuid'</span>, { comment: <span class="s">'รหัสอ้างอิงหลัก'</span> })  id: <span class="t">string</span>;
+  <span class="d">@PrimaryColumn</span>({ type: <span class="s">'uuid'</span>, default: () =&gt; <span class="s">'uuidv7()'</span>, comment: <span class="s">'รหัสอ้างอิงหลัก'</span> })  id: <span class="t">string</span>;  <span class="c">// UUID v7 ที่ Postgres 18 สร้าง</span>
   <span class="d">@CreateDateColumn</span>({ type: <span class="s">'timestamptz'</span> })  created_at: <span class="t">Date</span>;
   <span class="d">@Column</span>({ type: <span class="s">'uuid'</span>, nullable: <span class="k">true</span> })   created_by: <span class="t">string</span>;
   <span class="d">@UpdateDateColumn</span>({ type: <span class="s">'timestamptz'</span> })  updated_at: <span class="t">Date</span>;

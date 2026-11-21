@@ -137,7 +137,8 @@
         <div class="code p-5 mb-4">
 <pre><span class="d">@Entity</span>(<span class="s">'goods_receipts'</span>)
 <span class="k">export class</span> <span class="t">GoodsReceipt</span> {
-  <span class="d">@PrimaryGeneratedColumn</span>(<span class="s">'uuid'</span>)  id: <span class="t">string</span>;
+  <span class="c">// จริง ๆ id มาจาก BaseEntity: @PrimaryColumn({ type: 'uuid', default: () => 'uuidv7()' })</span>
+  id: <span class="t">string</span>;
   <span class="c">// snake_case → ไม่ต้องใส่ @Column({ name: '...' })</span>
   <span class="d">@Column</span>()  po_id: <span class="t">string</span>;
   <span class="d">@Column</span>()  supplier_id: <span class="t">string</span>;
@@ -227,7 +228,7 @@ is_public: <span class="t">boolean</span>;</pre>
         <div class="eyebrow text-[var(--muted)] mb-3">ตัวอย่าง · DDL ตาม convention</div>
         <div class="code p-5">
 <pre><span class="k">CREATE TABLE</span> goods_receipts (
-  id            <span class="t">uuid</span> <span class="k">DEFAULT</span> gen_random_uuid(),
+  id            <span class="t">uuid</span> <span class="k">NOT NULL DEFAULT</span> uuidv7(),   <span class="c">-- UUID v7 (PostgreSQL 18+)</span>
   po_id         <span class="t">uuid</span> <span class="k">NOT NULL</span>,          <span class="c">-- FK → supplier-bc (ข้าม BC = UUID เท่านั้น)</span>
   warehouse_id  <span class="t">uuid</span> <span class="k">NOT NULL</span>,
   status        <span class="t">varchar</span> <span class="k">NOT NULL</span>,
@@ -742,7 +743,7 @@ microserviceInstance.useGlobalInterceptors(
         <div class="eyebrow text-[var(--muted)] mb-3">BaseEntity · ทุก entity ที่ persist ต้อง extend</div>
         <div class="code p-5 mb-4">
 <pre><span class="k">export abstract class</span> <span class="t">BaseEntity</span> {
-  id: <span class="t">string</span>;               <span class="c">// @PrimaryGeneratedColumn('uuid')</span>
+  id: <span class="t">string</span>;               <span class="c">// @PrimaryColumn({ type: 'uuid', default: () =&gt; 'uuidv7()' })</span>
   created_at: <span class="t">Date</span>;         <span class="c">// @CreateDateColumn timestamptz</span>
   created_by: <span class="t">string</span> | <span class="k">null</span>;
   updated_at: <span class="t">Date</span>;         <span class="c">// @UpdateDateColumn timestamptz</span>
@@ -753,6 +754,11 @@ microserviceInstance.useGlobalInterceptors(
   deleted_by: <span class="t">string</span> | <span class="k">null</span>;
 }</pre>
         </div>
+        <div class="rulebox mb-4"><div class="rc mb-1">RULE · primary key = UUID v7 ที่ Postgres สร้าง · ต้องใช้ PostgreSQL 18+ (2026-11-21)</div><p class="text-[13.5px]">
+          <span class="mono text-[12px]">BaseEntity.id</span> เป็น <span class="mono text-[12px]">@PrimaryColumn({ type: 'uuid', default: () =&gt; 'uuidv7()' })</span> — คอลัมน์ <span class="mono text-[12px]">id</span> ทุกตารางมี <span class="mono text-[12px]">DEFAULT uuidv7()</span> (ฟังก์ชัน built-in ของ <b>PostgreSQL 18</b> ไม่ต้องลง extension) · v7 เรียงตามเวลา จึงแทรก B-tree ของ PK ท้ายดัชนีแทนที่จะกระจายแบบสุ่มอย่าง v4 · TypeORM อ่าน id กลับมาด้วย <span class="mono text-[12px]">RETURNING</span> หลัง <span class="mono text-[12px]">save()</span>/<span class="mono text-[12px]">insert()</span>
+          <br><b>สร้างใน DB ไม่ใช่ใน Node:</b> ห้ามใช้ <span class="mono text-[12px]">@BeforeInsert</span> สร้าง id — <span class="mono text-[12px]">insert().values()</span> และ raw SQL (seeders) ข้าม entity listener แล้วจะชน NOT NULL · โค้ดที่ต้องรู้ id ก่อน insert (เช่น key ของไฟล์ใน storage หรือ idempotency key ของบรรทัด POS) ให้ใช้ <span class="mono text-[12px]">v7()</span> จาก <span class="mono text-[12px]">uuid</span> ไม่ใช่ <span class="mono text-[12px]">randomUUID()</span> · id แบบ v4 ที่มีอยู่แล้วยังใช้ได้ตามเดิม (คอลัมน์ยังเป็น <span class="mono text-[12px]">uuid</span>) · migration เก่ายังเรียก <span class="mono text-[12px]">uuid_generate_v4()</span> จึงยังต้องมี extension <span class="mono text-[12px]">uuid-ossp</span> บน database ใหม่
+          <br><b>DTO ห้ามล็อกเวอร์ชัน:</b> <span class="mono text-[12px]">@IsUUID('4')</span> ปฏิเสธ id v7 ทุกตัวด้วย 400 — ใช้ <span class="mono text-[12px]">@IsUUID()</span> / <span class="mono text-[12px]">@IsUUID('all', { each: true })</span> (7 DTO ที่เคยล็อก v4 แก้แล้ว 2026-11-21)
+        </p></div>
         <div class="rulebox mb-4"><div class="rc mb-1">RULE · base operations เป็น single source of truth แม้อยู่ใน transaction (2026-09-27)</div><p class="text-[13.5px]">
           ทุก method ของ <span class="mono text-[12px]">BaseServiceOperations</span> รับ <span class="mono text-[12px]">manager?: EntityManager</span> เป็นพารามิเตอร์สุดท้าย — <span class="mono text-[12px]">findById / findByIdOrNull / create / update / delete</span> · ส่ง manager มาจะทำงานใน transaction ของผู้เรียก (แบบเดียวกับ <span class="mono text-[12px]">*-number.service.ts</span>) · เขียนข้อมูลภายในที่มีคอลัมน์นอก DTO (เลขเอกสาร, สถานะ, snapshot, <span class="mono text-[12px]">lft/rgt</span>) ใช้ <span class="mono text-[12px]">this.createEntity(payload, user, manager)</span> / <span class="mono text-[12px]">this.updateEntity(id, patch, user, manager)</span> (protected, typed <span class="mono text-[12px]">DeepPartial&lt;Entity&gt;</span>) แทนการ cast เป็น DTO
           <br><b>ที่ยังเขียนเองได้:</b> read ที่ต้อง <span class="mono text-[12px]">lock: pessimistic_write</span> (<span class="mono text-[12px]">loadLocked*</span>) และ status transition ที่แก้ row ที่ล็อกไว้แล้ว save · ห้ามใส่ child collection (<span class="mono text-[12px]">items</span>) ใน patch ของ <span class="mono text-[12px]">updateEntity</span> ถ้าไม่ต้องการ child diffing ของ base · ใน override ของ create/update ให้เรียก <span class="mono text-[12px]">super.*</span> หรือ helper — ห้าม <span class="mono text-[12px]">this.create()</span> (recursion)

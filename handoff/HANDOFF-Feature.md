@@ -217,6 +217,22 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-21 · Primary key ทุกตารางเป็น UUID v7 (`uuidv7()` ของ PostgreSQL 18) ✅ **migrate 7 DB บน dev · `pnpm verify` ครบ 6 ขั้นเขียวทั้ง 7 BC (auth · iam · inventory · supplier · sales · finance · report) + storage 5 ขั้น (ไม่มีไฟล์ smoke) · push ขึ้น main**
+
+| | |
+|---|---|
+| ทำไม | ผู้ใช้สั่ง 2026-11-21 — v7 เรียงตามเวลา แทรก B-tree ของ PK ต่อท้ายแทนการกระจายแบบสุ่มของ v4 · migration `EnableUuidV7Extension` (erp_iam / erp_auth) ชื่อชวนเข้าใจผิด — มันแค่ `CREATE EXTENSION pgcrypto` ไม่เคยมีการใช้ v7 จริง |
+| entity | `BaseEntity.id` จาก `@PrimaryGeneratedColumn('uuid')` (= `DEFAULT uuid_generate_v4()`) เป็น `@PrimaryColumn({ type: 'uuid', default: () => 'uuidv7()', comment: 'รหัสอ้างอิงหลัก' })` · **สร้าง id ใน DB ไม่ใช่ใน Node** — `insert().values()` และ raw SQL (seeders) ข้าม `@BeforeInsert` แล้วจะชน NOT NULL · TypeORM อ่าน id กลับด้วย `RETURNING` เหมือนเดิม · TypeORM อ่าน `uuidv7()` เป็น default ธรรมดา (นับเป็น "generated" แค่ `gen_random_uuid()`/`uuid_generate_v*()`) จึงไม่มี diff วนซ้ำหลัง migrate |
+| migration | `UseUuidV7PrimaryKeys` ทั้ง 7 DB (auth 5 ตาราง · iam 12 · inventory 42 · supplier 10 · sales 25 · finance 42 · report 12) — generate แล้วใช้ตามที่ generator ออกมา **ไม่แก้ SQL** (ผู้ใช้ตัดสิน 2026-11-21) รวม FK drop/re-add และ enum rebuild ด้านล่าง · `down()` คืน `uuid_generate_v4()` |
+| id ที่สร้างฝั่งแอป | เปลี่ยนเป็น `v7()` จาก `uuid` เฉพาะ PK ที่ต้องรู้ก่อน insert: `products.service.ts` (id สินค้า ใช้เป็น path รูปใน storage) · `print-templates.service.ts` (id แม่แบบ ใช้เป็น path ไฟล์) · `pos-sales.service.ts` (id บรรทัดบิล = idempotency key ของการตัดสต็อก + rekey) · `pos-returns.service.ts` (id บรรทัดรับคืน) · `delivery-notes.service.ts` (rekey บรรทัด) · seeders 15 ไฟล์ · **คงไว้ที่ v4**: `jti` ของ auth, `journal_id` ของ GL (ไม่ใช่ PK), `id` ใน response ของการพิมพ์, ชื่อไฟล์/object key, trace/span id |
+| DTO ที่ล็อก v4 | **7 DTO ใช้ `@IsUUID('4')` ซึ่งปฏิเสธ id v7 ทุกตัวด้วย 400** — เจอจาก smoke `master-data-delete-guards` (`generate-variants`: "each value in value_ids must be a UUID") · แก้เป็น `@IsUUID('all', …)` / `@IsUUID()` เหมือนอีก 138 จุด: `set-credential` (auth) · `attach-policy` / `assign-role` / `set-statements` / `attach-access-key-policy` (iam) · `generate-variants` (inventory) · `replace-document-type-footer-notes` (report) · ไม่แก้ก่อน deploy = ผูก role/policy/สิทธิ์ให้ user ใหม่ไม่ได้ · smoke ใหม่ `iam/uuid-v7-ids` (role + policy ใหม่ได้ id v7 แล้ว `PUT /roles/:id/policies` ด้วย id v7 → 204) · `ParseUuidParamPipe` ใช้ `isUUID(value)` ไม่ระบุเวอร์ชันอยู่แล้ว |
+| **ต้องมี PostgreSQL 18+** | `uuidv7()` เป็น built-in ของ PG 18 — dev/prod เป็น 18.4 และ `infra-erp/docker-compose.yml` ใช้ `postgres:18` อยู่แล้ว · CI ไม่มี Postgres จึงไม่กระทบ · installer ต้องเช็กเวอร์ชันก่อน migrate |
+| ข้อมูลเดิม | id v4 ที่มีอยู่ใช้ได้เหมือนเดิม (คอลัมน์ยังเป็น `uuid`) — แค่แถวใหม่ได้ v7 · migration เก่ายังเรียก `uuid_generate_v4()` ตอน `CREATE TABLE` **database ใหม่จึงยังต้องมี extension `uuid-ossp`** |
+| หลักฐาน | ทุกแถวที่สร้างหลัง migrate ใน 7 DB เป็น v7 (ตัวอักษร hex ตัวที่ 13 = `7`) รวม id ที่แอปสร้างเอง (`pos_return_items`, สินค้า): auth 84 · iam 16 · inventory 1494 · supplier 72 · sales 654 · finance 3564 · report 386 แถว **ไม่มี v4 สักแถว** · smoke ใหม่ `iam/uuid-v7-ids` ผ่าน |
+| fixture บน dev (ผู้ใช้อนุมัติ 2026-11-21) | DB dev ว่างหลังล้าง 2026-11-20 ทำให้ smoke ที่ "ยืมเอกสาร" แดง 23 suite ใน 5 BC — สร้างผ่าน API จริง (ไม่ insert ตรง) และ**ทิ้งไว้ให้ smoke ยืม**: ผู้ขาย `FIXTURE-S-MWQ5F3JU` · `PO-2026-00007` (approve + send) → `GRN-2026-00001` SUBMITTED (60 × 150 + 40 × 120) → `APINV-2026-00001` SUBMITTED · ลูกค้า `FIXTURE-C-MWQ5FI6S` · `QT-2026-00007` APPROVED → `SO-2026-00001` → `DN-2026-00001` SUBMITTED (ออก `INV-2026-00019` อัตโนมัติ) · คุณลักษณะ `FIXTURE ขนาด …` + ค่า เล็ก/ใหญ่ · ลงทะเบียน `print_templates` + `document_types` `pos_credit_note` (receipt-adjustment.html, A4) และ `pos_credit_note_slip` (pos-credit-note-slip.html, Roll80) ตาม `_README.md` — งานหลัง deploy ข้อ (3) ของ BE-07 จึงเสร็จแล้วบน DB นี้ |
+| verify บนเครื่องที่มี installer รันอยู่ | installer build ยึดพอร์ต 3001–3008 → รัน verify ด้วย `*_MODULE_HTTP_PORT=1300x` / `*_MODULE_MICROSERVICE_PORT=1400x` (ดู trap ข้อ 3 ด้านล่าง) |
+| trap ที่เจอ | (1) **เปลี่ยนแค่ default ของ PK ทำให้ TypeORM drop + re-add ทุก FK ที่ชี้มาที่คอลัมน์นั้น** (`RdbmsSchemaBuilder.updateExistColumns()` ทำกับทุกคอลัมน์ที่ "เปลี่ยน" ไม่ว่าเปลี่ยนอะไร) — รอบนี้ 130 FK · เทียบกับ `pg_get_constraintdef` แล้วนิยามตรงกันทุกตัว (ต่างแค่ลำดับ `ON DELETE`/`ON UPDATE` ใน iam 4 ตัว) · ไม่เปลี่ยน schema แต่ต้อง lock + validate FK ใหม่ทุกตัวตอน migrate (2) generator ของ sales / finance **ยัง rebuild `customers_branch_type_enum` / `receipts_customer_branch_type_enum` ทุกครั้ง** ทั้งที่ค่าใน DB ตรงแล้ว (`{head_office, branch}`) — `DecimalQuantities` / `AddDeliveryNoteInvoicing` / `PosPartialReturn` ตัดบรรทัดเหล่านี้ทิ้งด้วยมือ รอบนี้ปล่อยไว้ (no-op แต่ rewrite ตาราง `customers` / `receipts`) · ต้นเหตุใน entity ยังไม่แก้ — issue #47 (`iotechsoft-company/erp-api`) — ลบ `enumName` ที่ซ้ำกับชื่อ default ออกจาก entity ทั้งสอง (3) `pnpm verify` **adopt service ที่รันอยู่แล้วบนพอร์ตเดียวกัน** แม้เป็นของโปรเจกต์อื่น (installer build รันอยู่บน 3001–3008 ต่อ DB อื่น → login 401) — override `*_MODULE_HTTP_PORT` / `*_MODULE_MICROSERVICE_PORT` ใน shell ได้ เพราะ `loadEnv()` ให้ `process.env` ทับ `.env` |
+
 ### 2026-11-20 · รับคืนสินค้าบางส่วนจากบิล POS + ใบลดหนี้ + คืนเงิน (BE-07, `feat/be-07-pos-partial-return` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้นทั้ง 4 BC บน local (sales-bc · finance-bc · inventory-bc · report-bc)**
 
 | | |
@@ -2890,6 +2906,13 @@ curl -s -X POST https://erp-api.<domain>/auth/v1/auth/login \
     `@Type(() => Boolean)` / `Boolean(x)` / `!!x` ด้วย `no-restricted-syntax` และเปิด `eqeqeq: 'always'` (ไม่ยกเว้น `== null`
     — ของเก่ามีแค่ 14 จุด แก้หมดแล้ว) · DTO ใช้ `@Transform(toBoolean)` · เขียน `x != null` ใหม่เป็น `x !== null`
     **ไม่ใช่การแก้** — ปล่อย `undefined` ผ่าน · กฎเต็ม: `.claude/rules/naming-and-code-style.md`
+
+30. **(จาก 2026-11-21) เปลี่ยนแค่ `default` ของ primary key → `migration:generate` drop แล้ว add ทุก FK ที่ชี้มาที่มัน** —
+    `RdbmsSchemaBuilder.updateExistColumns()` ของ TypeORM 0.3.x ถอด FK ที่อ้างคอลัมน์ที่ "เปลี่ยน" ทุกตัวก่อนแก้คอลัมน์ ไม่ดูว่าเปลี่ยนอะไร
+    (`UseUuidV7PrimaryKeys` จึงมี FK drop/re-add 130 ตัวจากการเปลี่ยน default เป็น `uuidv7()` อย่างเดียว) · ไม่ใช่ drift — เทียบนิยามที่ re-add
+    กับ `pg_get_constraintdef` ก่อนรันทุกครั้ง แล้วรู้ไว้ว่า migrate จะ lock + validate FK ใหม่ทั้งชุด · generate ใน sales / finance ยังพ่วง rebuild
+    enum `*branch_type_enum` มาทุกครั้ง (drift เดิม ดูรายการ 2026-11-21 ใน §2) · และ PK ตอนนี้คือ `DEFAULT uuidv7()` = **ต้อง PostgreSQL 18+**
+    · **ห้ามใช้ `@IsUUID('4')`** กับ id ของระบบ — id ใหม่เป็น v7 จะโดน 400 ทั้งหมด ใช้ `@IsUUID()` / `@IsUUID('all', { each: true })`
 
 ---
 
