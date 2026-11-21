@@ -27,6 +27,7 @@
 | [Pgpool Access Control Hardening](https://iots1.github.io/plan-erp/pgpool-access-control-hardening.html) | `pool_hba.conf` Hardening · Least-Privilege Role |
 | [HA &amp; Failover Operations Guide](https://iots1.github.io/plan-erp/ha-failover-operations-guide.html) | เครื่องไหนดับแล้วเกิดอะไร · Triage สำหรับ Junior |
 | [Deployment Guide](https://iots1.github.io/plan-erp/deployment-guide.html) | On-Premise · Docker Compose · Kong · Cloudflare Tunnel |
+| [ERP Installer Guide](https://iots1.github.io/plan-erp/erp-installer-guide.html) | On-Premise ไม่ใช้ Docker · Release อัตโนมัติจาก push → ERP Console → เครื่องลูกค้า · ใครทำอะไร |
 | [IAM Policy Engine](https://iots1.github.io/plan-erp/iam-policy-engine-guide.html) | Core Invariant · API Contract · Defect Log |
 | [Incident Runbook](https://iots1.github.io/plan-erp/runbook.html) | Symptom → Diagnosis → Fix → Verify |
 | [Runbook · Pgpool Nodes Down](https://iots1.github.io/plan-erp/runbook-pgpool-nodes-down.html) | Backend node ของ Pgpool ดับพร้อมกันหมด — Diagnosis → Fix → Verify |
