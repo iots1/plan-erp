@@ -32,11 +32,12 @@
       <a href="#pipeline"  class="navlink"><span class="n">03</span> Workflow: dev → เครื่องลูกค้า</a>
       <a href="#release"   class="navlink"><span class="n">04</span> ไฟล์ release (.tar.gz)</a>
       <a href="#onsite"    class="navlink"><span class="n">05</span> ติดตั้งครั้งแรกที่หน้างาน</a>
-      <a href="#update"    class="navlink"><span class="n">06</span> อัปเดต · ย้อนกลับ</a>
+      <a href="#update"    class="navlink"><span class="n">06</span> อัปเดต · ย้อนกลับ · DB</a>
       <a href="#machine"   class="navlink"><span class="n">07</span> บนเครื่องลูกค้ามีอะไรรันอยู่</a>
       <a href="#console"   class="navlink"><span class="n">08</span> ERP Console</a>
       <a href="#roles"     class="navlink"><span class="n">09</span> ใครทำอะไร</a>
       <a href="#pitfalls"  class="navlink"><span class="n">10</span> กับดักที่เจอมาแล้ว</a>
+      <a href="#security"  class="navlink"><span class="n">11</span> ความปลอดภัยบนเครื่องลูกค้า</a>
     </nav>
     <div slot="footnote">
       <a href="deployment-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← Deployment Guide (Kong / Docker)</a>
@@ -53,7 +54,7 @@
         <a href="index.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
           ← กลับสู่สารบัญเอกสาร
         </a>
-        <div class="eyebrow text-[#7FE3DE] mb-5">ERP Installer Guide · On-Premise ไม่ใช้ Docker</div>
+        <div class="eyebrow text-[#7FE3DE] mb-5">ERP Installer Guide · On-Premise · ERP บน PM2 · infra ใน Docker (WSL2)</div>
         <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
           จาก <span class="text-[#7FE3DE]">git push</span><br>
           ถึงเครื่องลูกค้าในปุ่มเดียว
@@ -61,12 +62,14 @@
         <p class="mt-6 text-[15.5px] text-[#C6D4EA] max-w-2xl leading-relaxed">
           <span class="mono text-[13px]">erp-installer</span> รวม erp-api + erp-frontend เป็นไฟล์ release เดียว
           แล้วติดตั้ง / อัปเดต / ย้อนกลับบนเครื่องลูกค้า <b>Windows · macOS · Ubuntu</b> ด้วย PM2 + Caddy
-          พร้อมหน้าควบคุม (ERP Console) สำหรับคนดูแลหน้างานที่ไม่ใช่ developer
+          พร้อมหน้าควบคุม (ERP Console) สำหรับคนดูแลหน้างานที่ไม่ใช่ developer ·
+          Redis / RabbitMQ / RustFS / Gotenberg ลงด้วยสคริปต์เดียวเป็น Docker stack
         </p>
         <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>Windows 11: ติดตั้ง · migrate · อัปเดตจาก Console ผ่านบนเครื่องลูกค้าจริง</span>
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>macOS: ทดสอบจริงครบวงจร</span>
           <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>Release CI: build + publish อัตโนมัติ</span>
-          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#F59E0B"></span>Windows / Ubuntu: ยังไม่ได้ทดสอบบนเครื่องจริง</span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#F59E0B"></span>ยังไม่ทดสอบ: Ubuntu · Windows autostart ตอนบูต · สคริปต์ client</span>
         </div>
       </div>
     </header>
@@ -80,7 +83,8 @@
           ที่แตกไว้ใน <span class="mono text-[12px]">&lt;home&gt;/releases/&lt;version&gt;</span> ·
           ทีม dev แค่ <b class="text-[var(--ink)]">push <span class="mono text-[12px]">main</span></b> ของ erp-api / erp-frontend → CI ของ erp-installer build release ให้เอง ·
           คนดูแลหน้างานกด <b class="text-[var(--ink)]">Sync → ติดตั้ง</b> ใน ERP Console — การติดตั้ง<b class="text-[var(--ink)]">รัน migration กับ DB ของลูกค้า</b>
-          และ<b class="text-[var(--ink)]">ไม่ย้อน migration</b> เมื่อ rollback
+          และ<b class="text-[var(--ink)]">ไม่ย้อน migration</b> เมื่อ rollback ·
+          บน Windows <b class="text-[var(--ink)]">สั่ง <span class="mono text-[12px]">erp</span> จาก PowerShell เท่านั้น</b> (ไม่ใช่ Git Bash — §10)
         </p>
       </div>
 
@@ -89,19 +93,22 @@
         <div class="eyebrow text-[var(--accent)] mb-3">01 — หน้าที่</div>
         <h2 class="display text-3xl mb-6">erp-installer มีหน้าที่อะไร</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-8 leading-[1.85]">
-          โจทย์คือติดตั้ง ERP บน<b>เครื่องของลูกค้าเอง</b> (ส่วนใหญ่ Windows) ใน local domain ของออฟฟิศ โดย<b>ไม่ใช้ Docker</b>
-          — ซึ่งต่างจาก <a href="deployment-guide.html" class="underline" style="color:var(--accent)">Deployment Guide</a>
+          โจทย์คือติดตั้ง ERP บน<b>เครื่องของลูกค้าเอง</b> (ส่วนใหญ่ Windows) ใน local domain ของออฟฟิศ — ตัว ERP (8 BC + web + Caddy + console)
+          รันด้วย <b>PM2 ไม่ใช้ Docker</b> ส่วน infra ที่ไม่มี build สำหรับ Windows ที่ดูแลง่าย (Redis, RabbitMQ, RustFS, Gotenberg) รันเป็น
+          <b>Docker compose stack ใน WSL2</b> ที่สคริปต์ลงให้ — ต่างจาก <a href="deployment-guide.html" class="underline" style="color:var(--accent)">Deployment Guide</a>
           (Kong + Docker Compose บน server ของเรา) repo นี้จึงแยกออกมาเป็นของตัวเอง และ<b>ไม่แก้โค้ดของ erp-api / erp-frontend</b>
         </p>
         <div class="card overflow-hidden mb-6">
           <table class="d">
             <thead><tr><th>ทำ</th><th>ไม่ทำ</th></tr></thead>
             <tbody>
-              <tr><td>build erp-api + erp-frontend จาก commit เป็นไฟล์ release เดียว พร้อม smoke test</td><td>ติดตั้ง Node / PostgreSQL / Redis / RabbitMQ / MinIO / Gotenberg — ลงเอง installer แค่ตรวจ</td></tr>
-              <tr><td>ติดตั้ง · อัปเกรด · ย้อนกลับ แบบ idempotent (รันซ้ำได้)</td><td>ใช้ Docker / Kong / Cloudflare Tunnel</td></tr>
-              <tr><td>สร้าง DB ที่ยังไม่มี, รัน migration, sync สิทธิ์</td><td>ย้อน migration (rollback สลับแค่โค้ด)</td></tr>
-              <tr><td>รันทุก process ด้วย PM2 และ HTTPS ด้วย Caddy (<span class="mono text-[12px]">tls internal</span>)</td><td>ออก certificate สาธารณะ — ใช้ CA ภายในที่ทุกเครื่องในออฟฟิศต้องเชื่อ</td></tr>
-              <tr><td>หน้าควบคุม ERP Console (เว็บ + desktop app) สำหรับคนดูแลหน้างาน</td><td>แทนที่ CI / Deploy ของ erp-api / erp-frontend (ยังทำงานเหมือนเดิม)</td></tr>
+              <tr><td style="white-space:normal;width:38%">build erp-api + erp-frontend จาก commit เป็นไฟล์ release เดียว พร้อม smoke test</td><td>ติดตั้ง Node / PostgreSQL / Caddy — ลงเอง installer แค่ตรวจ (PM2 กดติดตั้งจาก Console ได้)</td></tr>
+              <tr><td style="white-space:normal;width:38%">ลง Redis / RabbitMQ / RustFS (S3) / Gotenberg ด้วย <span class="mono text-[12px]">install-infra.ps1</span> (Docker ใน WSL2) แล้วเขียนค่าเชื่อมต่อลง <span class="mono text-[12px]">api.env</span></td><td>รัน ERP เองใน Docker / Kong / Cloudflare Tunnel</td></tr>
+              <tr><td style="white-space:normal;width:38%">ติดตั้ง · อัปเกรด · ย้อนกลับ แบบ idempotent (รันซ้ำได้) · ทีละคำสั่งต่อเครื่อง (ล็อก)</td><td>อัปเดตเอง — ทุกการติดตั้งมีคนกด</td></tr>
+              <tr><td style="white-space:normal;width:38%">สร้าง DB ที่ยังไม่มี, รัน migration, sync สิทธิ์ · ตรวจ DB ก่อน start ทุกครั้ง</td><td>ย้อน migration (rollback สลับแค่โค้ด)</td></tr>
+              <tr><td style="white-space:normal;width:38%">รันทุก process ด้วย PM2 และ HTTPS ด้วย Caddy (<span class="mono text-[12px]">tls internal</span>)</td><td>ออก certificate สาธารณะ — ใช้ CA ภายในที่ทุกเครื่องในออฟฟิศต้องเชื่อ</td></tr>
+              <tr><td style="white-space:normal;width:38%">ปิดสิทธิ์ไฟล์ของ install ให้เหลือเจ้าของเครื่อง (§11)</td><td>เข้ารหัส secret ด้วย key บนดิสก์เดียวกัน (ไม่ช่วยจริง)</td></tr>
+              <tr><td style="white-space:normal;width:38%">หน้าควบคุม ERP Console (เว็บ + desktop app) สำหรับคนดูแลหน้างาน</td><td>แทนที่ CI / Deploy ของ erp-api / erp-frontend (ยังทำงานเหมือนเดิม)</td></tr>
             </tbody>
           </table>
         </div>
@@ -119,13 +126,18 @@
             <tbody>
               <tr><td class="mono text-[12px]">scripts/build-release.mjs</td><td>CI / เครื่อง dev</td><td>export สอง repo ด้วย <span class="mono text-[12px]">git archive</span> → build → compile migration → ติดตั้ง <span class="mono text-[12px]">--prod</span> + บูตจริง → แพ็ก <span class="mono text-[12px]">.tar.gz</span></td></tr>
               <tr><td class="mono text-[12px]">.github/workflows/release.yml</td><td>GitHub Actions (self-hosted Linux)</td><td>เรียก build-release แล้ว publish เป็น GitHub Release · เก็บ 10 ตัวล่าสุด</td></tr>
-              <tr><td class="mono text-[12px]">bin/erp.mjs + lib/</td><td>เครื่องลูกค้า</td><td>CLI <span class="mono text-[12px]">erp</span> — install, update, rollback, status, finish, migrate, … (Node ล้วน ไม่มี dependency)</td></tr>
+              <tr><td class="mono text-[12px]">bin/erp.mjs + lib/</td><td>เครื่องลูกค้า</td><td>CLI <span class="mono text-[12px]">erp</span> — install, update, rollback, start, status, migrate, finish, set-db-password, … (Node ล้วน ไม่มี dependency)</td></tr>
               <tr><td class="mono text-[12px]">lib/console.mjs + console-ui/</td><td>เครื่องลูกค้า (PM2: erp-console)</td><td>ERP Console — API + หน้าเว็บ React ที่ <span class="mono text-[12px]">http://127.0.0.1:3399</span></td></tr>
+              <tr><td class="mono text-[12px]">infra/docker/compose.yaml</td><td>เครื่องลูกค้า (WSL2 / Docker)</td><td>Redis · RabbitMQ · RustFS · Gotenberg — image ตรึงเวอร์ชัน, พอร์ตผูก 127.0.0.1, healthcheck, จำกัด RAM / CPU / log</td></tr>
+              <tr><td class="mono text-[12px]">infra/windows/install-infra.ps1</td><td>เครื่องลูกค้า Windows (Administrator)</td><td>ลง WSL2 + Docker Engine ใน distro <span class="mono text-[12px]">erp-infra</span> → ขึ้น stack → สุ่มรหัส → สร้าง bucket → <span class="mono text-[12px]">-ErpHome</span> เขียนค่าลง <span class="mono text-[12px]">api.env</span></td></tr>
               <tr><td class="mono text-[12px]">desktop/</td><td>เครื่องคนดูแล</td><td>ERP Console แบบ desktop app (Tauri 2)</td></tr>
               <tr><td class="mono text-[12px]">docs/{windows,macos,ubuntu}.md</td><td>—</td><td>คู่มือติดตั้งแต่ละ OS · <span class="mono text-[12px]">docs/windows.md</span> มี checklist หน้างาน</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="text-sm mb-4" style="color:var(--ink-soft)">
+          <span class="mono text-[12px]">infra/</span> ถูกแพ็กเข้า release ด้วย — บนเครื่องลูกค้าอยู่ที่ <span class="mono text-[12px]">erp-&lt;version&gt;\installer\infra\</span> ไม่ต้องมี repo
+        </p>
       </section>
 
       <div class="rule my-14"></div>
@@ -162,7 +174,7 @@ sequenceDiagram
   Con->>GH: อ่านรายการ release (UPDATE_GITHUB_TOKEN)
   Ops->>Con: กด ติดตั้ง
   Con->>GH: ดาวน์โหลด + ตรวจ sha256
-  Con->>Con: แตกไฟล์ → pnpm install --prod → migration → sync สิทธิ์ → สลับ current → restart → health check
+  Con->>Con: แตกไฟล์ → pnpm install --prod → migration → sync สิทธิ์ → ตรวจ DB → สลับ current → restart → health check
 </pre>
 
         <div class="card overflow-hidden mt-8 mb-6">
@@ -171,6 +183,7 @@ sequenceDiagram
             <tbody>
               <tr><td>push <span class="mono text-[12px]">main</span> → build release</td><td>อัตโนมัติ</td><td>push ติดกันหลายครั้ง = build เดียวหลังตัวที่กำลังรัน · push ทั้งสอง repo พร้อมกัน = build ครั้งเดียว</td></tr>
               <tr><td>build จาก branch / tag อื่น</td><td>กดเอง</td><td>GitHub → erp-installer → Actions → <b>Release</b> → Run workflow (เลือก ref ได้, build เสมอ)</td></tr>
+              <tr><td>แก้ installer อย่างเดียว (ไม่มี push ของ erp-api / erp-frontend)</td><td>กดเอง</td><td>Run workflow — <span class="mono text-[12px]">installer/</span> ใน release มาจาก commit ของ erp-installer ตอน build · การแก้ที่ยังไม่ push ไม่เข้า release</td></tr>
               <tr><td>ติดตั้งที่เครื่องลูกค้า</td><td><b>กดเอง เสมอ</b></td><td>ตั้งใจไม่ให้อัปเดตเอง — การติดตั้งรัน migration กับ DB จริงของลูกค้า ต้องมีคนเลือกเวลา</td></tr>
             </tbody>
           </table>
@@ -180,8 +193,8 @@ sequenceDiagram
           <div class="rc mb-1">secret ที่ต้องตั้งครั้งเดียว (ชื่อเท่านั้น — ค่าอยู่ใน GitHub)</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
             <span class="mono text-[12px]">erp-installer</span>: <span class="mono text-[12px]">ERP_SOURCE_TOKEN</span> — อ่าน erp-api + erp-frontend (Contents: read) ·
-            <span class="mono text-[12px]">erp-api</span> และ <span class="mono text-[12px]">erp-frontend</span>: <span class="mono text-[12px]">ERP_INSTALLER_DISPATCH_TOKEN</span> — เฉพาะ repo erp-installer (Contents: read &amp; write) ·
-            เครื่องลูกค้า: <span class="mono text-[12px]">UPDATE_GITHUB_TOKEN</span> ใน <span class="mono text-[12px]">config/erp.env</span> — อ่าน release ของ erp-installer อย่างเดียว ·
+            <span class="mono text-[12px]">erp-api</span> และ <span class="mono text-[12px]">erp-frontend</span>: <span class="mono text-[12px]">ERP_INSTALLER_DISPATCH_TOKEN</span> — เฉพาะ repo erp-installer (Contents: read &amp; write, มีวันหมดอายุ — ต่อก่อนหมด ไม่งั้นไม่มี release ใหม่) ·
+            เครื่องลูกค้า: <span class="mono text-[12px]">UPDATE_GITHUB_TOKEN</span> ใน <span class="mono text-[12px]">config/erp.env</span> — fine-grained, เฉพาะ erp-installer, Contents: read-only, แยกต่อลูกค้า ·
             Settings → Secrets and variables → <b>Actions</b> ของแต่ละ repo (org secret ใช้กับ private repo บน plan ปัจจุบันไม่ได้)
           </p>
         </div>
@@ -200,7 +213,7 @@ sequenceDiagram
         </p>
         <div class="code p-5 mb-6"><pre>erp-&lt;version&gt;/
   VERSION.json   <span class="c"># version, built_at, node, commit ของทั้ง 3 repo, internal_api_port</span>
-  installer/     <span class="c"># bin/ lib/ templates/ docs/ + console-ui/dist — release ติดตั้งตัวเอง</span>
+  installer/     <span class="c"># bin/ lib/ templates/ docs/ infra/ + console-ui/dist — release ติดตั้งตัวเอง</span>
   api/           <span class="c"># erp-api: dist/ (migration + data source compile แล้ว), permissions snapshot, lockfile</span>
   web/           <span class="c"># erp-frontend: apps/web/.next, public, lockfile</span></pre></div>
 
@@ -229,39 +242,65 @@ node scripts/build-release.mjs --api ../erp-api --web ../erp-frontend
       <!-- ========== 05 ON SITE ========== -->
       <section id="onsite" class="section pt-14 pb-4">
         <div class="eyebrow text-[var(--accent)] mb-3">05 — ติดตั้งครั้งแรก</div>
-        <h2 class="display text-3xl mb-6">ที่หน้างาน (ตัวอย่าง Windows)</h2>
+        <h2 class="display text-3xl mb-6">ที่หน้างาน (Windows — ลำดับที่ใช้จริง)</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ทุกคำสั่งใช้ <b>PowerShell แบบ Run as Administrator</b> · ตัวอย่างใช้ <span class="mono text-[12px]">C:\erp</span> เป็น install home และ
+          <span class="mono text-[12px]">C:\Temp\erp-&lt;version&gt;</span> เป็นที่แตก release · checklist เต็มอยู่ใน <span class="mono text-[12px]">erp-installer/docs/windows.md</span>
+        </p>
 
         <div class="step">
           <span class="sn">1</span>
-          <h3 class="font-semibold text-[16px] mb-2">ลงโปรแกรมพื้นฐานเอง</h3>
+          <h3 class="font-semibold text-[16px] mb-2">เตรียมเครื่อง + ลงโปรแกรมพื้นฐานเอง</h3>
           <p class="text-sm" style="color:var(--ink-soft)">
-            Node.js (major ตาม <span class="mono text-[12px]">VERSION.json</span>) · <span class="mono text-[12px]">npm i -g pm2</span> · Caddy · PostgreSQL ·
-            Redis (Windows: Memurai) · RabbitMQ (<b>บังคับ</b>) · MinIO · Gotenberg (Windows: WSL2 หรือเครื่องอื่น) · ปิด Sleep · พอร์ต 80/443 ว่าง
+            Sleep = Never · <b>ติดตั้ง Windows Update ให้จบ</b> (“Update and restart” — ไม่งั้น WSL2 ขึ้นไม่ได้) · BIOS เปิด virtualization ·
+            Node.js (major ตาม <span class="mono text-[12px]">VERSION.json</span>, อยู่ใน PATH ของระบบ) · Caddy · PostgreSQL 18+ (จดพอร์ต / รหัส) ·
+            PM2 (<span class="mono text-[12px]">npm i -g pm2</span> หรือปุ่มใน Console) · พอร์ต 80 / 443 ว่าง (IIS → <span class="mono text-[12px]">net stop w3svc</span>)
           </p>
         </div>
 
         <div class="step">
           <span class="sn">2</span>
-          <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง แล้วกรอก config</h3>
-          <div class="code p-4 mb-2"><pre>tar -xzf erp-&lt;version&gt;.tar.gz
-node erp-&lt;version&gt;\installer\bin\erp.mjs install --home C:\erp
-<span class="c"># ครั้งแรกหยุดให้กรอก C:\erp\config\erp.env (ชื่อเว็บ, Caddy, token Sync) และ api.env (DB, Redis, RabbitMQ, MinIO)</span>
-C:\erp\erp.cmd install C:\erp\releases\&lt;version&gt;   <span class="c"># → "ERP &lt;version&gt; is running"</span></pre></div>
+          <h3 class="font-semibold text-[16px] mb-2">infra ด้วยสคริปต์เดียว</h3>
+          <div class="code p-4 mb-2"><pre>tar -xzf erp-&lt;version&gt;.tar.gz -C C:\Temp
+$infra = 'C:\Temp\erp-&lt;version&gt;\installer\infra\windows\install-infra.ps1'
+powershell -ExecutionPolicy Bypass -File $infra
+<span class="c"># ยังไม่มี WSL → ลงให้แล้วจบที่ exit 3010 → รีสตาร์ท Windows → รันคำสั่งเดิมซ้ำ</span>
+<span class="c"># → Redis / RabbitMQ / RustFS / Gotenberg ขึ้น OK ครบ (ครั้งแรกโหลด image 5–10 นาที)</span></pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ทุก container ผูกพอร์ตที่ <span class="mono text-[12px]">127.0.0.1</span> เท่านั้น · รหัสสุ่มครั้งเดียวเก็บใน <span class="mono text-[12px]">C:\erp-infra\secrets.env</span>
+            (อ่านได้เฉพาะ Administrators / SYSTEM) · scheduled task เปิด WSL ตอนบูต · รันซ้ำได้ ตัวที่ config ไม่เปลี่ยนไม่ถูก restart
+          </p>
         </div>
 
         <div class="step">
           <span class="sn">3</span>
-          <h3 class="font-semibold text-[16px] mb-2">ปิดงานด้วยคำสั่งเดียว — PowerShell แบบ Administrator</h3>
-          <div class="code p-4 mb-2"><pre>C:\erp\erp.cmd finish     <span class="c"># --dry-run ดูก่อนได้ · รันซ้ำได้ ข้อที่ผ่านแล้วข้าม</span></pre></div>
+          <h3 class="font-semibold text-[16px] mb-2">ติดตั้ง ERP แล้วกรอก config</h3>
+          <div class="code p-4 mb-2"><pre>node C:\Temp\erp-&lt;version&gt;\installer\bin\erp.mjs install --home C:\erp   <span class="c"># รอบแรก: สร้าง C:\erp\config\ แล้วหยุด</span>
+powershell -ExecutionPolicy Bypass -File $infra -ErpHome C:\erp           <span class="c"># เขียนค่า Redis / RabbitMQ / S3 / Gotenberg ลง api.env + สร้าง bucket</span>
+node C:\Temp\erp-&lt;version&gt;\installer\bin\erp.mjs set-db-password --home C:\erp   <span class="c"># รหัส PostgreSQL ครั้งเดียว ลงทุก *_DB_PASSWORD (ไม่แสดงตัวอักษร)</span>
+<span class="c"># แก้มือ: erp.env → ERP_DOMAIN, ERP_API_DOMAIN, CADDY_BIN, UPDATE_GITHUB_TOKEN</span>
+<span class="c">#         api.env → *_DB_HOST / *_DB_PORT (ถ้าไม่ใช่ 5432), STORAGE_S3_PUBLIC_ENDPOINT=https://&lt;ERP_DOMAIN&gt;:9443</span>
+<span class="c"># ห้ามแก้: NODE_ENV (prod), SECRET_KEY, ACCESS_KEY_SECRET_ENCRYPTION_KEY, *_DB_SYNCHRONIZE</span>
+C:\erp\erp.cmd install C:\erp\releases\&lt;version&gt;   <span class="c"># รอบสอง → สร้าง DB + migration → "ERP &lt;version&gt; is running"</span></pre></div>
           <p class="text-sm" style="color:var(--ink-soft)">
-            ถามรหัสใหม่ของ <span class="mono text-[12px]">superadmin</span> ครั้งเดียว (migration ของ erp-api สร้างบัญชีนี้ด้วยรหัสที่อยู่ใน source) แล้วทำต่อเอง:
-            ปิด login บัญชี mock <span class="mono text-[12px]">staff</span> · autostart ตอนบูต · firewall · ให้เครื่องนี้เชื่อ HTTPS + hosts ·
-            สร้างสคริปต์สำหรับเครื่อง client · <span class="mono text-[12px]">erp status</span> — จบด้วยตารางสรุป ✓ / ⚠ / ✗
+            ใช้เวลาราว <b>5 นาที</b> บน Windows (ดู §06) · <b>อย่ากด Start ERP / สั่ง <span class="mono text-[12px]">erp start</span> ซ้อนระหว่างติดตั้ง</b> — release ใหม่ล็อกให้ทีละคำสั่ง ·
+            start ครั้งแรกจะปิดสิทธิ์ไฟล์ทั้ง home (§11) ใช้เวลาเพิ่มอีกไม่กี่นาที ครั้งเดียว
           </p>
         </div>
 
         <div class="step">
           <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">ปิดงานด้วยคำสั่งเดียว — PowerShell แบบ Administrator</h3>
+          <div class="code p-4 mb-2"><pre>C:\erp\erp.cmd finish     <span class="c"># --dry-run ดูก่อนได้ · รันซ้ำได้ ข้อที่ผ่านแล้วข้าม · --ip &lt;IP&gt; · --no-hosts</span></pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ถามรหัสใหม่ของ <span class="mono text-[12px]">superadmin</span> ครั้งเดียว (migration ของ erp-api สร้างบัญชีนี้ด้วยรหัสที่อยู่ใน source) แล้วทำต่อเอง:
+            ปิด login บัญชี mock <span class="mono text-[12px]">staff</span> · autostart ตอนบูต · firewall 80/443/9443 · ให้เครื่องนี้เชื่อ HTTPS + hosts ·
+            สร้างสคริปต์สำหรับเครื่อง client · <span class="mono text-[12px]">erp status</span> — จบด้วยตารางสรุป ✓ / ⚠ / ✗
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">5</span>
           <h3 class="font-semibold text-[16px] mb-2">เครื่อง client ทุกเครื่อง — ไฟล์เดียว</h3>
           <p class="text-sm mb-2" style="color:var(--ink-soft)">
             copy <span class="mono text-[12px]">erp-client-setup.ps1</span> (จาก <span class="mono text-[12px]">C:\erp\</span> หรือปุ่มดาวน์โหลดในการ์ด Web access ของ Console)
@@ -272,17 +311,17 @@ C:\erp\erp.cmd install C:\erp\releases\&lt;version&gt;   <span class="c"># → "
             <p class="text-[13px]">
               Caddy ออก certificate ให้ <span class="mono text-[12px]">erp.internal</span> จาก CA ภายในของเครื่อง server เอง (ไม่มี public CA ไหนออกให้ชื่อ .internal ได้)
               — เครื่องที่ยังไม่เชื่อ CA จะเห็นคำเตือน และ cookie ของ login (<span class="mono text-[12px]">COOKIE_SECURE=true</span>) ต้องใช้ HTTPS ·
-              CA นี้รับรองเว็บไหนก็ได้ ติดตั้งเฉพาะเครื่องที่ใช้ ERP
+              CA นี้รับรองเว็บไหนก็ได้ — ติดตั้งเฉพาะเครื่องที่ใช้ ERP และถอนออกเมื่อเลิกใช้ / ย้ายเครื่อง server (§11)
             </p>
           </div>
         </div>
 
         <div class="step">
-          <span class="sn">5</span>
+          <span class="sn">6</span>
           <h3 class="font-semibold text-[16px] mb-2">ตรวจรับใน ERP Console</h3>
           <p class="text-sm" style="color:var(--ink-soft)">
-            ภาพรวม: ทุกการ์ดเขียว · Web access = เข้าเว็บได้ · Migration: ไม่มี “ยังไม่รัน” / “DB ใหม่กว่าโค้ด” · Release: Sync ต่อ GitHub ได้ ·
-            login จากเครื่อง client 1 เครื่อง — checklist เต็มอยู่ใน <span class="mono text-[12px]">erp-installer/docs/windows.md</span>
+            ภาพรวม: ทุกการ์ดเขียว (รวม security — ไม่มีบัญชีรหัส mock, ไฟล์ config / install home ไม่เปิดให้คนอื่น) · Web access = เข้าเว็บได้ ·
+            Migration: ไม่มี “ยังไม่รัน” / “DB ใหม่กว่าโค้ด” · Release: Sync ต่อ GitHub ได้ · login จากเครื่อง client 1 เครื่อง
           </p>
         </div>
       </section>
@@ -291,13 +330,16 @@ C:\erp\erp.cmd install C:\erp\releases\&lt;version&gt;   <span class="c"># → "
 
       <!-- ========== 06 UPDATE ========== -->
       <section id="update" class="section pt-14 pb-4">
-        <div class="eyebrow text-[var(--accent)] mb-3">06 — อัปเดต · ย้อนกลับ</div>
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — อัปเดต · ย้อนกลับ · DB</div>
         <h2 class="display text-3xl mb-6">install ทำอะไรทีละขั้น</h2>
 
 <pre class="mermaid">
 flowchart LR
-  A["แตก release ใหม่<br/>pnpm install --prod"] --> D["สร้าง DB ที่ยังไม่มี<br/>migration · permissions:sync"]
-  D --> F["สลับ current<br/>restart ผ่าน PM2"]
+  L["ล็อก home<br/>ทีละคำสั่ง"] --> A["แตก release ใหม่<br/>pnpm install --prod"]
+  A --> D["สร้าง DB ที่ยังไม่มี<br/>migration · permissions:sync"]
+  D --> P{"ตรวจ Postgres<br/>+ DB ครบทุก BC"}
+  P -- ไม่ครบ --> X["หยุด ไม่แตะ PM2<br/>บอกให้ erp migrate"]
+  P -- ครบ --> F["สลับ current<br/>restart ผ่าน PM2"]
   F --> H{"health check<br/>ทุก service"}
   H -- ผ่าน --> I[เสร็จ]
   H -- ไม่ผ่าน --> J["สลับ current กลับ<br/>migration ไม่ย้อน"]
@@ -307,17 +349,26 @@ flowchart LR
           <table class="d">
             <thead><tr><th>ทาง</th><th>ใช้เมื่อ</th></tr></thead>
             <tbody>
-              <tr><td>Console → Release → <b>Sync</b> → ติดตั้ง</td><td>ปกติ — ต้องมี <span class="mono text-[12px]">UPDATE_GITHUB_TOKEN</span></td></tr>
+              <tr><td>Console → Release → <b>Sync</b> → ติดตั้ง</td><td>ปกติ — ต้องมี <span class="mono text-[12px]">UPDATE_GITHUB_TOKEN</span> · release ใหม่ถูกส่งต่อให้ installer ของ release นั้นเองติดตั้ง</td></tr>
               <tr><td>ลากไฟล์ <span class="mono text-[12px]">.tar.gz</span> ลงการ์ดอัปเกรด</td><td>เครื่องไม่มี token / ได้ไฟล์มาทาง USB</td></tr>
-              <tr><td class="mono text-[12px]">erp update · erp install &lt;file&gt;</td><td>บรรทัดคำสั่งบนเครื่อง server</td></tr>
+              <tr><td class="mono text-[12px]">erp update · erp install &lt;file&gt;</td><td>บรรทัดคำสั่งบนเครื่อง server (PowerShell)</td></tr>
               <tr><td>ปุ่ม “ย้อนกลับ” · <span class="mono text-[12px]">erp rollback</span></td><td>สลับกลับ release ก่อนหน้า — <b>DB ไม่ย้อน</b> ใช้ได้เฉพาะเมื่อ migration ใหม่ยังเข้ากับโค้ดเก่า</td></tr>
+              <tr><td class="mono text-[12px]">erp migrate</td><td>DB หาย / Postgres ใหม่ — <span class="mono text-[12px]">CREATE DATABASE</span> + <span class="mono text-[12px]">uuid-ossp</span> + migration ทีละ BC (รันซ้ำได้) → แล้ว <span class="mono text-[12px]">erp sync-permissions</span> → <span class="mono text-[12px]">erp start</span> · บัญชี mock กลับมา → <span class="mono text-[12px]">set-password</span> / <span class="mono text-[12px]">disable-login</span> อีกรอบ</td></tr>
             </tbody>
           </table>
         </div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-4 leading-[1.85]">
           config อยู่ที่ <span class="mono text-[12px]">&lt;home&gt;/config/</span> ที่เดียว และถูก copy เข้า release ทุกครั้งที่ start / install —
-          แก้ในหน้า <b>ตั้งค่า</b> ของ Console (ตรวจค่า + backup ไฟล์เดิมให้) แล้วกด apply
+          แก้ในหน้า <b>ตั้งค่า</b> ของ Console (ตรวจค่า + backup ไฟล์เดิมให้ เก็บ 20 ชุดต่อไฟล์) แล้วกด apply
         </p>
+        <div class="edge mb-6">
+          <div class="tag mb-1">ทำไมติดตั้งบน Windows ใช้ ~5 นาที (วัดบนเครื่องลูกค้าจริง)</div>
+          <p class="text-[13px]">
+            ไม่ได้ช้าที่ดาวน์โหลด (pnpm store อยู่ไดรฟ์เดียวกัน → hard link) แต่สร้าง <span class="mono text-[12px]">node_modules</span> ใหม่ทั้งชุด
+            ~106k ไฟล์ (api ~40k + web ~66k) ทุก release + Defender สแกนแบบ real-time · ERP ตัวเก่ารันต่อระหว่างติดตั้ง หยุดแค่ตอนสลับ / restart ·
+            ทางที่ยังไม่ได้ทำ: Defender exclusion ของ <span class="mono text-[12px]">releases\</span>, ใช้ <span class="mono text-[12px]">node_modules</span> ของ release ก่อนซ้ำเมื่อ lockfile เท่าเดิม
+          </p>
+        </div>
       </section>
 
       <div class="rule my-14"></div>
@@ -330,7 +381,7 @@ flowchart LR
 <pre class="mermaid">
 flowchart LR
   U[เบราว์เซอร์ในออฟฟิศ] -- "https://erp.internal" --> C
-  subgraph PM2["PM2 — รันทุก process ของ install นี้"]
+  subgraph PM2["PM2 — รันทุก process ของ install นี้ (ไม่ใช้ Docker)"]
     C[Caddy :443<br/>tls internal]
     W[erp-web<br/>Next.js :3300]
     A[erp-api<br/>8 BC :3001–3008]
@@ -339,22 +390,37 @@ flowchart LR
   C -- "/" --> W
   C -- "/api/‹app›/…" --> A
   W -- "SSR → 127.0.0.1:8080" --> C
-  A --> DB[(PostgreSQL<br/>DB ต่อ BC)]
-  A --> R[(Redis · RabbitMQ · MinIO)]
+  A --> DB[(PostgreSQL native<br/>DB ต่อ BC)]
+  subgraph WSL["WSL2 distro erp-infra · Docker compose · 127.0.0.1 เท่านั้น"]
+    R[(Redis :6379<br/>มีรหัสผ่าน)]
+    Q[(RabbitMQ :5672)]
+    S[(RustFS S3 :9000)]
+    G[Gotenberg :3009<br/>network แยก]
+  end
+  A --> R
+  A --> Q
+  A --> S
+  A --> G
 </pre>
 
-        <div class="code p-5 mt-8 mb-6"><pre>C:\erp\                   <span class="c"># /opt/erp บน macOS / Ubuntu</span>
-  config\erp.env          <span class="c"># ชื่อเว็บ, พอร์ต, Caddy, UPDATE_REPO / UPDATE_GITHUB_TOKEN</span>
+        <div class="code p-5 mt-8 mb-6"><pre>C:\erp\                   <span class="c"># /opt/erp บน macOS / Ubuntu · เข้าได้เฉพาะเจ้าของ (§11)</span>
+  config\erp.env          <span class="c"># ชื่อเว็บ, พอร์ต, Caddy, UPDATE_REPO / UPDATE_GITHUB_TOKEN, CONSOLE_*</span>
   config\api.env          <span class="c"># ค่าของ erp-api — copy เข้า releases\&lt;v&gt;\api\.env ทุกครั้ง</span>
+  config\backup\          <span class="c"># สำเนาก่อนแก้จาก Console</span>
   releases\&lt;version&gt;\    <span class="c"># release ที่ติดตั้งแล้ว (เก็บหลายตัวไว้ย้อนกลับ)</span>
   current → releases\…    <span class="c"># ตัวที่รันอยู่ (Windows: junction)</span>
   .pm2\  caddy-data\      <span class="c"># PM2 ของ install นี้ · CA ของ Caddy (private key — อย่าแชร์)</span>
-  erp-local-ca.crt        <span class="c"># CA สำหรับติดตั้งบนเครื่อง client</span>
-  erp.cmd                 <span class="c"># C:\erp\erp.cmd &lt;คำสั่ง&gt;</span></pre></div>
+  erp-local-ca.crt        <span class="c"># CA สำหรับติดตั้งบนเครื่อง client — ไฟล์เดียวที่ทุก user อ่านได้</span>
+  erp.cmd                 <span class="c"># C:\erp\erp.cmd &lt;คำสั่ง&gt;</span>
+
+C:\erp-infra\             <span class="c"># install-infra.ps1</span>
+  secrets.env             <span class="c"># รหัส Redis / RabbitMQ / RustFS — Administrators + SYSTEM เท่านั้น · ต้องสำรอง</span>
+  wsl\erp-infra\          <span class="c"># ดิสก์ของ WSL distro — stack อยู่ที่ /opt/erp-infra ข้างใน, ข้อมูลใน docker volume</span></pre></div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-4 leading-[1.85]">
           หน้าเว็บเรียก backend ผ่าน <span class="mono text-[12px]">/api</span> ของชื่อเดียวกัน (same-origin — ไม่ต้อง CORS, cookie ของ login ทำงาน) ·
           ชื่อ <span class="mono text-[12px]">ERP_API_DOMAIN</span> (เช่น <span class="mono text-[12px]">erp-api.internal</span>) เปิดไว้ให้ระบบอื่น / Swagger / ทีม support เรียก API ตรง ·
-          frontend build ครั้งเดียวใช้ได้ทุกลูกค้า เพราะฝั่ง SSR เรียก <span class="mono text-[12px]">127.0.0.1:8080</span> ซึ่งเหมือนกันทุกเครื่อง
+          frontend build ครั้งเดียวใช้ได้ทุกลูกค้า เพราะฝั่ง SSR เรียก <span class="mono text-[12px]">127.0.0.1:8080</span> ซึ่งเหมือนกันทุกเครื่อง ·
+          ไฟล์แนบอยู่ใน volume <span class="mono text-[12px]">rustfs-data</span> — <b>ต้องสำรอง</b> คู่กับ PostgreSQL และ <span class="mono text-[12px]">secrets.env</span>
         </p>
       </section>
 
@@ -368,17 +434,19 @@ flowchart LR
           <table class="d">
             <thead><tr><th>หน้า</th><th>ทำอะไรได้</th></tr></thead>
             <tbody>
-              <tr><td>ภาพรวม</td><td>สถานะทุก service + DB / Redis / RabbitMQ / MinIO · โปรแกรมที่ต้องใช้ (node, pnpm, pm2, caddy) · Start / Stop / Restart · การ์ด <b>Web access</b> ทดสอบจากเบราว์เซอร์ที่เปิดอยู่ว่าขาดชื่อ / CA / พอร์ต + ปุ่มดาวน์โหลดสคริปต์ client</td></tr>
-              <tr><td>ตั้งค่า</td><td>แก้ <span class="mono text-[12px]">erp.env</span> / <span class="mono text-[12px]">api.env</span> (ตรวจค่า, ซ่อน secret, backup อัตโนมัติ) แล้ว apply</td></tr>
+              <tr><td>ภาพรวม</td><td>สถานะทุก service + DB / Redis / RabbitMQ / S3 / Gotenberg · security (บัญชีรหัส mock, สิทธิ์ไฟล์) · โปรแกรมที่ต้องใช้ (node, pnpm, pm2, caddy) + ปุ่มติดตั้ง pm2 / pnpm · Start / Stop / Restart · การ์ด <b>Web access</b> ทดสอบจากเบราว์เซอร์ที่เปิดอยู่ว่าขาดชื่อ / CA / พอร์ต + ปุ่มดาวน์โหลดสคริปต์ client</td></tr>
+              <tr><td>ตั้งค่า</td><td>แก้ <span class="mono text-[12px]">erp.env</span> / <span class="mono text-[12px]">api.env</span> (ตรวจค่า, ซ่อน secret — ทั้ง key ชื่อแบบรหัส และ URL ที่มี <span class="mono text-[12px]">user:pass@</span>, backup อัตโนมัติ) แล้ว apply</td></tr>
               <tr><td>Release</td><td>Sync จาก GitHub · ติดตั้ง · อัปโหลดไฟล์เอง · ย้อนกลับ · คู่มือสร้าง <span class="mono text-[12px]">.tar.gz</span></td></tr>
               <tr><td>Migration</td><td>ต่อ DB: ไฟล์ใน release เทียบตาราง <span class="mono text-[12px]">migrations</span> → รันแล้ว / <b>ยังไม่รัน</b> / <b>DB ใหม่กว่าโค้ด</b> · ปุ่มรัน migrate</td></tr>
-              <tr><td>งาน</td><td>log สดของ install / update / rollback / migrate — ไม่หายแม้ console restart ระหว่างงาน</td></tr>
+              <tr><td>งาน</td><td>log สดของ install / update / rollback / migrate — ไม่หายแม้ console restart ระหว่างงาน · มีงานค้าง = ปุ่มอื่นถูกปิด (409)</td></tr>
             </tbody>
           </table>
         </div>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-4 leading-[1.85]">
-          เปิดได้เฉพาะบนเครื่อง server โดยค่าเริ่มต้น (<span class="mono text-[12px]">127.0.0.1:3399</span>) · ดูได้ทุกคน แต่สั่งงานต้องปลดล็อกด้วย
-          admin token (<span class="mono text-[12px]">erp console-token</span>) · เปิดจากเครื่องอื่นในออฟฟิศต้องตั้ง <span class="mono text-[12px]">CONSOLE_PASSWORD</span>
+          เปิดได้เฉพาะบนเครื่อง server โดยค่าเริ่มต้น (<span class="mono text-[12px]">127.0.0.1:3399</span>, ตอบเฉพาะชื่อ <span class="mono text-[12px]">127.0.0.1</span> / <span class="mono text-[12px]">localhost</span> — กัน DNS rebinding) ·
+          ดูได้ทุกคน แต่สั่งงานต้องปลดล็อกด้วย admin token (<span class="mono text-[12px]">erp console-token</span>) ·
+          เปิดจากเครื่องอื่นในออฟฟิศต้องตั้ง <span class="mono text-[12px]">CONSOLE_HOST=0.0.0.0</span> + <span class="mono text-[12px]">CONSOLE_PASSWORD</span> —
+          <b>รหัสวิ่งเป็น HTTP ธรรมดา</b> (ยังไม่ผ่าน Caddy / TLS) ใช้เฉพาะ LAN ที่ไว้ใจได้ หรือเปิดชั่วคราว
         </p>
       </section>
 
@@ -393,9 +461,9 @@ flowchart LR
             <thead><tr><th>ใคร</th><th>ทำ</th><th>ไม่ต้องทำ</th></tr></thead>
             <tbody>
               <tr><td><b>ทีม dev</b> (erp-api / erp-frontend)</td><td>merge เข้า <span class="mono text-[12px]">main</span> · เขียน migration ที่ย้อนเข้ากันได้ · ดู Actions → Release ว่าเขียว</td><td>build / แพ็กไฟล์ · เข้าเครื่องลูกค้า</td></tr>
-              <tr><td><b>ทีม erp-installer</b></td><td>ดูแล build-release / CLI / Console · แก้เมื่อ erp-api เพิ่ม BC, dependency, ตัวแปร env ใหม่</td><td>แก้โค้ดใน erp-api / erp-frontend</td></tr>
-              <tr><td><b>คนดูแลหน้างาน</b></td><td>ติดตั้งครั้งแรก (§05) · กด Sync → ติดตั้ง ในเวลาที่ลูกค้าตกลง · ดู Migration หลังติดตั้ง · ตั้งเครื่อง client</td><td>ใช้ git / pnpm / build</td></tr>
-              <tr><td><b>ลูกค้า</b></td><td>เครื่อง server ที่เปิดตลอด · DNS / hosts ของออฟฟิศ · เปิด firewall</td><td>—</td></tr>
+              <tr><td><b>ทีม erp-installer</b></td><td>ดูแล build-release / CLI / Console / infra stack · แก้เมื่อ erp-api เพิ่ม BC, dependency, ตัวแปร env ใหม่ · อัปเกรด image ของ infra</td><td>แก้โค้ดใน erp-api / erp-frontend</td></tr>
+              <tr><td><b>คนดูแลหน้างาน</b></td><td>ติดตั้งครั้งแรก (§05) · กด Sync → ติดตั้ง ในเวลาที่ลูกค้าตกลง · ดู Migration หลังติดตั้ง · ตั้งเครื่อง client · สำรอง DB + ไฟล์แนบ + <span class="mono text-[12px]">secrets.env</span></td><td>ใช้ git / pnpm / build</td></tr>
+              <tr><td><b>ลูกค้า</b></td><td>เครื่อง server ที่เปิดตลอด · DNS / hosts ของออฟฟิศ · เปิด firewall · ไม่ให้ user ทั่วไปเป็น Administrator ของเครื่อง server</td><td>—</td></tr>
             </tbody>
           </table>
         </div>
@@ -404,7 +472,7 @@ flowchart LR
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
             เพิ่ม / ลบ BC หรือ data source · ตัวแปรใหม่ใน <span class="mono text-[12px]">.env.example</span> ที่ไม่มีค่าเริ่มต้นที่ใช้ได้ ·
             เปลี่ยนวิธีรัน migration / <span class="mono text-[12px]">permissions:sync</span> / seed · เปลี่ยน Node major หรือ pnpm major ·
-            dependency ที่ต้อง compile native (ไม่มี prebuilt สำหรับ Windows)
+            dependency ที่ต้อง compile native (ไม่มี prebuilt สำหรับ Windows) · ต้องการ infra ตัวใหม่ (ต้องเพิ่มใน <span class="mono text-[12px]">compose.yaml</span>)
           </p>
         </div>
       </section>
@@ -419,21 +487,61 @@ flowchart LR
           <table class="d">
             <thead><tr><th>อาการ</th><th>ต้นเหตุ → ที่ทำไว้</th></tr></thead>
             <tbody>
-              <tr><td>คอลัมน์ / PK default หายจาก DB</td><td>release เก่าชี้ DB ที่ใหม่กว่า + <span class="mono text-[12px]">*_DB_SYNCHRONIZE=true</span> → TypeORM synchronize ลบของใหม่ → installer <b>บังคับ synchronize=false ทุกทาง</b> · ก่อนชี้ไป DB ไหน ดูหน้า Migration ก่อน</td></tr>
-              <tr><td>Migration ขึ้น “DB ใหม่กว่าโค้ด”</td><td>release ที่ติดตั้งเก่ากว่า DB → <b>ติดตั้ง release ใหม่</b> ไม่ใช่กดรัน migrate</td></tr>
-              <tr><td>ทุก service crash-loop</td><td><span class="mono text-[12px]">NODE_ENV=production</span> — erp-api รับแค่ <span class="mono text-[12px]">local|test|dev|staging|prod</span> → installer ตั้ง <span class="mono text-[12px]">prod</span> ให้</td></tr>
-              <tr><td>login ตอบ 500</td><td><span class="mono text-[12px]">TRANSPORT=tcp</span> ใช้ไม่ได้ (RMQ interceptor) → RabbitMQ บังคับ, <span class="mono text-[12px]">erp status</span> ขึ้น ✗</td></tr>
-              <tr><td>migration แรกพังบน Postgres ใหม่</td><td>ต้องมี <span class="mono text-[12px]">uuid-ossp</span> → install สร้าง extension ให้ทุก DB</td></tr>
-              <tr><td>สิทธิ์ API หายหมดหลังกด Sync Permissions</td><td>scan ไม่เจอ source → permission snapshot (§04)</td></tr>
-              <tr><td>เปิดเว็บแล้วเตือน certificate / ชื่อไม่รู้จัก</td><td>เครื่องนั้นยังไม่เชื่อ CA / ไม่มี hosts → สคริปต์ client (§05 ข้อ 4) · การ์ด Web access บอกว่าขาดข้อไหน</td></tr>
+              <tr><td style="white-space:normal;width:38%">คอลัมน์ / PK default หายจาก DB</td><td>release เก่าชี้ DB ที่ใหม่กว่า + <span class="mono text-[12px]">*_DB_SYNCHRONIZE=true</span> → TypeORM synchronize ลบของใหม่ → installer <b>บังคับ synchronize=false ทุกทาง</b> · ก่อนชี้ไป DB ไหน ดูหน้า Migration ก่อน</td></tr>
+              <tr><td style="white-space:normal;width:38%">Migration ขึ้น “DB ใหม่กว่าโค้ด”</td><td>release ที่ติดตั้งเก่ากว่า DB → <b>ติดตั้ง release ใหม่</b> ไม่ใช่กดรัน migrate</td></tr>
+              <tr><td style="white-space:normal;width:38%">drop DB แล้วกด Start → crash loop + หน้าต่าง cmd กระพริบไม่หยุด</td><td>ทุก BC ต่อ DB ไม่ได้ → PM2 รีสตาร์ทไม่จบ, <span class="mono text-[12px]">erp stop</span> หยุดตัวที่ <span class="mono text-[12px]">launching</span> ไม่ได้ → <b>preflight</b>: start / restart ตรวจ Postgres + DB ครบก่อนแตะ PM2 · สร้าง DB คืนด้วย <span class="mono text-[12px]">erp migrate</span></td></tr>
+              <tr><td style="white-space:normal;width:38%">Update จาก Console พังที่ <span class="mono text-[12px]">tar</span>: <span class="mono text-[12px]">Cannot connect to D: resolve failed</span></td><td>เคยสั่ง <span class="mono text-[12px]">erp start</span> จาก <b>Git Bash</b> → PM2 จำ PATH ที่มี GNU tar ก่อน System32 ให้ทุก process → <span class="mono text-[12px]">systemTar()</span> ใช้ <span class="mono text-[12px]">System32\tar.exe</span> เสมอ + PM2 ได้ env แบบ allowlist ไม่มี PATH ของ Git · <b>สั่ง erp จาก PowerShell</b></td></tr>
+              <tr><td style="white-space:normal;width:38%">ทุก service มีสองชุด, web / Caddy <span class="mono text-[12px]">EADDRINUSE</span></td><td>กด Start ERP ระหว่าง install ยังไม่จบ → <span class="mono text-[12px]">erp.lock</span>: install / update / rollback / start / restart / stop / finish ทีละคำสั่ง · ซ่อมเครื่องที่โดนแล้ว: <span class="mono text-[12px]">pm2 delete all</span> (PM2_HOME ของ ERP) แล้ว <span class="mono text-[12px]">erp start</span> ครั้งเดียว</td></tr>
+              <tr><td style="white-space:normal;width:38%">ทุก service crash-loop</td><td><span class="mono text-[12px]">NODE_ENV=production</span> — erp-api รับแค่ <span class="mono text-[12px]">local|test|dev|staging|prod</span> → installer ตั้ง <span class="mono text-[12px]">prod</span> ให้</td></tr>
+              <tr><td style="white-space:normal;width:38%">login ตอบ 500</td><td><span class="mono text-[12px]">TRANSPORT=tcp</span> ใช้ไม่ได้ (RMQ interceptor) → RabbitMQ บังคับ, <span class="mono text-[12px]">erp status</span> ขึ้น ✗</td></tr>
+              <tr><td style="white-space:normal;width:38%">Redis ไม่มีรหัสทั้งที่ตั้งแล้ว</td><td><span class="mono text-[12px]">REDIS_ARGS=--requirepass</span> ใช้ได้กับ <span class="mono text-[12px]">redis-stack</span> เท่านั้น image <span class="mono text-[12px]">redis</span> ทางการไม่อ่าน → compose ใส่ <span class="mono text-[12px]">--requirepass</span> ใน command</td></tr>
+              <tr><td style="white-space:normal;width:38%">หลังสลับ infra เป็น Docker ใน log มี <span class="mono text-[12px]">WRONGPASS</span></td><td>process เก่ายังต่อด้วยค่าเดิม → <span class="mono text-[12px]">erp restart</span> ทันทีหลัง <span class="mono text-[12px]">install-infra.ps1 -ErpHome</span></td></tr>
+              <tr><td style="white-space:normal;width:38%">WSL2 ขึ้นไม่ได้หลังรีสตาร์ท</td><td>Windows Update ค้าง — รีสตาร์ทธรรมดาไม่ติดตั้ง ต้อง “Update and restart” · หรือ BIOS ปิด virtualization</td></tr>
+              <tr><td style="white-space:normal;width:38%">migration แรกพังบน Postgres ใหม่</td><td>ต้องมี <span class="mono text-[12px]">uuid-ossp</span> → install / migrate สร้าง extension ให้ทุก DB</td></tr>
+              <tr><td style="white-space:normal;width:38%">สิทธิ์ API หายหมดหลังกด Sync Permissions</td><td>scan ไม่เจอ source → permission snapshot (§04)</td></tr>
+              <tr><td style="white-space:normal;width:38%">เปิดเว็บแล้วเตือน certificate / ชื่อไม่รู้จัก</td><td>เครื่องนั้นยังไม่เชื่อ CA / ไม่มี hosts → สคริปต์ client (§05 ข้อ 5) · การ์ด Web access บอกว่าขาดข้อไหน</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="rulebox">
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 11 SECURITY ========== -->
+      <section id="security" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">11 — ความปลอดภัย</div>
+        <h2 class="display text-3xl mb-6">บนเครื่องลูกค้า</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ตรวจบนเครื่องลูกค้า Windows จริง (2026-11-22) แล้วแก้ใน installer — มีผลกับ release ที่ build หลังจากนั้น · ภาพรวม: ERP ทุก process รันเป็น account เดียว
+          (เจ้าของ install) ภายใต้ PM2 ดังนั้น<b>ไม่มีใครอื่นในเครื่องต้องอ่านหรือแก้ไฟล์ของ install</b>
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>ความเสี่ยง</th><th>ที่ทำไว้</th></tr></thead>
+            <tbody>
+              <tr><td style="white-space:normal;width:38%">โฟลเดอร์ใต้ <span class="mono text-[12px]">C:\</span> สืบสิทธิ์ <span class="mono text-[12px]">Authenticated Users: Modify</span> → user ไหนก็แก้ <span class="mono text-[12px]">autostart.cmd</span> / โค้ดใน <span class="mono text-[12px]">releases\</span> ที่ task ตอนบูตรันด้วยสิทธิ์สูงสุดได้</td><td>start / install ปิด inheritance ของทั้ง home — เหลือเจ้าของ + Administrators + SYSTEM (ครั้งแรกไล่ทุกไฟล์ ใช้หลายนาที) · macOS / Ubuntu: ตัดสิทธิ์เขียนของคนอื่น + โฟลเดอร์ส่วนตัว 0700 · <span class="mono text-[12px]">erp status</span> เตือน <span class="mono text-[12px]">install home</span></td></tr>
+              <tr><td style="white-space:normal;width:38%"><span class="mono text-[12px]">caddy-data\…\root.key</span> อ่านได้ทุก user — ใครได้ไปออก cert ปลอมของเว็บไหนก็ได้ให้ทุกเครื่องที่เชื่อ CA นี้</td><td>อยู่ใต้ home ที่ล็อกแล้ว · เปิดอ่านได้เฉพาะ <span class="mono text-[12px]">erp-local-ca.crt</span> (cert สาธารณะ) · ย้าย / ทิ้งเครื่อง server → ถอน CA ออกจาก client</td></tr>
+              <tr><td style="white-space:normal;width:38%">secret ใน <span class="mono text-[12px]">config\*.env</span>, backup, <span class="mono text-[12px]">.env</span> ของแต่ละ release</td><td>เจ้าของเท่านั้น (Windows: <span class="mono text-[12px]">icacls</span> ด้วย SID, POSIX: 0600 / 0700) ทุกครั้งที่ start</td></tr>
+              <tr><td style="white-space:normal;width:38%">PM2 เก็บ env ทั้งหมดของ shell คนสั่ง (token ส่วนตัว, PATH) ลง <span class="mono text-[12px]">.pm2\dump.pm2</span> และส่งให้ทุก process</td><td>คำสั่ง pm2 ได้ env แบบ allowlist (เฉพาะของ OS) · ครั้งแรกหลังอัปเดต <span class="mono text-[12px]">pm2 kill</span> หนึ่งครั้งเพื่อล้าง env เก่า (ERP หยุด ~30 วินาที)</td></tr>
+              <tr><td style="white-space:normal;width:38%">Gotenberg รัน JavaScript ของ template — เดิม deny-list เทียบข้อความ URL จึงหลุดไป <span class="mono text-[12px]">http://rustfs:9000</span>, <span class="mono text-[12px]">localhost</span>, <span class="mono text-[12px]">[::1]</span></td><td>Gotenberg อยู่ docker network ของตัวเอง (มองไม่เห็น Redis / RabbitMQ / RustFS) + deny-list ใหม่ (ชื่อไม่มีจุด, IPv6, private range, <span class="mono text-[12px]">.internal</span>, <span class="mono text-[12px]">file:</span>) · ทดสอบแล้ว: ภายในทั้งหมด 403, เว็บภายนอกผ่าน · template ที่ใช้รูปจาก LAN ต้องฝังเป็น data URI</td></tr>
+              <tr><td style="white-space:normal;width:38%">Redis แบบ native บน Windows ไม่มีรหัส</td><td><b>ถอดออกแล้ว</b> — Redis เป็น container ที่มี <span class="mono text-[12px]">requirepass</span> เสมอ (รวม <span class="mono text-[12px]">-Mode native</span>)</td></tr>
+              <tr><td style="white-space:normal;width:38%">หน้าเว็บภายนอกชี้ชื่อของตัวเองมาที่ 127.0.0.1 (DNS rebinding) แล้วอ่าน Console</td><td>Console ที่ฟัง loopback ตอบเฉพาะ Host <span class="mono text-[12px]">127.0.0.1</span> / <span class="mono text-[12px]">localhost</span> / <span class="mono text-[12px]">[::1]</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">ยังไม่ได้ทำ</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            <b>สิทธิ์ต่ำสุดของบัญชี infra</b> — erp-api ใช้ root key ของ RustFS, RabbitMQ user เป็น administrator, Postgres มักเป็น superuser
+            (ต้องตกลงกับทีม erp-api ว่า migration / storage ต้องการสิทธิ์อะไร) ·
+            <b>Console ผ่าน TLS</b> เมื่อเปิดให้ LAN — ตอนนี้ <span class="mono text-[12px]">CONSOLE_PASSWORD</span> ส่งเป็น HTTP ธรรมดา
+          </p>
+        </div>
+        <div class="rulebox mt-6">
           <div class="rc mb-1">อ่านต่อ</div>
           <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
             repo <span class="mono text-[12px]">iotechsoft-company/erp-installer</span> (private): <span class="mono text-[12px]">README.md</span> — ติดตั้งทีละขั้น ·
-            <span class="mono text-[12px]">docs/windows.md</span> — checklist หน้างาน · <span class="mono text-[12px]">HANDOFF.md</span> — สถานะ, การตัดสินใจ, สิ่งที่ยังไม่ได้ทดสอบ ·
+            <span class="mono text-[12px]">docs/windows.md</span> — checklist หน้างาน + infra · <span class="mono text-[12px]">HANDOFF.md</span> — สถานะ, การตัดสินใจ, แผน security S1–S10, สิ่งที่ยังไม่ได้ทดสอบ ·
             <a href="caddy-reverse-proxy-guide.html" class="underline" style="color:var(--accent)">Caddy Reverse Proxy Guide</a> ·
             <a href="deployment-guide.html" class="underline" style="color:var(--accent)">Deployment Guide</a>
           </p>
@@ -443,7 +551,7 @@ flowchart LR
       <!-- FOOTER -->
       <erp-footer
         line1="ERP SYSTEM · INSTALLER GUIDE · ON-PREMISE"
-        line2="PM2 · Caddy · GitHub Releases · ERP Console">
+        line2="PM2 · Caddy · Docker (WSL2) infra · GitHub Releases · ERP Console">
       </erp-footer>
 
     </div>
