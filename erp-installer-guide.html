@@ -174,7 +174,7 @@ sequenceDiagram
   Con->>GH: อ่านรายการ release (UPDATE_GITHUB_TOKEN)
   Ops->>Con: กด ติดตั้ง
   Con->>GH: ดาวน์โหลด + ตรวจ sha256
-  Con->>Con: แตกไฟล์ → pnpm install --prod → migration → sync สิทธิ์ → ตรวจ DB → สลับ current → restart → health check
+  Con->>Con: แตกไฟล์ → pnpm install --prod → migration → sync สิทธิ์ → สลับ current → ตรวจ DB → restart → health check (ไม่ผ่าน = สลับกลับ)
 </pre>
 
         <div class="card overflow-hidden mt-8 mb-6">
@@ -337,12 +337,13 @@ C:\erp\erp.cmd install C:\erp\releases\&lt;version&gt;   <span class="c"># ร�
 flowchart LR
   L["ล็อก home<br/>ทีละคำสั่ง"] --> A["แตก release ใหม่<br/>pnpm install --prod"]
   A --> D["สร้าง DB ที่ยังไม่มี<br/>migration · permissions:sync"]
-  D --> P{"ตรวจ Postgres<br/>+ DB ครบทุก BC"}
-  P -- ไม่ครบ --> X["หยุด ไม่แตะ PM2<br/>บอกให้ erp migrate"]
-  P -- ครบ --> F["สลับ current<br/>restart ผ่าน PM2"]
+  D --> S["สลับ current"]
+  S --> P{"ตรวจ Postgres<br/>+ DB ครบทุก BC"}
+  P -- ครบ --> F["restart ผ่าน PM2"]
   F --> H{"health check<br/>ทุก service"}
   H -- ผ่าน --> I[เสร็จ]
-  H -- ไม่ผ่าน --> J["สลับ current กลับ<br/>migration ไม่ย้อน"]
+  P -- ไม่ครบ --> J["สลับ current กลับ<br/>migration ไม่ย้อน"]
+  H -- ไม่ผ่าน --> J
 </pre>
 
         <div class="card overflow-hidden mt-8 mb-6">
@@ -412,6 +413,10 @@ flowchart LR
   .pm2\  caddy-data\      <span class="c"># PM2 ของ install นี้ · CA ของ Caddy (private key — อย่าแชร์)</span>
   erp-local-ca.crt        <span class="c"># CA สำหรับติดตั้งบนเครื่อง client — ไฟล์เดียวที่ทุก user อ่านได้</span>
   erp.cmd                 <span class="c"># C:\erp\erp.cmd &lt;คำสั่ง&gt;</span>
+  state.json              <span class="c"># current / previous / ประวัติการติดตั้ง</span>
+  Caddyfile  ecosystem.config.cjs   <span class="c"># สร้างใหม่ทุก start — อย่าแก้เอง</span>
+  jobs\  uploads\         <span class="c"># log ของงานใน Console · ไฟล์ release ที่อัปโหลด / ดาวน์โหลด (เก็บตัวล่าสุด)</span>
+  erp.lock                <span class="c"># มีระหว่างคำสั่งที่เปลี่ยนสถานะ (install / update / start …)</span>
 
 C:\erp-infra\             <span class="c"># install-infra.ps1</span>
   secrets.env             <span class="c"># รหัส Redis / RabbitMQ / RustFS — Administrators + SYSTEM เท่านั้น · ต้องสำรอง</span>
