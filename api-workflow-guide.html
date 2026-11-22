@@ -1084,7 +1084,8 @@ sequenceDiagram
   FIN-->>SAL: receipt_number + ยอดภาษีที่คำนวณแล้ว
   SAL->>SAL: commit แถว pos_sales = COMPLETED
   SAL-->>C: 201 + เลขใบกำกับ + เงินทอน
-  INV-->>FIN: stock.deducted → COGS + กำไรต่อล็อต
+  SAL--)FIN: priceSaleLines (หลัง commit · ไม่รอผล · BE-25)
+  INV-->>FIN: stock.deducted → COGS + กำไรต่อล็อต (มาก่อนหรือหลัง priceSaleLines ก็ได้)
 </pre>
         </div>
 
@@ -1290,8 +1291,9 @@ sequenceDiagram
             ฝั่ง sales-bc จะหาใน <span class="mono text-[12px]">delivery_note_items</span> ก่อน ไม่เจอค่อยหาใน
             <span class="mono text-[12px]">pos_sale_items</span> · ยอดขายหน้าร้านจึงเข้ารายงานกำไรต่อล็อต (E2) เท่าเทียมกับการขายแบบ B2B
             ไม่ใช่กลายเป็นต้นทุนที่ไม่มีรายได้คู่กัน<br>
-            <b>FE อย่ารอ</b> — เหมือน B3 ตัวเลขกำไรมาช้ากว่า 1–5 วินาที ส่วนสลิปพิมพ์ได้ทันทีจาก
+            <b>FE อย่ารอ</b> — เหมือน B3 ตัวเลขกำไรมาช้ากว่าไม่กี่วินาที ส่วนสลิปพิมพ์ได้ทันทีจาก
             <span class="mono text-[12px]">receipt_id</span> ที่ตอบกลับมาแล้ว<br>
+            <b>กำไรของบิล POS มาเองเสมอ (BE-25, 2026-11-22)</b> — บิลตัดสต็อกก่อนเป็น <span class="mono text-[12px]">COMPLETED</span> ถ้า <span class="mono text-[12px]">stock.deducted</span> ถึงก่อน finance-bc จะลงต้นทุนไว้ก่อน แล้ว sales-bc แจ้ง finance-bc ให้ price บรรทัดทันทีหลัง commit (RPC <span class="mono text-[12px]">financeBc.profitLoss.priceSaleLines</span> ไม่รอผล) · finance-bc ไม่ตอบตอนนั้น การขายก็สำเร็จปกติ แล้ว cron ทุก 5 นาทีของ finance-bc เติมให้ · ไม่มี endpoint ใหม่ และ FE ไม่ต้องเรียก reconcile เอง<br>
             <b>ตอน void ก็มีช่วงคาบเกี่ยวแบบเดียวกัน และเป็นทิศที่คนลืม</b> (ยืนยันบนเครื่องจริง 2026-09-20) —
             คำสั่ง void คืนสต็อกและ void ใบกำกับ<b>ทันที</b> แต่การกลับรายการ COGS เดินทางผ่าน outbox
             จึงมาถึงหลังเอกสาร commit ไปแล้วไม่กี่วินาที · อ่านงบดุล/รายงานกำไร<b>ในช่วงนั้น</b> จะเห็นภาพ
@@ -2320,7 +2322,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/income-statements/print</td><td class="mono text-[11px]">income_statement:print</td><td>พิมพ์งบกำไรขาดทุนของช่วงนั้น → presigned URL ของ PDF · body คือช่วงเวลา ไม่ใช่ id เพราะไม่มีแถวเอกสารให้อ้าง</td></tr><tr><td class="mono text-[11.5px]">POST /finance-bc/v1/balance-sheets/print</td><td class="mono text-[11px]">balance_sheet:print</td><td>พิมพ์งบแสดงฐานะการเงิน ณ วันที่นั้น · ถ้างบไม่ลงตัว บรรทัดผลต่างและข้อความกำกับจะอยู่บนใบที่พิมพ์ออกมาเอง</td></tr><tr><td class="mono text-[11.5px]">GET /finance-bc/v1/ledger-entries</td><td class="mono text-[11px]">ledger_entry:view</td><td>บัญชีแยกประเภท · กรองด้วย <span class="mono">journal_id</span> หรือ <span class="mono">ref_doc_id</span></td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/cogs-entries</td><td class="mono text-[11px]">cogs_entry:view</td><td>ต้นทุนขายต่อล็อต</td></tr>
               <tr><td class="mono text-[11.5px]">GET /finance-bc/v1/profit-loss-records</td><td class="mono text-[11px]">profit_loss_record:view</td><td>กำไรขั้นต้นต่อล็อต · <b>ติดลบได้</b> เมื่อขายต่ำกว่าทุน</td></tr>
-              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/profit-loss-reconciliations</td><td class="mono text-[11px]">profit_loss_record:reconcile</td><td>เติมรายการกำไรที่ค้าง (ตอน sales-bc ไม่ตอบ)</td></tr>
+              <tr><td class="mono text-[11.5px]">POST /finance-bc/v1/profit-loss-reconciliations</td><td class="mono text-[11px]">profit_loss_record:reconcile</td><td>เติมรายการกำไรที่ค้าง (ตอน sales-bc ไม่ตอบ) · ระบบเรียกงานเดียวกันเองทุก 5 นาทีแล้ว (BE-25) — ใช้ล้างค้างทันที เช่นหลัง deploy</td></tr>
             </tbody>
           </table>
         </div>
@@ -2329,8 +2331,9 @@ sequenceDiagram
           <p class="text-[13.5px]">
             ต้นทุน (<span class="mono text-[12px]">cogs-entries</span>) ลงทันทีจาก event · แต่กำไรต้องถามราคาขายจาก sales-bc
             ถ้าตอนนั้นเรียกไม่ได้ ระบบจะ<b>ลงต้นทุนไว้ก่อนแล้วเว้นกำไรไว้</b> ·
-            หน้าจอควรมีปุ่ม “เติมรายการกำไรที่ค้าง” ที่ยิงไป <span class="mono text-[12px]">POST /profit-loss-reconciliations</span>
-            ซึ่งเรียกซ้ำได้ไม่จำกัด
+            ตั้งแต่ BE-25 (2026-11-22) finance-bc เติมให้เองทุก 5 นาที และบิล POS ถูก price ทันทีหลังปิดการขาย ·
+            ปุ่ม “เติมรายการกำไรที่ค้าง” ที่ยิงไป <span class="mono text-[12px]">POST /profit-loss-reconciliations</span>
+            ยังมีไว้ล้างค้างทันทีโดยไม่ต้องรอรอบถัดไป · เรียกซ้ำได้ไม่จำกัด
           </p>
         </div>
 
