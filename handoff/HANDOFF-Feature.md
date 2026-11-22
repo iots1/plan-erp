@@ -217,6 +217,19 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-22 · ประวัติการซื้อของลูกค้า: ราคาขายล่าสุด + ยอดรวม VAT (BE-23 + BE-26, `feat/be-23-26-customer-purchase-history` จาก main) ✅ **`pnpm verify sales-bc` ครบ 6 ขั้นบน local (หลัง rebase บน #49)**
+
+| | |
+|---|---|
+| ปัญหา | (BE-23) หน้าขายหา "ราคาขายล่าสุด" ของลูกค้าจากใบเสนอราคาอย่างเดียว เพราะ `purchased-products` มีแค่ `avg_price` ต่อหน่วยฐาน ไม่มีราคา/หน่วยของบิลล่าสุด · (BE-26) `line_total` ของ POS เป็นยอดก่อน VAT แต่ของ SO เป็นยอดตามฐานที่คีย์ → `/bills` แสดงบิล ABB 4 × 30 เป็น 112.15 และ `total_amount` ของ `/purchased-products` บวกสองฐานเข้าด้วยกัน |
+| ผู้ใช้ตัดสิน (2026-11-22) | (1) `last_unit_price` ส่งตามที่เก็บ (ฐานที่คีย์) + `last_is_vat_included` ให้ FE เทียบฐานกับตะกร้าเอง — BE แปลงฐานไม่ได้ (บรรทัด POS ไม่เก็บอัตรา VAT และห้ามใช้อัตรา literal) (2) ยอดรวม VAT ของสินค้าที่มีบรรทัด POS ยังไม่ backfill แม้บรรทัดเดียว = **null ทั้งแถว** ไม่ใช่รวมแบบข้าม null |
+| ทำแล้ว | `aggregateCustomerProducts()` ทั้ง `PosSalesService`/`SalesOrdersService` อ่าน `last_*` ทุกช่องด้วย `ARRAY_AGG(… ORDER BY NEWEST_LINE_FIRST)[1]` (`document_date DESC, item.created_at DESC, item.id DESC`) ให้ทุกช่องมาจากบรรทัดเดียวกัน (sku/ชื่อที่แสดงก็ใช้ลำดับเดียวกันแล้ว) · SO ส่ง `last_uom_*` null + factor 1 (ยังไม่มีหน่วยจนกว่า BE-03) · facade รวมสองฝั่งโดยเอาแถวที่ใหม่กว่าทั้งก้อน · `?product_ids=` (csv uuid ไม่ซ้ำ 1–100, transform `toCsvList` ในโมดูล) · `total_amount_incl_vat`: POS `CASE WHEN BOOL_OR(line_total_incl_vat IS NULL) THEN NULL ELSE SUM(...)`, SO `SUM(vat_base + vat_amount)` · `/bills` หัวบิล `is_vat_included`, บรรทัด `line_total_incl_vat` · sort ใหม่ `total_amount_incl_vat` (null ท้ายเสมอ) · swagger อธิบายฐานของ `line_total`/`total_amount`/`avg_price` เดิม · raw row + mapper ย้ายเป็น `ICustomerProductAggregateRawRow` + `toCustomerProductAggregate()` ใช้ร่วมสองฝั่ง |
+| ตรวจแล้ว (ตามใบงาน) | `purchased-products` นับ SO + POS เท่านั้น ใบส่งของไม่นับ · Σ `vat_base + vat_amount` ของ SO = `total` ของหัวใบพอดี (`applyTaxLayer` สร้าง `total` จากตัวเลขชุดเดียวกัน · SO ก่อนมี VAT รายบรรทัดถูก backfill `vat_base = line_total`, `vat_amount = 0`) · smoke ยืนยันกับข้อมูลจริงทั้ง SO และ POS |
+| สังเกต | บรรทัด POS ใหม่ที่ไม่ส่ง `uom_id` เก็บ `uom_id` ของหน่วยฐานจริง (ไม่ใช่ null) — `last_uom_id` null จึงเกิดเฉพาะ SO กับบรรทัด POS ก่อน BE-02 · `line_total_incl_vat` ของ SO รวมส่วนลดท้ายบิลที่ปันมาแล้ว แต่ `line_total` ของ SO ยังไม่หัก จึงต่างกันได้แม้ใบรวม VAT · response ส่งชื่อหน่วยเป็น `last_uom_name: { th, en }` (interceptor รวม `_th/_en`) — smoke รอบแรกแดงเพราะอ่าน `last_uom_name_th` ตรง ๆ |
+| smoke | ใหม่ `sales-bc/customer-last-sold-price` — ลูกค้าทดสอบของตัวเอง ขาย 4 บิล (หน่วยฐาน → หน่วยที่สอง ×2 → บิลที่ void ทันที → หน่วยฐาน) ตรวจ `last_*` สลับตามบิลล่าสุดที่ไม่ void · `product_ids` กรองได้/ผิดรูป 400 · ยอดรวม VAT = คอลัมน์ใน DB · Σ `line_total_incl_vat` = `total` ของบิล · void ทุกบิลใน `finally` · `customer-purchase-history` เดิมเพิ่มการตรวจฟิลด์ใหม่ + ยอดรวม VAT ของสินค้าอันดับแรกเทียบ SQL (SO + POS) + Σ บรรทัด = `total` ทุกบิลในหน้า |
+| ไม่มี | migration · permission ใหม่ · การเปลี่ยนความหมายฟิลด์เดิม (เพิ่มอย่างเดียว ไม่ breaking) |
+| ไม่ทำ (นอกขอบเขต) | หักยอดรับคืน POS (BE-07) ในประวัติการซื้อ · แก้ docblock `unit_price` ของ `pos-sale-item.entity.ts` ที่บอกว่าฐานมาจาก `document_type` (โค้ดใช้ `is_vat_included` ของหัวบิล) — จดไว้ในใบ BE-26 แล้ว |
+
 ### 2026-11-22 · กำไรต่อล็อตของบิล POS มาเองโดยไม่ต้อง reconcile (BE-25, `feat/be-25-pos-profit-loss-timing` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้นบน local ทั้ง finance-bc และ sales-bc** · ยังไม่ commit
 
 | | |
