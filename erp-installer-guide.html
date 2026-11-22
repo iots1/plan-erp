@@ -512,7 +512,11 @@ C:\erp-infra\             <span class="c"># install-infra.ps1</span>
         <div class="eyebrow text-[var(--accent)] mb-3">11 — ความปลอดภัย</div>
         <h2 class="display text-3xl mb-6">บนเครื่องลูกค้า</h2>
         <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
-          ตรวจบนเครื่องลูกค้า Windows จริง (2026-11-22) แล้วแก้ใน installer — มีผลกับ release ที่ build หลังจากนั้น · ภาพรวม: ERP ทุก process รันเป็น account เดียว
+          ตรวจบนเครื่องลูกค้า Windows จริง (2026-11-22) แล้วแก้ใน erp-installer commit <span class="mono text-[12px]">1726cce</span> —
+          ใช้ได้กับ release ที่ build จาก installer commit นั้นขึ้นไปเท่านั้น (ดู <span class="mono text-[12px]">VERSION.json</span> → commit ของ installer) ·
+          release ที่ build อัตโนมัติก่อนหน้า<b>ยังไม่มี</b> — ถ้ายังไม่มี push ใหม่ของ erp-api / erp-frontend ให้กด Actions → Release → Run workflow แล้ว Sync → ติดตั้ง ·
+          ติดตั้งครั้งแรกหลังจากนั้นช้ากว่าปกติหลายนาที (ปิดสิทธิ์ทุกไฟล์ใน <span class="mono text-[12px]">releases\</span>) และ PM2 รีสตาร์ทหนึ่งครั้ง ·
+          ภาพรวม: ERP ทุก process รันเป็น account เดียว
           (เจ้าของ install) ภายใต้ PM2 ดังนั้น<b>ไม่มีใครอื่นในเครื่องต้องอ่านหรือแก้ไฟล์ของ install</b>
         </p>
         <div class="card overflow-hidden mb-6">
