@@ -217,6 +217,20 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-22 · ใบกำกับภาษีเต็มรูปและใบส่งของ พิมพ์ต้นฉบับ + สำเนา ใน PDF ไฟล์เดียว (BE-22, `feat/be-22-print-original-and-copy` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้นบน local ทั้ง report-bc · finance-bc · sales-bc**
+
+| | |
+|---|---|
+| ทำไม | requirement 2026-11-18 ข้อ 14 — ใบกำกับเต็มรูป (รวมใบที่ BE-14 ออกจากใบส่งของ) และใบส่งของ ต้องได้ต้นฉบับ + สำเนาในการพิมพ์ครั้งเดียว · ใบกำกับอย่างย่อ / สลิป / ใบอื่นไม่เปลี่ยน |
+| ผู้ใช้ตัดสิน (2026-11-22) | (1) **เพิ่ม** `copies` (`original` / `copy`, ไม่ส่ง = ทั้งสอง) (2) พิมพ์ซ้ำหลังมีต้นฉบับแล้ว = **สำเนา 2 ชุด** (3) ป้าย**ภาษาเดียว**ตาม `locale` — "ต้นฉบับ"/"สำเนา" · "Original"/"Copy" (4) ใบ DRAFT พิมพ์ **2 ชุดมีป้าย + ลายน้ำ** ไม่นับเป็นต้นฉบับ |
+| report-bc | `paginator.inline.js` วางเอกสารซ้ำหนึ่งรอบต่อ `params.__copies` (ทุกชุดครบทุกหน้า `{{__page}}/{{__pages}}` นับต่อชุด) · Gotenberg ยังเรียกครั้งเดียว ไม่ต้อง merge PDF · `DocumentPrintsService` ประกอบ `__copies` + `copy_label: ''` เอง (ผู้เรียกส่งป้ายเองไม่ได้ เหมือนลายน้ำ) · `resolvePrintCopySets()` ใช้กฎ "ต้นฉบับมีครั้งเดียว" · `claimCopyNumber()` อ่าน `hasOriginalBeenPrinted` ใต้ lock เดิม · `is_original` = ครั้งนี้มีชุดต้นฉบับ (เอกสารชุดเดียว = `copy_number = 1` เท่าเดิม) · การพิมพ์ 1 ครั้ง = แถว `document_prints` เดียว · result มี `copies` เฉพาะการพิมพ์แบบชุด · replay ด้วย `idempotency_key` อ่าน `copies` จาก snapshot |
+| แม่แบบ | `receipt-tax-invoice.html` + `delivery-note.html` กล่อง `.copy-label` `{{copy_label}}` บนหัว `.doc` มุมบนขวาทุกหน้า `:empty` ซ่อน (ใบ ABB/INV ที่ใช้ไฟล์เดียวกันจึงไม่เห็น) · `_README.md` อัปเดต · **ยังไม่อัปโหลดขึ้น DB** ต้องอัปโหลดทั้งสองไฟล์ตั้งใจหลัง deploy — แถวที่ยังเป็นแม่แบบเก่าพิมพ์ 2 ชุดได้แต่ไม่มีป้าย |
+| finance-bc / sales-bc | `PrintReceiptDTO.copies` / `PrintDeliveryNoteDTO.copies` (`@ArrayMinSize(1)` `@ArrayMaxSize(2)` `@ArrayUnique` enum) · `ORIGINAL_AND_COPY_RECEIPT_DOCUMENT_TYPES = {FULL_TAX_INVOICE}` · `copies` กับใบชนิดอื่น/สลิป → 400 · `resolveRequestedPrintCopies()` (`@lib/common` ใช้สอง BC) เรียงต้นฉบับก่อนเสมอ · `PrintCopy` enum ใน `@lib/common` |
+| migration | `erp_report` `DocumentPrintIsOriginalComment` (generate — เปลี่ยน COMMENT ของ `is_original` อย่างเดียว) · seeder ไม่ต้องแก้ · ไม่มีสิทธิ์ใหม่ |
+| test | unit report-bc 8 (ชุดคู่ / อังกฤษ / พิมพ์ซ้ำ / copy-only ไม่ใช้ต้นฉบับ / DRAFT / ป้ายจากผู้เรียกถูกทับ / ใบอื่นชุดเดียว / replay) · finance-bc 7 · sales-bc 2 · libs/common 2 · smoke ใหม่ `finance-bc/receipt-original-and-copy-print` (ร่างใบกำกับของลูกค้าทดสอบเอง → 2 ชุด = หน้าเป็นสองเท่าของชุดเดียว, เรียงลำดับ, อังกฤษ, 400, RECEIPT ชุดเดียว, ใบที่มีเลขแล้วพิมพ์ 2 ครั้ง → `[original,copy]` แล้ว `[copy,copy]`) · `sales-bc/delivery-note-original-and-copy-print` (ใบส่งของที่มีอยู่) · `report-bc/print-original-and-copy-scope` (ใบเสนอราคา / ใบสั่งขาย / ABB A4 + สลิป ยังชุดเดียว) — ไม่ได้สร้างเอกสารที่ตัดสต็อกหรือออกเลข |
+| หลัง deploy | (1) migrate `erp_report` (2) อัปโหลด `receipt-tax-invoice.html` ไปทั้ง `receipt_full_tax_invoice` / `receipt_inv_tax_invoice` / `receipt_abb_tax_invoice` และ `delivery-note.html` ไป `delivery_note` — เทียบ `html_content` เดิมกับ git log ก่อนทับ (3) แจ้ง FE (ใบงาน BE-22 หัวข้อ "แจ้ง frontend") |
+| ไม่ทำ (นอกขอบเขต) | ข้อความ "ใบแทน" ตาม ม.86/12 (ยังรอฝ่ายบัญชี — `print_reason` ยังไม่บังคับ) · การพิมพ์แบบชุดในแม่แบบที่มี `js_content` ของตัวเอง (ไม่มีสักแถววันนี้) |
+
 ### 2026-11-22 · แก้ใบสั่งซื้อที่ผ่านร่างแล้วทับเลขเดิม + revision (BE-18b, `feat/be-18b-edit-submitted-purchase-order` จาก main) ✅ **`pnpm verify supplier-bc` ครบ 6 ขั้นบน local (smoke 10/10)**
 
 | | |
