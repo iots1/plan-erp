@@ -2457,19 +2457,21 @@ sequenceDiagram
   <span class="s">"timezone"</span>: <span class="s">"Asia/Bangkok"</span>,                              <span class="c">// IANA ของเครื่องผู้พิมพ์ (BE-17) — ไม่ระบุ = TIMEZONE ของ server · ชื่อผิด = 400</span>
   <span class="s">"idempotency_key"</span>: <span class="s">"b6e6c6b0-6b3e-4b3e-8b3e-6b3e4b3e8b3e"</span>,  <span class="c">// กันกดพิมพ์ซ้ำ (แนะนำให้ FE สุ่ม UUID ต่อการกดปุ่ม 1 ครั้ง)</span>
   <span class="s">"print_reason"</span>: <span class="k">null</span>,                                    <span class="c">// ใช้เมื่อพิมพ์ใบแทน (ยังไม่บังคับกรอกในเวอร์ชันนี้)</span>
-  <span class="s">"format"</span>: <span class="s">"slip"</span>                                       <span class="c">// "slip" (80mm) | "a4" — ไม่ระบุ = "a4" · slip ได้เฉพาะ RECEIPT/ABB_TAX_INVOICE ไม่งั้น 400</span>
+  <span class="s">"format"</span>: <span class="s">"slip"</span>,                                      <span class="c">// "slip" (80mm) | "a4" — ไม่ระบุ = "a4" · slip ได้เฉพาะ RECEIPT/ABB_TAX_INVOICE ไม่งั้น 400</span>
+  <span class="s">"copies"</span>: [<span class="s">"original"</span>, <span class="s">"copy"</span>]                        <span class="c">// BE-22 — เฉพาะ FULL_TAX_INVOICE แบบ A4 · ไม่ระบุ = ทั้งสอง · ดูกล่อง "ต้นฉบับ + สำเนา"</span>
 }
 
 <span class="c">// ตอบกลับ (JSON:API)</span>
 { <span class="s">"data"</span>: { <span class="s">"type"</span>: <span class="s">"receipts"</span>, <span class="s">"id"</span>: <span class="s">"6ed5…"</span>, <span class="s">"attributes"</span>: {
   <span class="s">"url"</span>: <span class="s">"https://…/receipt_full_tax_invoice-….pdf?X-Amz-…"</span>,  <span class="c">// presigned URL อายุ 1 ชม.</span>
-  <span class="s">"copy_number"</span>: <span class="t">1</span>, <span class="s">"is_original"</span>: <span class="t">true</span>
+  <span class="s">"copy_number"</span>: <span class="t">1</span>, <span class="s">"is_original"</span>: <span class="t">true</span>,
+  <span class="s">"copies"</span>: [<span class="s">"original"</span>, <span class="s">"copy"</span>]      <span class="c">// BE-22 — มีเฉพาะใบที่พิมพ์ต้นฉบับ + สำเนา</span>
 } } }</pre>
         </div>
         <div class="rulebox mb-4">
           <div class="rc mb-1">copy_number / is_original คำนวณฝั่ง backend เท่านั้น — FE แค่แสดงผล</div>
           <p class="text-[13.5px]">
-            <span class="mono text-[12px]">copy_number</span>: <b>1</b> = พิมพ์ครั้งแรกของเอกสารที่มีเลขที่แล้ว (ต้นฉบับ, <span class="mono text-[12px]">is_original: true</span>),
+            <span class="mono text-[12px]">copy_number</span>: <b>1</b> = พิมพ์ครั้งแรกของเอกสารที่มีเลขที่แล้ว (ต้นฉบับ, <span class="mono text-[12px]">is_original: true</span> — ใบที่พิมพ์ต้นฉบับ + สำเนา ดู <a href="#print-original-and-copy" style="color:var(--blueprint);text-decoration:underline">BE-22</a>),
             <b>2+</b> = พิมพ์ซ้ำ (สำเนา) · <b>0</b> = เอกสารยังเป็น <span class="mono text-[12px]">DRAFT</span> (ใบเสร็จที่ยังไม่ออกเลขที่ —
             <span class="mono text-[12px]">document_number</span> เป็น <span class="mono text-[12px]">null</span>) — PDF จะมีลายน้ำ DRAFT บังคับเสมอ ·
             ใบเสนอราคามีเลขที่ตั้งแต่สร้าง จึงไม่เจอ <span class="mono text-[12px]">copy_number: 0</span> ยกเว้นกรณีพิเศษในอนาคต<br>
@@ -2486,6 +2488,17 @@ sequenceDiagram
             <b><span class="mono text-[12px]">receipt_slip</span> ไม่ได้สร้างด้วย migration</b> — ต้องลงทะเบียน template + document type ในแต่ละ environment ก่อน
             (ดู <span class="mono text-[12px]">apps/report-bc/…/assets/templates/_README.md</span>) ไม่งั้นพิมพ์สลิปได้ 404 ·
             ค่าเริ่มต้นของร้านเก็บที่ <span class="mono text-[12px]">sales_settings.default_receipt_format</span> — FE อ่านแล้วส่งเป็น <span class="mono text-[12px]">format</span> เอง backend ไม่เดาให้
+          </p>
+        </div>
+        <div class="rulebox mb-4" id="print-original-and-copy">
+          <div class="rc mb-1">ใบกำกับภาษีเต็มรูปและใบส่งของ พิมพ์ต้นฉบับ + สำเนา ใน PDF ไฟล์เดียว (BE-22 · 2026-11-22)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">POST /finance-bc/v1/receipts/{id}/print</span> ของ <span class="mono text-[12px]">FULL_TAX_INVOICE</span> แบบ A4 (รวมใบที่ออกจากใบส่งของตาม BE-14) และ <span class="mono text-[12px]">POST /sales-bc/v1/delivery-notes/{id}/print</span> ได้ <b>PDF ไฟล์เดียว 2 ชุด</b> — ชุดแรกมุมบนขวาเขียน "ต้นฉบับ" ชุดที่สอง "สำเนา" (<span class="mono text-[12px]">locale: "en"</span> = "Original" / "Copy") · แต่ละชุดมีครบทุกหน้า และนับหน้า 1/N ของตัวเอง ·
+            ฟิลด์ใหม่ <span class="mono text-[12px]">copies</span> (optional) = <span class="mono text-[12px]">["original","copy"]</span> ค่าใดค่าหนึ่งหรือทั้งคู่ ไม่ส่ง = ทั้งสอง · พิมพ์ต้นฉบับก่อนเสมอไม่ว่าส่งลำดับไหน · อาร์เรย์ว่าง / ซ้ำ / ค่าอื่น = <b>400</b> · ส่ง <span class="mono text-[12px]">copies</span> กับใบเสร็จชนิดอื่นหรือ <span class="mono text-[12px]">format: "slip"</span> = <b>400</b> ·
+            <b>ต้นฉบับมีครั้งเดียว:</b> เมื่อเคยพิมพ์ชุดต้นฉบับของเอกสารนั้นแล้ว <span class="mono text-[12px]">original</span> จะพิมพ์เป็นสำเนา — พิมพ์ซ้ำจึงได้สำเนา 2 ชุด · พิมพ์ <span class="mono text-[12px]">["copy"]</span> ครั้งแรกยังไม่ใช้ต้นฉบับ ·
+            response มี <span class="mono text-[12px]">copies</span> = ชุดที่พิมพ์จริงตามลำดับ (เช่น <span class="mono text-[12px]">["copy","copy"]</span>) และ <span class="mono text-[12px]">is_original</span> = ครั้งนี้มีชุดต้นฉบับ · ใบ DRAFT พิมพ์ 2 ชุดพร้อมป้ายและลายน้ำ แต่ไม่นับเป็นต้นฉบับ (<span class="mono text-[12px]">copy_number: 0</span>) ·
+            ใบชนิดอื่น (ใบกำกับอย่างย่อ, <span class="mono text-[12px]">INV_TAX_INVOICE</span>, สลิป ฯลฯ) พิมพ์ชุดเดียวเหมือนเดิม ไม่มี <span class="mono text-[12px]">copies</span> ใน response · snapshot อยู่ใน <span class="mono text-[12px]">document_prints.params.__copies</span> ·
+            <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — อัปโหลด <span class="mono text-[12px]">receipt-tax-invoice.html</span> และ <span class="mono text-[12px]">delivery-note.html</span> ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy (แถวที่ยังเป็นแม่แบบเก่าพิมพ์ 2 ชุดได้ แต่ไม่มีป้าย)
           </p>
         </div>
         <div class="rulebox mb-4" id="print-issued-caption">
