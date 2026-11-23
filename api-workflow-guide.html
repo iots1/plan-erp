@@ -452,9 +452,22 @@ sequenceDiagram
   <span class="s">"discount_value"</span>: <span class="t">0</span>,
   <span class="s">"items"</span>: [
     { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"qty"</span>: <span class="t">100</span>, <span class="s">"unit_cost"</span>: <span class="t">450</span>,
-      <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> }
+      <span class="s">"discount_type"</span>: <span class="s">"amount"</span>, <span class="s">"discount"</span>: <span class="t">0</span> },
+    { <span class="s">"product_id"</span>: <span class="s">"1b7f…"</span>, <span class="s">"uom_id"</span>: <span class="s">"c0a8…"</span>,   <span class="c">// BE-04 · สั่งเป็นลัง (ไม่ส่ง = หน่วยฐาน)</span>
+      <span class="s">"qty"</span>: <span class="t">10</span>, <span class="s">"unit_cost"</span>: <span class="t">5400</span> }        <span class="c">// qty / unit_cost เป็นของหน่วยนั้น</span>
   ]
 }</pre>
+        </div>
+        <div class="rulebox mb-6" id="purchase-uom">
+          <div class="rc mb-1">หน่วยที่สั่งบนบรรทัดใบสั่งซื้อ (BE-04 · 2026-11-23) — request เพิ่ม <span class="mono text-[12px]">uom_id</span> (ไม่บังคับ) response เพิ่มหน่วยและ <span class="mono text-[12px]">stock_qty</span></div>
+          <p class="text-[13.5px]">
+            บรรทัด create / update / revision รับ <span class="mono text-[12px]">uom_id</span> — หน่วยฐานหรือหน่วยที่มี <span class="mono text-[12px]">uom_conversion_factors</span> ชนิด <b>purchase</b> ของสินค้านั้น (หน่วยขายอย่างเดียว = 400) · <b>ไม่ส่ง = หน่วยฐาน factor 1</b> client เก่าใช้ได้เหมือนเดิม · <span class="mono text-[12px]">qty</span> และ <span class="mono text-[12px]">unit_cost</span> เป็นของหน่วยที่สั่ง · server หา <span class="mono text-[12px]">conversion_factor</span> เองจาก inventory-bc (ส่งมาใน body ถูกตัดทิ้ง) · สินค้าเดียวกันต่างหน่วยเป็นสองบรรทัดได้ ซ้ำคู่ <span class="mono text-[12px]">(product_id, uom_id)</span> = 400 ·
+            response ของบรรทัดเพิ่ม <span class="mono text-[12px]">uom_id</span>, <span class="mono text-[12px]">uom_name_th/en</span>, <span class="mono text-[12px]">conversion_factor</span>, <span class="mono text-[12px]">stock_qty</span> (= <span class="mono text-[12px]">qty × conversion_factor</span>), <span class="mono text-[12px]">returned_qty</span> · <b><span class="mono text-[12px]">received_qty</span> / <span class="mono text-[12px]">returned_qty</span> เป็นหน่วยฐาน</b> ยอดค้างรับ = <span class="mono text-[12px]">stock_qty − (received_qty − returned_qty)</span> ·
+            บรรทัดก่อน BE-04: <span class="mono text-[12px]">uom_id</span> null, factor 1, <span class="mono text-[12px]">stock_qty = qty</span> ·
+            <b>ใบรับสินค้า</b>: หน้าจอเติมหน่วยเริ่มต้นของบรรทัดจาก <span class="mono text-[12px]">uom_id</span> ของบรรทัด PO เอง — API ใบรับยังถือว่าไม่ส่ง <span class="mono text-[12px]">uom_id</span> = หน่วยฐาน · <span class="mono text-[12px]">import_cost</span> เป็นต่อหน่วยฐาน (ต้นทุนต่อหน่วยฐานของ PO = <span class="mono text-[12px]">unit_cost ÷ conversion_factor</span>) · เพดานรับเกินตอน submit คิดจาก <span class="mono text-[12px]">stock_qty</span> ·
+            รายงาน <span class="mono text-[12px]">/purchase-reports/products|outstanding</span>: <span class="mono text-[12px]">ordered_qty</span> / <span class="mono text-[12px]">received_qty</span> / <span class="mono text-[12px]">outstanding_qty</span> เป็นหน่วยฐาน ·
+            พิมพ์ใบสั่งซื้อมีคอลัมน์หน่วย — <b>อัปโหลด <span class="mono text-[12px]">purchase-order.html</span> ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy</b>
+          </p>
         </div>
         <div class="rulebox mb-6" id="purchase-vat">
           <div class="rc mb-1">VAT ในใบสั่งซื้อ / ใบรับ / ใบคืน (BE-19 · 2026-11-19) — response มีตัวเลขเพิ่ม request ไม่เปลี่ยน</div>
