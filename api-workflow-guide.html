@@ -2505,6 +2505,16 @@ sequenceDiagram
             <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — อัปโหลด <span class="mono text-[12px]">receipt-tax-invoice.html</span> และ <span class="mono text-[12px]">delivery-note.html</span> ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy (แถวที่ยังเป็นแม่แบบเก่าพิมพ์ 2 ชุดได้ แต่ไม่มีป้าย)
           </p>
         </div>
+        <div class="rulebox mb-4" id="print-revision-label">
+          <div class="rc mb-1">บิล POS ที่ถูกแก้ทับเลขเดิม พิมพ์ป้าย "ฉบับแก้ไขครั้งที่ n" (BE-18c · 2026-11-23)</div>
+          <p class="text-[13.5px]">
+            <span class="mono text-[12px]">POST /finance-bc/v1/receipts/{id}/print</span> ของใบกำกับบิล POS ที่ผ่าน <span class="mono text-[12px]">POST /sales-bc/v1/pos-sales/{id}/revisions</span> (<a href="#b5-pos-revision" style="color:var(--blueprint);text-decoration:underline">BE-18a</a>) แสดง "ฉบับแก้ไขครั้งที่ n" (<span class="mono text-[12px]">locale: "en"</span> = "Revision n") — A4 ข้างป้ายต้นฉบับ/สำเนา (ขึ้นทุกชุด) · สลิปใต้เลขที่/วันที่ · request และ response ไม่เปลี่ยน ·
+            n = <span class="mono text-[12px]">revision_count</span> ของบิล · เปิด/ปิดด้วย <span class="mono text-[12px]">PUT /sales-bc/v1/sales-settings</span> <span class="mono text-[12px]">{ should_print_pos_sale_revision_label }</span> (ค่าเริ่มต้นเปิด) — มีผลกับการพิมพ์ครั้งต่อไป ไม่แก้ PDF ที่พิมพ์ไปแล้ว ·
+            ไม่มีป้าย: บิลไม่เคยแก้ · ปิดสวิตช์ · ใบย่อเดิมที่ void ตอนเปลี่ยนเป็นใบเต็มรูป · ใบที่ไม่ใช่ของบิล POS · snapshot อยู่ใน <span class="mono text-[12px]">document_prints.params.revision_label</span> ·
+            <b>พิมพ์ใหม่หลังแก้ต้องใช้ <span class="mono text-[12px]">idempotency_key</span> ใหม่</b> — key เดิมคืน PDF เดิมก่อนแก้ ·
+            <b>แม่แบบใน DB ไม่เปลี่ยนเอง</b> — อัปโหลด <span class="mono text-[12px]">receipt-tax-invoice.html</span> และ <span class="mono text-[12px]">receipt-slip.html</span> ด้วย <span class="mono text-[12px]">PUT /report-bc/v1/print-templates/{id}</span> หลัง deploy (แถวที่ยังเป็นแม่แบบเก่าพิมพ์ได้แต่ไม่มีป้าย)
+          </p>
+        </div>
         <div class="rulebox mb-4" id="print-issued-caption">
           <div class="rc mb-1">วันเวลาที่ทำรายการ + ผู้ทำรายการ บนใบพิมพ์ทุกใบ (BE-17 · 2026-11-19)</div>
           <p class="text-[13.5px]">
@@ -2675,7 +2685,7 @@ sequenceDiagram
               <tr><td>inventory</td><td class="mono text-[11.5px]">/products/{id}/reorder-levels · /products/{id}/variant-barcodes</td><td>จุดสั่งซื้อซ้ำ · บาร์โค้ด</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/purchase-returns</td><td>ส่งคืนสินค้าให้ผู้ขาย (ดู A4 ด้านบน) — submittable, ไม่ใช่ CRUD ตรง</td></tr>
               <tr><td>inventory</td><td class="mono text-[11.5px]">/stock-settings</td><td><b>GET/PUT เท่านั้น</b> · FIFO/FEFO · วันแจ้งเตือนหมดอายุ · % รับเกิน · <b>เพดานอนุมัติใบปรับยอด</b> · <b><span class="mono">allow_negative_stock</span></b> = ขาย POS/ส่งของเกินคงเหลือได้ (BE-15 · ดู E1.1)</td></tr>
-              <tr><td>sales</td><td class="mono text-[11.5px]">/sales-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบเสนอราคา (%) · <span class="mono text-[11.5px]">default_receipt_format</span> <span class="mono text-[11.5px]">slip|a4</span> (2026-10-23) · <span class="mono text-[11.5px]">allow_edit_completed_pos_sale</span> (ค่าเริ่มต้นปิด) + <span class="mono text-[11.5px]">pos_sale_edit_window_days</span> (ค่าเริ่มต้น 30 · 0 = ไม่จำกัด) — แก้บิล POS ที่สำเร็จแล้ว (BE-18a, 2026-11-22)</td></tr>
+              <tr><td>sales</td><td class="mono text-[11.5px]">/sales-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบเสนอราคา (%) · <span class="mono text-[11.5px]">default_receipt_format</span> <span class="mono text-[11.5px]">slip|a4</span> (2026-10-23) · <span class="mono text-[11.5px]">allow_edit_completed_pos_sale</span> (ค่าเริ่มต้นปิด) + <span class="mono text-[11.5px]">pos_sale_edit_window_days</span> (ค่าเริ่มต้น 30 · 0 = ไม่จำกัด) — แก้บิล POS ที่สำเร็จแล้ว (BE-18a, 2026-11-22) · <span class="mono text-[11.5px]">should_print_pos_sale_revision_label</span> (ค่าเริ่มต้นเปิด) — พิมพ์ป้าย "ฉบับแก้ไขครั้งที่ n" บนใบกำกับ/สลิปของบิลที่ถูกแก้ (BE-18c, 2026-11-23 · ดู <a href="#print-revision-label" style="color:var(--blueprint);text-decoration:underline">ป้ายฉบับแก้ไข</a>)</td></tr>
               <tr><td>supplier</td><td class="mono text-[11.5px]">/supplier-settings</td><td><b>GET/PUT เท่านั้น</b> · กรอบราคาใบสั่งซื้อ (%)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/finance-settings</td><td><b>GET/PATCH</b> · กรอบราคาใบตั้งหนี้ (%) — <span class="mono text-[11px]">ledger_frozen_upto</span> แก้ที่นี่ไม่ได้ ต้องผ่าน close-period (ดู C6)</td></tr>
               <tr><td>finance</td><td class="mono text-[11.5px]">/finance-setting-audit-logs</td><td><b>GET เท่านั้น</b> · ประวัติการเปลี่ยนค่า finance_settings/tax_configs ทีละฟิลด์ (ดู C9)</td></tr>

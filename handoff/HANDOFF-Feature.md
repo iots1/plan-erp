@@ -217,6 +217,15 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-23 · พิมพ์ซ้ำบิล POS ที่ถูกแก้ แสดง "ฉบับแก้ไขครั้งที่ n" (BE-18c, `feat/be-18c-print-revision-label` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้น sales-bc · finance-bc · report-bc**
+
+| | |
+|---|---|
+| ทำแล้ว | **sales-bc:** `sales_settings.should_print_pos_sale_revision_label` (ค่าเริ่มต้นเปิด · audit · migration `AddPosSaleRevisionLabelSetting`) · RPC `FindPaymentsByReceipt` ส่ง `revision_count` + `should_print_revision_label` เพิ่ม (optional) — true เฉพาะบิลที่แก้แล้ว + สวิตช์เปิด + receipt ที่ถามคือ `receipt_id` ปัจจุบัน **finance-bc:** `toPrintParams` ประกอบ `revision_label` ตาม `locale` ("ฉบับแก้ไขครั้งที่ n" / "Revision n") **report-bc:** `receipt-tax-invoice.html` (กล่องข้าง `copy_label`) + `receipt-slip.html` (ใต้เลขที่/วันที่) ซ่อนด้วย `:empty` · smoke `pos-sale-revision-print-label` |
+| ข้อตัดสินใจ (ผู้ใช้ 2026-11-23 ตามค่าที่ใบงานแนะนำ) | สวิตช์ค่าเริ่มต้นเปิด · ภาษาเดียวตาม `locale` แบบ BE-22 · A4 ต่อท้าย `copy_label` / สลิปใต้เลขที่ · ใช้กับใบกำกับ A4 + สลิปของบิล POS เท่านั้น · ไม่พิมพ์รายละเอียดการแก้ |
+| ต่างจากแผน | ใบย่อเดิมที่ void ตอนเปลี่ยนเป็นใบเต็มรูป (`previous_receipt_id`) ไม่มีป้าย — การแก้ทับเฉพาะใบปัจจุบัน ใบเดิมพิมพ์ซ้ำตามที่ออกไว้ |
+| หลัง deploy | (1) migration erp_sales รันเอง (2) อัปโหลดแม่แบบ 2 ไฟล์ `receipt-tax-invoice.html`, `receipt-slip.html` ด้วย `PUT /report-bc/v1/print-templates/:id` (เทียบ `html_content` เดิมกับ git log ก่อนทับ) — ยังไม่อัปโหลดก็พิมพ์ได้แต่ไม่มีป้าย (3) แจ้ง FE-25 PR 1: สวิตช์ใหม่ในหน้าตั้งค่าขาย · ไม่มี permission ใหม่ |
+
 ### 2026-11-22 · แก้บิล POS ที่ขายสำเร็จแล้ว ทับเลขบิล/เลขใบกำกับเดิม (BE-18a, `feat/be-18a-edit-completed-pos-sale` จาก main) ✅ **`pnpm verify` ครบ 6 ขั้นบน local ทั้ง sales-bc · finance-bc · iam**
 
 | | |
