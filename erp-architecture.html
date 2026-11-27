@@ -972,8 +972,8 @@ sequenceDiagram
     SLS->>SLS: อ่าน customer — ต้อง is_active · snapshot ชื่อ + เลขผู้เสียภาษี
     SLS->>INV: getProductById (RPC) ต่อ product ที่ไม่ซ้ำ — ยิงขนาน
     INV-->>SLS: sku, ชื่อ, has_variants, type
-    SLS->>INV: getEffectivePrice (RPC) — ราคาอ้างอิงจาก item_prices
-    INV-->>SLS: rate อ้างอิง (หรือ null = ไม่มีข้อมูลอ้างอิง)
+    SLS->>INV: getEffectiveRatesByUom (RPC) — ราคาทุกหน่วยจาก item_prices
+    INV-->>SLS: rate ต่อหน่วย (หน่วยบรรทัดก่อน ไม่มีจึงหน่วยฐาน × factor · ว่าง = ไม่มีข้อมูลอ้างอิง)
     Note over SLS,INV: unit_price เบี่ยงเบนเกิน ±20% จากราคาอ้างอิง → 400<br/>ไม่มีราคาอ้างอิง → ผ่าน (ต่อรองได้)
     SLS-->>SAL: 201 · QT-{YYYY}-{00001} · DRAFT
     SAL->>SLS: POST /quotations/{id}/send
