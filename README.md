@@ -28,6 +28,7 @@
 | [HA &amp; Failover Operations Guide](https://iots1.github.io/plan-erp/ha-failover-operations-guide.html) | เครื่องไหนดับแล้วเกิดอะไร · Triage สำหรับ Junior |
 | [Deployment Guide](https://iots1.github.io/plan-erp/deployment-guide.html) | On-Premise · Docker Compose · Kong · Cloudflare Tunnel |
 | [ERP Installer Guide](https://iots1.github.io/plan-erp/erp-installer-guide.html) | On-Premise · ERP บน PM2 + infra Docker (WSL2) · Release อัตโนมัติจาก push → ERP Console → เครื่องลูกค้า · ใครทำอะไร · ความปลอดภัย |
+| [LAN Setup Guide](https://iots1.github.io/plan-erp/lan-setup-guide.html) | ตั้งค่า Server + Client บน Windows · Firewall 80/443/9443 · hosts / DNS · CA ของ Caddy · ไล่ปัญหา |
 | [IAM Policy Engine](https://iots1.github.io/plan-erp/iam-policy-engine-guide.html) | Core Invariant · API Contract · Defect Log |
 | [Incident Runbook](https://iots1.github.io/plan-erp/runbook.html) | Symptom → Diagnosis → Fix → Verify |
 | [Runbook · Pgpool Nodes Down](https://iots1.github.io/plan-erp/runbook-pgpool-nodes-down.html) | Backend node ของ Pgpool ดับพร้อมกันหมด — Diagnosis → Fix → Verify |

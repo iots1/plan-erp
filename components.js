@@ -24,6 +24,7 @@ class ErpDocnav extends HTMLElement {
     { href: 'deployment-guide.html', icon: '🚀', label: 'Deployment Guide', desc: 'On-Premise · Docker Compose · Kong · Cloudflare Tunnel' },
     { href: 'caddy-reverse-proxy-guide.html', icon: '🌀', label: 'Caddy Reverse Proxy Guide', desc: 'Local Dev Setup · Caddy vs Kong สำหรับ Production' },
     { href: 'erp-installer-guide.html', icon: '📦', label: 'ERP Installer Guide', desc: 'On-Premise · PM2 + infra Docker (WSL2) · Release → ERP Console → เครื่องลูกค้า' },
+    { href: 'lan-setup-guide.html', icon: '🖧', label: 'LAN Setup Guide', desc: 'Server + Client · Firewall · hosts / DNS · HTTPS ภายใน' },
     { href: 'iam-policy-engine-guide.html', icon: '🛡️', label: 'IAM Policy Engine', desc: 'Invariants · API Contract · Defect Log · ABAC' },
     { href: 'bugfix-log.html', icon: '🐛', label: 'Bug Fix Log', desc: 'บั๊กที่แก้แล้ว · อาการ → ต้นเหตุ → เทสต์ที่คุม' },
     { href: 'runbook.html', icon: '🚨', label: 'Runbook', desc: 'Incident Response · Symptom → Diagnosis → Fix → Verify' },

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<script>
+(function(){try{var t=localStorage.getItem('erp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LAN Setup Guide — ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@12.0.0/dist/mermaid.min.js"></script>
+<script src="mermaid-init.js" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="components.js" defer></script>
+<script src="theme-toggle.js" defer></script>
+</head>
+<body>
+
+<erp-docnav></erp-docnav>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <erp-sidebar badge="🖧" title="LAN Setup" subtitle="SERVER · CLIENT · WINDOWS" width="280">
+    <nav slot="nav" id="nav">
+      <a href="#overview"  class="navlink"><span class="n">01</span> ภาพรวม: เครื่องในออฟฟิศเข้า ERP อย่างไร</a>
+      <a href="#plan"      class="navlink"><span class="n">02</span> ก่อนเริ่ม: IP · ชื่อ · พอร์ต</a>
+      <a href="#server"    class="navlink"><span class="n">03</span> ตั้งค่าเครื่อง Server</a>
+      <a href="#server-manual" class="navlink"><span class="n">04</span> Server — ทำเองทีละขั้น</a>
+      <a href="#client"    class="navlink"><span class="n">05</span> ตั้งค่าเครื่อง Client</a>
+      <a href="#client-manual" class="navlink"><span class="n">06</span> Client — ทำเองทีละขั้น</a>
+      <a href="#dns"       class="navlink"><span class="n">07</span> ทางเลือก: DNS ของ router</a>
+      <a href="#verify"    class="navlink"><span class="n">08</span> ตรวจรับ</a>
+      <a href="#trouble"   class="navlink"><span class="n">09</span> เข้าไม่ได้ — ไล่ปัญหา</a>
+      <a href="#change"    class="navlink"><span class="n">10</span> เปลี่ยน IP · ย้ายเครื่อง · ถอนออก</a>
+      <a href="#security"  class="navlink"><span class="n">11</span> ข้อควรระวังด้านความปลอดภัย</a>
+    </nav>
+    <div slot="footnote">
+      <a href="erp-installer-guide.html" class="mono text-[10px] leading-relaxed text-[#7FE3DE] hover:text-white transition-colors">← ERP Installer Guide</a>
+    </div>
+  </erp-sidebar>
+
+  <!-- ============ MAIN ============ -->
+  <main class="flex-1 min-w-0">
+
+    <!-- HERO -->
+    <header class="blueprint-bg text-white relative overflow-hidden">
+      <div class="absolute inset-0" style="background:radial-gradient(120% 90% at 85% -10%, rgba(10,162,160,.28), transparent 55%);"></div>
+      <div class="relative max-w-[900px] mx-auto px-6 sm:px-10 py-16 sm:py-20">
+        <a href="index.html" class="inline-flex items-center gap-2 mono text-[11px] text-[#9FB0C6] hover:text-white transition-colors mb-6">
+          ← กลับสู่สารบัญเอกสาร
+        </a>
+        <div class="eyebrow text-[#7FE3DE] mb-5">LAN Setup Guide · Windows · Local Domain · HTTPS ภายใน</div>
+        <h1 class="display text-3xl sm:text-[42px] leading-[1.15] max-w-3xl">
+          ให้ทุกเครื่องในออฟฟิศเปิด<br>
+          <span class="text-[#7FE3DE]">https://erp.internal</span> ได้
+        </h1>
+        <p class="mt-6 text-[15.5px] text-[#C6D4EA] max-w-2xl leading-relaxed">
+          คู่มือตั้งค่าเครือข่ายหลังติดตั้ง ERP แล้ว ฝั่ง <b>Server</b> (เครื่องที่รัน ERP) ต้องเปิด firewall และให้ Caddy ตอบชื่อ domain
+          ฝั่ง <b>Client</b> (ทุกเครื่องที่เปิดเว็บ) ต้องรู้ว่าชื่อนั้นอยู่ที่ IP ไหน และต้องเชื่อ certificate ของ Caddy
+          ทั้งสองฝั่งมีทางลัดเป็นคำสั่งเดียว และมีขั้นตอนทำเองไว้ใช้ตอนทางลัดไม่ผ่าน
+        </p>
+        <div class="mt-9 flex flex-wrap gap-2.5">
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>Server: <span class="mono">erp finish</span></span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#22C55E"></span>Client: <span class="mono">erp-client-setup.ps1</span></span>
+          <span class="chip !bg-white/10 !border-white/15 !text-white"><span class="dot" style="background:#F59E0B"></span>ยังไม่ทดสอบบนเครื่องจริง: <span class="mono">erp finish</span> แบบไม่ dry-run · สคริปต์ client</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[900px] mx-auto px-6 sm:px-10">
+
+      <div class="rulebox mt-12" style="border-color:var(--signal)">
+        <div class="rc mb-1" style="color:var(--signal)">สรุปใน 30 วินาที</div>
+        <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+          <b class="text-[var(--ink)]">Server:</b> PowerShell แบบ Run as Administrator → <span class="mono text-[12px]">C:\erp\erp.cmd finish</span>
+          (เปิด firewall <b class="text-[var(--ink)]">80 / 443 / 9443</b> และสร้าง <span class="mono text-[12px]">C:\erp\erp-client-setup.ps1</span>) ·
+          <b class="text-[var(--ink)]">Client:</b> copy <span class="mono text-[12px]">erp-client-setup.ps1</span> ไปเครื่อง client แล้วคลิกขวา → <b class="text-[var(--ink)]">Run with PowerShell</b>
+          → ปิดแล้วเปิด Chrome / Edge ใหม่ → เปิด <span class="mono text-[12px]">https://erp.internal</span> ·
+          ตั้ง IP ของ server ให้<b class="text-[var(--ink)]">คงที่</b>ก่อนเริ่ม ไม่อย่างนั้น hosts ของทุกเครื่องจะชี้ผิดเมื่อ IP เปลี่ยน
+        </p>
+      </div>
+
+      <!-- ========== 01 OVERVIEW ========== -->
+      <section id="overview" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">01 — ภาพรวม</div>
+        <h2 class="display text-3xl mb-6">เครื่องในออฟฟิศเข้า ERP อย่างไร</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ทุก request จาก browser เข้าทาง <b>Caddy</b> บนเครื่อง server ที่เดียว Caddy แยกตามชื่อและพอร์ต แล้วส่งต่อไปที่ process ของ ERP ซึ่งฟังแค่
+          <span class="mono text-[12px]">127.0.0.1</span> ส่วน Redis / RabbitMQ / RustFS / Gotenberg ก็ฟังแค่ <span class="mono text-[12px]">127.0.0.1</span>
+          ดังนั้นพอร์ตที่ต้องเปิดให้ LAN มีแค่พอร์ตของ Caddy
+        </p>
+
+        <div class="diagram card p-5 mb-6">
+<pre class="mermaid">
+flowchart TB
+  subgraph C["เครื่อง Client (Windows)"]
+    B["Chrome / Edge"]
+    H["hosts หรือ DNS<br/>erp.internal → 192.168.1.10"]
+    CA["Trusted Root<br/>erp-local-ca.crt"]
+  end
+  subgraph S["เครื่อง Server 192.168.1.10"]
+    FW["Windows Firewall<br/>rule: ERP (Caddy)<br/>TCP 80, 443, 9443"]
+    CD["Caddy<br/>tls internal"]
+    FE["erp-frontend (Next)"]
+    API["erp-api (8 BC)"]
+    S3["RustFS (S3)<br/>127.0.0.1:9000"]
+  end
+  B -- "1 ถามว่า erp.internal อยู่ไหน" --> H
+  B -- "2 HTTPS :443 / :9443" --> FW --> CD
+  CA -. "3 ตรวจ certificate" .- B
+  CD -- "/" --> FE
+  CD -- "/api/*" --> API
+  CD -- ":9443" --> S3
+</pre>
+        </div>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>พอร์ต (บน server)</th><th>ใครเรียก</th><th>ใช้ทำอะไร</th><th>ตั้งค่าใน <span class="mono text-[12px]">erp.env</span></th></tr></thead>
+            <tbody>
+              <tr><td class="mono text-[12px]">80</td><td>browser</td><td style="white-space:normal">redirect ไป HTTPS (คนพิมพ์ <span class="mono text-[12px]">erp.internal</span> เฉยๆ ก็ไปถูก)</td><td class="mono text-[12px]">ERP_HTTP_PORT</td></tr>
+              <tr><td class="mono text-[12px]">443</td><td>browser · API client</td><td style="white-space:normal">หน้าเว็บ <span class="mono text-[12px]">https://erp.internal</span> และ <span class="mono text-[12px]">/api/*</span> · <span class="mono text-[12px]">https://erp-api.internal</span> (ถ้าเปิด)</td><td class="mono text-[12px]">ERP_HTTPS_PORT</td></tr>
+              <tr><td class="mono text-[12px]">9443</td><td>browser</td><td style="white-space:normal">ไฟล์แนบ / รูปสินค้า ผ่าน presigned URL ของ S3 (RustFS) — <b>ไม่เปิด = รูปและไฟล์แนบโหลดไม่ขึ้น</b> แม้หน้าเว็บจะเปิดได้</td><td class="mono text-[12px]">FILES_PUBLIC_PORT</td></tr>
+              <tr><td class="mono text-[12px]">3399</td><td>คนดูแลบนเครื่อง server</td><td style="white-space:normal">ERP Console — ฟังแค่ <span class="mono text-[12px]">127.0.0.1</span> <b>ห้ามเปิดให้ LAN</b></td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="edge">
+          <div class="tag mb-1">ทำไมต้องมีทั้ง “ชื่อ” และ “certificate”</div>
+          <p class="text-[13px]">
+            <b>ชื่อ</b> — <span class="mono text-[12px]">erp.internal</span> ไม่ใช่ชื่อบนอินเทอร์เน็ต ไม่มี DNS สาธารณะตอบให้ client ต้องรู้จากไฟล์ hosts หรือ DNS ของออฟฟิศ ·
+            <b>certificate</b> — ไม่มี public CA ไหนออก certificate ให้ชื่อ <span class="mono text-[12px]">.internal</span> ได้ Caddy จึงเป็น CA ของตัวเอง (<span class="mono text-[12px]">tls internal</span>)
+            เครื่องที่ไม่เชื่อ CA นี้จะเห็นคำเตือน และ login ไม่ติด เพราะ cookie ของ login ตั้ง <span class="mono text-[12px]">COOKIE_SECURE=true</span> ·
+            เข้าด้วย IP ตรงๆ (<span class="mono text-[12px]">https://192.168.1.10</span>) <b>ไม่ได้</b> เพราะ Caddy ตอบตามชื่อ และ certificate ออกให้ชื่อ ไม่ได้ออกให้ IP
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 02 PLAN ========== -->
+      <section id="plan" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">02 — ก่อนเริ่ม</div>
+        <h2 class="display text-3xl mb-6">จด IP · ชื่อ · พอร์ต ให้เรียบร้อย</h2>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">IP ของเครื่อง server ต้องคงที่</h3>
+          <p class="text-sm mb-2" style="color:var(--ink-soft)">
+            ดู IP ปัจจุบัน แล้วจองไว้ที่ router (DHCP reservation ผูกกับ MAC address) — วิธีนี้ดีกว่าตั้ง static IP ในเครื่อง เพราะ router จะไม่แจก IP นี้ให้เครื่องอื่น
+          </p>
+          <div class="code p-4 mb-2"><pre><span class="c"># บนเครื่อง server</span>
+Get-NetIPConfiguration | Where-Object IPv4DefaultGateway | Select-Object InterfaceAlias, IPv4Address
+Get-NetAdapter | Where-Object Status -eq 'Up' | Select-Object Name, MacAddress   <span class="c"># MAC สำหรับจองที่ router</span></pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            เครื่องที่มีหลาย IP (Wi-Fi + LAN, VPN, WSL / Hyper-V) — ใช้ IP ของการ์ดที่อยู่วงเดียวกับ client และควรต่อสาย LAN ไม่ใช่ Wi-Fi
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">ตั้งชื่อใน <span class="mono text-[13px]">C:\erp\config\erp.env</span> และ <span class="mono text-[13px]">api.env</span></h3>
+          <div class="code p-4 mb-2"><pre><span class="c"># erp.env</span>
+ERP_DOMAIN=erp.internal            <span class="c"># หน้าเว็บที่ผู้ใช้เปิด</span>
+ERP_API_DOMAIN=erp-api.internal    <span class="c"># backend สำหรับ Swagger / ระบบอื่น / support (เว้นว่าง = ไม่เปิด)</span>
+ERP_HTTP_PORT=80
+ERP_HTTPS_PORT=443
+FILES_PUBLIC_PORT=9443
+
+<span class="c"># api.env — ต้องตรงตัวอักษรกับที่ browser เรียก (ชื่อ + พอร์ต)</span>
+STORAGE_S3_PUBLIC_ENDPOINT=https://erp.internal:9443
+COOKIE_SECURE=true</pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            แนะนำ suffix <span class="mono text-[12px]">.internal</span> (สงวนไว้ใช้ในเครือข่ายภายใน ไม่ชนกับชื่อจริงบนอินเทอร์เน็ต) ·
+            <b>หลีกเลี่ยง <span class="mono text-[12px]">.local</span></b> — Windows / macOS ส่งชื่อ .local ไปถาม mDNS ก่อน ทำให้ช้าหรือหาไม่เจอ ·
+            แก้ชื่อแล้วสั่ง <span class="mono text-[12px]">C:\erp\erp.cmd caddy</span> เพื่อสร้าง Caddyfile ใหม่ และต้องสร้างสคริปต์ client ใหม่ (§10)
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">พอร์ต 80 / 443 / 9443 บน server ต้องว่าง</h3>
+          <div class="code p-4 mb-2"><pre>netstat -ano | findstr ":80 :443 :9443"
+<span class="c"># ถ้าเป็น IIS (System / PID 4 บนพอร์ต 80):</span>
+net stop w3svc
+Set-Service w3svc -StartupType Disabled</pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ถ้าปิดโปรแกรมที่ใช้พอร์ตไม่ได้ ให้เปลี่ยน <span class="mono text-[12px]">ERP_HTTPS_PORT</span> (เช่น 8443) — แต่ผู้ใช้ต้องพิมพ์พอร์ตใน URL ทุกครั้ง (<span class="mono text-[12px]">https://erp.internal:8443</span>)
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 03 SERVER ========== -->
+      <section id="server" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">03 — เครื่อง Server</div>
+        <h2 class="display text-3xl mb-6">ทางลัด: <span class="mono">erp finish</span></h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ทำหลัง <span class="mono text-[12px]">erp install</span> ขึ้น <span class="mono text-[12px]">ERP &lt;version&gt; is running</span> แล้ว
+          (ขั้นติดตั้งดูใน <a href="erp-installer-guide.html#onsite" class="underline" style="color:var(--accent)">ERP Installer Guide §05</a>) ·
+          เปิด <b>PowerShell แบบ Run as Administrator</b> — ไม่ใช่ Git Bash และไม่ใช่ PowerShell ธรรมดา (ถ้าไม่ใช่ Administrator ขั้น firewall / hosts / autostart จะถูกข้าม)
+        </p>
+
+        <div class="code p-5 mb-6"><pre>C:\erp\erp.cmd finish --dry-run      <span class="c"># ดูก่อนว่าจะทำอะไร ไม่เปลี่ยนอะไร</span>
+C:\erp\erp.cmd finish                <span class="c"># ทำจริง — รันซ้ำได้ ข้อที่ผ่านแล้วจะข้าม</span>
+
+<span class="c"># ตัวเลือกที่เกี่ยวกับ LAN</span>
+C:\erp\erp.cmd finish --ip 192.168.1.10   <span class="c"># server มีหลาย IP — ระบุ IP ที่ client ใช้ (ฝังลงสคริปต์ client)</span>
+C:\erp\erp.cmd finish --no-hosts          <span class="c"># ออฟฟิศมี DNS ที่รู้จักชื่อแล้ว — สคริปต์ client ไม่แตะ hosts</span></pre></div>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>ขั้นใน <span class="mono text-[12px]">finish</span></th><th>ผลลัพธ์</th></tr></thead>
+            <tbody>
+              <tr><td>superadmin password · ปิด <span class="mono text-[12px]">staff</span></td><td style="white-space:normal">ถามรหัสใหม่ครั้งเดียว · ปิดบัญชี mock ถ้ายังใช้รหัส mock</td></tr>
+              <tr><td>autostart</td><td style="white-space:normal">Scheduled Task <span class="mono text-[12px]">ERP (PM2 resurrect)</span> — ถามรหัส Windows ของ user นี้ (<span class="mono text-[12px]">--system</span> = รันเป็น SYSTEM)</td></tr>
+              <tr><td><b>firewall</b></td><td style="white-space:normal">ลบแล้วสร้าง rule <span class="mono text-[12px]">ERP (Caddy)</span> ใหม่ — Inbound TCP <span class="mono text-[12px]">ERP_HTTP_PORT, ERP_HTTPS_PORT, FILES_PUBLIC_PORT</span> (ค่าเริ่มต้น 80, 443, 9443)</td></tr>
+              <tr><td><b>HTTPS บนเครื่องนี้</b></td><td style="white-space:normal">= <span class="mono text-[12px]">erp caddy-run --hosts</span>: start Caddy, ให้ Windows เชื่อ CA, ใส่ <span class="mono text-[12px]">127.0.0.1 erp.internal erp-api.internal</span> ลง hosts ของ server</td></tr>
+              <tr><td><b>client setup script</b></td><td style="white-space:normal">เขียน <span class="mono text-[12px]">C:\erp\erp-client-setup.ps1</span> ฝัง IP ของ server (IP LAN ตัวแรก หรือ <span class="mono text-[12px]">--ip</span>), ชื่อ domain, พอร์ต HTTPS และ CA — ถ้า server มีหลาย IP จะบอก IP อื่นไว้ในบรรทัดสรุป</td></tr>
+              <tr><td>status</td><td style="white-space:normal">จบด้วยตารางสรุป ✓ / ⚠ / ✗ — มี ✗ ให้แก้แล้วรัน <span class="mono text-[12px]">finish</span> ซ้ำ</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rulebox ok">
+          <div class="rc ok mb-1">ตรวจว่า IP ในสคริปต์ client ถูก</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            ดูบรรทัด <span class="mono text-[12px]">client setup script</span> ในตารางสรุป — ต้องเป็น <span class="mono text-[12px]">hosts → &lt;IP ที่จองไว้ใน §02&gt;</span>
+            ถ้าได้ IP ของ WSL / VPN / Wi-Fi มาแทน ให้รันใหม่ด้วย <span class="mono text-[12px]">erp client-setup --ip &lt;IP ที่ถูก&gt;</span> (สร้างแค่สคริปต์ ไม่ทำขั้นอื่นซ้ำ)
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 04 SERVER MANUAL ========== -->
+      <section id="server-manual" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">04 — เครื่อง Server (ทำเอง)</div>
+        <h2 class="display text-3xl mb-6">ทีละขั้น เมื่อ <span class="mono">finish</span> ไม่ผ่าน</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ทุกคำสั่งใน PowerShell แบบ Run as Administrator บนเครื่อง server
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">สร้าง Caddyfile และ start Caddy</h3>
+          <div class="code p-4 mb-2"><pre>C:\erp\erp.cmd caddy          <span class="c"># เขียน C:\erp\Caddyfile ใหม่จาก erp.env</span>
+C:\erp\erp.cmd caddy-run      <span class="c"># start Caddy ถ้ายังไม่รัน + ให้เครื่องนี้เชื่อ CA</span>
+C:\erp\erp.cmd status</pre></div>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">เปิด Windows Firewall — 80, 443, 9443</h3>
+          <div class="code p-4 mb-2"><pre>Get-NetFirewallRule -DisplayName 'ERP (Caddy)' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+New-NetFirewallRule -DisplayName 'ERP (Caddy)' -Direction Inbound -Protocol TCP -LocalPort 80,443,9443 -Action Allow
+
+<span class="c"># ตรวจ</span>
+Get-NetFirewallRule -DisplayName 'ERP (Caddy)' | Get-NetFirewallPortFilter | Select-Object Protocol, LocalPort</pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            rule นี้ใช้ได้ทุก profile (Domain / Private / Public) · ถ้าต้องการจำกัดให้แค่วง LAN ของออฟฟิศ เพิ่ม <span class="mono text-[12px]">-RemoteAddress LocalSubnet</span> ·
+            ถ้าเครื่องมี antivirus / firewall ของค่ายอื่น (ESET, Kaspersky ฯลฯ) ต้องเปิดพอร์ตในโปรแกรมนั้นด้วย เพราะ Windows Firewall rule ไม่มีผลกับมัน ·
+            เปลี่ยนพอร์ตใน <span class="mono text-[12px]">erp.env</span> เมื่อไหร่ ต้องแก้ rule ตาม
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ตั้ง network profile เป็น Private</h3>
+          <div class="code p-4 mb-2"><pre>Get-NetConnectionProfile
+Set-NetConnectionProfile -InterfaceAlias 'Ethernet' -NetworkCategory Private</pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ไม่บังคับสำหรับ rule ข้างบน แต่ Public profile ปิด ping และ network discovery ทำให้ทดสอบจาก client ยากขึ้น
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">4</span>
+          <h3 class="font-semibold text-[16px] mb-2">hosts ของเครื่อง server เอง (ถ้าเปิดเว็บบนเครื่องนี้ด้วย)</h3>
+          <div class="code p-4 mb-2"><pre>C:\erp\erp.cmd caddy-run --hosts   <span class="c"># ใส่ 127.0.0.1 erp.internal erp-api.internal ให้</span></pre></div>
+        </div>
+
+        <div class="step">
+          <span class="sn">5</span>
+          <h3 class="font-semibold text-[16px] mb-2">ส่งออก CA + สร้างสคริปต์ client</h3>
+          <div class="code p-4 mb-2"><pre>C:\erp\erp.cmd ca                              <span class="c"># C:\erp\erp-local-ca.crt + วิธีติดตั้งของแต่ละ OS</span>
+C:\erp\erp.cmd client-setup --ip 192.168.1.10   <span class="c"># C:\erp\erp-client-setup.ps1</span>
+C:\erp\erp.cmd client-setup --no-hosts          <span class="c"># เมื่อใช้ DNS ของออฟฟิศ (§07)</span></pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ไฟล์ <span class="mono text-[12px]">.crt</span> เป็น certificate สาธารณะ แจกได้ — <b>แต่ห้ามแจกโฟลเดอร์ <span class="mono text-[12px]">C:\erp\caddy-data</span></b> ซึ่งมี private key ของ CA (§11)
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">6</span>
+          <h3 class="font-semibold text-[16px] mb-2">ทดสอบจากตัว server</h3>
+          <div class="code p-4 mb-2"><pre>curl.exe -sS -o NUL -w "%{http_code}`n" --ssl-no-revoke https://erp.internal/.erp-probe        <span class="c"># 200</span>
+curl.exe -sS -o NUL -w "%{http_code}`n" --ssl-no-revoke https://erp.internal:9443/.erp-probe   <span class="c"># 200 = Caddy ฟังพอร์ตไฟล์แนบ</span>
+Test-NetConnection 192.168.1.10 -Port 443                                                     <span class="c"># TcpTestSucceeded : True</span></pre></div>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 05 CLIENT ========== -->
+      <section id="client" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">05 — เครื่อง Client</div>
+        <h2 class="display text-3xl mb-6">ทางลัด: <span class="mono">erp-client-setup.ps1</span></h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          ทำทุกเครื่องที่จะเปิด ERP ใน browser · ไฟล์เดียว ไม่ต้องติดตั้งอะไรเพิ่ม · ใช้ได้กับ Windows 10 / 11
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">เอาไฟล์มาที่เครื่อง client</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ทางใดทางหนึ่ง: copy <span class="mono text-[12px]">C:\erp\erp-client-setup.ps1</span> จาก server ด้วย USB / shared folder ·
+            หรือเปิด ERP Console (<span class="mono text-[12px]">http://127.0.0.1:3399</span> บน server) → Overview → การ์ด <b>Web access</b> → <b>Download erp-client-setup.ps1</b>
+            แล้วส่งต่อให้เครื่อง client
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">คลิกขวา → Run with PowerShell</h3>
+          <p class="text-sm mb-2" style="color:var(--ink-soft)">
+            สคริปต์ขอสิทธิ์ Administrator เอง (กด Yes ที่ UAC) แล้วทำ 3 อย่าง:
+          </p>
+          <div class="card overflow-hidden mb-2">
+            <table class="d">
+              <thead><tr><th>ขั้น</th><th>ทำอะไร</th></tr></thead>
+              <tbody>
+                <tr><td>certificate</td><td style="white-space:normal">เขียน CA ลง <span class="mono text-[12px]">C:\ProgramData\erp\erp-local-ca.crt</span> แล้ว <span class="mono text-[12px]">certutil -addstore Root</span> — เชื่อทั้งเครื่อง (ทุก user) · มีแล้วข้าม</td></tr>
+                <tr><td>hosts</td><td style="white-space:normal">เพิ่ม <span class="mono text-[12px]">192.168.1.10 erp.internal erp-api.internal # erp-installer</span> · บรรทัดเดิมของสคริปต์ถูกแทนที่ · บรรทัดอื่นที่ map ชื่อเดียวกันถูก comment ทิ้ง (กันมีสองคำตอบ) · <span class="mono text-[12px]">ipconfig /flushdns</span></td></tr>
+                <tr><td>ทดสอบ</td><td style="white-space:normal"><span class="mono text-[12px]">curl.exe</span> ไปที่ <span class="mono text-[12px]">https://erp.internal/.erp-probe</span> แบบเดียวกับ Chrome / Edge (Schannel) — บอกแยกว่า “ต่อไม่ได้” หรือ “ต่อได้แต่ยังไม่เชื่อ certificate”</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code p-4 mb-2"><pre><span class="c"># ผลที่ถูกต้อง</span>
+  OK    certificate: added to Trusted Root (all users of this PC)
+  OK    hosts: 192.168.1.10 erp.internal erp-api.internal
+  OK    https://erp.internal/ answers and the certificate is trusted
+Done. Close and reopen Chrome / Edge, then open https://erp.internal/</pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ถ้าคลิกขวาไม่มี “Run with PowerShell” หรือหน้าต่างปิดทันที ให้เปิด PowerShell แบบ Administrator แล้วสั่ง
+            <span class="mono text-[12px]">powershell -ExecutionPolicy Bypass -File C:\Users\&lt;user&gt;\Downloads\erp-client-setup.ps1</span>
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ปิด browser ให้หมดแล้วเปิดใหม่</h3>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            Chrome / Edge อ่าน Trusted Root ตอนเปิดเท่านั้น — ต้องปิดทุกหน้าต่าง (รวมที่ค้างใน system tray) ·
+            <b>Firefox</b> ใช้ที่เก็บ certificate ของตัวเอง: Settings → Privacy &amp; Security → Certificates → View Certificates → Authorities → Import
+            <span class="mono text-[12px]">C:\ProgramData\erp\erp-local-ca.crt</span> → ติ๊ก “Trust this CA to identify websites”
+          </p>
+        </div>
+
+        <div class="edge">
+          <div class="tag mb-1">รันซ้ำได้เสมอ</div>
+          <p class="text-[13px]">
+            สคริปต์ idempotent — server เปลี่ยน IP, เปลี่ยนชื่อ domain หรือ CA เปลี่ยน ให้สร้างสคริปต์ใหม่บน server แล้วรันซ้ำบน client ได้เลย ·
+            ถอนออก: <span class="mono text-[12px]">powershell -ExecutionPolicy Bypass -File erp-client-setup.ps1 -Remove</span> (ลบบรรทัด hosts ของตัวเอง + ลบ CA)
+          </p>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 06 CLIENT MANUAL ========== -->
+      <section id="client-manual" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">06 — เครื่อง Client (ทำเอง)</div>
+        <h2 class="display text-3xl mb-6">เมื่อรันสคริปต์ไม่ได้</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          เช่น Group Policy บังคับ <span class="mono text-[12px]">AllSigned</span>, antivirus บล็อก .ps1 หรือ IT ของลูกค้าต้องการทำเอง ·
+          ใช้ PowerShell แบบ Run as Administrator บนเครื่อง client
+        </p>
+
+        <div class="step">
+          <span class="sn">1</span>
+          <h3 class="font-semibold text-[16px] mb-2">ชื่อ → IP ของ server (hosts)</h3>
+          <div class="code p-4 mb-2"><pre>Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "192.168.1.10  erp.internal erp-api.internal"
+ipconfig /flushdns
+Resolve-DnsName erp.internal      <span class="c"># ต้องได้ 192.168.1.10</span></pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            หรือเปิด Notepad แบบ Run as administrator → File → Open → <span class="mono text-[12px]">C:\Windows\System32\drivers\etc\hosts</span> (เลือก All Files) → เพิ่มบรรทัดท้ายไฟล์ ·
+            ตรวจว่าไม่มีบรรทัดอื่นที่ map <span class="mono text-[12px]">erp.internal</span> ไป IP เก่า · บาง antivirus ล็อกไฟล์ hosts — ต้องปิด protection ชั่วคราว
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">2</span>
+          <h3 class="font-semibold text-[16px] mb-2">เชื่อ CA ของ Caddy</h3>
+          <div class="code p-4 mb-2"><pre><span class="c"># copy C:\erp\erp-local-ca.crt จาก server มาก่อน (หรือดาวน์โหลดจากการ์ด Web access)</span>
+certutil -addstore -f Root C:\Users\&lt;user&gt;\Downloads\erp-local-ca.crt
+Get-ChildItem Cert:\LocalMachine\Root | Where-Object Subject -like '*Caddy*'   <span class="c"># ต้องเห็น Caddy Local Authority</span></pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">
+            ทางคลิก: ดับเบิลคลิกไฟล์ .crt → Install Certificate → <b>Local Machine</b> → Place all certificates in the following store →
+            <b>Trusted Root Certification Authorities</b> → Finish · ต้องเป็น <i>Trusted Root</i> ไม่ใช่ <i>Personal</i> หรือ <i>Intermediate</i>
+          </p>
+        </div>
+
+        <div class="step">
+          <span class="sn">3</span>
+          <h3 class="font-semibold text-[16px] mb-2">ทดสอบ</h3>
+          <div class="code p-4 mb-2"><pre>Test-NetConnection erp.internal -Port 443        <span class="c"># TcpTestSucceeded : True → ชื่อ + firewall ผ่าน</span>
+Test-NetConnection erp.internal -Port 9443       <span class="c"># ไฟล์แนบ / รูป</span>
+curl.exe -sS -o NUL -w "%{http_code}`n" --ssl-no-revoke https://erp.internal/.erp-probe   <span class="c"># 200 = certificate ผ่านด้วย</span></pre></div>
+          <p class="text-sm" style="color:var(--ink-soft)">ผ่านแล้วปิด / เปิด Chrome / Edge ใหม่ (§05 ขั้น 3)</p>
+        </div>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>OS ของ client</th><th>hosts</th><th>เชื่อ CA</th></tr></thead>
+            <tbody>
+              <tr><td>macOS</td><td class="mono text-[12px]" style="white-space:normal">sudo sh -c 'echo "192.168.1.10 erp.internal erp-api.internal" &gt;&gt; /etc/hosts'</td><td class="mono text-[12px]" style="white-space:normal">sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain erp-local-ca.crt</td></tr>
+              <tr><td>Ubuntu</td><td class="mono text-[12px]" style="white-space:normal">sudo sh -c 'echo "192.168.1.10 erp.internal erp-api.internal" &gt;&gt; /etc/hosts'</td><td class="mono text-[12px]" style="white-space:normal">sudo cp erp-local-ca.crt /usr/local/share/ca-certificates/ &amp;&amp; sudo update-ca-certificates</td></tr>
+              <tr><td>Android / iOS</td><td style="white-space:normal">แก้ hosts ไม่ได้ — ต้องใช้ DNS ของ router (§07)</td><td style="white-space:normal">ติดตั้ง .crt เป็น CA (Android: Settings → Security → Install certificate · iOS: ติดตั้ง profile แล้วเปิด Full Trust ใน About → Certificate Trust Settings)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 07 DNS ========== -->
+      <section id="dns" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">07 — ทางเลือก</div>
+        <h2 class="display text-3xl mb-6">ใช้ DNS ของ router / ออฟฟิศแทน hosts</h2>
+        <p class="text-[var(--ink-soft)] text-[15.5px] max-w-3xl mb-6 leading-[1.85]">
+          เหมาะเมื่อมีเครื่อง client เยอะ มีมือถือ / tablet หรือ IP ของ server อาจเปลี่ยน — แก้ที่เดียวทุกเครื่องได้ผล ·
+          <b>แต่ทุกเครื่องยังต้องเชื่อ CA</b> (DNS แก้แค่เรื่องชื่อ)
+        </p>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>ที่ตั้ง DNS</th><th>วิธี</th></tr></thead>
+            <tbody>
+              <tr><td>router ทั่วไป</td><td style="white-space:normal">หน้า admin ของ router → LAN / DHCP → <i>Static DNS</i> / <i>Local DNS</i> / <i>DNS host mapping</i> → เพิ่ม <span class="mono text-[12px]">erp.internal</span> และ <span class="mono text-[12px]">erp-api.internal</span> → <span class="mono text-[12px]">192.168.1.10</span> (ชื่อเมนูต่างกันแต่ละยี่ห้อ — router บ้านหลายรุ่นไม่มีเมนูนี้)</td></tr>
+              <tr><td>MikroTik</td><td class="mono text-[12px]" style="white-space:normal">/ip dns static add name=erp.internal address=192.168.1.10<br>/ip dns static add name=erp-api.internal address=192.168.1.10</td></tr>
+              <tr><td>pfSense / OPNsense</td><td style="white-space:normal">Services → DNS Resolver (Unbound) → Host Overrides</td></tr>
+              <tr><td>Windows Server (AD DNS)</td><td class="mono text-[12px]" style="white-space:normal">Add-DnsServerPrimaryZone -Name "erp.internal" -ReplicationScope Domain<br>Add-DnsServerResourceRecordA -ZoneName "erp.internal" -Name "@" -IPv4Address 192.168.1.10<br><span class="c" style="font-family:inherit"># ทำซ้ำกับ erp-api.internal</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code p-5 mb-4"><pre><span class="c"># บน server: สร้างสคริปต์ client ที่ไม่แตะ hosts (ติดตั้งแค่ CA + ทดสอบ)</span>
+C:\erp\erp.cmd client-setup --no-hosts
+
+<span class="c"># บน client: ตรวจว่าได้คำตอบจาก DNS</span>
+ipconfig /flushdns
+Resolve-DnsName erp.internal</pre></div>
+        <p class="text-sm" style="color:var(--ink-soft)">
+          client ต้องใช้ DNS ตัวนั้นจริง — ถ้าเครื่องตั้ง DNS เป็น <span class="mono text-[12px]">8.8.8.8</span> / <span class="mono text-[12px]">1.1.1.1</span> เอง หรือ browser เปิด
+          <i>Secure DNS (DoH)</i> ไว้ จะไม่รู้จักชื่อ — ปิด Secure DNS ใน Chrome / Edge (Settings → Privacy → Use secure DNS) หรือตั้งเป็น “With your current service provider”
+        </p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 08 VERIFY ========== -->
+      <section id="verify" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">08 — ตรวจรับ</div>
+        <h2 class="display text-3xl mb-6">ก่อนส่งมอบ</h2>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>ที่ไหน</th><th>ตรวจอะไร</th><th>ผ่านเมื่อ</th></tr></thead>
+            <tbody>
+              <tr><td>server · ERP Console</td><td style="white-space:normal">Overview → การ์ด Web access</td><td style="white-space:normal">Reachable · ทุกการ์ดเขียว</td></tr>
+              <tr><td>server</td><td class="mono text-[12px]">Get-NetFirewallRule -DisplayName 'ERP (Caddy)'</td><td style="white-space:normal">มี rule · Enabled True · พอร์ต 80,443,9443</td></tr>
+              <tr><td>client</td><td style="white-space:normal">เปิด <span class="mono text-[12px]">https://erp.internal</span></td><td style="white-space:normal">ไม่มีคำเตือน · รูปกุญแจปกติ</td></tr>
+              <tr><td>client</td><td style="white-space:normal">login ด้วย superadmin (รหัสใหม่)</td><td style="white-space:normal">เข้าได้ · refresh หน้าแล้วยังไม่หลุด (cookie ใช้ได้)</td></tr>
+              <tr><td>client</td><td style="white-space:normal">เปิดสินค้าที่มีรูป / อัปโหลดรูปใหม่</td><td style="white-space:normal">รูปแสดง (พิสูจน์ว่าพอร์ต 9443 ผ่าน)</td></tr>
+              <tr><td>client</td><td style="white-space:normal">พิมพ์เอกสาร PDF</td><td style="white-space:normal">ได้ PDF (Gotenberg ทำงาน)</td></tr>
+              <tr><td>server</td><td style="white-space:normal">รีบูต server แล้วรอ ~3 นาที <b>โดยยังไม่ login ที่หน้าเครื่อง</b> → เปิดจาก client</td><td style="white-space:normal">เว็บขึ้น (autostart + WSL keep-alive ทำงาน)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-sm" style="color:var(--ink-soft)">
+          การ์ด Web access ทดสอบจาก <b>browser ของเครื่องที่เปิดหน้านั้น</b> — เปิด Console บน server จะทดสอบได้แค่ฝั่ง server ·
+          ฝั่ง client ใช้ผลของ <span class="mono text-[12px]">erp-client-setup.ps1</span> หรือคำสั่งใน §06 ขั้น 3
+        </p>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 09 TROUBLE ========== -->
+      <section id="trouble" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">09 — ไล่ปัญหา</div>
+        <h2 class="display text-3xl mb-6">เข้าไม่ได้ — เริ่มจากอาการ</h2>
+
+        <div class="diagram card p-5 mb-6">
+<pre class="mermaid">
+flowchart TD
+  A["client: Resolve-DnsName erp.internal"] -->|"ไม่ได้ IP / IP ผิด"| A1["แก้ hosts / DNS<br/>ipconfig /flushdns"]
+  A -->|"ได้ IP ของ server"| B["client: Test-NetConnection erp.internal -Port 443"]
+  B -->|"False"| B1["server: firewall rule · Caddy รันไหม<br/>antivirus ค่ายอื่น · คนละวง LAN"]
+  B -->|"True"| C["client: curl.exe https://erp.internal/.erp-probe"]
+  C -->|"certificate error"| C1["ติดตั้ง CA เป็น Trusted Root<br/>ปิด/เปิด browser ใหม่"]
+  C -->|"200"| D["เปิดเว็บได้ แต่…"]
+  D -->|"รูป/ไฟล์แนบไม่ขึ้น"| D1["พอร์ต 9443 · STORAGE_S3_PUBLIC_ENDPOINT"]
+  D -->|"login แล้วเด้งออก"| D2["ต้องเข้าทาง https://ชื่อ ไม่ใช่ IP<br/>COOKIE_SECURE=true"]
+</pre>
+        </div>
+
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>อาการ</th><th>สาเหตุที่พบบ่อย</th><th>แก้</th></tr></thead>
+            <tbody>
+              <tr><td style="white-space:normal"><span class="mono text-[12px]">DNS_PROBE_FINISHED_NXDOMAIN</span> / “This site can’t be reached”</td><td style="white-space:normal">client ไม่รู้จักชื่อ · Chrome เปิด Secure DNS · hosts ถูก antivirus คืนค่า</td><td style="white-space:normal">§06 ขั้น 1 · ปิด Secure DNS · รันสคริปต์ client ซ้ำ</td></tr>
+              <tr><td style="white-space:normal"><span class="mono text-[12px]">ERR_CONNECTION_TIMED_OUT</span></td><td style="white-space:normal">firewall บน server บล็อก · client อยู่คนละ subnet / VLAN / Wi-Fi guest · server ปิด / sleep</td><td style="white-space:normal">§04 ขั้น 2 · ต่อวงเดียวกัน · Sleep = Never</td></tr>
+              <tr><td style="white-space:normal"><span class="mono text-[12px]">ERR_CONNECTION_REFUSED</span></td><td style="white-space:normal">ถึงเครื่องแล้วแต่ Caddy ไม่ฟัง — Caddy ไม่รัน หรือพอร์ตชน (IIS)</td><td style="white-space:normal"><span class="mono text-[12px]">erp status</span> · <span class="mono text-[12px]">erp caddy-run</span> · §02 ขั้น 3</td></tr>
+              <tr><td style="white-space:normal"><span class="mono text-[12px]">NET::ERR_CERT_AUTHORITY_INVALID</span></td><td style="white-space:normal">client ยังไม่เชื่อ CA · ติดตั้งผิด store · browser ยังไม่ปิดเปิดใหม่ · Firefox</td><td style="white-space:normal">§06 ขั้น 2 · §05 ขั้น 3</td></tr>
+              <tr><td style="white-space:normal"><span class="mono text-[12px]">ERR_CERT_COMMON_NAME_INVALID</span></td><td style="white-space:normal">เปิดด้วย IP หรือชื่อที่ไม่ได้อยู่ใน <span class="mono text-[12px]">ERP_DOMAIN</span></td><td style="white-space:normal">เปิดด้วย <span class="mono text-[12px]">https://erp.internal</span> เท่านั้น</td></tr>
+              <tr><td style="white-space:normal">เคยใช้ได้ แล้วขึ้น certificate error ทุกเครื่องพร้อมกัน</td><td style="white-space:normal">CA ของ Caddy ถูกสร้างใหม่ (ลบ <span class="mono text-[12px]">caddy-data</span>, ย้ายเครื่อง server, ติดตั้งใหม่)</td><td style="white-space:normal">§10 — สร้างสคริปต์ใหม่แล้วรันซ้ำทุก client</td></tr>
+              <tr><td style="white-space:normal">หน้าเว็บขึ้น แต่รูป / ไฟล์แนบไม่ขึ้น</td><td style="white-space:normal">ไม่ได้เปิด 9443 · <span class="mono text-[12px]">STORAGE_S3_PUBLIC_ENDPOINT</span> ไม่ตรงกับชื่อที่ browser ใช้ · client ยังไม่เชื่อ CA (รูปโหลดเงียบๆ ไม่มีคำเตือน)</td><td style="white-space:normal">§04 ขั้น 2 · §02 ขั้น 2 แล้ว <span class="mono text-[12px]">erp restart</span> · เปิด <span class="mono text-[12px]">https://erp.internal:9443</span> ตรงๆ ดูว่ามีคำเตือนไหม</td></tr>
+              <tr><td style="white-space:normal">login สำเร็จแต่เด้งกลับหน้า login</td><td style="white-space:normal">เปิดผ่าน http หรือ IP — cookie <span class="mono text-[12px]">Secure</span> ไม่ถูกเก็บ</td><td style="white-space:normal">เข้าทาง <span class="mono text-[12px]">https://erp.internal</span></td></tr>
+              <tr><td style="white-space:normal">ใช้ได้บางเครื่อง</td><td style="white-space:normal">เครื่องที่ไม่ได้ใช้ยังไม่ได้รันสคริปต์ · hosts ชี้ IP เก่า · ต่อ Wi-Fi คนละวง</td><td style="white-space:normal">รันสคริปต์ client ล่าสุดบนเครื่องนั้น</td></tr>
+              <tr><td style="white-space:normal">ใช้ได้ทุกเครื่องยกเว้นตัว server</td><td style="white-space:normal">hosts ของ server ไม่มีบรรทัด <span class="mono text-[12px]">127.0.0.1 erp.internal</span></td><td style="white-space:normal"><span class="mono text-[12px]">erp caddy-run --hosts</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 10 CHANGE ========== -->
+      <section id="change" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">10 — เปลี่ยนแปลงภายหลัง</div>
+        <h2 class="display text-3xl mb-6">เปลี่ยน IP · เปลี่ยนชื่อ · ย้ายเครื่อง · ถอนออก</h2>
+        <div class="card overflow-hidden mb-6">
+          <table class="d">
+            <thead><tr><th>เหตุการณ์</th><th>Server</th><th>Client</th></tr></thead>
+            <tbody>
+              <tr><td>IP ของ server เปลี่ยน</td><td class="mono text-[12px]" style="white-space:normal">erp client-setup --ip &lt;IP ใหม่&gt;</td><td style="white-space:normal">รันสคริปต์ใหม่ทุกเครื่อง (แทนบรรทัดเดิมให้เอง) · ใช้ DNS → แก้ที่ router ที่เดียว</td></tr>
+              <tr><td>เปลี่ยนชื่อ domain</td><td class="mono text-[12px]" style="white-space:normal">แก้ ERP_DOMAIN / ERP_API_DOMAIN / STORAGE_S3_PUBLIC_ENDPOINT → erp caddy → erp restart → erp caddy-run --hosts → erp client-setup</td><td style="white-space:normal">รันสคริปต์ใหม่ · ลบบรรทัดชื่อเก่าใน hosts เอง (สคริปต์แทนเฉพาะบรรทัดของตัวเองและชื่อใหม่)</td></tr>
+              <tr><td>เปลี่ยนพอร์ต</td><td class="mono text-[12px]" style="white-space:normal">แก้ erp.env (+ STORAGE_S3_PUBLIC_ENDPOINT ถ้าเป็น 9443) → erp caddy → erp finish (สร้าง firewall rule ใหม่)</td><td style="white-space:normal">รันสคริปต์ใหม่ (URL ที่ทดสอบเปลี่ยน)</td></tr>
+              <tr><td>ย้าย / ติดตั้ง server ใหม่</td><td style="white-space:normal">CA ใหม่ถูกสร้าง → <span class="mono text-[12px]">erp finish</span> บนเครื่องใหม่</td><td style="white-space:normal">รันสคริปต์ <b>เก่า</b> ด้วย <span class="mono text-[12px]">-Remove</span> (ถอน CA เก่า) แล้วรันสคริปต์ใหม่</td></tr>
+              <tr><td>เลิกใช้เครื่อง client</td><td>—</td><td class="mono text-[12px]" style="white-space:normal">powershell -ExecutionPolicy Bypass -File erp-client-setup.ps1 -Remove</td></tr>
+              <tr><td>ปิดการเข้าจาก LAN</td><td class="mono text-[12px]" style="white-space:normal">Get-NetFirewallRule -DisplayName 'ERP (Caddy)' | Remove-NetFirewallRule</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="rule my-14"></div>
+
+      <!-- ========== 11 SECURITY ========== -->
+      <section id="security" class="section pt-14 pb-4">
+        <div class="eyebrow text-[var(--accent)] mb-3">11 — ความปลอดภัย</div>
+        <h2 class="display text-3xl mb-6">สิ่งที่ห้ามทำ</h2>
+
+        <div class="rulebox" style="border-color:var(--signal)">
+          <div class="rc mb-1" style="color:var(--signal)">CA ของ Caddy รับรองเว็บไหนก็ได้</div>
+          <p class="text-[13.5px] text-[var(--ink-soft)] leading-relaxed">
+            เครื่องที่เชื่อ CA นี้จะเชื่อ certificate <b class="text-[var(--ink)]">ทุกชื่อ</b> ที่ CA นี้ออก (รวม google.com ถ้ามีคนได้ private key ไป) ·
+            private key อยู่ใน <span class="mono text-[12px]">C:\erp\caddy-data</span> — <b class="text-[var(--ink)]">ห้าม share โฟลเดอร์นี้ ห้าม copy ไปเครื่องอื่น ห้ามใส่ใน backup ที่คนอื่นเข้าถึงได้</b> ·
+            ติดตั้ง CA เฉพาะเครื่องที่ใช้ ERP และถอนออกเมื่อเลิกใช้
+          </p>
+        </div>
+
+        <div class="card overflow-hidden mt-6 mb-6">
+          <table class="d">
+            <thead><tr><th>ห้าม</th><th>เหตุผล</th></tr></thead>
+            <tbody>
+              <tr><td style="white-space:normal">เปิดพอร์ตอื่นนอกจาก 80 / 443 / 9443 ให้ LAN (3399, 5432, 6379, 5672, 9000, 15672 …)</td><td style="white-space:normal">Console, PostgreSQL, Redis, RabbitMQ, RustFS ออกแบบให้ฟังแค่ localhost — เปิดแล้วข้ามการ login ของ ERP ได้</td></tr>
+              <tr><td style="white-space:normal">port-forward 80 / 443 / 9443 ที่ router ออกอินเทอร์เน็ต</td><td style="white-space:normal">ระบบตั้งใจให้ใช้ใน LAN เท่านั้น — ถ้าต้องเข้าจากนอกออฟฟิศให้ใช้ VPN (ดู <a href="deployment-guide.html" class="underline" style="color:var(--accent)">Deployment Guide</a> สำหรับแบบ public)</td></tr>
+              <tr><td style="white-space:normal">ปิด Windows Firewall ทั้งเครื่องเพื่อ “ให้มันใช้ได้ก่อน”</td><td style="white-space:normal">เปิดทุกพอร์ตข้างบนให้ทั้งวง — ใช้ rule เฉพาะพอร์ตตาม §04</td></tr>
+              <tr><td style="white-space:normal">ให้ผู้ใช้กด “Proceed anyway” ผ่านคำเตือน certificate</td><td style="white-space:normal">login ไม่ติดอยู่ดี และสอนให้ผู้ใช้กดผ่านคำเตือนของเว็บปลอม — ติดตั้ง CA ให้ถูกแทน</td></tr>
+              <tr><td style="white-space:normal">ส่ง <span class="mono text-[12px]">erp-client-setup.ps1</span> ผ่านช่องทางสาธารณะ</td><td style="white-space:normal">สคริปต์รันด้วยสิทธิ์ Administrator — คนที่แก้ไฟล์ระหว่างทางได้ก็ติดตั้ง CA ของตัวเองได้ ใช้ USB / shared folder ภายใน</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <erp-footer
+        line1="ERP SYSTEM · LAN SETUP GUIDE · WINDOWS"
+        line2="Caddy tls internal · Windows Firewall · hosts / DNS · erp-client-setup.ps1">
+      </erp-footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // Scroll-spy active nav
+  const links = [...document.querySelectorAll('#nav .navlink')];
+  const map = new Map(links.map(l => [l.getAttribute('href').slice(1), l]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = map.get(e.target.id);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('section[id]').forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>
