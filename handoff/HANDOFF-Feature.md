@@ -217,6 +217,14 @@ print) + P2#7 (party_currency_enforcement ตั้งค่าได้) — �
 4. ~~`api-workflow-guide.html` ยังไม่บอกเรื่อง COGS ผูกกับรายการใบส่งของ~~ ✅ 2026-09-27 กล่อง `#cogs-per-delivery-line` ใต้ B3
 5. เลข SKU ที่ smoke/curl ใช้ไป: `product_sku_counters` ต้อง reset ก่อน go-live (วิธีอยู่ในรายการ "SKU ไม่บังคับกรอก")
 
+### 2026-11-28 · เลขใบเพิ่มหนี้ชนใบส่งของ + สิทธิ์สะกดผิด (BE-35, `fix/be-35-document-number-series`)
+
+- ใบเพิ่มหนี้ (finance-bc) เปลี่ยน prefix `DN` → `DBN` · ใบส่งของคง `DN` · ไม่แก้เลขเก่า counter เดินต่อ
+- prefix ทุกเอกสารอยู่ที่ `libs/common/src/constants/document-number-prefixes.ts` · **เพิ่มเอกสารใหม่ต้องลงทะเบียนที่นี่** (spec คู่กันตรวจค่าซ้ำ และตรวจว่า `*-number.service.ts` ไม่เขียน prefix เอง)
+- `component:btn_fiter_date` → `component:btn_filter_date` · migration `erp_iam` ย้าย grant ตามไป ไม่ขึ้นกับลำดับ sync/migration · FE-39 ใช้ชื่อใหม่
+- `pnpm verify` ครบ 6 ขั้น finance-bc · iam · supplier-bc · inventory-bc · sales-bc บน local
+- DB local ไม่มีใบ `DEBIT_NOTE` · **ยังไม่ได้ตรวจบน env ที่ deploy** (ผลไม่กระทบวิธีแก้)
+
 ### 2026-11-27 · ราคาอ้างอิง/ราคาตามกฎหยิบราคาของหน่วยอื่น — ทุกการถามราคาระบุหน่วย (BE-29, `fix/be-29-effective-price-uom` จาก main `2a1e47e`) ✅ **`pnpm verify` ครบ 6 ขั้น sales-bc (smoke 38/38) · supplier-bc (smoke 11/11) · inventory-bc (smoke 22/22 — รอบแรกล้มที่ supplier-bc ขึ้นไม่ทัน รันขั้น smoke ซ้ำผ่าน) · ยังไม่ commit**
 
 | | |

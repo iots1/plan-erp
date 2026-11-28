@@ -1588,7 +1588,7 @@ sequenceDiagram
               <tr><td class="mono text-[11.5px]">INV_TAX_INVOICE</td><td>ใบแจ้งหนี้/ใบกำกับภาษี</td><td>บวกเพิ่ม</td><td>เอกสารรวม · กฎผู้ซื้อเดียวกับ FULL_TAX_INVOICE</td></tr>
               <tr><td class="mono text-[11.5px]">ABB_TAX_INVOICE</td><td>ใบกำกับภาษีอย่างย่อ</td><td><b>รวมในราคาแล้ว</b></td><td>ค้าปลีก · ไม่ต้องมีเลขผู้เสียภาษี</td></tr>
               <tr><td class="mono text-[11.5px]">CREDIT_NOTE</td><td>ใบลดหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span> · <b>ยอดรวม ≤ ยอดที่ใบต้นทางยังยืนอยู่</b> = total + ใบเพิ่มหนี้ ISSUED − ใบลดหนี้ ISSUED อื่น (409 ตอนสร้าง/แก้ และตรวจซ้ำตอน issue · 2026-09-27) · <b>ยอดค้างของใบต้นทางหักใบลดหนี้ ISSUED แล้ว</b> — รับชำระได้ไม่เกินยอดสุทธิ (400) และใบวางบิลเรียกเก็บยอดสุทธิ · ฝั่งซื้อเหมือนกัน: จ่ายชำระใบแจ้งหนี้ผู้ขายได้ไม่เกิน total − ใบลดหนี้ผู้ขาย SUBMITTED − ที่จ่ายแล้ว</td></tr>
-              <tr><td class="mono text-[11.5px]">DEBIT_NOTE</td><td>ใบเพิ่มหนี้</td><td>ตามใบต้นทาง</td><td><b>ต้องมี</b> <span class="mono">reference_receipt_id</span></td></tr>
+              <tr><td class="mono text-[11.5px]">DEBIT_NOTE</td><td>ใบเพิ่มหนี้</td><td>ตามใบต้นทาง</td><td>เลขที่ <span class="mono">DBN-YYYY-00001</span> (<span class="mono">DN-</span> เป็นของใบส่งของ) · <b>ต้องมี</b> <span class="mono">reference_receipt_id</span></td></tr>
             </tbody>
           </table>
         </div>
